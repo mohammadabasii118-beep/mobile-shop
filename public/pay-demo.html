@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>درگاه آزمایشی</title><link rel="stylesheet" href="/style.css"></head>
+<body><main class="wrap" style="max-width:440px;padding-top:40px">
+<div class="summary" style="text-align:center"><div style="font-size:56px">🏦</div><h2>درگاه پرداخت آزمایشی</h2>
+<p class="alert">این صفحه فقط برای تست است. برای فعال‌سازی درگاه واقعی، «مرچنت‌کد زرین‌پال» را در پنل مدیریت → تنظیمات وارد کنید.</p>
+<p id="info" style="margin:12px 0"></p>
+<button class="btn block" id="ok">پرداخت موفق</button><br><button class="btn ghost block" id="no">انصراف</button><div id="e"></div></div></main>
+<script>
+const code=new URLSearchParams(location.search).get('code')||'';
+document.getElementById('info').textContent='سفارش '+code;
+async function pay(ok){
+  const r=await fetch('/api/pay/demo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code,ok})});
+  if(!r.ok){document.getElementById('e').innerHTML='<div class="alert err">'+((await r.json()).error||'خطا')+'</div>';return}
+  location.href='/#/order/'+code+'?pay='+(ok?'ok':'fail');
+}
+document.getElementById('ok').onclick=()=>pay(true);document.getElementById('no').onclick=()=>pay(false);
+</script></body></html>
