@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>موبایل‌شاپ | فروشگاه لوازم جانبی موبایل</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <button id="menuBtn" class="icon-btn" aria-label="باز کردن منو" aria-expanded="false" aria-controls="drawer">
+    <span class="burger"><i></i><i></i><i></i></span>
+  </button>
+  <a href="#" class="logo" data-cat="all">📱 موبایل‌شاپ</a>
+  <button id="cartBtn" class="icon-btn cart-btn" aria-label="سبد خرید">🛒<span id="cartCount" class="badge">0</span></button>
+</header>
+
+<div id="overlay" class="overlay" hidden></div>
+<nav id="drawer" class="drawer" aria-hidden="true">
+  <div class="drawer-head"><strong>دسته‌بندی‌ها</strong><button id="closeMenu" class="icon-btn" aria-label="بستن">✕</button></div>
+  <ul id="menuList"></ul>
+</nav>
+
+<main>
+  <section class="hero"><h1>لوازم جانبی موبایل</h1><p>قاب، کابل، شارژر، گلس، آویز و بند — با پرداخت کارت‌به‌کارت</p></section>
+  <h2 id="listTitle" class="section-title">همه محصولات</h2>
+  <div id="grid" class="grid"></div>
+</main>
+
+<aside id="cart" class="cart" aria-hidden="true">
+  <div class="drawer-head"><strong>سبد خرید</strong><button id="closeCart" class="icon-btn" aria-label="بستن">✕</button></div>
+  <div id="cartItems" class="cart-items"></div>
+  <div class="cart-foot"><div>جمع کل: <strong id="cartTotal">0</strong> تومان</div>
+    <button id="checkoutBtn" class="btn">ادامه و پرداخت</button></div>
+</aside>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-box">
+    <button id="closeModal" class="icon-btn modal-x" aria-label="بستن">✕</button>
+    <div id="step1">
+      <h3>اطلاعات ارسال</h3>
+      <form id="orderForm">
+        <input name="name" placeholder="نام و نام خانوادگی" required>
+        <input name="phone" placeholder="شماره موبایل" inputmode="tel" pattern="0?9[0-9]{9}" required>
+        <textarea name="address" placeholder="آدرس کامل و کد پستی" rows="3" required></textarea>
+        <button class="btn">مرحله بعد: پرداخت</button>
+      </form>
+    </div>
+    <div id="step2" hidden>
+      <h3>پرداخت کارت‌به‌کارت</h3>
+      <p>مبلغ <strong id="payAmount"></strong> تومان را به کارت زیر واریز کنید:</p>
+      <div class="card-box">
+        <div class="card-num" id="cardNum" dir="ltr"></div>
+        <div id="cardOwner"></div>
+        <button type="button" id="copyCard" class="btn small">کپی شماره کارت</button>
+      </div>
+      <form id="payForm">
+        <input name="tracking" placeholder="شماره پیگیری / ۴ رقم آخر کارت پرداخت‌کننده" required>
+        <button class="btn">ثبت پرداخت و تکمیل سفارش</button>
+      </form>
+    </div>
+    <div id="step3" hidden>
+      <h3>✅ سفارش ثبت شد</h3>
+      <p>کد سفارش شما: <strong id="orderCode"></strong></p>
+      <p>پس از تأیید پرداخت توسط فروشگاه، سفارش ارسال می‌شود.</p>
+      <a id="tgLink" class="btn" target="_blank" rel="noopener" hidden>ارسال رسید در تلگرام</a>
+    </div>
+  </div>
+</div>
+<div id="toast" class="toast" hidden></div>
+<script src="config.js"></script>
+<script src="products.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
