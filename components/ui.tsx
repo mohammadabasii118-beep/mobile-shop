@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
@@ -45,7 +46,7 @@ export function SectionHeader({ title, href, sub }: { title: string; href?: stri
         <h2 className="text-xl font-extrabold sm:text-2xl">{title}</h2>
         {sub && <p className="mt-1 text-sm text-muted">{sub}</p>}
       </div>
-      {href && <a href={href} className="shrink-0 text-sm font-medium text-primary hover:underline">‹ مشاهده همه</a>}
+      {href && <Link href={href} className="shrink-0 text-sm font-medium text-primary hover:underline">‹ مشاهده همه</Link>}
     </div>
   );
 }

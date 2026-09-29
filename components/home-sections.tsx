@@ -137,7 +137,7 @@ export function Blog() {
   return (
     <section id="blog" className="py-4">
       <Container>
-        <SectionHeader title="آخرین بلاگ‌ها" href="#" />
+        <SectionHeader title="آخرین بلاگ‌ها" href="/blog" />
         <div className="grid gap-3 md:grid-cols-3">
           {blogPosts.map((b, i) => (
             <a key={b.title} href="#" className="glass rounded-lg p-4 transition-shadow hover:shadow-md">
