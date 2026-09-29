@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:pages": "PAGES=1 next build && rm -rf docs/_next docs/*.html docs/*.txt docs/_not-found && cp -r out/. docs/ && touch docs/.nojekyll"
   },
   "dependencies": {
     "@fontsource-variable/vazirmatn": "^5.3.0",
