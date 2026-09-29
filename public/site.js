@@ -20,7 +20,8 @@
   var mem = load();
   function cart() { return mem; }
   function save(c) { mem = c; store(c); }
-  var thumb = function (h) { return '<span class="cl-thumb" style="background:linear-gradient(160deg,hsl(' + h + ' 80% 56%),hsl(' + ((h + 40) % 360) + ' 70% 30%))"></span>'; };
+  var imgUrl = function (i) { return art ? i.replace(/^\//, "") : base + i; };
+  var thumb = function (h, img) { return '<span class="cl-thumb" style="background:' + (img ? "url(" + imgUrl(img) + ") center/cover" : "linear-gradient(160deg,hsl(" + h + " 80% 56%),hsl(" + ((h + 40) % 360) + " 70% 30%))") + '"></span>'; };
 
   /* ---------- drawer ---------- */
   var drawer;
@@ -41,7 +42,7 @@
       return;
     }
     body.innerHTML = c.map(function (l, i) {
-      return '<div class="cl-line">' + thumb(l.hue) + '<div class="cl-info"><a href="' + L("product", l.id) + '">' + esc(l.name) + '</a>' + (l.opt ? '<small>' + esc(l.opt) + '</small>' : "") +
+      return '<div class="cl-line">' + thumb(l.hue, l.img) + '<div class="cl-info"><a href="' + L("product", l.id) + '">' + esc(l.name) + '</a>' + (l.opt ? '<small>' + esc(l.opt) + '</small>' : "") +
         '<div class="cl-row"><span class="cl-qty"><button data-qty-set="' + i + '" data-d="1" aria-label="افزایش">+</button><i>' + fa(l.qty) + '</i><button data-qty-set="' + i + '" data-d="-1" aria-label="کاهش">−</button></span><b>' + toman(l.price * l.qty) + '</b></div></div><button class="cl-rm" data-rm="' + i + '" aria-label="حذف">✕</button></div>';
     }).join("");
     foot.innerHTML = '<div class="cl-total"><span>جمع:</span><b>' + toman(sum(c)) + '</b></div><a class="cl-btn" href="' + L("checkout") + '">تسویه حساب</a><button class="cl-btn cl-btn-ghost" data-close>ادامه خرید</button>';
@@ -71,7 +72,7 @@
     withData(function () {
       var r = data.filter(function (p) { return (p.name + " " + p.brand + " " + (p.compat || "") + " " + p.catLabel).toLowerCase().indexOf(q) > -1; }).slice(0, 8);
       out.innerHTML = r.length ? r.map(function (p) {
-        return '<a class="cl-res" href="' + L("product", p.id) + '">' + thumb(p.hue) + '<span><b>' + esc(p.name) + (p.compat ? " " + esc(p.compat) : "") + '</b><small>' + esc(p.catLabel) + '</small></span><em>' + toman(p.price) + '</em></a>';
+        return '<a class="cl-res" href="' + L("product", p.id) + '">' + thumb(p.hue, p.img) + '<span><b>' + esc(p.name) + (p.compat ? " " + esc(p.compat) : "") + '</b><small>' + esc(p.catLabel) + '</small></span><em>' + toman(p.price) + '</em></a>';
       }).join("") : '<p class="cl-empty">محصولی پیدا نشد.</p>';
     });
   }
@@ -94,7 +95,7 @@
     var qe = $("[data-qty]"), q = qe ? parseInt(qe.textContent, 10) || 1 : 1;
     var c = cart().slice(), id = box.dataset.id, hit = null;
     c.forEach(function (l) { if (l.id === id && l.opt === opt) hit = l; });
-    if (hit) hit.qty += q; else c.push({ id: id, name: box.dataset.name, price: +box.dataset.price, hue: +box.dataset.hue, opt: opt, qty: q });
+    if (hit) hit.qty += q; else c.push({ id: id, name: box.dataset.name, price: +box.dataset.price, hue: +box.dataset.hue, img: box.dataset.img || "", opt: opt, qty: q });
     save(c); openCart();
   }
 
@@ -104,7 +105,7 @@
   function renderCheckout() {
     var root = $("[data-checkout]"); if (!root) return;
     var c = cart(), t = totals(), list = $("[data-order-list]", root);
-    list.innerHTML = c.length ? c.map(function (l) { return '<div class="cl-oline">' + thumb(l.hue) + '<div><b>' + esc(l.name) + '</b>' + (l.opt ? '<small>' + esc(l.opt) + '</small>' : "") + '<small>' + toman(l.price) + ' × ' + fa(l.qty) + '</small></div><em>' + toman(l.price * l.qty) + '</em></div>'; }).join("") : '<p class="cl-empty">سبد خرید شما خالی است. <a href="' + L("shop") + '">مشاهده فروشگاه</a></p>';
+    list.innerHTML = c.length ? c.map(function (l) { return '<div class="cl-oline">' + thumb(l.hue, l.img) + '<div><b>' + esc(l.name) + '</b>' + (l.opt ? '<small>' + esc(l.opt) + '</small>' : "") + '<small>' + toman(l.price) + ' × ' + fa(l.qty) + '</small></div><em>' + toman(l.price * l.qty) + '</em></div>'; }).join("") : '<p class="cl-empty">سبد خرید شما خالی است. <a href="' + L("shop") + '">مشاهده فروشگاه</a></p>';
     $("[data-order-sub]", root).textContent = toman(t.s);
     $("[data-order-discount]", root).textContent = t.d ? "−" + toman(t.d) : "—";
     $("[data-order-ship]", root).textContent = t.ship ? toman(t.ship) : "رایگان";

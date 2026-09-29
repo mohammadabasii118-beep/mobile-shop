@@ -3,13 +3,19 @@ import { useState } from "react";
 import { ChevronDown, Minus, Plus } from "lucide-react";
 import { Badge, Container } from "@/components/ui";
 import { ProductVisual } from "@/components/product-visual";
+import { withBase } from "@/lib/base";
 import { formatToman } from "@/lib/utils";
 import { optionsFor, type Product } from "@/lib/data";
 
 export function Thumb({ p, className }: { p: Product; className?: string }) {
   return (
     <span className={`relative block overflow-hidden ${className ?? ""}`} style={{ background: `linear-gradient(160deg, hsl(${p.hue} 80% 56%), hsl(${(p.hue + 40) % 360} 70% 30%))` }}>
-      <ProductVisual kind={p.kind} hue={(p.hue + 180) % 360} className="absolute inset-0 size-full p-1" />
+      {p.img ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={withBase(p.img)} alt={p.name} className="absolute inset-0 size-full object-cover" />
+      ) : (
+        <ProductVisual kind={p.kind} hue={(p.hue + 180) % 360} className="absolute inset-0 size-full p-1" />
+      )}
     </span>
   );
 }
@@ -19,7 +25,7 @@ export function BuyBox({ p }: { p: Product }) {
   const [choice, setChoice] = useState("");
   const [qty, setQty] = useState(1);
   return (
-    <div data-product data-id={p.id} data-name={`${p.name}${p.compat ? ` ${p.compat}` : ""}`} data-price={p.price} data-hue={p.hue} className="space-y-4">
+    <div data-product data-id={p.id} data-name={`${p.name}${p.compat ? ` ${p.compat}` : ""}`} data-price={p.price} data-hue={p.hue} data-img={p.img ?? ""} className="space-y-4">
       <span className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-medium text-success">موجود و آماده تحویل سریع <i className="size-2 rounded-full bg-success" /></span>
       <ul className="space-y-3 text-[13px] leading-7">
         {[["نسخه اختصاصی با", "بهترین قیمت", "ممکن عرضه می‌شود."], ["محصول کاملاً", "اورجینال", "بوده و مرجوعی ۷ روزه دارد."], ["ارسال سفارش در", "سریع‌ترین زمان", "ممکن انجام می‌شود."], ["سازگاری کامل با مدل گوشی شما با", "ضمانت بازگشت", "وجه."]].map(([a, b, c]) => (

@@ -14,6 +14,7 @@ export interface Product {
   compat?: string;
   cat?: string; // shop category override
   sub?: string; // shop subcategory
+  img?: string; // real product photo (public/)
 }
 
 export const categories: { slug: string; label: string; kind: Kind; hue: number }[] = [
@@ -115,8 +116,17 @@ export const accessoryItems: Product[] = [
   np("ac7", "هولدر رومیزی تاشو", "Baseus", "holder", 210, 260_000, { cat: "accessories", sub: "holder" }),
 ];
 
+const photoCases: Partial<Product>[] = [
+  { name: "قاب مشکی محافظ لنز طرح اپل", compat: "iPhone 15 Pro", img: "/products/p1.webp", badge: "پرفروش" },
+  { name: "قاب کریسمسی طرح جینجربرد", compat: "iPhone 16 Pro", img: "/products/p2.webp", badge: "جدید" },
+  { name: "قاب کیف‌پولی طرح ونگوگ با بند", compat: "iPhone 15", img: "/products/p3.webp" },
+  { name: "قاب شفاف طرح لاک‌پشت دریایی", compat: "iPhone 16", img: "/products/p4.webp", badge: "جدید" },
+  { name: "قاب طرح گربه و گل صورتی", compat: "iPhone 15 Pro Max", img: "/products/p5.webp" },
+];
+const withPhotos = (items: Product[]) => items.map((p, i) => ({ ...p, ...photoCases[i], hue: p.hue }));
+
 export const rails = [
-  { slug: "iphone", title: "قاب آیفون", items: mk("ip", "Apple", ["iPhone 15 Pro Max", "iPhone 15", "iPhone 14 Pro", "iPhone 13", "iPhone 12"], 14, 290_000) },
+  { slug: "iphone", title: "قاب آیفون", items: withPhotos(mk("ip", "Apple", ["iPhone 15 Pro Max", "iPhone 15", "iPhone 14 Pro", "iPhone 13", "iPhone 12"], 14, 290_000)) },
   { slug: "samsung", title: "قاب سامسونگ", items: mk("sm", "Samsung", ["Galaxy S24 Ultra", "Galaxy S24", "Galaxy A55", "Galaxy A35", "Galaxy S23"], 200, 240_000) },
   { slug: "xiaomi", title: "قاب شیائومی", items: mk("xi", "Xiaomi", ["Redmi Note 13 Pro", "Poco X6", "Xiaomi 14", "Redmi 13C", "Poco F5"], 30, 180_000) },
   { slug: "airpods", title: "لوازم جانبی ایرپاد", items: airpodsItems.slice(0, 5) },
