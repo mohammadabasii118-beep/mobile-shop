@@ -1,0 +1,41 @@
+{
+  "name": "caseline-shop",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:push": "prisma db push",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:studio": "prisma studio",
+    "release-expired-reservations": "tsx scripts/releaseExpiredReservations.ts",
+    "backup": "bash scripts/backup.sh",
+    "restore": "bash scripts/restore.sh",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.19.1",
+    "bcryptjs": "^2.4.3",
+    "nanoid": "^5.0.9",
+    "next": "16.3.6",
+    "next-auth": "^4.24.11",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.14.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.41",
+    "prisma": "^5.19.1",
+    "tailwindcss": "^3.4.10",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.4"
+  }
+}

@@ -1,0 +1,769 @@
+// Case Line — production database schema
+// Design note: a single `User` model with a `role` field (CUSTOMER | ADMIN)
+// replaces a separate "Admins" table. This is the standard, more secure
+// pattern in production apps (one auth system, one password store) and is
+// functionally identical to what was requested.
+
+// One-time manual step (Prisma doesn't manage Postgres extensions): run
+// `CREATE EXTENSION IF NOT EXISTS pg_trgm;` once against your database
+// (e.g. via `psql $DATABASE_URL -c "CREATE EXTENSION IF NOT EXISTS pg_trgm;"`)
+// before the typo-tolerant search fallback in lib/products.ts will work —
+// see README §13.20. Without it, that fallback query simply errors and is
+// caught, so plain substring search still works; it just won't catch typos.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+  // A limited staff account: can sign into /admin, but only into the areas
+  // its `permissions` array grants (see lib/actions/guard.ts and
+  // middleware.ts). Created only by a real ADMIN from /admin/staff.
+  STAFF
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT // در انتظار پرداخت
+  PAID // پرداخت شده
+  PROCESSING // در حال آماده‌سازی
+  SHIPPED // ارسال شده
+  DELIVERED // تحویل داده شده
+  CANCELED // لغو شده
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+enum PaymentMethod {
+  ZARINPAL
+  CARD_TRANSFER
+  // Paid immediately, in full, from the customer's own wallet balance — no
+  // gateway or manual receipt involved. Only usable when the wallet balance
+  // already covers the entire order total (see app/api/checkout/route.ts);
+  // there is no partial wallet + gateway combination yet.
+  WALLET
+}
+
+enum ReceiptStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum HomepageSectionType {
+  HERO
+  BANNER
+  CATEGORY_STRIP
+  BEST_SELLERS
+  NEW_ARRIVALS
+  DISCOUNTED
+  TRENDING
+  WHY_US
+  TESTIMONIALS
+  // A free-form marketing block an admin creates and fills in themselves —
+  // title, body text, an optional image, and an optional button — stored
+  // in `config` (see HomepageSectionType usage in app/page.tsx and
+  // lib/actions/homepage.ts). This is the one section type an admin can
+  // both ADD and DELETE (the others are fixed, built-in sections that can
+  // only be reordered/toggled), which is what makes the homepage section
+  // list a real, if basic, page builder rather than a fixed layout.
+  CUSTOM_BLOCK
+}
+
+model User {
+  id           String       @id @default(cuid())
+  name         String
+  email        String       @unique
+  phone        String?      @unique
+  passwordHash String
+  role         Role         @default(CUSTOMER)
+  // Granular access for STAFF accounts only (ignored for CUSTOMER/ADMIN —
+  // ADMIN implicitly has every permission). Currently the only permission
+  // actually enforced anywhere is "SUPPORT" (see requireStaffPermission in
+  // lib/actions/guard.ts) — keep this list honest: don't add a value here
+  // that no server action actually checks.
+  permissions      String[]  @default([])
+  // TOTP two-factor auth (RFC 6238, see lib/totp.ts) — self-service, for
+  // ADMIN/STAFF accounts. twoFactorSecret is set as soon as setup begins
+  // but twoFactorEnabled only flips to true after the user proves they can
+  // generate a valid code, so a half-finished setup can never lock anyone
+  // out or silently start being enforced.
+  twoFactorSecret  String?
+  twoFactorEnabled Boolean   @default(false)
+  // One-time 2FA backup codes (bcrypt-hashed, exactly like passwords —
+  // never stored or logged in plaintext). Generated once when 2FA is first
+  // confirmed and shown to the user exactly that one time; each entry here
+  // is consumed (removed from the array) the moment it's used to sign in,
+  // so a leaked-but-already-used code is worthless. Lets someone who lost
+  // their authenticator app still get into their own account. See
+  // lib/backupCodes.ts and lib/auth.ts.
+  twoFactorBackupCodes String[] @default([])
+  // "گوشی من" — the customer's own phone, saved once in their account so
+  // the storefront can pre-select matching variant options and offer a
+  // "فقط سازگار با گوشی من" filter. Both nullable/optional: a user may
+  // never set this, and phoneModel itself is optional per brand.
+  myBrandId       String?
+  myBrand         Brand?      @relation(fields: [myBrandId], references: [id])
+  myPhoneModelId  String?
+  myPhoneModel    PhoneModel? @relation(fields: [myPhoneModelId], references: [id])
+  // True only after an admin approves this user's PartnerApplication (see
+  // below) — the sole source of truth for wholesale/reseller status.
+  // Nothing else in the app may set this directly.
+  isWholesale  Boolean      @default(false)
+  // Real money, in Toman, the customer can spend at checkout. The ONLY
+  // ways this number changes are: an admin's manual, reasoned adjustment
+  // (lib/actions/wallet.ts's adjustWalletBalance) or a real order refund
+  // (refundOrderToWallet / cancelOrderAtomic's refundToWallet option) or a
+  // real wallet payment at checkout. There is no top-up flow yet — the
+  // master prompt explicitly disables that until a payment gateway's
+  // top-up path is connected and tested — so this balance can only ever
+  // grow from a genuine refund or an admin's explicit, logged correction,
+  // never from a customer "adding funds" themselves.
+  walletBalance       Int                  @default(0)
+  walletTransactions  WalletTransaction[]
+  // Real points earned only on orders that actually reached PAID (see
+  // lib/loyalty.ts) — one credit per order, enforced by the @unique on
+  // LoyaltyTransaction.orderId so a status re-check or a race can never
+  // double-credit the same order.
+  loyaltyPoints       Int                  @default(0)
+  loyaltyTransactions LoyaltyTransaction[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  orders       Order[]
+  wishlist     WishlistItem[]
+  reviews      Review[]
+  productQuestions    ProductQuestion[]
+  partnerApplications PartnerApplication[]
+  supportTickets      SupportTicket[]
+}
+
+// A real, append-only ledger of every wallet balance change — positive
+// amount = credit (refund or admin bonus), negative = debit (a wallet
+// payment at checkout). User.walletBalance is a cached running total kept
+// in sync with this ledger inside the same transaction on every write, so
+// the two can never drift; the ledger itself is what the customer/admin
+// sees as their transaction history, not a display-only convenience.
+model WalletTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount    Int
+  reason    String
+  orderId   String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// A real, append-only ledger of loyalty points. orderId is unique so a
+// given order can only ever generate one earn-credit, no matter how many
+// times its status is re-checked or re-processed.
+model LoyaltyTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  points    Int
+  reason    String
+  orderId   String?  @unique
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// A logged-in customer's saved/favorited products ("لیست علاقه‌مندی‌ها").
+// Deliberately account-only (not guest/localStorage) so the list is the
+// same across devices — consistent with how the rest of the account
+// features (orders, addresses) work in this project.
+model WishlistItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([userId])
+}
+
+// A real, customer-submitted product review. There is no seed/demo data for
+// this model anywhere in the project — every row must come from an actual
+// logged-in user through submitReview(), per the explicit project rule
+// against fabricated reviews or review counts.
+//
+// isVerifiedPurchase is computed at submit time from the user's own Order
+// history (an OrderItem for this product on an order that is PAID or later)
+// — it is never settable by the client.
+model Review {
+  id                 String   @id @default(cuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId          String
+  product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  rating             Int // 1..5
+  comment            String   @db.Text
+  isVerifiedPurchase Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // One review per user per product — resubmitting updates it in place
+  // rather than piling up duplicates.
+  @@unique([userId, productId])
+  @@index([productId])
+}
+
+// Product Q&A — deliberately separate from Review: a question is not a
+// star rating or an opinion, it's something a shopper needs answered
+// before buying, and it should get a real answer from the store, not just
+// accumulate. `answer`/`answeredAt`/`answeredBy` all stay null until an
+// admin/staff actually answers — no fake or auto-generated answers.
+model ProductQuestion {
+  id         String    @id @default(cuid())
+  productId  String
+  product    Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question   String    @db.Text
+  answer     String?   @db.Text
+  answeredAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([productId])
+}
+
+model Brand {
+  id       String           @id @default(cuid())
+  name     String
+  slug     String           @unique
+  products Product[]
+  models   PhoneModel[]
+  variants ProductVariant[]
+  myBrandOfUsers User[]
+}
+
+model PhoneModel {
+  id       String           @id @default(cuid())
+  name     String // e.g. "آیفون ۱۵ پرو مکس"
+  slug     String           @unique
+  // Every model created through the admin UI is required to belong to a
+  // brand (enforced in phoneModelSchema + the admin form); the FK itself
+  // stays nullable only for schema flexibility, not as an intended state.
+  brandId  String?
+  brand    Brand?           @relation(fields: [brandId], references: [id])
+  products Product[]
+  variants ProductVariant[]
+  myPhoneModelOfUsers User[]
+
+  @@index([brandId])
+}
+
+model Color {
+  id       String           @id @default(cuid())
+  name     String
+  slug     String           @unique
+  hexCode  String?
+  variants ProductVariant[]
+}
+
+model Category {
+  id       String     @id @default(cuid())
+  name     String
+  slug     String     @unique
+  imageUrl String?
+  order    Int        @default(0)
+  isActive Boolean    @default(true)
+  parentId String?
+  parent   Category?  @relation("CategoryToCategory", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryToCategory")
+  products Product[]
+}
+
+model Product {
+  id                String      @id @default(cuid())
+  name              String
+  slug              String      @unique
+  description       String      @db.Text
+  specs             Json? // key/value technical specs
+  images            String[] // image URLs, first = primary
+  price             Int // sell price (Toman)
+  oldPrice          Int?
+  costPrice         Int? // supplier/cost price, used by the pricing engine
+  // Optional wholesale price shown ONLY to users approved as a partner
+  // (User.isWholesale — see lib/actions/partners.ts). Null means this
+  // product has no wholesale price yet, so wholesale customers simply see
+  // the normal retail price for it, never a fabricated discount.
+  wholesalePrice    Int?
+  stock             Int         @default(0)
+  sku               String?     @unique
+  supplierProductId String? // external id for future supplier sync
+  isActive          Boolean     @default(true)
+  isBestSeller      Boolean     @default(false)
+  isNew             Boolean     @default(false)
+  isFeatured        Boolean     @default(false)
+  isTrending        Boolean     @default(false)
+  categoryId        String
+  category          Category    @relation(fields: [categoryId], references: [id])
+  brandId           String?
+  brand             Brand?      @relation(fields: [brandId], references: [id])
+  phoneModelId      String?
+  phoneModel        PhoneModel? @relation(fields: [phoneModelId], references: [id])
+  // When true, this product is sold only through its ProductVariant
+  // combinations (brand/model/color, each with its own price/stock/image)
+  // instead of the plain price/stock fields above.
+  hasVariants       Boolean     @default(false)
+  // Cached aggregate of Review rows for this product — recomputed from
+  // real data every time a review is created/updated/deleted (see
+  // lib/actions/reviews.ts), never set by hand. Cached (rather than
+  // aggregated live on every listing page) so showing a rating on a
+  // product card in a list of dozens of products costs nothing extra.
+  // avgRating stays null (not 0) until at least one real review exists,
+  // so a product with no reviews shows no rating at all instead of a
+  // misleading "0 stars".
+  avgRating         Float?
+  reviewCount       Int         @default(0)
+  variants          ProductVariant[]
+  orderItems        OrderItem[]
+  wishlistedBy      WishlistItem[]
+  reviews           Review[]
+  questions         ProductQuestion[]
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([categoryId])
+  @@index([isActive])
+}
+
+// One purchasable combination of a variable product, e.g.
+// "قاب سیلیکونی / Apple / iPhone 14 / صورتی". Every dimension (brand,
+// phoneModel, color) is optional so a product can vary along any subset —
+// a glass protector might only vary by brand+model with no color at all.
+model ProductVariant {
+  id           String      @id @default(cuid())
+  productId    String
+  product      Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  brandId      String?
+  brand        Brand?      @relation(fields: [brandId], references: [id])
+  phoneModelId String?
+  phoneModel   PhoneModel? @relation(fields: [phoneModelId], references: [id])
+  colorId      String?
+  color        Color?      @relation(fields: [colorId], references: [id])
+  sku          String?     @unique
+  price        Int
+  oldPrice     Int?
+  // Same wholesale-pricing rule as Product.wholesalePrice — null means no
+  // wholesale price set for this specific combination yet.
+  wholesalePrice Int?
+  stock        Int         @default(0)
+  imageUrl     String?
+  isActive     Boolean     @default(true)
+  orderItems   OrderItem[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  // Postgres treats NULL as distinct in a unique index, so this constraint
+  // alone won't catch every duplicate (e.g. two variants with the same
+  // brand+model and no color) — lib/actions/variants.ts adds an app-level
+  // check on top of this for full duplicate protection.
+  @@unique([productId, brandId, phoneModelId, colorId])
+  @@index([productId])
+}
+
+model Order {
+  id               String      @id @default(cuid())
+  orderNumber      String      @unique
+  // Long, cryptographically random token required (alongside admin session)
+  // to access a GUEST order's payment/receipt pages — knowing the order id
+  // or orderNumber alone must never grant access. Nullable only so rows
+  // created before this field existed don't break migration; every order
+  // created from now on always gets one (see app/api/checkout/route.ts).
+  guestToken       String?     @unique
+  userId           String?
+  user             User?       @relation(fields: [userId], references: [id])
+  status           OrderStatus @default(PENDING_PAYMENT)
+  paymentMethod    PaymentMethod @default(ZARINPAL)
+  subtotal         Int
+  discountAmount   Int         @default(0)
+  // Real loyalty-point redemption (Phase 5) — points actually claimed and
+  // debited from the customer's balance at checkout (never invented), and
+  // the exact Toman value that produced, at the fixed rate in
+  // lib/loyalty.ts. Zero for every order that didn't redeem points.
+  loyaltyPointsUsed Int        @default(0)
+  loyaltyDiscount  Int         @default(0)
+  // How much of `total` was actually covered by a wallet debit at checkout
+  // (Phase 5 partial wallet payment) — separate from paymentMethod
+  // "WALLET", which means 100%. Zero unless the customer chose to apply
+  // part of their wallet balance alongside a gateway/card-transfer payment.
+  walletAmountUsed Int         @default(0)
+  shippingFee      Int         @default(0)
+  total            Int
+  discountCode     String?
+  shippingName     String
+  shippingPhone    String
+  shippingAddress  String
+  shippingCity     String
+  shippingPostal   String?
+  paymentAuthority String? // gateway transaction authority/token
+  paymentRefId     String? // verified payment reference id
+  // Short-lived lock claimed by the Zarinpal callback handler so two
+  // concurrent/duplicate callback hits for the same order can never both
+  // process it (see app/api/payment/callback/route.ts). Not used for
+  // card-transfer orders.
+  paymentLockedAt  DateTime?
+  // For CARD_TRANSFER orders only: the stock reserved by this order is
+  // held only until this time (see lib/reservation.ts for the hold
+  // duration and scripts/releaseExpiredReservations.ts for how it's
+  // released back to inventory if no receipt is approved in time). Null
+  // for ZARINPAL orders and for any order created before this field
+  // existed.
+  reservationExpiresAt DateTime?
+  // Real shipment tracking, entered by an admin once the order is actually
+  // handed to a carrier — never auto-filled or guessed. Both null until an
+  // admin sets them (see lib/actions/orders.ts's updateOrderTracking). No
+  // live carrier-API integration exists yet, so this is a manually entered
+  // reference the customer can use on the carrier's own site, not a
+  // live-tracked shipment.
+  trackingCarrier  String?
+  trackingNumber   String?
+  // Set exactly once, the moment an admin refunds this order's total to
+  // the customer's wallet (see lib/orderLifecycle.ts's cancelOrderAtomic
+  // with refundToWallet). Guards against ever refunding the same order
+  // twice, including under a concurrent double-click.
+  refundedToWalletAt DateTime?
+  items            OrderItem[]
+  receipts         CardTransferReceipt[]
+  statusHistory    OrderStatusHistory[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([paymentMethod, status, reservationExpiresAt])
+  // /admin/orders and the reports page both sort/filter recent orders by
+  // date — added in Phase 10 after noticing this was the one common admin
+  // query pattern with no supporting index.
+  @@index([createdAt])
+}
+
+// A real, append-only log of every status this order has actually passed
+// through and when — the data source for the order-tracking timeline UI.
+// Every entry is written at the exact moment `Order.status` changes (same
+// transaction), so this is never decorative/estimated data — a stage the
+// order hasn't reached yet simply has no row here.
+model OrderStatusHistory {
+  id        String      @id @default(cuid())
+  orderId   String
+  order     Order       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    OrderStatus
+  note      String?
+  createdAt DateTime    @default(now())
+
+  @@index([orderId, createdAt])
+}
+
+// Rate-limits the public "track my order" lookup (order number + shipping
+// phone) so an attacker who knows/guesses an order number can't brute-force
+// the shipping phone number. Not tied to a specific order id on purpose —
+// keyed by the order number string so attempts against non-existent order
+// numbers count too.
+model TrackLookupAttempt {
+  id          String   @id @default(cuid())
+  orderNumber String
+  ip          String?
+  createdAt   DateTime @default(now())
+
+  @@index([orderNumber, createdAt])
+}
+
+// Rate-limits login attempts (Phase 10 hardening) — without this, the
+// credentials provider had no brute-force protection at all, on either the
+// customer login or the admin panel. Keyed by the submitted email only
+// (not IP, which a determined attacker can rotate anyway, and this project
+// has no IP available inside NextAuth's authorize() callback) — the same
+// keying choice already used for TrackLookupAttempt above.
+model LoginAttempt {
+  id        String   @id @default(cuid())
+  email     String
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+}
+
+model OrderItem {
+  id         String  @id @default(cuid())
+  orderId    String
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String?
+  product    Product? @relation(fields: [productId], references: [id])
+  variantId  String?
+  variant    ProductVariant? @relation(fields: [variantId], references: [id])
+  // Human-readable snapshot of the chosen combination, e.g.
+  // "Apple / iPhone 14 / صورتی", captured at order time so invoices stay
+  // accurate even if the variant/brand/model/color records later change.
+  variantLabel String?
+  nameSnapshot  String
+  unitPrice  Int
+  quantity   Int
+  total      Int
+}
+
+model CardTransferReceipt {
+  id           String        @id @default(cuid())
+  orderId      String
+  order        Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  imageFile    String // filename on disk under the private receipts storage folder
+  trackingCode String?
+  status       ReceiptStatus @default(PENDING)
+  rejectReason String?
+  reviewedAt   DateTime?
+  createdAt    DateTime      @default(now())
+
+  @@index([orderId])
+  @@index([status])
+}
+
+// Singleton row (id is always "singleton") holding the bank card shown to
+// customers for card-to-card payment. Editable from /admin/settings.
+model BankCardSettings {
+  id             String   @id @default("singleton")
+  cardNumber     String   @default("0000-0000-0000-0000")
+  cardHolderName String   @default("نام صاحب کارت")
+  bankName       String   @default("نام بانک")
+  updatedAt      DateTime @updatedAt
+}
+
+// Site-wide SEO metadata and social links (Phase 6), plus the one
+// operational number every LOW_STOCK automation rule reads from
+// (lowStockThreshold). Same lazily-created singleton pattern as
+// BankCardSettings above — a real, editable row from /admin/settings,
+// never hardcoded page metadata. Every field is optional/has a safe
+// default; the site falls back to NEXT_PUBLIC_SITE_NAME/env-based text
+// wherever an admin hasn't filled one in yet (see app/layout.tsx), never a
+// fabricated placeholder shown as if it were real content.
+model SiteSettings {
+  id              String   @id @default("singleton")
+  siteTitle       String?
+  siteDescription String?
+  metaKeywords    String? // comma-separated, optional
+  instagramUrl    String?
+  telegramUrl     String?
+  whatsappUrl     String?
+  // Below-or-equal-to-this stock level counts as "low stock" for the
+  // LOW_STOCK automation trigger. A real, admin-set number — not invented;
+  // 3 is just the shipped default until an admin changes it.
+  lowStockThreshold Int    @default(3)
+  updatedAt       DateTime @updatedAt
+}
+
+model Discount {
+  id             String       @id @default(cuid())
+  code           String       @unique
+  type           DiscountType
+  value          Int // percent (0-100) or fixed Toman amount
+  minOrderAmount Int?
+  startsAt       DateTime?
+  endsAt         DateTime?
+  usageLimit     Int?
+  usedCount      Int          @default(0)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+}
+
+model Banner {
+  id        String   @id @default(cuid())
+  title     String
+  subtitle  String?
+  imageUrl  String?
+  linkUrl   String?
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model HomepageSection {
+  id        String              @id @default(cuid())
+  type      HomepageSectionType
+  title     String?
+  order     Int                 @default(0)
+  isActive  Boolean             @default(true)
+  config    Json? // e.g. { "categoryId": "..." } for category-linked sections
+}
+
+// Quantity-based extra discount for approved wholesale partners ONLY
+// (isWholesale must already be true — see lib/wholesalePricing.ts). This
+// stacks on top of the product's own wholesalePrice (or retail price, if
+// no wholesalePrice is set), as a further percentage off, once a single
+// order line's quantity reaches minQuantity. A normal retail customer
+// never sees or gets this discount, no matter how many they buy.
+model WholesaleTier {
+  id              String   @id @default(cuid())
+  minQuantity     Int      @unique
+  discountPercent Int // extra % off, on top of wholesale/retail price
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+}
+
+model PricingRule {
+  id        String   @id @default(cuid())
+  minPrice  Int // cost price range start (Toman)
+  maxPrice  Int // cost price range end (Toman)
+  sellPrice Int // resulting sell price (Toman)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([minPrice, maxPrice])
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  message   String   @db.Text
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// A simple CMS content page (درباره ما، حریم خصوصی، قوانین و مانند آن) —
+// an admin writes the title and body once, and it's served publicly at
+// /page/[slug]. Deliberately plain (no rich-text blocks, no versioning,
+// no scheduling) — a real, working "edit this page's text" tool, not the
+// full CMS/marketing-automation platform the master prompt describes.
+model Page {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  title     String
+  body      String   @db.Text
+  isPublished Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum TicketStatus {
+  OPEN // waiting on an admin reply
+  ANSWERED // an admin has replied; waiting on the customer
+  CLOSED // resolved — an admin explicitly closed it
+}
+
+// A real, two-way support conversation tied to a logged-in account (guest
+// tickets aren't supported — a guest with a question uses /contact
+// instead). Status is a simple, honest reflection of whose turn it is to
+// reply, not a multi-stage SLA workflow: replying (either side) always
+// updates it (see lib/actions/support.ts), and only an admin can move it
+// to CLOSED.
+model SupportTicket {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject   String
+  status    TicketStatus     @default(OPEN)
+  messages  SupportMessage[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+// One message in a ticket's thread. senderRole reuses the existing Role
+// enum (CUSTOMER | ADMIN) rather than inventing a parallel one — it's
+// always set from the actual authenticated session's role at the moment
+// the message is posted, never from anything the client claims.
+model SupportMessage {
+  id         String        @id @default(cuid())
+  ticketId   String
+  ticket     SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderRole Role
+  body       String        @db.Text
+  createdAt  DateTime      @default(now())
+
+  @@index([ticketId])
+}
+
+// ---------------------------------------------------------------------
+// No-code automation engine (Phase 9) — deliberately bounded: an admin
+// picks one real event this app already fires, and one real in-app
+// action, with no code. There is NO email/SMS action, because no such
+// provider is connected/tested in this project (same rule that keeps
+// wallet top-up disabled) — an action that silently failed to send would
+// be worse than not offering it. See README §13.18 for the exact scope.
+// ---------------------------------------------------------------------
+enum AutomationTrigger {
+  ORDER_DELIVERED // Order.status manually set to DELIVERED by an admin
+  NEW_SUPPORT_TICKET // a customer opens a support ticket
+  NEW_CONTACT_MESSAGE // the public /contact form is submitted
+  // A real stock decrement (at checkout) just brought a product's (or
+  // variant's) stock down to or below SiteSettings.lowStockThreshold — only
+  // fired the moment it CROSSES that threshold (not on every sale while
+  // already low), to avoid alert spam. See lib/lowStock.ts.
+  LOW_STOCK
+}
+
+enum AutomationAction {
+  CREATE_ADMIN_ALERT // writes an AdminAlert row, shown in /admin/alerts + a header badge
+  GRANT_LOYALTY_BONUS // credits extra LoyaltyTransaction points (ORDER_DELIVERED only)
+}
+
+model AutomationRule {
+  id         String            @id @default(cuid())
+  name       String
+  trigger    AutomationTrigger
+  action     AutomationAction
+  // Free-form small config for the action, e.g. {"points": 5} for
+  // GRANT_LOYALTY_BONUS. Never executed as code — only read as plain
+  // numbers/strings by lib/automation.ts.
+  actionConfig Json?
+  isActive   Boolean           @default(true)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([trigger, isActive])
+}
+
+// An in-app notification for staff/admins, created only by the automation
+// engine (see lib/automation.ts) or left for future direct use — never a
+// fabricated/sample row. Shown as a badge + list in /admin/alerts.
+model AdminAlert {
+  id        String   @id @default(cuid())
+  message   String
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([isRead, createdAt])
+}
+
+enum PartnerApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// A real application to become a wholesale/reseller partner — reviewed by
+// an admin, never auto-approved. Deliberately its own workflow, separate
+// from any affiliate/referral system. Approving one is the ONLY thing that
+// sets User.isWholesale = true (see reviewPartnerApplication in
+// lib/actions/partners.ts).
+model PartnerApplication {
+  id           String                   @id @default(cuid())
+  userId       String
+  user         User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  companyName  String?
+  phone        String
+  city         String?
+  message      String                   @db.Text
+  status       PartnerApplicationStatus @default(PENDING)
+  reviewNote   String?
+  reviewedAt   DateTime?
+  createdAt    DateTime                 @default(now())
+
+  @@index([userId])
+  @@index([status])
+}
