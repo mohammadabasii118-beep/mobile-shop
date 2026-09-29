@@ -53,7 +53,7 @@ function ProductRail({ slug, title, items, href }: { slug: string; title: string
   return (
     <section id={slug} className="scroll-mt-24 py-5">
       <Container>
-        <SectionHeader title={title} href={href ?? `/shop#${slug}`} />
+        <SectionHeader title={title} href={href ?? `/shop#${["iphone", "samsung", "xiaomi"].includes(slug) ? "cases" : slug}`} />
         <div className="no-scrollbar -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0">
           {items.map((p) => <div key={p.id} className="w-[42%] shrink-0 snap-start sm:w-[calc((100%-3rem)/5)]"><ProductCard p={p} /></div>)}
         </div>
@@ -72,9 +72,8 @@ export function NewestRail() {
 }
 
 const tileKinds: Record<string, Kind[]> = {
-  iphone: ["case", "case", "case"], samsung: ["case", "case", "case"], xiaomi: ["case", "case", "case"],
-  glass: ["glass", "lens", "glass"], charger: ["charger", "cable", "charger"], earbuds: ["earbuds", "earbuds", "earbuds"],
-  powerbank: ["powerbank", "powerbank", "powerbank"], other: ["holder", "flash", "holder"],
+  cases: ["case", "case", "case"], airpods: ["airpods", "airpods", "airpods"], watch: ["watch", "watch", "watch"],
+  electric: ["charger", "cable", "powerbank"], accessories: ["glass", "earbuds", "holder"],
 };
 const tileHues = [14, 200, 30];
 
@@ -83,11 +82,11 @@ export function CategoryTiles() {
     <section className="py-5">
       <Container>
         <SectionHeader title="دسته‌بندی‌ها" />
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {shopCats.map((c) => (
             <Link key={c.slug} href={`/shop#${c.slug}`} className="flex flex-col items-center gap-2 rounded-lg bg-surface-2 px-3 py-4 text-center transition-shadow hover:shadow-md">
               <span className="flex gap-1" dir="rtl">
-                {tileKinds[c.slug].map((k, i) => <span key={i} className="grid size-8 place-items-center rounded-full bg-surface shadow-sm"><ProductVisual kind={k} hue={(tileHues[i] + (c.slug === "samsung" ? 170 : c.slug === "xiaomi" ? 20 : 0)) % 360} className="size-6" /></span>)}
+                {tileKinds[c.slug].map((k, i) => <span key={i} className="grid size-8 place-items-center rounded-full bg-surface shadow-sm"><ProductVisual kind={k} hue={tileHues[i]} className="size-6" /></span>)}
               </span>
               <span className="text-sm font-bold">{c.label}</span>
               <span className="text-[11px] text-muted">{toFa(catalog.filter(c.test).length)} محصول</span>

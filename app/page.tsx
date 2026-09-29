@@ -11,7 +11,7 @@ export default function Home() {
         <BrandMarquee />
         <Rails slugs={["iphone", "samsung"]} />
         <CategoryTiles />
-        <Rails slugs={["xiaomi", "other"]} />
+        <Rails slugs={["xiaomi", "airpods", "watch", "electric"]} />
         <NewestRail />
         <TelegramBanner />
         <Blog />

@@ -1,23 +1,18 @@
 "use client";
 import Link from "next/link";
 import { useEffect } from "react";
-import { ArrowLeft, BatteryCharging, ChevronDown, Headphones, LayoutGrid, Menu, ShieldCheck, Smartphone, Sparkles, Zap } from "lucide-react";
+import { ArrowLeft, BatteryCharging, ChevronDown, Headphones, LayoutGrid, Menu, Smartphone, Sparkles, Watch, Zap } from "lucide-react";
 import { Thumb } from "@/components/product-detail";
-import { allProducts, rails, type Product } from "@/lib/data";
+import { airpodsItems, electricItems, products, rails, watchItems, type Product } from "@/lib/data";
 import { formatToman } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
-const pick = (kinds: Product["kind"][]) => allProducts.filter((p) => kinds.includes(p.kind)).slice(0, 6);
-
-const menu = [
-  { slug: "iphone", label: "قاب آیفون", icon: Smartphone, items: rails[0].items, chips: ["MagSafe", "ضدضربه", "شفاف", "چرمی", "رینگ‌دار"] },
-  { slug: "samsung", label: "قاب سامسونگ", icon: Smartphone, items: rails[1].items, chips: ["Galaxy S24", "Galaxy A55", "شفاف", "Armor"] },
-  { slug: "xiaomi", label: "قاب شیائومی", icon: Smartphone, items: rails[2].items, chips: ["Redmi Note 13", "Poco X6", "Xiaomi 14"] },
-  { slug: "glass", label: "گلس و محافظ لنز", icon: ShieldCheck, items: pick(["glass", "lens"]), chips: ["آنتی‌استاتیک", "مات", "محافظ لنز"] },
-  { slug: "charger", label: "شارژر و کابل", icon: Zap, items: pick(["charger", "cable"]), chips: ["GaN", "وایرلس", "Type-C", "Lightning"] },
-  { slug: "earbuds", label: "هندزفری", icon: Headphones, items: pick(["earbuds"]), chips: ["ایرپاد", "بلوتوثی", "سیمی", "Over-Ear"] },
-  { slug: "powerbank", label: "پاوربانک", icon: BatteryCharging, items: pick(["powerbank"]), chips: ["۱۰۰۰۰ mAh", "۲۰۰۰۰ mAh", "مگ‌سیف", "لپ‌تاپی"] },
-  { slug: "other", label: "سایر لوازم جانبی", icon: Sparkles, items: pick(["holder", "flash"]), chips: ["هولدر", "فلش OTG"] },
+const menu: { slug: string; label: string; icon: typeof Smartphone; items: Product[]; chips: string[] }[] = [
+  { slug: "cases", label: "قاب و کاور موبایل", icon: Smartphone, items: [rails[0].items[0], rails[1].items[0], rails[2].items[0], rails[0].items[2], rails[1].items[2], rails[2].items[2]], chips: ["آیفون", "سامسونگ", "شیائومی", "MagSafe", "ضدضربه", "شفاف"] },
+  { slug: "airpods", label: "لوازم جانبی ایرپاد", icon: Headphones, items: airpodsItems, chips: ["کیس ایرپاد", "تیپ سیلیکونی", "قلاب", "بند گردنی"] },
+  { slug: "watch", label: "لوازم جانبی اپل واچ", icon: Watch, items: watchItems, chips: ["بند", "قاب محافظ", "گلس", "پایه شارژ"] },
+  { slug: "electric", label: "لوازم برقی", icon: Zap, items: electricItems, chips: ["شارژر", "کابل", "پاوربانک", "آداپتور", "وایرلس"] },
+  { slug: "accessories", label: "اکسسوری و لوازم جانبی", icon: Sparkles, items: [products[1], products[4], products[6], products[7], products[9], products[11]], chips: ["گلس", "محافظ لنز", "هندزفری", "هولدر", "فلش"] },
 ];
 
 export function useCloseDetails() {
@@ -43,7 +38,7 @@ export function CategoryMenu() {
         <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />دسته‌بندی‌ها<LayoutGrid className="size-4" />
       </summary>
       <div className="mega border border-border bg-surface absolute start-0 top-[calc(100%+1.1rem)] z-50 w-[min(92vw,760px)] rounded-xl p-4 shadow-lg">
-        <ul className="relative grid min-h-[370px] grid-cols-[210px_1fr] content-start gap-x-0 gap-y-1">
+        <ul className="relative grid min-h-[300px] grid-cols-[210px_1fr] content-start gap-x-0 gap-y-1">
           {menu.map((c) => (
             <li key={c.slug} tabIndex={0} className="col-start-1">
               <Link href={`/shop#${c.slug}`} className="mega-item flex items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium">
