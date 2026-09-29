@@ -45,9 +45,9 @@ export function CategoryMenu() {
         <ul className="relative grid min-h-[330px] grid-cols-[210px_1fr] content-start gap-x-0 gap-y-1">
           {menu.map((c) => (
             <li key={c.slug} tabIndex={0} className="col-start-1">
-              <a href={`#${c.slug}`} className="mega-item flex items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium">
+              <Link href={`/shop#${c.slug}`} className="mega-item flex items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium">
                 <span>{c.label}</span><c.icon className="size-4 text-primary" />
-              </a>
+              </Link>
               <div className="mega-panel absolute inset-y-0 end-0 hidden w-[calc(100%-210px)] flex-col ps-5">
                 <div className="mb-3 text-[11px] text-muted">محصولات پرطرفدار {c.label}</div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
@@ -58,9 +58,9 @@ export function CategoryMenu() {
                     </Link>
                   ))}
                 </div>
-                <a href={`#${c.slug}`} className="mt-auto flex items-center gap-1 pt-3 text-xs font-bold text-primary"><ArrowLeft className="size-3.5" />همه محصولات {c.label}</a>
+                <Link href={`/shop#${c.slug}`} className="mt-auto flex items-center gap-1 pt-3 text-xs font-bold text-primary"><ArrowLeft className="size-3.5" />همه محصولات {c.label}</Link>
                 <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-xs">
-                  <span className="text-muted">پرطرفدار:</span>{c.chips.map((x) => <a key={x} href={`#${c.slug}`} className="hover:text-primary">{x}</a>)}
+                  <span className="text-muted">پرطرفدار:</span>{c.chips.map((x) => <Link key={x} href={`/shop#${c.slug}`} className="hover:text-primary">{x}</Link>)}
                 </div>
               </div>
             </li>
@@ -79,7 +79,7 @@ export function MobileMenu({ className }: { className?: string }) {
       <summary aria-label="منو" className="grid size-10 cursor-pointer list-none place-items-center rounded-full text-primary hover:bg-primary/10 [&::-webkit-details-marker]:hidden"><Menu className="size-5" /></summary>
       <div className="border border-border bg-surface fixed inset-x-3 top-20 z-50 rounded-xl p-3 shadow-lg">
         <div className="mb-1 flex items-center gap-2 px-2 text-xs text-muted"><BatteryCharging className="size-4" />دسته‌بندی‌ها</div>
-        {menu.map((c) => <a key={c.slug} href={`#${c.slug}`} className="flex items-center justify-between rounded-md px-3 py-3 text-sm font-medium hover:bg-primary/10"><span>{c.label}</span><c.icon className="size-4 text-primary" /></a>)}
+        {menu.map((c) => <Link key={c.slug} href={`/shop#${c.slug}`} className="flex items-center justify-between rounded-md px-3 py-3 text-sm font-medium hover:bg-primary/10"><span>{c.label}</span><c.icon className="size-4 text-primary" /></Link>)}
       </div>
     </details>
   );

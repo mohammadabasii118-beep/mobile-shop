@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowLeft, Search, Send } from "lucide-react";
 import { Button, Container, SectionHeader, Badge } from "@/components/ui";
@@ -26,7 +27,7 @@ export function Hero() {
         </form>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs">
           <span className="text-muted">پیشنهادها:</span>
-          {quickChips.map((c) => <a key={c} href="#featured" className="glass rounded-full px-3 py-1.5 font-medium hover:border-primary">{c}</a>)}
+          {quickChips.map((c) => <Link key={c} href="/shop" className="glass rounded-full px-3 py-1.5 font-medium hover:border-primary">{c}</Link>)}
         </div>
       </Container>
     </section>
@@ -51,7 +52,7 @@ function ProductRail({ slug, title, items }: { slug: string; title: string; item
   return (
     <section id={slug} className="scroll-mt-24 py-5">
       <Container>
-        <SectionHeader title={title} href="#" />
+        <SectionHeader title={title} href={`/shop#${slug === "iphone" || slug === "samsung" || slug === "xiaomi" ? slug : "other"}`} />
         <div className="no-scrollbar -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0">
           {items.map((p) => <div key={p.id} className="w-[42%] shrink-0 snap-start sm:w-[calc((100%-3rem)/5)]"><ProductCard p={p} /></div>)}
         </div>
@@ -72,13 +73,13 @@ export function CategoryTiles() {
         <SectionHeader title="دسته‌بندی‌ها" />
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           {homeCategories.map((c) => (
-            <a key={c.slug} href={`#${c.slug}`} className="flex flex-col items-center gap-3 rounded-lg bg-surface-2 p-4 pt-5 text-center transition-shadow hover:shadow-md">
+            <Link key={c.slug} href={`/shop#${c.slug}`} className="flex flex-col items-center gap-3 rounded-lg bg-surface-2 p-4 pt-5 text-center transition-shadow hover:shadow-md">
               <span className="flex -space-x-2 space-x-reverse" dir="rtl">
                 {c.logos.map((l, i) => <span key={i} className="grid size-9 place-items-center rounded-full border-2 border-surface-2 bg-surface text-xs font-black text-primary shadow-sm">{l}</span>)}
               </span>
               <span className="text-sm font-bold">{c.label}</span>
               <span className="text-[11px] text-muted">{toFa(c.count)} محصول</span>
-            </a>
+            </Link>
           ))}
         </div>
       </Container>

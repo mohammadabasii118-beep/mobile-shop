@@ -39,7 +39,7 @@ export function TopHeader() {
           <Logo />
           <nav className="hidden items-center gap-5 text-sm font-medium sm:ms-6 sm:flex" aria-label="منوی اصلی">
             <CategoryMenu />
-            <a href="#iphone" className="hover:text-primary">فروشگاه</a>
+            <Link href="/shop" className="hover:text-primary">فروشگاه</Link>
             <Link href="/blog" className="hover:text-primary">وبلاگ</Link>
             <Link href="/support" className="hover:text-primary">پشتیبانی</Link>
           </nav>
@@ -72,7 +72,7 @@ export function FloatingHeader() {
           <Logo className="text-xl sm:text-2xl" />
           <nav className="hidden items-center gap-5 text-sm font-medium sm:flex sm:ms-6" aria-label="منوی اصلی">
             <CategoryMenu />
-            <a href="#iphone" className="hover:text-primary">فروشگاه</a>
+            <Link href="/shop" className="hover:text-primary">فروشگاه</Link>
             <Link href="/blog" className="hover:text-primary">وبلاگ</Link>
             <Link href="/support" className="hover:text-primary">پشتیبانی</Link>
           </nav>
@@ -108,7 +108,7 @@ export function BottomNav() {
         <Link href="/support" className={item}><Headphones className="size-5" />پشتیبانی</Link>
         <Link href="/blog" className={item}><PenLine className="size-5" />بلاگ</Link>
         <NightButton className={item} />
-        <a href="#iphone" className={item}><Store className="size-5" />فروشگاه</a>
+        <Link href="/shop" className={item}><Store className="size-5" />فروشگاه</Link>
         <a href="#" className={item}><User className="size-5" />داشبورد</a>
       </nav>
     </>

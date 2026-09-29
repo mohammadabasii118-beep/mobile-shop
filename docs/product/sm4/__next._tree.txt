@@ -1,3 +1,3 @@
-:HL["/mobile-shop/_next/static/chunks/22_o8wif12ur5.css","style"]
+:HL["/mobile-shop/_next/static/chunks/3x2vu8-786dp8.css","style"]
 :HC["/",""]
-0:{"tree":{"name":"","param":null,"prefetchHints":4176,"slots":{"children":{"name":"product","param":null,"prefetchHints":4192,"slots":{"children":{"name":"id","param":{"type":"d","key":"sm4","siblings":[]},"prefetchHints":4192,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":4256,"slots":null}}}}}}},"staleTime":300,"buildId":"hVaqNYO0PzY9BN-WiLluu"}
+0:{"tree":{"name":"","param":null,"prefetchHints":4176,"slots":{"children":{"name":"product","param":null,"prefetchHints":4192,"slots":{"children":{"name":"id","param":{"type":"d","key":"sm4","siblings":[]},"prefetchHints":4192,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":4256,"slots":null}}}}}}},"staleTime":300,"buildId":"oHZe3eytN5VjP6QCNiH0C"}

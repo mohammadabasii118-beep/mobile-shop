@@ -130,3 +130,39 @@ export const blogPosts2: BlogPost[] = [
   mkPost(14, "قاب شیائومی Redmi Note 13 Pro؛ راهنمای خرید", blogCats[3], "۴ آبان ۱۴۰۵", "قاب Redmi Note 13 Pro", "case", 30, "بهترین قاب‌های موجود برای ردمی نوت ۱۳ پرو از نظر محافظت و قیمت."),
   mkPost(15, "چند نکته برای عمر بیشتر باتری گوشی", blogCats[3], "۷ آبان ۱۴۰۵", "عمر بیشتر باتری", "powerbank", 150, "عادت‌های ساده‌ای که به سلامت باتری گوشی در طولانی‌مدت کمک می‌کنند."),
 ];
+
+/* ---------- Shop catalog ---------- */
+const extraSpecs: [string, string, Kind, string, number, number][] = [
+  ["گلس مات ضدلک", "Baseus", "glass", "iPhone 15", 210, 160_000],
+  ["گلس پرایوسی ضدجاسوسی", "Samsung", "glass", "Galaxy S24", 190, 260_000],
+  ["گلس سرامیکی ۹H+", "Xiaomi", "glass", "Redmi Note 13 Pro", 170, 190_000],
+  ["کابل Type-C به Type-C ۶۰ وات", "Anker", "cable", "", 160, 320_000],
+  ["کابل مگنتی سه‌سر", "Baseus", "cable", "", 140, 380_000],
+  ["شارژر دیواری ۲۰ وات", "Apple", "charger", "", 45, 780_000],
+  ["شارژر فندکی ۳۰ وات", "Xiaomi", "charger", "", 35, 350_000],
+  ["ایرباد بلوتوثی Sport", "JBL", "earbuds", "", 300, 1_890_000],
+  ["هندزفری سیمی Type-C", "Samsung", "earbuds", "", 270, 420_000],
+  ["پاوربانک ۱۰۰۰۰ مگ‌سیف", "Anker", "powerbank", "", 230, 1_650_000],
+  ["پاوربانک ۳۰۰۰۰ لپ‌تاپی", "Baseus", "powerbank", "", 215, 2_450_000],
+  ["هولدر دریچه‌ای", "Baseus", "holder", "", 350, 240_000],
+  ["رینگ نگهدارنده مگنتی", "Xiaomi", "holder", "", 330, 180_000],
+  ["محافظ لنز شفاف", "Samsung", "lens", "Galaxy S24 Ultra", 250, 170_000],
+  ["فلش ۶۴GB USB-C", "Samsung", "flash", "", 105, 590_000],
+];
+const extras: Product[] = extraSpecs.map(([name, brand, kind, compat, hue, price], i) => ({
+  id: `x${i}`, name, brand, kind, hue, price, oldPrice: i % 3 === 0 ? Math.round(price * 1.2 / 1000) * 1000 : undefined,
+  rating: 4.2 + (i % 5) / 10, reviews: 20 + i * 23, badge: i % 5 === 1 ? "جدید" : undefined, compat: compat || undefined,
+}));
+export const catalog: Product[] = [...allProducts, ...extras];
+
+export const shopCats: { slug: string; label: string; icon: string; test: (p: Product) => boolean }[] = [
+  { slug: "iphone", label: "قاب آیفون", icon: "phone", test: (p) => p.kind === "case" && p.brand === "Apple" },
+  { slug: "samsung", label: "قاب سامسونگ", icon: "phone", test: (p) => p.kind === "case" && p.brand === "Samsung" },
+  { slug: "xiaomi", label: "قاب شیائومی", icon: "phone", test: (p) => p.kind === "case" && p.brand === "Xiaomi" },
+  { slug: "glass", label: "گلس و محافظ لنز", icon: "shield", test: (p) => p.kind === "glass" || p.kind === "lens" },
+  { slug: "charger", label: "شارژر و کابل", icon: "zap", test: (p) => p.kind === "charger" || p.kind === "cable" },
+  { slug: "audio", label: "هندزفری و پاوربانک", icon: "headphones", test: (p) => p.kind === "earbuds" || p.kind === "powerbank" },
+  { slug: "other", label: "سایر لوازم جانبی", icon: "sparkles", test: (p) => p.kind === "holder" || p.kind === "flash" },
+];
+export const shopCatOf = (p: Product) => shopCats.find((c) => c.test(p))?.slug ?? "other";
+export const shopModels = Object.values(phoneModels).flat();
