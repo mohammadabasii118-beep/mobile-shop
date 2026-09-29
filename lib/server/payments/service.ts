@@ -57,7 +57,7 @@ async function pendingReview(tx: Prisma.TransactionClient, paymentId: string) {
 }
 
 /** Admin approval: Payment = PAID, Order = PROCESSING. Caller must already hold payment.review. */
-export async function approvePayment(paymentId: string, adminId: string) {
+export async function approvePayment(paymentId: string, adminId: string, after?: (tx: Prisma.TransactionClient, p: { orderId: string; orderNumber: number }) => Promise<void>) {
   return db.$transaction(async (tx) => {
     const payment = await pendingReview(tx, paymentId);
     if (!ORDER_TRANSITIONS[payment.order.status].includes("PROCESSING")) throw conflict("وضعیت سفارش اجازه تأیید پرداخت را نمی‌دهد.");
@@ -66,12 +66,13 @@ export async function approvePayment(paymentId: string, adminId: string) {
     await tx.order.update({ where: { id: payment.orderId }, data: { status: "PROCESSING", paymentStatus: "PAID" } });
     await tx.orderStatusHistory.create({ data: { orderId: payment.orderId, status: "PROCESSING", description: "پرداخت تأیید شد. سفارش در حال پردازش است.", createdById: adminId } });
     if (payment.order.userId) await tx.notification.create({ data: { userId: payment.order.userId, type: "payment_approved", title: "پرداخت شما تأیید شد", body: `سفارش ${payment.order.number.toLocaleString("fa-IR")} در حال پردازش است.`, link: `/account/orders/${payment.order.number}` } });
+    await after?.(tx, { orderId: payment.orderId, orderNumber: payment.order.number });
     return { ok: true };
   });
 }
 
 /** Admin rejection: Payment = REJECTED with a reason; the order goes back to awaiting payment so the customer can resubmit. */
-export async function rejectPayment(paymentId: string, adminId: string, reason: string) {
+export async function rejectPayment(paymentId: string, adminId: string, reason: string, after?: (tx: Prisma.TransactionClient, p: { orderId: string; orderNumber: number }) => Promise<void>) {
   if (!reason.trim()) throw badRequest("دلیل رد پرداخت لازم است.");
   return db.$transaction(async (tx) => {
     const payment = await pendingReview(tx, paymentId);
@@ -79,12 +80,13 @@ export async function rejectPayment(paymentId: string, adminId: string, reason: 
     await tx.order.update({ where: { id: payment.orderId }, data: { status: "PENDING_PAYMENT", paymentStatus: "REJECTED" } });
     await tx.orderStatusHistory.create({ data: { orderId: payment.orderId, status: "PENDING_PAYMENT", description: `پرداخت رد شد: ${reason}`, createdById: adminId } });
     if (payment.order.userId) await tx.notification.create({ data: { userId: payment.order.userId, type: "payment_rejected", title: "پرداخت شما رد شد", body: reason, link: `/account/orders/${payment.order.number}` } });
+    await after?.(tx, { orderId: payment.orderId, orderNumber: payment.order.number });
     return { ok: true };
   });
 }
 
 /** Cancels an order and returns its stock (Business Rule: unshipped orders restock; wallet refund arrives with the wallet phase). */
-export async function cancelOrder(orderId: string, byId: string, reason: string) {
+export async function cancelOrder(orderId: string, byId: string, reason: string, after?: (tx: Prisma.TransactionClient) => Promise<void>) {
   return db.$transaction(async (tx) => {
     const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: true } });
     if (!order) throw notFound("سفارش پیدا نشد.");
@@ -96,6 +98,7 @@ export async function cancelOrder(orderId: string, byId: string, reason: string)
     }
     await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } });
     await tx.orderStatusHistory.create({ data: { orderId, status: "CANCELLED", description: reason, createdById: byId } });
+    await after?.(tx);
     return { ok: true };
   });
 }

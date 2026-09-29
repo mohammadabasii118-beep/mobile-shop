@@ -36,3 +36,15 @@ export function validateReceipt(file: { name: string; type: string; size: number
   const originalName = file.name.replace(/[^\p{L}\p{N}._ -]/gu, "").slice(0, 80) || "receipt";
   return { ext: TYPES[kind].exts[0], mime: TYPES[kind].mime, size: buf.length, originalName };
 }
+
+export const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+/** Admin image upload: real image types only (no SVG/PDF), size cap, magic-byte check. */
+export function validateImage(file: { name: string; type: string }, buf: Buffer): { ext: string; mime: string } {
+  if (buf.length === 0) throw badRequest("فایل خالی است.", "upload_empty");
+  if (buf.length > MAX_IMAGE_BYTES) throw badRequest("حجم تصویر نباید بیشتر از ۴ مگابایت باشد.", "upload_too_large");
+  const kind = sniff(buf);
+  if (!kind || kind === "pdf") throw badRequest("فقط تصویر JPG، PNG یا WebP مجاز است.", "upload_type");
+  const ext = (file.name.split(".").pop() ?? "").toLowerCase();
+  if (!(TYPES[kind].exts as readonly string[]).includes(ext)) throw badRequest("پسوند فایل با محتوای آن نمی‌خواند.", "upload_ext");
+  return { ext: TYPES[kind].exts[0], mime: TYPES[kind].mime };
+}

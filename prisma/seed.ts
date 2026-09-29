@@ -3,6 +3,7 @@ import "dotenv/config";
 import bcrypt from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../lib/generated/prisma/client";
+import { seedDemoOrders } from "./seed-demo-orders";
 import { blogPosts2, blogCats, catalog, phoneModels, shopCatOf, shopCats, shopSubOf } from "./seed-data";
 
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
@@ -16,6 +17,7 @@ const PERMISSIONS: [string, string][] = [
   ["customer.write", "مدیریت مشتریان"], ["wholesale.review", "بررسی درخواست عمده"], ["coupon.write", "مدیریت کوپن"], ["review.moderate", "مدیریت نظرات"],
   ["banner.write", "مدیریت بنر"], ["homepage.write", "مدیریت صفحه اصلی"], ["menu.write", "مدیریت منو"], ["blog.write", "مدیریت وبلاگ"],
   ["support.reply", "پاسخ به پشتیبانی"], ["wallet.adjust", "مدیریت کیف پول"], ["loyalty.adjust", "مدیریت امتیاز"], ["shipping.write", "مدیریت ارسال"],
+  ["wallet.read", "مشاهده کیف پول"], ["loyalty.read", "مشاهده امتیاز وفاداری"], ["support.read", "مشاهده پشتیبانی"],
   ["seo.write", "مدیریت سئو"], ["settings.write", "تنظیمات سایت"], ["audit.read", "مشاهده لاگ‌ها"], ["role.manage", "مدیریت نقش‌ها"],
 ];
 const ROLES: { key: string; name: string; staff: boolean; perms: string[] | "all" | "all-but-roles" }[] = [
@@ -24,7 +26,7 @@ const ROLES: { key: string; name: string; staff: boolean; perms: string[] | "all
   { key: "product_manager", name: "مدیر محصول", staff: true, perms: ["dashboard.view", "product.read", "product.write", "product.delete", "category.write", "brand.write", "phone.write", "inventory.write"] },
   { key: "order_manager", name: "مدیر سفارش", staff: true, perms: ["dashboard.view", "order.read", "order.write", "payment.review", "shipping.write", "customer.read"] },
   { key: "content_manager", name: "مدیر محتوا", staff: true, perms: ["dashboard.view", "blog.write", "banner.write", "homepage.write", "menu.write", "seo.write"] },
-  { key: "support", name: "پشتیبان", staff: true, perms: ["dashboard.view", "support.reply", "customer.read", "review.moderate", "order.read"] },
+  { key: "support", name: "پشتیبان", staff: true, perms: ["dashboard.view", "support.reply", "support.read", "customer.read", "review.moderate", "order.read"] },
   { key: "wholesale_manager", name: "مدیر همکاران عمده", staff: true, perms: ["dashboard.view", "wholesale.review", "customer.read", "order.read"] },
   { key: "customer", name: "مشتری", staff: false, perms: [] },
   { key: "wholesale_partner", name: "همکار عمده", staff: false, perms: [] },
@@ -48,6 +50,7 @@ async function main() {
   const demo = [
     { phone: "09120000001", email: "admin@caseline.local", first: "مدیر", last: "سایت", password: "Admin@12345", role: "super_admin" },
     { phone: "09120000002", email: "customer@caseline.local", first: "مشتری", last: "نمونه", password: "Customer@12345", role: "customer" },
+    { phone: "09120000006", email: "products@caseline.local", first: "مدیر", last: "محصول", password: "Manager@12345", role: "product_manager" },
     { phone: "09120000003", email: "partner@caseline.local", first: "همکار", last: "نمونه", password: "Partner@12345", role: "wholesale_partner" },
   ];
   const users: Record<string, string> = {};
@@ -72,6 +75,18 @@ async function main() {
   for (const t of tiers) await db.wholesaleTier.upsert({ where: { key: t.key }, update: t, create: t });
   const bronze = await db.wholesaleTier.findUniqueOrThrow({ where: { key: "bronze" } });
   await db.wholesaleProfile.upsert({ where: { userId: users.wholesale_partner }, update: {}, create: { userId: users.wholesale_partner, tierId: bronze.id, storeName: "فروشگاه نمونه" } });
+
+  /* pending wholesale applications (real rows an admin can approve in the panel) */
+  const applicants = [
+    { phone: "09120000004", first: "علی", last: "رضایی", store: "موبایل‌کده رضایی", type: "physical_store", city: "تهران", instagram: "mobilekade_rezaei" },
+    { phone: "09120000005", first: "سارا", last: "محمدی", store: "کیف و قاب سارا", type: "instagram_shop", city: "اصفهان", instagram: "sara_cases" },
+  ];
+  for (const a of applicants) {
+    const user = await db.user.upsert({ where: { phone: a.phone }, update: {}, create: { phone: a.phone, firstName: a.first, lastName: a.last, displayName: `${a.first} ${a.last}`, phoneVerifiedAt: new Date() } });
+    await db.userRole.upsert({ where: { userId_roleId: { userId: user.id, roleId: await roleId("customer") } }, update: {}, create: { userId: user.id, roleId: await roleId("customer") } });
+    if (!(await db.wholesaleApplication.findFirst({ where: { phone: a.phone } })))
+      await db.wholesaleApplication.create({ data: { userId: user.id, name: `${a.first} ${a.last}`, phone: a.phone, storeName: a.store, businessType: a.type, instagram: a.instagram, city: a.city, address: `${a.city}، خیابان اصلی، پلاک ۱۲`, description: "فروش لوازم جانبی موبایل، حدود ۵۰ سفارش در ماه." } });
+  }
 
   /* categories (tree from the storefront's shop categories) */
   const icons: Record<string, number> = {};
@@ -191,7 +206,15 @@ async function main() {
   }
   if ((await db.address.count({ where: { userId: cust } })) === 0) await db.address.create({ data: { userId: cust, title: "خانه", receiver: "مشتری نمونه", phone: "09120000002", province: "تهران", city: "تهران", postalCode: "1234567890", address: "خیابان ولیعصر، پلاک ۱", isDefault: true } });
 
-  console.log(`\nSeed OK: ${n} products.\nDemo logins (dev only):\n  admin     09120000001 / Admin@12345\n  customer  09120000002 / Customer@12345\n  partner   09120000003 / Partner@12345`);
+  /* pending reviews for the moderation queue */
+  if ((await db.review.count()) === 0) {
+    for (const [i, p] of (await db.product.findMany({ take: 2, orderBy: { soldCount: "desc" } })).entries())
+      await db.review.create({ data: { productId: p.id, userId: cust, rating: 5 - i, body: i ? "کیفیت خوب بود ولی بسته‌بندی ساده‌تر از انتظارم بود." : "عالی بود، دقیقاً مطابق توضیحات و سازگار با گوشی من." } });
+  }
+
+  await seedDemoOrders(db);
+
+  console.log(`\nSeed OK: ${n} products.\nDemo logins (dev only):\n  admin     09120000001 / Admin@12345\n  customer  09120000002 / Customer@12345\n  partner   09120000003 / Partner@12345\n  product manager (limited) 09120000006 / Manager@12345`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); }).finally(() => db.$disconnect());

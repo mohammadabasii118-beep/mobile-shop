@@ -42,6 +42,12 @@ export async function getProductsByCategory(slug: string, take = 5) {
   return getProducts({ OR: [{ category: { slug } }, { category: { parent: { slug } } }] }, { take, orderBy: [{ soldCount: "desc" }, { createdAt: "asc" }] });
 }
 
+/** Hand-picked products (admin homepage section), kept in the order the admin chose. */
+export async function getProductsByIds(ids: string[]) {
+  const rows = await getProducts({ id: { in: ids } }, {});
+  return ids.map((id) => rows.find((r) => r.id === id)).filter((r): r is NonNullable<typeof r> => !!r);
+}
+
 export async function getNewestProducts(take = 5) {
   return getProducts({}, { take, orderBy: { createdAt: "desc" } });
 }

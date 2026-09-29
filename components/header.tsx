@@ -8,7 +8,15 @@ import { CategoryMenu, MobileMenu } from "@/components/category-menu";
 import type { MenuCategory, SiteInfo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export function Logo({ className }: { className?: string }) {
+export function Logo({ className, logo, name }: { className?: string; logo?: string; name?: string }) {
+  if (logo) {
+    return (
+      <Link href="/" className={cn("flex items-center", className)} aria-label={name ?? "CaseLine"}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={logo} alt={name ?? "CaseLine"} className="h-9 w-auto max-w-40 object-contain" />
+      </Link>
+    );
+  }
   return (
     <Link href="/" className={cn("flex items-center gap-1.5 text-2xl font-black tracking-tight text-primary", className)} aria-label="CaseLine">
       <Smartphone className="size-6" strokeWidth={2.6} />
@@ -39,7 +47,7 @@ export function TopHeader({ menu, info, links, loggedIn }: HeaderProps) {
       </div>
       <Container className="py-2 sm:py-4">
         <div className="flex h-12 items-center gap-3 sm:glass sm:h-14 sm:rounded-full sm:px-5 sm:shadow-sm">
-          <Logo />
+          <Logo logo={info.logo} name={info.name} />
           <nav className="hidden items-center gap-1 text-sm font-medium sm:ms-6 sm:flex" aria-label="منوی اصلی">
             <CategoryMenu menu={menu} />
             {links.map((l) => <Link key={l.link + l.label} href={l.link} className={navLink}>{l.label}</Link>)}
@@ -58,7 +66,7 @@ export function TopHeader({ menu, info, links, loggedIn }: HeaderProps) {
 }
 
 /** Header 2: floating pill that slides in once the page is scrolled. */
-export function FloatingHeader({ menu, links, loggedIn }: HeaderProps) {
+export function FloatingHeader({ menu, links, loggedIn, info }: HeaderProps) {
   const [show, setShow] = useState(false);
   useEffect(() => {
     const on = () => setShow(window.scrollY > 140);
@@ -71,7 +79,7 @@ export function FloatingHeader({ menu, links, loggedIn }: HeaderProps) {
       className="pointer-events-none fixed inset-x-0 top-3 z-50 -translate-y-24 opacity-0 transition-all duration-300 data-[show=true]:pointer-events-auto data-[show=true]:translate-y-0 data-[show=true]:opacity-100">
       <Container>
         <div className="glass flex h-14 items-center gap-2 rounded-full px-3 shadow-md sm:px-5">
-          <Logo className="text-xl sm:text-2xl" />
+          <Logo className="text-xl sm:text-2xl" logo={info.logo} name={info.name} />
           <nav className="hidden items-center gap-1 text-sm font-medium sm:flex sm:ms-6" aria-label="منوی اصلی">
             <CategoryMenu menu={menu} />
             {links.map((l) => <Link key={l.link + l.label} href={l.link} className={navLink}>{l.label}</Link>)}

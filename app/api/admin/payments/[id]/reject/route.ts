@@ -1,13 +1,6 @@
-import { parseJson, route } from "@/lib/server/http";
-import { requirePermission, requireUser } from "@/lib/server/auth/guard";
-import { rejectPayment } from "@/lib/server/payments/service";
+import { adminRoute } from "@/lib/server/admin/core";
+import { reject } from "@/lib/server/admin/orders";
+import { parseJson } from "@/lib/server/http";
 import { rejectSchema } from "@/lib/server/validation";
 
-type Ctx = { params: Promise<{ id: string }> };
-
-export const POST = route<Ctx>(async (req, { params }) => {
-  const admin = await requireUser();
-  requirePermission(admin, "payment.review");
-  const { reason } = await parseJson(req, rejectSchema);
-  return rejectPayment((await params).id, admin.id, reason);
-});
+export const POST = adminRoute<{ id: string }>("payment.review", async (req, p, a) => reject(p.id, (await parseJson(req, rejectSchema)).reason, a));

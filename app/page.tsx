@@ -3,7 +3,7 @@ import { Header } from "@/components/site-header";
 import { Footer } from "@/components/footer";
 import { Hero } from "@/components/hero";
 import { BlogSection, BrandMarquee, CategoryTiles, ProductRail, TelegramBanner } from "@/components/home-sections";
-import { getBanner, getBlogPosts, getBrandNames, getCategoryTree, getHomeSections, getNewestProducts, getProductsByCategory } from "@/lib/queries";
+import { getBanner, getBlogPosts, getBrandNames, getCategoryTree, getHomeSections, getNewestProducts, getProductsByCategory, getProductsByIds } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 const faDate = (d: Date | null) => (d ? d.toLocaleDateString("fa-IR", { day: "numeric", month: "long", year: "numeric" }) : "");
@@ -12,7 +12,7 @@ export default async function Home() {
   const [sections, tree] = await Promise.all([getHomeSections(), getCategoryTree()]);
   const blocks = await Promise.all(
     sections.map(async (s) => {
-      const cfg = (s.config ?? {}) as { categorySlug?: string; limit?: number };
+      const cfg = (s.config ?? {}) as { categorySlug?: string; productIds?: string[]; limit?: number };
       switch (s.type) {
         case "hero":
           return <Hero key={s.key} chips={["قاب آیفون", "گلس", "شارژر", "کابل", "ایرپاد"]} />;
@@ -20,7 +20,7 @@ export default async function Home() {
           return <BrandMarquee key={s.key} brands={await getBrandNames()} />;
         case "product_rail": {
           const slug = cfg.categorySlug ?? "";
-          const items = await getProductsByCategory(slug, cfg.limit ?? 5);
+          const items = cfg.productIds?.length ? await getProductsByIds(cfg.productIds) : await getProductsByCategory(slug, cfg.limit ?? 5);
           return <ProductRail key={s.key} id={slug} title={s.title ?? slug} items={items} href={s.link ?? `/shop#${slug}`} />;
         }
         case "newest":

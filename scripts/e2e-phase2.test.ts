@@ -77,7 +77,10 @@ async function productWithStock(minStock = 5) {
 
 describe("Phase 2", () => {
   // Seeded demo accounts are logged into by several tests; clear their login counters so reruns are stable.
-  before(async () => { await db.rateLimit.deleteMany({ where: { key: { startsWith: "login:phone:0912000" } } }); });
+  before(async () => {
+    await db.rateLimit.deleteMany({}); // tests use fixed fake IPs; counters from earlier runs must not leak in
+    await db.address.deleteMany({ where: { user: { phone: { in: ["09120000002", "09120000003"] } } } }); // the address cap (10) would otherwise trip on reruns
+  });
   after(async () => { await db.$disconnect(); });
 
   describe("Authentication", () => {

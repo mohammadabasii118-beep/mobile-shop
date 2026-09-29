@@ -162,6 +162,8 @@ model PhoneModel {
   name      String
   brandId   String
   brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  image     String?
+  description String?
   isActive  Boolean  @default(true)
   sortOrder Int      @default(0)
   seoTitle  String?
@@ -286,6 +288,7 @@ model InventoryMovement {
   inventoryId String
   inventory   Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
   delta       Int
+  balanceAfter Int?
   reason      String   // order | cancel | refund | manual | restock
   orderId     String?
   note        String?
@@ -825,6 +828,7 @@ model AdminLog {
 
   @@index([entity, entityId])
   @@index([createdAt])
+  @@index([adminId])
 }
 
 /* Fixed-window rate limiter shared by every app instance (works on a plain VPS). */

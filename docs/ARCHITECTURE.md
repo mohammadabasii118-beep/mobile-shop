@@ -49,7 +49,7 @@ Money is integer Toman. Highlights:
 | 0 | Audit, checkpoint, architecture | done |
 | 1 | Schema, migrations, seed, DB-backed read path (menu, home, shop, product, blog, search) | **done** |
 | 2 | Real auth (OTP + password, sessions, RBAC helpers), DB cart, checkout, orders, card-to-card payment + private receipt upload, order timeline | **done** |
-| 3 | Admin panel: dashboard, products/categories/brands/phone models, inventory, orders, payment review, users | |
+| 3 | Admin panel: dashboard, products/categories/brands/phone models, inventory, orders, payment review, users | **done** |
 | 4 | Wholesale (application, approval, tiers, server-side wholesale pricing), wallet, loyalty, coupons, reviews, Q&A, back-in-stock, tickets | |
 | 5 | Homepage/banner/menu/footer/settings/blog CMS, SEO (metadata, JSON-LD, sitemap, robots, brand/phone pages), audit log, security hardening, tests | |
 
@@ -108,3 +108,42 @@ Move PostgreSQL by changing only `DATABASE_URL` (`prisma migrate deploy` on the 
 * Wallet payment, loyalty earning, refunds-to-wallet and notifications delivery (SMS/e-mail/Telegram) are schema-ready but not wired.
 * Coupon usage is not returned on cancellation yet.
 * No admin UI yet (Phase 3); use the seeded admin only through the API.
+
+
+## Phase 3 — admin panel (`/admin`)
+
+```
+app/admin/**                 pages (server components: guard + data) → components/admin/* (client UI)
+app/api/admin/**             REST API. Every handler is wrapped by adminRoute(permission, handler)
+app/media/[...path]          public image files (uploads);  private receipts stay behind /api/orders/.../proof
+lib/server/admin/
+  core.ts       adminRoute(): CSRF → session → staff check → permission (server) → per-admin rate limit; audit(); diff()
+  resources.ts  registry of simple CRUD resources: Zod schema, permission, search/filters, delete guards, immutable fields
+  crud.ts       generic list/get/create/update/delete/reorder — every write is one transaction that also writes AdminLog
+  products.ts inventory.ts orders.ts customers.ts wholesale.ts settings.ts misc.ts (dashboard, reviews, audit, wallet/loyalty/support views)
+lib/admin/nav.ts, format.ts, product-map.ts
+```
+
+**Authorization.** `adminRoute` requires a signed-in *staff* user (role with `isStaff`) holding the listed permission; it is checked on every request from the DB (no permission is cached in the cookie). Pages call `requireAdminPage(perm)`; the sidebar only hides links for convenience. Role changes need `role.manage` and you can only grant/remove roles whose permissions you hold; you cannot demote or deactivate yourself.
+
+**Resource registry** (`/api/admin/r/<resource>`): `categories, brands, phone-models, coupons, shipping, banners, homepage, menus, tiers, seo, blog`. Adding a new simple CRUD screen = one registry entry + one page config.
+
+**Money-affecting rules kept in one place.** Product prices are validated (wholesale ≤ retail, discounts ≤ price); every retail/wholesale change writes `PriceHistory` (product, type, old, new, admin, time). Stock only changes through `adjustStock()` (atomic, never negative, writes `InventoryMovement` with `balanceAfter` + audit). Order status changes go through `ORDER_TRANSITIONS`; cancel/refund/payment-driven transitions have dedicated endpoints (cancel restocks, refund marks order+payment REFUNDED).
+
+**Audit log.** `AdminLog` (admin, action, entity, id, old/new, ip, time). No write API exists, and a PostgreSQL trigger rejects UPDATE/DELETE, so even a compromised admin account cannot rewrite history.
+
+**Uploads.** `POST /api/admin/upload`: JPG/PNG/WebP only (magic bytes + extension), ≤4 MB, random server-side name, stored in `UPLOAD_DIR/public/images`, served with `nosniff`. SVG/PDF are refused.
+
+**Storefront wiring.** Header/footer menus, homepage sections (incl. hand-picked `productIds`), banners (`home_telegram`, `shop_top`), site info/logo/favicon, payment card details, shipping methods, coupons, categories, brands (`/brand/<slug>`), phone models (`/model/<slug>`) are all read from the database on each request.
+
+### Tests
+
+`npm run test:e2e` (server on :3300 with `TRUST_PROXY=1`) runs Phase 2 + Phase 3 suites sequentially: 75 integration tests (48 for the admin panel: authorization matrix, CRUD per module, price history, inventory races, order/payment flows, role escalation, wholesale approval, settings → storefront, audit immutability, rate limiting).
+
+### Known limits after Phase 3
+
+* Coupon usage is not rolled back on cancel/refund — see `docs/TECH_DEBT.md` #1.
+* Wallet, loyalty and support screens are read-only; blog and SEO are basic forms (full versions later).
+* Refund marks the order/payment and restocks; returning the money is manual until wallet refunds exist.
+* Changing an order's shipping method after checkout does not recompute its shipping cost (the quote stays as a snapshot).
+* Wholesale application *documents* are not uploadable/viewable yet (count only).

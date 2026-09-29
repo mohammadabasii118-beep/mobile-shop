@@ -17,7 +17,7 @@ export async function Footer() {
       <Container>
         <div className="grid gap-8 border-t border-border py-10 text-sm sm:grid-cols-2 lg:grid-cols-[1.3fr_0.7fr_1.1fr_0.8fr]">
           <div>
-            <Logo />
+            <Logo logo={info.logo} name={info.name} />
             <p className="mt-4 leading-8 text-muted">{info.footerText}</p>
           </div>
           <div>

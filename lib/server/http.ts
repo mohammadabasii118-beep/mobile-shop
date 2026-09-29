@@ -50,6 +50,12 @@ export function route<C = { params: Promise<Record<string, string>> }>(handler: 
         if (e.status === 429 && e.details && typeof e.details === "object" && "retryAfter" in e.details) headers["Retry-After"] = String((e.details as { retryAfter: number }).retryAfter);
         return Response.json({ ok: false, error: { code: e.code, message: e.message, details: e.details } }, { status: e.status, headers });
       }
+      const code = (e as { code?: string; name?: string })?.code;
+      if ((e as { name?: string })?.name === "PrismaClientKnownRequestError") {
+        if (code === "P2002") return Response.json({ ok: false, error: { code: "duplicate", message: "مقدار تکراری است؛ این شناسه/اسلاگ قبلاً استفاده شده." } }, { status: 409 });
+        if (code === "P2003") return Response.json({ ok: false, error: { code: "in_use", message: "این مورد در بخش‌های دیگر استفاده شده و قابل حذف/تغییر نیست." } }, { status: 409 });
+        if (code === "P2025") return Response.json({ ok: false, error: { code: "not_found", message: "مورد پیدا نشد." } }, { status: 404 });
+      }
       console.error("[api] unhandled", e);
       return Response.json({ ok: false, error: { code: "internal", message: "خطای داخلی سرور. دوباره تلاش کنید." } }, { status: 500 });
     }

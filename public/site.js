@@ -1,6 +1,7 @@
 /* Site-wide behaviour: server-backed cart drawer, search overlay, support chat widget.
    Prices and totals are always computed by the server (/api/cart); this file only renders them. */
 (function () {
+  if (location.pathname.indexOf("/admin") === 0) return; // the admin panel has its own scripts
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var $$ = function (s, r) { return [].slice.call((r || document).querySelectorAll(s)); };
   var fa = function (n) { return Number(n).toLocaleString("fa-IR"); };

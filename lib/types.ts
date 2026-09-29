@@ -26,6 +26,7 @@ export interface MenuCategory {
 
 export interface SiteInfo {
   name: string;
+  tagline?: string;
   phone: string;
   email: string;
   address: string;
@@ -34,4 +35,6 @@ export interface SiteInfo {
   instagram: string;
   topBar: string;
   footerText: string;
+  logo?: string;
+  favicon?: string;
 }
