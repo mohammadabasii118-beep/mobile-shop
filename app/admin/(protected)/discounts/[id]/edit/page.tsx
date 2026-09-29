@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import DiscountForm from "@/components/admin/DiscountForm";
 import { updateDiscount } from "@/lib/actions/discounts";
 
-export default async function EditDiscountPage({ params }: { params: { id: string } }) {
+export default async function EditDiscountPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const discount = await db.discount.findUnique({ where: { id: params.id } });
   if (!discount) notFound();
   const action = updateDiscount.bind(null, discount.id);

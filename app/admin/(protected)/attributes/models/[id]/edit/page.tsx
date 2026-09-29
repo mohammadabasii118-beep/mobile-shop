@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import PhoneModelForm from "@/components/admin/PhoneModelForm";
 import { updatePhoneModel } from "@/lib/actions/attributes";
 
-export default async function EditModelPage({ params }: { params: { id: string } }) {
+export default async function EditModelPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const model = await db.phoneModel.findUnique({ where: { id: params.id } });
   if (!model) notFound();
   const action = updatePhoneModel.bind(null, model.id);

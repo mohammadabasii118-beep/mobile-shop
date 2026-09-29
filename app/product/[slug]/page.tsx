@@ -17,7 +17,8 @@ import { getMyPhone } from "@/lib/actions/myPhone";
 import { isViewerWholesale, effectivePrice } from "@/lib/wholesalePricing";
 import { fmtToman, fa } from "@/lib/format";
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const params = await props.params;
   const p = await getProductBySlug(params.slug);
   if (!p) return {};
   return {
@@ -28,7 +29,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default async function ProductPage({ params }: { params: { slug: string } }) {
+export default async function ProductPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const p = await getProductBySlug(params.slug);
   if (!p || !p.isActive) notFound();
   const related = await getRelatedProducts(p.categoryId, p.id);

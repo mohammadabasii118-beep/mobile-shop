@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import CategoryForm from "@/components/admin/CategoryForm";
 import { updateCategory } from "@/lib/actions/categories";
 
-export default async function EditCategoryPage({ params }: { params: { id: string } }) {
+export default async function EditCategoryPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const category = await db.category.findUnique({ where: { id: params.id } });
   if (!category) notFound();
   const action = updateCategory.bind(null, category.id);

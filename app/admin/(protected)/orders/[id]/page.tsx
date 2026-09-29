@@ -9,7 +9,8 @@ import OrderTimeline from "@/components/OrderTimeline";
 
 const receiptStatusLabel: Record<string, string> = { PENDING: "در انتظار بررسی", APPROVED: "تأیید شده", REJECTED: "رد شده" };
 
-export default async function AdminOrderDetailPage({ params }: { params: { id: string } }) {
+export default async function AdminOrderDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const order = await db.order.findUnique({
     where: { id: params.id },
     include: {

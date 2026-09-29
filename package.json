@@ -6,7 +6,6 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
@@ -14,7 +13,8 @@
     "release-expired-reservations": "tsx scripts/releaseExpiredReservations.ts",
     "backup": "bash scripts/backup.sh",
     "restore": "bash scripts/restore.sh",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@prisma/client": "^5.19.1",

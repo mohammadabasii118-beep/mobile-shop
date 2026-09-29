@@ -1,6 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { productSchema } from "@/lib/validation";
 import { requireAdmin } from "./guard";
@@ -37,7 +38,7 @@ export async function createProduct(formData: FormData) {
       wholesalePrice: data.wholesalePrice || null,
       stock: data.stock, categoryId: data.categoryId, brandId: data.brandId || null,
       phoneModelId: data.phoneModelId || null, images,
-      specs: parseSpecsText(data.specsText),
+      specs: parseSpecsText(data.specsText) ?? Prisma.DbNull,
       isActive: !!data.isActive, isBestSeller: !!data.isBestSeller, isNew: !!data.isNew,
       isFeatured: !!data.isFeatured, isTrending: !!data.isTrending,
       hasVariants: !!data.hasVariants,
@@ -59,7 +60,7 @@ export async function updateProduct(id: string, formData: FormData) {
       wholesalePrice: data.wholesalePrice || null,
       stock: data.stock, categoryId: data.categoryId, brandId: data.brandId || null,
       phoneModelId: data.phoneModelId || null, images,
-      specs: parseSpecsText(data.specsText),
+      specs: parseSpecsText(data.specsText) ?? Prisma.DbNull,
       isActive: !!data.isActive, isBestSeller: !!data.isBestSeller, isNew: !!data.isNew,
       isFeatured: !!data.isFeatured, isTrending: !!data.isTrending,
       hasVariants: !!data.hasVariants,

@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import VariantForm from "@/components/admin/VariantForm";
 import { updateVariant } from "@/lib/actions/variants";
 
-export default async function EditVariantPage({ params }: { params: { id: string; variantId: string } }) {
+export default async function EditVariantPage(props: { params: Promise<{ id: string; variantId: string }> }) {
+  const params = await props.params;
   const [product, variant, brands, models, colors] = await Promise.all([
     db.product.findUnique({ where: { id: params.id } }),
     db.productVariant.findUnique({ where: { id: params.variantId } }),

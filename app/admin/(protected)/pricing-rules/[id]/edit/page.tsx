@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import PricingRuleForm from "@/components/admin/PricingRuleForm";
 import { updatePricingRule } from "@/lib/actions/pricingRules";
 
-export default async function EditPricingRulePage({ params }: { params: { id: string } }) {
+export default async function EditPricingRulePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const rule = await db.pricingRule.findUnique({ where: { id: params.id } });
   if (!rule) notFound();
   const action = updatePricingRule.bind(null, rule.id);

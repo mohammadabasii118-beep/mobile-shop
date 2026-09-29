@@ -5,7 +5,8 @@ import AdminTicketActions from "@/components/admin/AdminTicketActions";
 
 const statusLabel: Record<string, string> = { OPEN: "در انتظار پاسخ", ANSWERED: "پاسخ داده‌شده", CLOSED: "بسته‌شده" };
 
-export default async function AdminTicketDetailPage({ params }: { params: { id: string } }) {
+export default async function AdminTicketDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ticket = await db.supportTicket.findUnique({
     where: { id: params.id },
     include: { messages: { orderBy: { createdAt: "asc" } }, user: { select: { name: true, email: true, phone: true } } },

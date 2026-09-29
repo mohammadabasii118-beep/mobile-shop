@@ -4,7 +4,8 @@ import { db } from "@/lib/db";
 import { fmtToman, fa } from "@/lib/format";
 import { deleteVariant } from "@/lib/actions/variants";
 
-export default async function ProductVariantsPage({ params }: { params: { id: string } }) {
+export default async function ProductVariantsPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const product = await db.product.findUnique({ where: { id: params.id } });
   if (!product) notFound();
 

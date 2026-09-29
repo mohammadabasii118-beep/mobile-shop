@@ -9,7 +9,8 @@ const orderStatusLabel: Record<string, string> = {
   SHIPPED: "ارسال شده", DELIVERED: "تحویل داده شده", CANCELED: "لغو شده",
 };
 
-export default async function AdminSearchPage({ searchParams }: { searchParams: { q?: string } }) {
+export default async function AdminSearchPage(props: { searchParams: Promise<{ q?: string }> }) {
+  const searchParams = await props.searchParams;
   const q = (searchParams.q || "").trim();
 
   if (!q) {

@@ -5,5 +5,6 @@ import { db } from "@/lib/db";
 export async function getSiteSettings() {
   const existing = await db.siteSettings.findUnique({ where: { id: "singleton" } });
   if (existing) return existing;
-  return db.siteSettings.create({ data: { id: "singleton" } });
+  // upsert: parallel first requests on an empty DB must not race on the unique id.
+  return db.siteSettings.upsert({ where: { id: "singleton" }, update: {}, create: { id: "singleton" } });
 }

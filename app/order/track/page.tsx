@@ -13,19 +13,20 @@ const statusLabel: Record<string, string> = {
   CANCELED: "لغو شده",
 };
 
-function clientIp(): string | null {
-  const h = headers();
+async function clientIp(): Promise<string | null> {
+  const h = await headers();
   const fwd = h.get("x-forwarded-for");
   if (fwd) return fwd.split(",")[0].trim();
   return h.get("x-real-ip");
 }
 
-export default async function TrackOrderPage({ searchParams }: { searchParams: { order?: string; phone?: string } }) {
+export default async function TrackOrderPage(props: { searchParams: Promise<{ order?: string; phone?: string }> }) {
+  const searchParams = await props.searchParams;
   let order: TrackedOrder | null = null;
   let errorMessage = "";
 
   if (searchParams.order && searchParams.phone) {
-    const result: TrackLookupResult = await lookupOrderForTracking(searchParams.order.trim(), searchParams.phone.trim(), clientIp());
+    const result: TrackLookupResult = await lookupOrderForTracking(searchParams.order.trim(), searchParams.phone.trim(), await clientIp());
     if (result.ok) {
       order = result.order;
     } else if (result.reason === "rate_limited") {

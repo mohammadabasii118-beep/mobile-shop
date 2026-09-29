@@ -8,11 +8,12 @@ import { fa } from "@/lib/format";
 
 export const metadata: Metadata = { title: "نتایج جستجو" };
 
-export default async function SearchPage({
-  searchParams,
-}: {
-  searchParams: { q?: string; sort?: string; discount?: string; cat?: string; myphone?: string; model?: string };
-}) {
+export default async function SearchPage(
+  props: {
+    searchParams: Promise<{ q?: string; sort?: string; discount?: string; cat?: string; myphone?: string; model?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const q = searchParams.q?.trim() || "";
   const selectedCats = searchParams.cat?.split(",").filter(Boolean) || [];
   const [myPhone, isWholesale] = await Promise.all([getMyPhone(), isViewerWholesale()]);

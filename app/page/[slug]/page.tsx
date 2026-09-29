@@ -2,13 +2,15 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { db } from "@/lib/db";
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const params = await props.params;
   const page = await db.page.findUnique({ where: { slug: params.slug } });
   if (!page || !page.isPublished) return {};
   return { title: page.title };
 }
 
-export default async function CmsPage({ params }: { params: { slug: string } }) {
+export default async function CmsPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const page = await db.page.findUnique({ where: { slug: params.slug } });
   if (!page || !page.isPublished) notFound();
 

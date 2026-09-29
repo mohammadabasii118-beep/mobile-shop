@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import VariantForm from "@/components/admin/VariantForm";
 import { createVariant } from "@/lib/actions/variants";
 
-export default async function NewVariantPage({ params }: { params: { id: string } }) {
+export default async function NewVariantPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const product = await db.product.findUnique({ where: { id: params.id } });
   if (!product) notFound();
 

@@ -4,7 +4,8 @@ import { db } from "@/lib/db";
 import ProductForm from "@/components/admin/ProductForm";
 import { updateProduct } from "@/lib/actions/products";
 
-export default async function EditProductPage({ params }: { params: { id: string } }) {
+export default async function EditProductPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const product = await db.product.findUnique({ where: { id: params.id } });
   if (!product) notFound();
   const action = updateProduct.bind(null, product.id);

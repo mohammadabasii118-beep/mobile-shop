@@ -8,7 +8,8 @@ import CustomerReplyForm from "@/components/support/CustomerReplyForm";
 
 const statusLabel: Record<string, string> = { OPEN: "در انتظار پاسخ پشتیبانی", ANSWERED: "پاسخ داده شد", CLOSED: "بسته‌شده" };
 
-export default async function TicketDetailPage({ params }: { params: { id: string } }) {
+export default async function TicketDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
 

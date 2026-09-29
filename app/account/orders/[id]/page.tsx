@@ -12,7 +12,8 @@ const statusLabel: Record<string, string> = {
 };
 const receiptStatusLabel: Record<string, string> = { PENDING: "در انتظار تأیید مدیر", APPROVED: "تأیید شده", REJECTED: "رد شده" };
 
-export default async function OrderDetailPage({ params }: { params: { id: string } }) {
+export default async function OrderDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const session = await getServerSession(authOptions);
   if (!session) redirect("/login");
   const order = await db.order.findUnique({

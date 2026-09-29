@@ -9,7 +9,8 @@ const statusLabel: Record<string, string> = {
   SHIPPED: "ارسال شده", DELIVERED: "تحویل داده شده", CANCELED: "لغو شده",
 };
 
-export default async function AdminUserDetailPage({ params }: { params: { id: string } }) {
+export default async function AdminUserDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await db.user.findUnique({ where: { id: params.id }, include: { orders: { orderBy: { createdAt: "desc" } } } });
   if (!user) notFound();
 

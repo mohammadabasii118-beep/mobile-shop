@@ -10,7 +10,8 @@ const CONTENT_TYPES: Record<string, string> = {
   jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", gif: "image/gif",
 };
 
-export async function GET(req: Request, { params }: { params: { filename: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ filename: string }> }) {
+  const params = await props.params;
   const filename = params.filename;
   const url = new URL(req.url);
   const token = url.searchParams.get("t");

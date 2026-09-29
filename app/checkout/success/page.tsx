@@ -1,7 +1,10 @@
 import Link from "next/link";
 import Icon from "@/components/Icon";
 
-export default function CheckoutSuccessPage({ searchParams }: { searchParams: { order?: string; status?: string; error?: string } }) {
+export default async function CheckoutSuccessPage(
+  props: { searchParams: Promise<{ order?: string; status?: string; error?: string }> }
+) {
+  const searchParams = await props.searchParams;
   const { order, status } = searchParams;
 
   if (searchParams.error || !order) {

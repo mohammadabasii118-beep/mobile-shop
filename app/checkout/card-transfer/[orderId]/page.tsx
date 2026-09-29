@@ -5,13 +5,14 @@ import { db } from "@/lib/db";
 import { getBankSettings } from "@/lib/bankSettings";
 import CardTransferForm from "@/components/CardTransferForm";
 
-export default async function CardTransferPage({
-  params,
-  searchParams,
-}: {
-  params: { orderId: string };
-  searchParams: { t?: string };
-}) {
+export default async function CardTransferPage(
+  props: {
+    params: Promise<{ orderId: string }>;
+    searchParams: Promise<{ t?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const order = await db.order.findUnique({
     where: { id: params.orderId },
     include: { receipts: { orderBy: { createdAt: "desc" }, take: 1 } },

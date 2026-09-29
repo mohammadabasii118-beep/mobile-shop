@@ -3,7 +3,8 @@ import { db } from "@/lib/db";
 import PageForm from "@/components/admin/PageForm";
 import { updatePage } from "@/lib/actions/pages";
 
-export default async function EditPagePage({ params }: { params: { id: string } }) {
+export default async function EditPagePage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const page = await db.page.findUnique({ where: { id: params.id } });
   if (!page) notFound();
   const action = updatePage.bind(null, page.id);

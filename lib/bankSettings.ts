@@ -5,5 +5,5 @@ export async function getBankSettings() {
   if (existing) return existing;
   // Created lazily on first read with sensible placeholder defaults, editable
   // right away from /admin/settings — no manual DB seeding required.
-  return db.bankCardSettings.create({ data: { id: "singleton" } });
+  return db.bankCardSettings.upsert({ where: { id: "singleton" }, update: {}, create: { id: "singleton" } });
 }

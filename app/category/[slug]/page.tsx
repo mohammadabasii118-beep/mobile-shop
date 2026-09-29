@@ -8,7 +8,8 @@ import { getMyPhone } from "@/lib/actions/myPhone";
 import { isViewerWholesale, effectivePrice } from "@/lib/wholesalePricing";
 import { fa } from "@/lib/format";
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const params = await props.params;
   const category = await getCategoryBySlug(params.slug);
   if (!category) return {};
   return {
@@ -18,12 +19,14 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   };
 }
 
-export default async function CategoryPage({
-  params, searchParams,
-}: {
-  params: { slug: string };
-  searchParams: { sort?: string; discount?: string; cat?: string; myphone?: string };
-}) {
+export default async function CategoryPage(
+  props: {
+    params: Promise<{ slug: string }>;
+    searchParams: Promise<{ sort?: string; discount?: string; cat?: string; myphone?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const category = await getCategoryBySlug(params.slug);
   if (!category) notFound();
 
