@@ -16,7 +16,8 @@ export function Logo({ className }: { className?: string }) {
   );
 }
 
-const iconBtn = "grid size-10 cursor-pointer place-items-center rounded-full text-primary hover:bg-primary/10";
+const iconBtn = "grid size-10 cursor-pointer place-items-center rounded-full bg-surface text-foreground/80 shadow-sm ring-1 ring-transparent transition-all duration-200 hover:bg-primary/10 hover:text-primary hover:shadow-md hover:ring-primary/35";
+const navLink = "rounded-full px-3.5 py-2 transition-colors hover:bg-primary/10 hover:text-primary";
 
 function CartBtn() {
   return (
@@ -37,11 +38,11 @@ export function TopHeader() {
       <Container className="py-2 sm:py-4">
         <div className="flex h-12 items-center gap-3 sm:glass sm:h-14 sm:rounded-full sm:px-5 sm:shadow-sm">
           <Logo />
-          <nav className="hidden items-center gap-5 text-sm font-medium sm:ms-6 sm:flex" aria-label="منوی اصلی">
+          <nav className="hidden items-center gap-1 text-sm font-medium sm:ms-6 sm:flex" aria-label="منوی اصلی">
             <CategoryMenu />
-            <Link href="/shop" className="hover:text-primary">فروشگاه</Link>
-            <Link href="/blog" className="hover:text-primary">وبلاگ</Link>
-            <Link href="/support" className="hover:text-primary">پشتیبانی</Link>
+            <Link href="/shop" className={navLink}>فروشگاه</Link>
+            <Link href="/blog" className={navLink}>وبلاگ</Link>
+            <Link href="/support" className={navLink}>پشتیبانی</Link>
           </nav>
           <div className="ms-auto flex items-center gap-1">
             <button data-search-btn className={iconBtn} aria-label="جستجو"><Search className="size-5" /></button>
@@ -71,11 +72,11 @@ export function FloatingHeader() {
       <Container>
         <div className="glass flex h-14 items-center gap-2 rounded-full px-3 shadow-md sm:px-5">
           <Logo className="text-xl sm:text-2xl" />
-          <nav className="hidden items-center gap-5 text-sm font-medium sm:flex sm:ms-6" aria-label="منوی اصلی">
+          <nav className="hidden items-center gap-1 text-sm font-medium sm:flex sm:ms-6" aria-label="منوی اصلی">
             <CategoryMenu />
-            <Link href="/shop" className="hover:text-primary">فروشگاه</Link>
-            <Link href="/blog" className="hover:text-primary">وبلاگ</Link>
-            <Link href="/support" className="hover:text-primary">پشتیبانی</Link>
+            <Link href="/shop" className={navLink}>فروشگاه</Link>
+            <Link href="/blog" className={navLink}>وبلاگ</Link>
+            <Link href="/support" className={navLink}>پشتیبانی</Link>
           </nav>
           <div className="ms-auto flex items-center">
             <Link href="/account" data-account-link className={cn(iconBtn, "relative hidden sm:grid")} aria-label="حساب کاربری"><User className="size-5" /><i data-user-dot hidden className="absolute end-2 top-2 size-2 rounded-full bg-accent" /></Link>

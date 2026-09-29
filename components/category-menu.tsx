@@ -30,7 +30,7 @@ export function CategoryMenu() {
   useCloseDetails();
   return (
     <details data-menu className="group relative">
-      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-sm font-medium text-primary [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-full bg-primary/10 px-3.5 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 [&::-webkit-details-marker]:hidden">
         <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />دسته‌بندی‌ها<LayoutGrid className="size-4" />
       </summary>
       <div className="mega border border-border bg-surface absolute start-0 top-[calc(100%+1.1rem)] z-50 w-[min(92vw,520px)] rounded-xl p-4 shadow-lg">
@@ -58,7 +58,7 @@ export function MobileMenu({ className }: { className?: string }) {
   useCloseDetails();
   return (
     <details data-menu className={cn("group", className)}>
-      <summary aria-label="منو" className="grid size-10 cursor-pointer list-none place-items-center rounded-full text-primary hover:bg-primary/10 [&::-webkit-details-marker]:hidden"><Menu className="size-5" /></summary>
+      <summary aria-label="منو" className="grid size-10 cursor-pointer list-none place-items-center rounded-full bg-surface text-foreground/80 shadow-sm ring-1 ring-transparent transition-all duration-200 hover:bg-primary/10 hover:text-primary hover:shadow-md hover:ring-primary/35 [&::-webkit-details-marker]:hidden"><Menu className="size-5" /></summary>
       <div className="border border-border bg-surface fixed inset-x-3 top-20 max-h-[75vh] overflow-y-auto z-50 rounded-xl p-3 shadow-lg">
         <div className="mb-1 flex items-center gap-2 px-2 text-xs text-muted"><BatteryCharging className="size-4" />دسته‌بندی‌ها</div>
         {menu.map((c) => (
