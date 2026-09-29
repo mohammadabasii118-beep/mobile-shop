@@ -136,29 +136,53 @@
   /* ---------- demo login ---------- */
   function initLogin() {
     var f = $("[data-login-form]"); if (!f) return;
-    var s1 = $("[data-step1]", f), s2 = $("[data-step2]", f), done = $("[data-login-done]"), err = $("[data-login-err]", f), btn = $("[data-login-btn]", f), timer = $("[data-login-timer]", f), tick;
+    var card = $("[data-login-card]"), s1 = $("[data-step1]", f), s2 = $("[data-step2]", f), done = $("[data-login-done]"), err = $("[data-login-err]", f), btn = $("[data-login-btn]", f), timer = $("[data-login-timer]", f), otp = $$("[data-otp] input", f), tick;
     function latin(v) { return v.replace(/[۰-۹]/g, function (d) { return "۰۱۲۳۴۵۶۷۸۹".indexOf(d); }).trim(); }
+    function busy(on) { card.dataset.loading = String(on); btn.disabled = on; }
     function startTimer() {
-      var n = 60; clearInterval(tick);
-      function draw() { timer.innerHTML = n > 0 ? "ارسال مجدد تا " + fa(n) + " ثانیه دیگر" : '<button type="button" data-login-resend class="cl-link">ارسال مجدد کد</button>'; }
+      var n = 120; clearInterval(tick);
+      function draw() { timer.innerHTML = n > 0 ? '<b class="cl-num">' + fa(n) + '</b> ثانیه مانده تا پایان اعتبار این کد' : '<button type="button" data-login-resend class="cl-link">ارسال مجدد کد</button>'; }
       draw(); tick = setInterval(function () { n--; draw(); if (n <= 0) clearInterval(tick); }, 1000);
     }
-    function back() { s2.hidden = true; s1.hidden = false; btn.textContent = "ارسال کد"; err.textContent = ""; clearInterval(tick); $("[name=phone]", f).focus(); }
+    function back() { s2.hidden = true; s1.hidden = false; btn.textContent = "ارسال کد"; err.textContent = ""; clearInterval(tick); otp.forEach(function (i) { i.value = ""; }); $("[name=phone]", f).focus(); }
+    otp.forEach(function (inp, i) {
+      inp.addEventListener("input", function () {
+        var d = latin(inp.value).replace(/\D/g, "");
+        inp.value = d.slice(-1);
+        if (d && otp[i + 1]) otp[i + 1].focus();
+      });
+      inp.addEventListener("keydown", function (e) { if (e.key === "Backspace" && !inp.value && otp[i - 1]) { otp[i - 1].focus(); otp[i - 1].value = ""; } });
+      inp.addEventListener("paste", function (e) {
+        var t = latin((e.clipboardData || window.clipboardData).getData("text")).replace(/\D/g, "");
+        if (!t) return; e.preventDefault();
+        otp.forEach(function (o, k) { o.value = t[k] || ""; });
+        otp[Math.min(t.length, otp.length) - 1].focus();
+      });
+    });
     f.addEventListener("click", function (e) {
       if (e.target.closest("[data-login-edit]")) back();
       if (e.target.closest("[data-login-resend]")) startTimer();
     });
     f.addEventListener("submit", function (e) {
       e.preventDefault();
+      if (card.dataset.loading === "true") return;
       if (!s2.hidden) {
-        if (!latin($("[name=code]", f).value)) { err.textContent = "کد تایید را وارد کنید."; return; }
-        try { localStorage.setItem("caseline-user", latin($("[name=phone]", f).value)); } catch (x) {}
-        f.hidden = true; done.hidden = false; return;
+        var code = otp.map(function (o) { return o.value; }).join("");
+        if (code.length < otp.length) { err.textContent = "کد تایید ۴ رقمی را کامل وارد کنید."; return; }
+        err.textContent = ""; busy(true);
+        setTimeout(function () {
+          try { localStorage.setItem("caseline-user", latin($("[name=phone]", f).value)); } catch (x) {}
+          busy(false); f.hidden = true; done.hidden = false;
+        }, 1200);
+        return;
       }
       var v = latin($("[name=phone]", f).value);
       if (!/^09\d{9}$/.test(v)) { err.textContent = "شماره موبایل را به‌صورت ۰۹۱۲۳۴۵۶۷۸۹ وارد کنید."; return; }
-      err.textContent = ""; s1.hidden = true; s2.hidden = false;
-      $("[data-login-phone]", f).textContent = v; btn.textContent = "تایید و ورود"; startTimer(); $("[name=code]", f).focus();
+      err.textContent = ""; busy(true);
+      setTimeout(function () {
+        busy(false); s1.hidden = true; s2.hidden = false;
+        $("[data-login-phone]", f).textContent = v; btn.textContent = "تایید"; startTimer(); otp[0].focus();
+      }, 1200);
     });
   }
 
