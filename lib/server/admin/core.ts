@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { forbidden } from "@/lib/server/errors";
 import { clientIp, route } from "@/lib/server/http";
+import { invalidatePublic } from "@/lib/server/public-cache";
 import { rateLimit } from "@/lib/server/rate-limit";
 import { requirePermission, requireUser } from "@/lib/server/auth/guard";
 import type { SessionUser } from "@/lib/server/auth/session";
@@ -33,7 +34,9 @@ export function adminRoute<P extends Record<string, string> = Record<string, str
     const params = (await ctx.params) ?? ({} as P);
     const admin = await authorizeAdmin(typeof perm === "function" ? perm(req, params) : perm);
     await rateLimit(`admin:${WRITE.has(req.method) ? "w" : "r"}:${admin.id}`, WRITE.has(req.method) ? 240 : 900, 60);
-    return handler(req, params, { admin, ip: clientIp(req) });
+    const result = await handler(req, params, { admin, ip: clientIp(req) });
+    if (WRITE.has(req.method)) invalidatePublic(); // admin edits are visible on the storefront immediately
+    return result;
   });
 }
 

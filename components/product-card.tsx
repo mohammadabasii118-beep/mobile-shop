@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SiteImage } from "@/components/site-image";
 import { Badge } from "@/components/ui";
 import { ProductVisual } from "@/components/product-visual";
 import { formatToman } from "@/lib/utils";
@@ -9,8 +10,7 @@ export function ProductCard({ p, showCat }: { p: CardProduct; showCat?: boolean 
     <Link href={`/product/${p.slug}`} className="group flex h-full flex-col overflow-hidden rounded-lg border border-border bg-surface p-2 transition-shadow hover:shadow-md">
       <div className="relative aspect-[4/4.3] overflow-hidden rounded-[18px]" style={{ background: `linear-gradient(160deg, hsl(${p.hue} 80% 56%), hsl(${(p.hue + 40) % 360} 70% 30%))` }}>
         {p.img ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={p.img} alt={p.name} loading="lazy" width={350} height={350} className="absolute inset-0 size-full object-cover transition-transform duration-300 group-hover:scale-105" />
+          <SiteImage src={p.img} alt={p.name} sizes="(min-width: 1024px) 22vw, (min-width: 640px) 30vw, 46vw" className="transition-transform duration-300 group-hover:scale-105" />
         ) : (
           <>
             <div className="absolute inset-0 opacity-30" style={{ background: "radial-gradient(circle at 30% 20%, #fff, transparent 60%)" }} />

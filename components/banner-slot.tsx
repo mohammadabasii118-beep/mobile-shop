@@ -12,7 +12,7 @@ export async function BannerSlot({ placement, className }: { placement: string; 
             <picture>
               {b.mobileImage && <source media="(max-width: 640px)" srcSet={b.mobileImage} />}
               
-              <img src={b.desktopImage || b.mobileImage || ""} alt={b.title} className="max-h-48 w-full object-cover" />
+              <img src={b.desktopImage || b.mobileImage || ""} alt={b.title} loading="lazy" decoding="async" className="max-h-48 w-full object-cover" />
             </picture>
           )}
           <div className="p-3">

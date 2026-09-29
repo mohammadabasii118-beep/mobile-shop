@@ -1,6 +1,7 @@
 // CaseLine e-commerce schema. Money is stored as integer Toman.
 generator client {
-  provider = "prisma-client"
+  provider        = "prisma-client"
+  previewFeatures = ["relationJoins"]
   output   = "../lib/generated/prisma"
 }
 
@@ -955,4 +956,15 @@ model NotificationDelivery {
   createdAt      DateTime     @default(now())
 
   @@index([status, channel])
+}
+
+/* Old public URLs after an admin changes a slug: answered with a permanent redirect (keeps SEO value and inbound links). */
+model SlugRedirect {
+  id        String   @id @default(cuid())
+  kind      String   // product | category | brand | model | post
+  oldSlug   String
+  newSlug   String
+  createdAt DateTime @default(now())
+
+  @@unique([kind, oldSlug])
 }

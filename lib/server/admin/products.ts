@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { badRequest, conflict, notFound } from "@/lib/server/errors";
 import { audit, diff, pageParams, type AdminCtx } from "@/lib/server/admin/core";
+import { recordSlugChange } from "@/lib/server/redirects";
 import { slug } from "@/lib/server/admin/resources";
 
 const txt = (max: number) => z.string().trim().max(max).transform((v) => (v === "" ? null : v)).nullable().optional();
@@ -111,6 +112,7 @@ export async function updateProduct(id: string, body: unknown, a: AdminCtx) {
     checkPrices(fields, cur);
     const df = diff(cur, fields);
     if (df.changed) await tx.product.update({ where: { id }, data: fields });
+    if (fields.slug && fields.slug !== cur.slug) await recordSlugChange(tx, "product", cur.slug, fields.slug);
 
     const priceLog: [string, number, number][] = [];
     if (fields.retailPrice !== undefined && fields.retailPrice !== cur.retailPrice) priceLog.push(["retail", cur.retailPrice, fields.retailPrice]);

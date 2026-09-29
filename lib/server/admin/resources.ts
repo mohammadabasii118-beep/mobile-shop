@@ -30,6 +30,8 @@ export interface Resource {
   /** Fields the API may never change once created. */
   immutable?: string[];
   auditName: string;
+  /** When set, changing `slug` records a permanent redirect from the old URL. */
+  slugKind?: "category" | "brand" | "model" | "post";
 }
 
 const noSelfParent = async (tx: Db, model: "category" | "menuItem", data: Record<string, unknown>, existing: Record<string, unknown> | null) => {
@@ -47,7 +49,7 @@ const noSelfParent = async (tx: Db, model: "category" | "menuItem", data: Record
 
 export const RESOURCES: Record<string, Resource> = {
   categories: {
-    model: "category", perm: "category.write", label: "دسته‌بندی", auditName: "category", hasSort: true, immutable: [],
+    model: "category", perm: "category.write", label: "دسته‌بندی", auditName: "category", slugKind: "category", hasSort: true, immutable: [],
     create: z.object({ name: req(80), slug, parentId: z.string().max(40).nullable().optional().transform((v) => v || null), description: opt(600), image, sortOrder: int(0, 100000).optional(), isActive: bool.optional(), seoTitle: opt(120), seoDescription: opt(300), seoContent: opt(20000), canonical: link }),
     orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }], search: ["name", "slug"], filters: ["isActive"],
     include: { parent: { select: { name: true } }, _count: { select: { products: true, children: true } } },
@@ -58,7 +60,7 @@ export const RESOURCES: Record<string, Resource> = {
     },
   },
   brands: {
-    model: "brand", perm: "brand.write", label: "برند", auditName: "brand", hasSort: true,
+    model: "brand", perm: "brand.write", label: "برند", auditName: "brand", slugKind: "brand", hasSort: true,
     create: z.object({ name: req(80), slug, logo: image, description: opt(1000), isActive: bool.optional(), sortOrder: int(0, 100000).optional(), seoTitle: opt(120), seoDescription: opt(300) }),
     orderBy: [{ sortOrder: "asc" }], search: ["name", "slug"], filters: ["isActive"], include: { _count: { select: { products: true, phoneModels: true } } },
     beforeDelete: async (tx, id) => {
@@ -66,7 +68,7 @@ export const RESOURCES: Record<string, Resource> = {
     },
   },
   "phone-models": {
-    model: "phoneModel", perm: "phone.write", label: "مدل گوشی", auditName: "phone_model", hasSort: true,
+    model: "phoneModel", perm: "phone.write", label: "مدل گوشی", auditName: "phone_model", slugKind: "model", hasSort: true,
     create: z.object({ name: req(80), slug, brandId: req(40), image, description: opt(1000), isActive: bool.optional(), sortOrder: int(0, 100000).optional(), seoTitle: opt(120), seoDescription: opt(300) }),
     orderBy: [{ brand: { sortOrder: "asc" } }, { sortOrder: "asc" }], search: ["name", "slug"], filters: ["isActive", "brandId"], include: { brand: { select: { name: true } }, _count: { select: { products: true } } },
   },
@@ -130,7 +132,7 @@ export const RESOURCES: Record<string, Resource> = {
     orderBy: [{ scope: "asc" }], search: ["scope", "title"],
   },
   blog: {
-    model: "blogPost", perm: "blog.write", label: "مقاله", auditName: "blog_post",
+    model: "blogPost", perm: "blog.write", label: "مقاله", auditName: "blog_post", slugKind: "post",
     create: z.object({ title: req(160), slug, excerpt: opt(400), content: req(50000), featuredImage: image, categoryId: z.string().max(40).nullable().optional().transform((v) => v || null), tags: z.array(z.string().trim().min(1).max(30)).max(10).optional(), authorName: opt(60), isPublished: bool.optional(), publishedAt: dateOpt, seoTitle: opt(120), seoDescription: opt(300), canonical: link }),
     orderBy: [{ createdAt: "desc" }], search: ["title", "slug"], filters: ["isPublished", "categoryId"], include: { category: { select: { name: true } } },
     guard: async (_tx, d, ex) => { if (d.isPublished && !d.publishedAt && !ex?.publishedAt) d.publishedAt = new Date(); },

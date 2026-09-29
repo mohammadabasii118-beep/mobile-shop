@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { cachedPublic } from "@/lib/server/public-cache";
 import type { CardProduct, MenuCategory, SiteInfo } from "@/lib/types";
 
 const cardInclude = {
@@ -33,90 +34,75 @@ const activeWhere = { isActive: true } satisfies Prisma.ProductWhereInput;
 const cardArgs = { include: { ...cardInclude, brand: { select: { name: true } } } } as const;
 
 export async function getProducts(where: Prisma.ProductWhereInput = {}, opts: { take?: number; orderBy?: Prisma.ProductOrderByWithRelationInput | Prisma.ProductOrderByWithRelationInput[] } = {}) {
-  const rows = await db.product.findMany({ where: { ...activeWhere, ...where }, ...cardArgs, take: opts.take, orderBy: opts.orderBy ?? { createdAt: "asc" } });
+  const rows = await db.product.findMany({ relationLoadStrategy: "join", where: { ...activeWhere, ...where }, ...cardArgs, take: opts.take, orderBy: opts.orderBy ?? { createdAt: "asc" } });
   return withBrand(rows);
 }
 
 /** Products of a top-level category (including its sub-categories). */
-export async function getProductsByCategory(slug: string, take = 5) {
-  return getProducts({ OR: [{ category: { slug } }, { category: { parent: { slug } } }] }, { take, orderBy: [{ soldCount: "desc" }, { createdAt: "asc" }] });
-}
+// Home-page rails: identical for everyone, so cached briefly (admin edits invalidate immediately; stock badges may lag ≤60 s,
+// while checkout always re-validates stock on the server).
+export const getProductsByCategory = cachedPublic("rail-category", async (slug: string, take: number) =>
+  getProducts({ OR: [{ category: { slug } }, { category: { parent: { slug } } }] }, { take, orderBy: [{ soldCount: "desc" }, { createdAt: "asc" }] }), 60);
 
 /** Hand-picked products (admin homepage section), kept in the order the admin chose. */
-export async function getProductsByIds(ids: string[]) {
+export const getProductsByIds = cachedPublic("rail-ids", async (ids: string[]) => {
   const rows = await getProducts({ id: { in: ids } }, {});
   return ids.map((id) => rows.find((r) => r.id === id)).filter((r): r is NonNullable<typeof r> => !!r);
-}
+}, 60);
 
-export async function getNewestProducts(take = 5) {
-  return getProducts({}, { take, orderBy: { createdAt: "desc" } });
-}
+export const getNewestProducts = cachedPublic("rail-newest", async (take: number) => getProducts({}, { take, orderBy: { createdAt: "desc" } }), 60);
 
-export async function getShopProducts() {
-  const rows = await db.product.findMany({ where: activeWhere, ...cardArgs, orderBy: { createdAt: "asc" } });
-  const cards = await withBrand(rows);
-  return cards.map((c, i) => ({
-    card: c,
-    sub: rows[i].category.parent ? rows[i].category.slug : "",
-    createdAt: rows[i].createdAt.getTime(),
-    soldCount: rows[i].soldCount,
-  }));
-}
-
-export async function getCategoryTree(): Promise<(MenuCategory & { id: string; productCount: number; sampleKinds: string[] })[]> {
+export const getCategoryTree = cachedPublic("category-tree", async (): Promise<(MenuCategory & { id: string; productCount: number; sampleKinds: string[] })[]> => {
   const tops = await db.category.findMany({
     where: { parentId: null, isActive: true }, orderBy: { sortOrder: "asc" },
     include: { children: { where: { isActive: true }, orderBy: { sortOrder: "asc" } } },
   });
-  const out = [];
-  for (const t of tops) {
+  // Categories are independent, so their two small queries each run in parallel (no sequential N+1).
+  return Promise.all(tops.map(async (t) => {
     const ids = [t.id, ...t.children.map((c) => c.id)];
     const [productCount, sample] = await Promise.all([
       db.product.count({ where: { isActive: true, categoryId: { in: ids } } }),
       db.product.findMany({ where: { isActive: true, categoryId: { in: ids } }, select: { visualKind: true }, take: 3, orderBy: { soldCount: "desc" } }),
     ]);
-    out.push({ id: t.id, slug: t.slug, label: t.name, subs: t.children.map((c) => ({ slug: c.slug, label: c.name })), productCount, sampleKinds: sample.map((s) => s.visualKind ?? "case") });
-  }
-  return out;
-}
+    return { id: t.id, slug: t.slug, label: t.name, subs: t.children.map((c) => ({ slug: c.slug, label: c.name })), productCount, sampleKinds: sample.map((x) => x.visualKind ?? "case") };
+  }));
+});
 
-export async function getMenu(menu: string) {
-  return db.menuItem.findMany({ where: { menu, isActive: true, parentId: null }, orderBy: { sortOrder: "asc" } });
-}
+export const getMenu = cachedPublic("menu", async (menu: string) =>
+  db.menuItem.findMany({ where: { menu, isActive: true, parentId: null }, orderBy: { sortOrder: "asc" } }));
 
 const DEFAULT_SITE: SiteInfo = { name: "CaseLine", phone: "", email: "", address: "", hours: "", telegram: "#", instagram: "#", topBar: "", footerText: "" };
-export async function getSiteInfo(): Promise<SiteInfo> {
+export const getSiteInfo = cachedPublic("site-info", async (): Promise<SiteInfo> => {
   const row = await db.siteSetting.findUnique({ where: { key: "site" } });
   return { ...DEFAULT_SITE, ...((row?.value as Partial<SiteInfo>) ?? {}) };
-}
+});
 export async function getSetting<T>(key: string, fallback: T): Promise<T> {
   const row = await db.siteSetting.findUnique({ where: { key } });
   return (row?.value as T) ?? fallback;
 }
 
-export async function getHomeSections() {
-  return db.homepageSection.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" } });
-}
-export async function getBanner(placement: string) {
+export const getHomeSections = cachedPublic("home-sections", async () =>
+  db.homepageSection.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" } }));
+// Banner windows are time based, so these use a short TTL on top of admin-triggered invalidation.
+export const getBanner = cachedPublic("banner", async (placement: string) => {
   const now = new Date();
   return db.banner.findFirst({ where: { placement, isActive: true, OR: [{ startsAt: null }, { startsAt: { lte: now } }], AND: [{ OR: [{ endsAt: null }, { endsAt: { gte: now } }] }] }, orderBy: { sortOrder: "asc" } });
-}
-export async function getBanners(placement: string) {
+}, 60);
+export const getBanners = cachedPublic("banners", async (placement: string) => {
   const now = new Date();
   return db.banner.findMany({ where: { placement, isActive: true, OR: [{ startsAt: null }, { startsAt: { lte: now } }], AND: [{ OR: [{ endsAt: null }, { endsAt: { gte: now } }] }] }, orderBy: { sortOrder: "asc" }, take: 6 });
-}
+}, 60);
 export async function getBlogPost(slug: string) {
   return db.blogPost.findFirst({ where: { slug, isPublished: true, publishedAt: { lte: new Date() } }, include: { category: true } });
 }
-export async function getBrandNames() {
-  return (await db.brand.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" }, select: { name: true } })).map((b) => b.name);
-}
-export async function getPhoneModels() {
-  return db.phoneModel.findMany({ where: { isActive: true }, orderBy: [{ brand: { sortOrder: "asc" } }, { sortOrder: "asc" }], include: { brand: { select: { name: true } } } });
-}
+export const getBrandNames = cachedPublic("brand-names", async () =>
+  (await db.brand.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" }, select: { name: true } })).map((b) => b.name));
+export const getPhoneModels = cachedPublic("phone-models", async () =>
+  db.phoneModel.findMany({ where: { isActive: true }, orderBy: [{ brand: { sortOrder: "asc" } }, { sortOrder: "asc" }], include: { brand: { select: { name: true } } } }));
 
 export async function getProductBySlug(slug: string) {
   return db.product.findFirst({
+    relationLoadStrategy: "join",
     where: { slug, isActive: true },
     include: {
       brand: true, category: { include: { parent: true } },
@@ -139,9 +125,8 @@ export async function getSidebarProducts(exceptId: string, take = 7) {
 export async function getBlogPosts(take?: number) {
   return db.blogPost.findMany({ where: { isPublished: true, publishedAt: { lte: new Date() } }, orderBy: { publishedAt: "desc" }, take, include: { category: true } });
 }
-export async function getBlogCategories() {
-  return db.blogCategory.findMany({ include: { _count: { select: { posts: { where: { isPublished: true } } } } } });
-}
+export const getBlogCategories = cachedPublic("blog-categories", async () =>
+  db.blogCategory.findMany({ include: { _count: { select: { posts: { where: { isPublished: true, publishedAt: { lte: new Date() } } } } } } }), 60);
 export async function getCatalogIndex() {
   const rows = await db.product.findMany({ where: activeWhere, ...cardArgs });
   const cards = await withBrand(rows);

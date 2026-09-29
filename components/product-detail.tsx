@@ -1,17 +1,17 @@
 "use client";
 import { useState } from "react";
 import { ChevronDown, Minus, Plus } from "lucide-react";
+import { SiteImage } from "@/components/site-image";
 import { Badge, Container } from "@/components/ui";
 import { ProductVisual } from "@/components/product-visual";
 import { formatToman } from "@/lib/utils";
 import type { CardProduct } from "@/lib/types";
 
-export function Thumb({ p, className }: { p: Pick<CardProduct, "hue" | "kind" | "img" | "name">; className?: string }) {
+export function Thumb({ p, className, priority }: { p: Pick<CardProduct, "hue" | "kind" | "img" | "name">; className?: string; priority?: boolean }) {
   return (
     <span className={`relative block overflow-hidden ${className ?? ""}`} style={{ background: `linear-gradient(160deg, hsl(${p.hue} 80% 56%), hsl(${(p.hue + 40) % 360} 70% 30%))` }}>
       {p.img ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={p.img} alt={p.name} className="absolute inset-0 size-full object-cover" />
+        <SiteImage src={p.img} alt={p.name} priority={priority} sizes={priority ? "(min-width: 768px) 384px, 90vw" : "96px"} />
       ) : (
         <ProductVisual kind={p.kind} hue={(p.hue + 180) % 360} className="absolute inset-0 size-full p-1" />
       )}

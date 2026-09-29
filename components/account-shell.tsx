@@ -26,7 +26,7 @@ export async function AccountShell({ active, children }: { active: string; child
   return (
     <>
       <Header />
-      <main className="py-6">
+      <main id="main" className="py-6">
         <Container className="max-w-[790px]">
           <div className="rounded-[28px] border border-border bg-surface/90 p-3 shadow-md sm:p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">

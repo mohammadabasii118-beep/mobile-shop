@@ -6,12 +6,17 @@ import { BottomNav } from "@/components/header";
 import { Header } from "@/components/site-header";
 import { Footer } from "@/components/footer";
 import { BannerSlot } from "@/components/banner-slot";
+import { SiteImage } from "@/components/site-image";
 import { Container } from "@/components/ui";
 import { ProductVisual } from "@/components/product-visual";
 import { getBlogCategories, getBlogPosts } from "@/lib/queries";
+import { buildMeta, getSeoSetting } from "@/lib/seo";
 import { toFa } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "وبلاگ | CaseLine" };
+export async function generateMetadata(): Promise<Metadata> {
+  const seo = await getSeoSetting("blog");
+  return buildMeta({ title: seo.title || "وبلاگ | راهنمای خرید لوازم جانبی موبایل | CaseLine", description: seo.description || "مقالات و راهنمای انتخاب قاب، گلس، شارژر و لوازم جانبی موبایل", path: "/blog", image: seo.ogImage, robots: seo.robots });
+}
 export const dynamic = "force-dynamic";
 const KINDS = ["case", "glass", "charger", "cable", "earbuds", "powerbank", "holder", "lens", "airpods", "watch"];
 const hash = (s: string) => [...s].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
@@ -34,7 +39,7 @@ export default async function BlogPage() {
   return (
     <>
       <Header />
-      <main className="py-6">
+      <main id="main" className="py-6">
         <Container>
           <div data-blog>
             <BannerSlot placement="blog_top" />
@@ -53,7 +58,7 @@ export default async function BlogPage() {
             <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {posts.map((p) => (
                 <article key={p.slug} data-post data-cat={p.category?.name ?? ""} className="flex flex-col rounded-[22px] border border-border bg-surface p-2 shadow-sm transition-shadow hover:shadow-md">
-                  {p.featuredImage ? <div className="aspect-[16/10] overflow-hidden rounded-[18px]"><img src={p.featuredImage} alt={p.title} loading="lazy" className="size-full object-cover" /></div> : <Cover title={p.title.split(/[؟?،:]/)[0].slice(0, 34)} kind={KINDS[hash(p.slug) % KINDS.length]} hue={hash(p.slug) % 360} />}
+                  {p.featuredImage ? <div className="relative aspect-[16/10] overflow-hidden rounded-[18px]"><SiteImage src={p.featuredImage} alt={p.title} sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 92vw" /></div> : <Cover title={p.title.split(/[؟?،:]/)[0].slice(0, 34)} kind={KINDS[hash(p.slug) % KINDS.length]} hue={hash(p.slug) % 360} />}
                   <div className="flex flex-1 flex-col gap-3 p-3">
                     <div className="flex items-center justify-between text-[11px] text-muted"><span className="rounded-md bg-primary/10 px-2 py-1 font-medium text-primary">{p.category?.name}</span><span>{faDate(p.publishedAt)}</span></div>
                     <h2 className="line-clamp-2 text-[15px] font-black leading-7">{p.title}</h2>

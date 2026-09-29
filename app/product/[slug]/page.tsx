@@ -1,7 +1,7 @@
 import { BannerSlot } from "@/components/banner-slot";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { FileText, Star } from "lucide-react";
 import { BottomNav } from "@/components/header";
 import { Header } from "@/components/site-header";
@@ -10,6 +10,10 @@ import { Container } from "@/components/ui";
 import { ProductCard } from "@/components/product-card";
 import { BuyBox, HotBadge, StickyBar, Thumb } from "@/components/product-detail";
 import { getProductBySlug, getRelatedProducts, getSidebarProducts, toCard } from "@/lib/queries";
+import { JsonLd } from "@/components/json-ld";
+import { db } from "@/lib/db";
+import { abs, breadcrumbLd, buildMeta, clip, paths, toRial } from "@/lib/seo";
+import { resolveSlugRedirect } from "@/lib/server/redirects";
 import { getCurrentUser } from "@/lib/server/auth/session";
 import { unitPriceFor } from "@/lib/server/pricing";
 import { formatToman, toFa } from "@/lib/utils";
@@ -27,20 +31,21 @@ const rules: [string, string][] = [
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const p = await getProductBySlug(decodeURIComponent(slug));
-  if (!p) return {};
-  return {
-    title: p.seoTitle ?? `خرید ${p.name} | CaseLine`,
-    description: p.seoDescription ?? p.shortDescription ?? undefined,
-    alternates: p.canonical ? { canonical: p.canonical } : undefined,
-    openGraph: { title: p.seoTitle ?? p.name, description: p.seoDescription ?? p.shortDescription ?? undefined, images: p.images[0] ? [p.images[0].url] : undefined },
-  };
+  if (!p) return { robots: { index: false } };
+  const models = p.phoneModels.map((m) => m.phoneModel.name);
+  return buildMeta({
+    title: p.seoTitle || `خرید ${p.name}${models[0] ? ` ${models[0]}` : ""} | ${p.category.name} | CaseLine`,
+    description: p.seoDescription || p.shortDescription || p.description || `خرید ${p.name} اورجینال با ضمانت اصالت و ارسال سریع از CaseLine.`,
+    path: paths.product(p.slug), canonical: p.canonical, image: p.images[0]?.url,
+  });
 }
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const row = await getProductBySlug(decodeURIComponent(slug));
-  if (!row) notFound();
-  const [related, others, user] = await Promise.all([getRelatedProducts(row.id, row.categoryId), getSidebarProducts(row.id), getCurrentUser()]);
+  if (!row) { const to = await resolveSlugRedirect("product", decodeURIComponent(slug)); if (to) permanentRedirect(paths.product(to)); notFound(); }
+  const [related, others, user, stats] = await Promise.all([getRelatedProducts(row.id, row.categoryId), getSidebarProducts(row.id), getCurrentUser(), db.review.aggregate({ where: { productId: row.id, status: "approved" }, _avg: { rating: true }, _count: true })]);
+  const realCount = stats._count, realAvg = stats._avg.rating ?? 0;
   const card = { ...toCard({ ...row, variants: row.variants }), brand: row.brand?.name ?? null };
   const models = row.phoneModels.map((m) => m.phoneModel.name);
   const stock = row.variants.reduce((a, v) => a + (v.inventory?.quantity ?? 0), 0);
@@ -56,24 +61,35 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const title = `خرید ${row.name}${models[0] ? ` ${models[0]}` : ""} با ضمانت اصالت | ارسال فوری`;
   const specs = (row.specifications ?? {}) as Record<string, string>;
   const cats = [row.category.parent, row.category].filter(Boolean);
+  const crumbs = [{ name: "خانه", path: "/" }, { name: "فروشگاه", path: "/shop" }, ...cats.map((c) => ({ name: c!.name, path: paths.category(c!.slug) })), { name: row.name, path: paths.product(row.slug) }];
+  const images = row.images.map((i) => abs(i.url)!).filter(Boolean);
+  // Structured data uses only stored facts. AggregateRating/Review appear only when there are real approved reviews.
+  const productLd = {
+    "@context": "https://schema.org", "@type": "Product", name: row.name, sku: row.sku, url: abs(paths.product(row.slug)),
+    ...(images.length ? { image: images } : {}), description: clip(row.description || row.shortDescription, 300),
+    ...(row.brand ? { brand: { "@type": "Brand", name: row.brand.name } } : {}), category: row.category.name,
+    offers: { "@type": "Offer", url: abs(paths.product(row.slug)), priceCurrency: "IRR", price: toRial(card.price), itemCondition: "https://schema.org/NewCondition", availability: stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock" },
+    ...(realCount > 0 ? { aggregateRating: { "@type": "AggregateRating", ratingValue: Math.round(realAvg * 10) / 10, reviewCount: realCount, bestRating: 5, worstRating: 1 }, review: row.reviews.map((r) => ({ "@type": "Review", author: { "@type": "Person", name: r.user.displayName ?? r.user.firstName ?? "کاربر" }, datePublished: r.createdAt.toISOString().slice(0, 10), reviewBody: r.body, reviewRating: { "@type": "Rating", ratingValue: r.rating, bestRating: 5, worstRating: 1 } })) } : {}),
+  };
   return (
     <>
       <Header />
-      <main className="pt-6">
+      <main id="main" className="pt-6">
         <Container className="grid items-start gap-4 lg:grid-cols-[1fr_230px]">
           <div className="min-w-0 space-y-4">
             <nav aria-label="مسیر" className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
+              <JsonLd data={[productLd, breadcrumbLd(crumbs)]} />
               <Link href="/" className="hover:text-primary">خانه</Link>
-              {cats.map((c) => c && <span key={c.id} className="flex items-center gap-1.5">‹ <Link href={`/shop#${c.slug}`} className="hover:text-primary">{c.name}</Link></span>)}
+              {cats.map((c) => c && <span key={c.id} className="flex items-center gap-1.5">‹ <Link href={paths.category(c.slug)} className="hover:text-primary">{c.name}</Link></span>)}
               <span>‹ {row.name}</span>
             </nav>
             <section className="rounded-xl border border-border bg-surface p-4 shadow-sm sm:p-6">
               <BannerSlot placement="product_top" />
               <h1 className="text-lg font-black leading-9 sm:text-xl">{title}</h1>
-              <p className="mt-1 text-xs text-muted">(دیدگاه کاربر {toFa(row.reviews.length)}) · <span className="inline-flex items-center gap-1"><Star className="size-3 fill-warning text-warning" />{toFa(row.ratingAvg)}</span> · SKU: <span dir="ltr">{row.sku}</span></p>
+              <p className="mt-1 text-xs text-muted">(دیدگاه کاربر {toFa(realCount)}) · <span className="inline-flex items-center gap-1"><Star className="size-3 fill-warning text-warning" />{toFa(Math.round(realAvg * 10) / 10)}</span> · SKU: <span dir="ltr">{row.sku}</span></p>
               <div className="mt-5 grid gap-6 md:grid-cols-2">
                 <div className="relative mx-auto aspect-square w-full max-w-sm md:order-2">
-                  <Thumb p={card} className="size-full rounded-[32px]" />
+                  <Thumb p={card} priority className="size-full rounded-[32px]" />
                   <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 rounded-b-[32px] bg-black/80 py-4 text-white">
                     <span dir="ltr" className="text-2xl font-black tracking-wide">{row.brand?.name ?? "CaseLine"}</span>
                     <span dir="ltr" className="text-[10px] font-bold tracking-[0.3em] text-accent">Caseline.ir</span>
@@ -85,7 +101,10 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                   <BuyBox p={card} opt={opt} inStock={stock > 0} maxQty={Math.max(1, Math.min(99, stock))} wholesale={wholesale} />
                 </div>
               </div>
-              <p className="mt-5 text-sm text-muted">دسته‌بندی: <b className="text-foreground">{row.category.name}</b></p>
+              <p className="mt-5 text-sm text-muted">دسته‌بندی: <Link href={paths.category(row.category.slug)} className="font-bold text-foreground hover:text-primary">{row.category.name}</Link>
+                {row.brand && <> · برند: <Link href={paths.brand(row.brand.slug)} className="font-bold text-foreground hover:text-primary">{row.brand.name}</Link></>}
+              </p>
+              {row.phoneModels.length > 0 && <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted">سازگار با: {row.phoneModels.slice(0, 8).map((m) => <Link key={m.phoneModelId} href={paths.model(m.phoneModel.slug)} className="rounded-full bg-surface-2 px-2.5 py-1 font-medium text-foreground hover:text-primary">{m.phoneModel.name}</Link>)}</p>}
             </section>
 
             <div className="tabs">

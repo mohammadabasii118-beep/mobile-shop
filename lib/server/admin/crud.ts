@@ -2,6 +2,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { badRequest, notFound } from "@/lib/server/errors";
 import { audit, diff, pageParams, type AdminCtx, type Db } from "@/lib/server/admin/core";
+import { recordSlugChange } from "@/lib/server/redirects";
 import { RESOURCES, type Resource } from "@/lib/server/admin/resources";
 import type { NextRequest } from "next/server";
 
@@ -65,6 +66,7 @@ export async function updateResource(key: string, id: string, body: unknown, a: 
     const d = diff(existing, patch);
     if (!d.changed) return existing;
     const row = await delegate(tx, r).update({ where: { id }, data: patch });
+    if (r.slugKind && typeof patch.slug === "string" && patch.slug !== existing.slug) await recordSlugChange(tx, r.slugKind, String(existing.slug), patch.slug);
     await audit(a, `${r.auditName}.update`, r.auditName, id, d.old, d.next, tx);
     return row;
   });

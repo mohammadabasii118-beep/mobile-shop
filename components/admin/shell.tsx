@@ -89,7 +89,7 @@ export function AdminShell({ user, perms, notices, children }: ShellProps) {
             </div>
           </div>
         </header>
-        <main className="p-4 sm:p-6">{children}</main>
+        <main id="main" className="p-4 sm:p-6">{children}</main>
       </div>
       <Toaster />
     </div>

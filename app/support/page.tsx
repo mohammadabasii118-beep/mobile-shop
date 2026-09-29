@@ -1,3 +1,4 @@
+import { buildMeta, getSeoSetting } from "@/lib/seo";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft, Phone, Send } from "lucide-react";
@@ -8,7 +9,10 @@ import { Container } from "@/components/ui";
 import { CopyChip } from "@/components/copy-chip";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "پشتیبانی | CaseLine" };
+export async function generateMetadata(): Promise<Metadata> {
+  const seo = await getSeoSetting("support");
+  return buildMeta({ title: seo.title || "پشتیبانی و راهنمای خرید | CaseLine", description: seo.description || "راه‌های ارتباط با پشتیبانی CaseLine، شرایط ارسال، ضمانت و مرجوعی", path: "/support", robots: seo.robots });
+}
 
 function SupportArt() {
   return (
@@ -36,7 +40,7 @@ export default function SupportPage() {
   return (
     <>
       <Header />
-      <main className="py-6">
+      <main id="main" className="py-6">
         <Container>
           <section className="rounded-[28px] border border-border bg-surface p-5 shadow-md sm:p-10">
             <div className="grid items-center gap-8 md:grid-cols-[1.5fr_1fr]">

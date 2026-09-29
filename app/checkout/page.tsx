@@ -21,7 +21,7 @@ export default async function CheckoutPage() {
   return (
     <>
       <Header />
-      <main className="py-6">
+      <main id="main" className="py-6">
         <Container>
           <h1 className="mb-4 text-lg font-black">تسویه حساب</h1>
           <CheckoutClient
