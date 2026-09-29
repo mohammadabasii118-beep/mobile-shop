@@ -12,6 +12,8 @@ export interface Product {
   reviews: number;
   badge?: string;
   compat?: string;
+  cat?: string; // shop category override
+  sub?: string; // shop subcategory
 }
 
 export const categories: { slug: string; label: string; kind: Kind; hue: number }[] = [
@@ -73,26 +75,44 @@ const mk = (prefix: string, brand: string, models: string[], hue: number, base: 
 
 const np = (id: string, name: string, brand: string, kind: Kind, hue: number, price: number, extra: Partial<Product> = {}): Product => ({ id, name, brand, kind, hue, price, rating: 4.4 + (id.length % 5) / 10, reviews: 40 + id.length * 17, ...extra });
 export const airpodsItems: Product[] = [
-  np("ap1", "کیس سیلیکونی ایرپاد پرو ۲", "Apple", "airpods", 320, 240_000, { oldPrice: 300_000, compat: "AirPods Pro 2" }),
-  np("ap2", "کاور محافظ طرح‌دار ایرپاد ۳", "Baseus", "airpods", 20, 190_000, { compat: "AirPods 3", badge: "جدید" }),
-  np("ap3", "قلاب ضدگمشدگی ایرپاد", "Baseus", "airpods", 200, 95_000, { compat: "AirPods Pro" }),
-  np("ap4", "تیپ سیلیکونی ایرپاد پرو (۳ جفت)", "Apple", "airpods", 260, 130_000, { oldPrice: 165_000, compat: "AirPods Pro 2" }),
-  np("ap5", "بند گردنی ایرپاد", "Baseus", "airpods", 150, 85_000, { compat: "AirPods 2" }),
-  np("ap6", "کیس چرمی ایرپاد پرو", "Apple", "airpods", 30, 420_000, { compat: "AirPods Pro 2" }),
+  np("ap1", "کیس سیلیکونی ایرپاد پرو ۲", "Apple", "airpods", 320, 240_000, { oldPrice: 300_000, compat: "AirPods Pro 2", sub: "appro12" }),
+  np("ap2", "کاور محافظ طرح‌دار ایرپاد ۳", "Baseus", "airpods", 20, 190_000, { compat: "AirPods 3", badge: "جدید", sub: "ap3" }),
+  np("ap3", "قلاب ضدگمشدگی ایرپاد", "Baseus", "airpods", 200, 95_000, { compat: "AirPods Pro", sub: "appro12" }),
+  np("ap4", "تیپ سیلیکونی ایرپاد پرو (۳ جفت)", "Apple", "airpods", 260, 130_000, { oldPrice: 165_000, compat: "AirPods Pro 2", sub: "appro12" }),
+  np("ap5", "بند گردنی ایرپاد", "Baseus", "airpods", 150, 85_000, { compat: "AirPods 2", sub: "ap12" }),
+  np("ap6", "کیس چرمی ایرپاد پرو", "Apple", "airpods", 30, 420_000, { compat: "AirPods Pro 2", sub: "appro12" }),
+  np("ap7", "کیس سیلیکونی ایرپاد ۴", "Apple", "airpods", 180, 260_000, { compat: "AirPods 4", sub: "ap4", badge: "جدید" }),
+  np("ap8", "کاور شفاف ایرپاد پرو ۳", "Baseus", "airpods", 240, 280_000, { compat: "AirPods Pro 3", sub: "appro3", badge: "جدید" }),
+  np("ap9", "کیس سیلیکونی ایرپاد ۱ و ۲", "Baseus", "airpods", 60, 150_000, { compat: "AirPods 1/2", sub: "ap12", oldPrice: 190_000 }),
+  np("ap10", "کیس محافظ ایرپاد ۴ ضدضربه", "Baseus", "airpods", 300, 310_000, { compat: "AirPods 4", sub: "ap4" }),
+  np("ap11", "کیس محافظ ایرپاد پرو ۳", "Apple", "airpods", 100, 360_000, { compat: "AirPods Pro 3", sub: "appro3" }),
 ];
 export const watchItems: Product[] = [
-  np("wt1", "بند سیلیکونی اپل واچ ۴۵mm", "Apple", "watch", 10, 260_000, { oldPrice: 330_000, compat: "Apple Watch 9" }),
-  np("wt2", "بند میلانز فلزی اپل واچ", "Baseus", "watch", 210, 380_000, { compat: "Apple Watch 45mm" }),
-  np("wt3", "قاب محافظ اپل واچ سری ۹", "Apple", "watch", 180, 210_000, { compat: "Apple Watch 9", badge: "جدید" }),
-  np("wt4", "گلس نانو اپل واچ", "Baseus", "watch", 190, 120_000, { compat: "Apple Watch 45mm" }),
+  np("wt1", "بند سیلیکونی اپل واچ ۴۵mm", "Apple", "watch", 10, 260_000, { oldPrice: 330_000, compat: "Apple Watch 9" , sub: "band" }),
+  np("wt2", "بند میلانز فلزی اپل واچ", "Baseus", "watch", 210, 380_000, { compat: "Apple Watch 45mm" , sub: "band" }),
+  np("wt3", "قاب محافظ اپل واچ سری ۹", "Apple", "watch", 180, 210_000, { compat: "Apple Watch 9", badge: "جدید" , sub: "wguard" }),
+  np("wt4", "گلس نانو اپل واچ", "Baseus", "watch", 190, 120_000, { compat: "Apple Watch 45mm" , sub: "wglass" }),
   np("wt5", "پایه شارژر مگنتی اپل واچ", "Anker", "watch", 40, 450_000, { oldPrice: 520_000, compat: "Apple Watch" }),
-  np("wt6", "بند نایلونی Sport Loop", "Apple", "watch", 330, 310_000, { compat: "Apple Watch Ultra" }),
+  np("wt6", "بند نایلونی Sport Loop", "Apple", "watch", 330, 310_000, { compat: "Apple Watch Ultra" , sub: "band" }),
   np("wt7", "استند رومیزی اپل واچ", "Baseus", "watch", 250, 280_000, { compat: "Apple Watch" }),
+  np("wt8", "گلس سرامیکی اپل واچ اولترا", "Baseus", "watch", 200, 160_000, { compat: "Apple Watch Ultra", sub: "wglass" }),
+  np("wt9", "گارد ضدضربه اپل واچ ۴۱mm", "Apple", "watch", 20, 230_000, { compat: "Apple Watch 41mm", sub: "wguard", oldPrice: 290_000 }),
+  np("wt10", "بند اسپورت دو رنگ اپل واچ", "Baseus", "watch", 120, 240_000, { compat: "Apple Watch 45mm", sub: "band" }),
 ];
 export const electricItems: Product[] = [
   products[2], products[3], products[5], products[10],
   np("el1", "آداپتور دو پورت ۳۵ وات", "Anker", "charger", 55, 690_000, { oldPrice: 820_000, badge: "جدید" }),
   np("el2", "کابل USB-C به USB-C ۶۰ وات", "Baseus", "cable", 165, 320_000),
+];
+
+export const accessoryItems: Product[] = [
+  np("ac1", "محافظ کابل سیلیکونی (۳ عددی)", "Baseus", "cable", 100, 85_000, { cat: "accessories", sub: "cableguard" }),
+  np("ac2", "محافظ کابل فنری ضدشکستگی", "Anker", "cable", 190, 70_000, { cat: "accessories", sub: "cableguard", oldPrice: 95_000 }),
+  np("ac3", "آویز گوشی طنابی", "Baseus", "lens", 330, 110_000, { cat: "accessories", sub: "charm", badge: "جدید" }),
+  np("ac4", "بند مچی و آویز موبایل", "Xiaomi", "lens", 260, 90_000, { cat: "accessories", sub: "charm" }),
+  np("ac5", "پاپ‌سوکت مگنتی", "Baseus", "holder", 350, 130_000, { cat: "accessories", sub: "popsocket", oldPrice: 160_000 }),
+  np("ac6", "پاپ‌سوکت طرح‌دار", "Xiaomi", "holder", 20, 75_000, { cat: "accessories", sub: "popsocket" }),
+  np("ac7", "هولدر رومیزی تاشو", "Baseus", "holder", 210, 260_000, { cat: "accessories", sub: "holder" }),
 ];
 
 export const rails = [
@@ -112,7 +132,7 @@ export const homeCategories = [
 ];
 
 export const allProducts: Product[] = Array.from(
-  new Map([...products, ...rails.flatMap((r) => r.items), ...airpodsItems, ...watchItems, ...electricItems].map((p) => [p.id, p])).values(),
+  new Map([...products, ...rails.flatMap((r) => r.items), ...airpodsItems, ...watchItems, ...electricItems, ...accessoryItems].map((p) => [p.id, p])).values(),
 );
 export const getProduct = (id: string) => allProducts.find((p) => p.id === id);
 
@@ -183,12 +203,22 @@ const extras: Product[] = extraSpecs.map(([name, brand, kind, compat, hue, price
 }));
 export const catalog: Product[] = [...allProducts, ...extras];
 
-export const shopCats: { slug: string; label: string; icon: string; test: (p: Product) => boolean }[] = [
-  { slug: "cases", label: "قاب و کاور موبایل", icon: "phone", test: (p) => p.kind === "case" },
-  { slug: "airpods", label: "لوازم جانبی ایرپاد", icon: "headphones", test: (p) => p.kind === "airpods" },
-  { slug: "watch", label: "لوازم جانبی اپل واچ", icon: "watch", test: (p) => p.kind === "watch" },
-  { slug: "electric", label: "لوازم برقی", icon: "zap", test: (p) => p.kind === "charger" || p.kind === "cable" || p.kind === "powerbank" },
-  { slug: "accessories", label: "اکسسوری و لوازم جانبی", icon: "sparkles", test: (p) => ["glass", "lens", "earbuds", "holder", "flash"].includes(p.kind) },
+export interface ShopSub { slug: string; label: string }
+export interface ShopCat { slug: string; label: string; icon: string; subs: ShopSub[]; test: (p: Product) => boolean }
+const kindCat = (p: Product) => p.cat ?? (p.kind === "case" ? "cases" : p.kind === "airpods" ? "airpods" : p.kind === "watch" ? "watch" : ["charger", "cable", "powerbank"].includes(p.kind) ? "electric" : "accessories");
+export const shopCats: ShopCat[] = [
+  { slug: "cases", label: "قاب و کاور موبایل", icon: "phone", subs: [{ slug: "iphone", label: "قاب آیفون" }, { slug: "samsung", label: "قاب سامسونگ" }, { slug: "xiaomi", label: "قاب شیائومی" }], test: (p) => kindCat(p) === "cases" },
+  { slug: "airpods", label: "لوازم جانبی ایرپاد", icon: "headphones", subs: [{ slug: "ap12", label: "ایرپاد ۱ و ۲" }, { slug: "ap3", label: "ایرپاد ۳" }, { slug: "appro12", label: "ایرپاد پرو ۱ و ۲" }, { slug: "ap4", label: "ایرپاد ۴" }, { slug: "appro3", label: "ایرپاد پرو ۳" }], test: (p) => kindCat(p) === "airpods" },
+  { slug: "watch", label: "لوازم جانبی اپل واچ", icon: "watch", subs: [{ slug: "band", label: "بند واچ" }, { slug: "wglass", label: "گلس واچ" }, { slug: "wguard", label: "گارد واچ" }], test: (p) => kindCat(p) === "watch" },
+  { slug: "electric", label: "لوازم برقی", icon: "zap", subs: [], test: (p) => kindCat(p) === "electric" },
+  { slug: "accessories", label: "اکسسوری و لوازم جانبی", icon: "sparkles", subs: [{ slug: "glass", label: "گلس" }, { slug: "cableguard", label: "محافظ کابل" }, { slug: "charm", label: "بند و آویز" }, { slug: "holder", label: "هولدر" }, { slug: "popsocket", label: "پاپ‌سوکت" }], test: (p) => kindCat(p) === "accessories" },
 ];
-export const shopCatOf = (p: Product) => shopCats.find((c) => c.test(p))?.slug ?? "accessories";
+export const shopCatOf = (p: Product) => kindCat(p);
+export const shopSubOf = (p: Product) => {
+  if (p.sub) return p.sub;
+  if (p.kind === "case") return p.brand === "Apple" ? "iphone" : p.brand === "Samsung" ? "samsung" : p.brand === "Xiaomi" ? "xiaomi" : "";
+  if (p.kind === "glass" || p.kind === "lens") return p.cat === undefined ? "glass" : "";
+  if (p.kind === "holder") return "holder";
+  return "";
+};
 export const shopModels = Object.values(phoneModels).flat();

@@ -5,7 +5,7 @@ import { BottomNav, Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Container } from "@/components/ui";
 import { ProductCard } from "@/components/product-card";
-import { catalog, shopCatOf, shopCats, shopModels } from "@/lib/data";
+import { catalog, shopCatOf, shopCats, shopModels, shopSubOf } from "@/lib/data";
 import { toFa } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "فروشگاه | CaseLine" };
@@ -14,7 +14,7 @@ const icons = { phone: Smartphone, shield: ShieldCheck, zap: Zap, headphones: He
 const sorts: [string, string][] = [["default", "مرتب سازی پیش فرض"], ["popular", "مرتب سازی بر اساس محبوبیت"], ["rating", "مرتب سازی بر اساس میانگین رتبه"], ["newest", "مرتب سازی بر اساس جدیدترین"], ["asc", "مرتب سازی بر اساس هزینه: کم به زیاد"], ["desc", "مرتب سازی بر اساس هزینه: زیاد به کم"]];
 
 export default function ShopPage() {
-  const items = catalog.map((p) => ({ p, cat: shopCatOf(p) }));
+  const items = catalog.map((p) => ({ p, cat: shopCatOf(p), sub: shopSubOf(p) }));
   const btn = "flex w-full shrink-0 cursor-pointer items-center gap-3 rounded-lg border border-transparent px-2 py-2 text-[13px] font-bold transition-colors hover:bg-primary/5 data-[active=true]:border-primary/30 data-[active=true]:bg-primary/10 data-[active=true]:text-primary";
   return (
     <>
@@ -32,11 +32,20 @@ export default function ShopPage() {
                   {shopCats.map((c) => {
                     const I = icons[c.icon as keyof typeof icons];
                     return (
-                      <button key={c.slug} data-cat-btn={c.slug} data-active="false" className={btn}>
-                        <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary"><I className="size-4" /></span>
-                        <span className="flex-1 whitespace-nowrap text-start">{c.label}</span>
-                        <span className="hidden size-6 place-items-center rounded-full bg-surface-2 text-[10px] text-muted lg:grid">{toFa(items.filter((x) => x.cat === c.slug).length)}</span>
-                      </button>
+                      <div key={c.slug} className="contents lg:block">
+                        <button data-cat-btn={c.slug} data-active="false" className={btn}>
+                          <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary"><I className="size-4" /></span>
+                          <span className="flex-1 whitespace-nowrap text-start lg:whitespace-normal">{c.label}</span>
+                          <span className="hidden size-6 place-items-center rounded-full bg-surface-2 text-[10px] text-muted lg:grid">{toFa(items.filter((x) => x.cat === c.slug).length)}</span>
+                        </button>
+                        {c.subs.length > 0 && (
+                          <div data-subs-of={c.slug} className="hidden flex-row gap-1 data-[open=true]:flex lg:flex-col lg:gap-0.5">
+                            {c.subs.map((sb) => (
+                              <button key={sb.slug} data-sub-btn={sb.slug} data-active="false" className="shrink-0 cursor-pointer whitespace-nowrap rounded-full border border-border px-3 py-1.5 text-start text-xs font-medium text-muted hover:text-primary data-[active=true]:border-primary data-[active=true]:font-bold data-[active=true]:text-primary lg:me-3 lg:rounded-md lg:border-0 lg:border-e-2">{sb.label}</button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
                 </div>
@@ -63,8 +72,8 @@ export default function ShopPage() {
               </div>
 
               <div data-grid className="mt-4 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3">
-                {items.map(({ p, cat }) => (
-                  <div key={p.id} data-item data-cat={cat} data-price={p.price} data-pop={p.reviews} data-rating={p.rating} data-new={p.badge === "جدید" ? 1 : 0} data-compat={p.compat ?? ""}>
+                {items.map(({ p, cat, sub }) => (
+                  <div key={p.id} data-item data-cat={cat} data-sub={sub} data-price={p.price} data-pop={p.reviews} data-rating={p.rating} data-new={p.badge === "جدید" ? 1 : 0} data-compat={p.compat ?? ""}>
                     <ProductCard p={p} showCat />
                   </div>
                 ))}
