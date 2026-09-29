@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AccountShell } from "@/components/account-shell";
 
+export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "سفارش‌های من | CaseLine" };
 
 export default function OrdersPage() {

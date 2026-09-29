@@ -1,12 +1,14 @@
-import { catalog, shopCatOf, shopCats } from "@/lib/data";
+import { getCatalogIndex } from "@/lib/queries";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 const fa: Record<string, string> = { Apple: "اپل آیفون", Samsung: "سامسونگ", Xiaomi: "شیائومی شیامی", Anker: "انکر", Baseus: "بیسوس", JBL: "جی بی ال" };
 
-export function GET() {
-  const label = (slug: string) => shopCats.find((c) => c.slug === slug)?.label ?? "";
+/** Lightweight search index for the header search overlay. */
+export async function GET() {
+  const items = await getCatalogIndex();
   return Response.json(
-    catalog.map((p) => ({ id: p.id, name: p.name, brand: `${p.brand} ${fa[p.brand] ?? ""}`, compat: p.compat ?? "", hue: p.hue, img: p.img ?? "", price: p.price, catLabel: label(shopCatOf(p)) })),
+    items.map((p) => ({ id: p.slug, name: p.name, brand: `${p.brand ?? ""} ${fa[p.brand ?? ""] ?? ""}`.trim(), compat: p.compat ?? "", hue: p.hue, img: p.img ?? "", price: p.price, catLabel: p.categoryLabel })),
+    { headers: { "Cache-Control": "public, max-age=60" } },
   );
 }

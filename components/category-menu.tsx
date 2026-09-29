@@ -2,14 +2,11 @@
 import Link from "next/link";
 import { useEffect } from "react";
 import { BatteryCharging, ChevronDown, Headphones, LayoutGrid, Menu, Smartphone, Sparkles, Watch, Zap } from "lucide-react";
-import { shopCats } from "@/lib/data";
+import type { MenuCategory } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const icons = { phone: Smartphone, headphones: Headphones, watch: Watch, zap: Zap, sparkles: Sparkles } as const;
-const menu = shopCats.map((c) => ({
-  ...c,
-  Icon: icons[c.icon as keyof typeof icons],
-}));
+const icons = { cases: Smartphone, airpods: Headphones, watch: Watch, electric: Zap, accessories: Sparkles } as const;
+const iconFor = (slug: string) => icons[slug as keyof typeof icons] ?? Sparkles;
 
 export function useCloseDetails() {
   useEffect(() => {
@@ -26,7 +23,7 @@ export function useCloseDetails() {
 }
 
 /** Desktop mega menu: category list on the right, popular products for the hovered category on the left. */
-export function CategoryMenu() {
+export function CategoryMenu({ menu }: { menu: MenuCategory[] }) {
   useCloseDetails();
   return (
     <details data-menu className="group relative">
@@ -38,7 +35,7 @@ export function CategoryMenu() {
           {menu.map((c) => (
             <li key={c.slug} tabIndex={0} className="col-start-1">
               <Link href={`/shop#${c.slug}`} className="mega-item flex items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium">
-                <span>{c.label}</span><c.Icon className="size-4 text-primary" />
+                <span>{c.label}</span>{(() => { const I = iconFor(c.slug); return <I className="size-4 text-primary" />; })()}
               </Link>
               <div className="mega-panel absolute inset-y-0 end-0 hidden w-[calc(100%-210px)] flex-col border-s border-border ps-4">
                 <div className="flex flex-col gap-0.5">
@@ -54,7 +51,7 @@ export function CategoryMenu() {
 }
 
 /** Mobile menu: hamburger opens a simple sheet of categories. */
-export function MobileMenu({ className }: { className?: string }) {
+export function MobileMenu({ menu, className }: { menu: MenuCategory[]; className?: string }) {
   useCloseDetails();
   return (
     <details data-menu className={cn("group", className)}>
@@ -63,7 +60,7 @@ export function MobileMenu({ className }: { className?: string }) {
         <div className="mb-1 flex items-center gap-2 px-2 text-xs text-muted"><BatteryCharging className="size-4" />دسته‌بندی‌ها</div>
         {menu.map((c) => (
           <div key={c.slug} className="border-b border-border/60 py-1 last:border-0">
-            <Link href={`/shop#${c.slug}`} className="flex items-center justify-between rounded-md px-3 py-2.5 text-sm font-bold hover:bg-primary/10"><span>{c.label}</span><c.Icon className="size-4 text-primary" /></Link>
+            <Link href={`/shop#${c.slug}`} className="flex items-center justify-between rounded-md px-3 py-2.5 text-sm font-bold hover:bg-primary/10"><span>{c.label}</span>{(() => { const I = iconFor(c.slug); return <I className="size-4 text-primary" />; })()}</Link>
             {c.subs.length > 0 && <div className="flex flex-wrap gap-1.5 px-3 pb-2">{c.subs.map((sb) => <Link key={sb.slug} href={`/shop#${sb.slug}`} className="rounded-full bg-surface-2 px-3 py-1 text-[11px] font-medium">{sb.label}</Link>)}</div>}
           </div>
         ))}

@@ -1,26 +1,32 @@
-import Link from "next/link";
 import { Clock, Mail, MapPin, Phone } from "lucide-react";
+import Link from "next/link";
 import { Container } from "@/components/ui";
 import { Logo } from "@/components/header";
+import { getMenu, getSiteInfo } from "@/lib/queries";
 
-export function Footer() {
+export async function Footer() {
+  const [info, links] = await Promise.all([getSiteInfo(), getMenu("footer")]);
   const rows = [
-    { i: Clock, t: "هر روز ساعت ۸ صبح تا ۱۰ شب", href: undefined as string | undefined },
-    { i: Phone, t: "021-12345678", href: "tel:02112345678" },
-    { i: Mail, t: "INFO@CASELINE.IR", href: "mailto:info@caseline.ir" },
-    { i: MapPin, t: "آدرس: تهران، میدان ونک، خیابان ملاصدرا", href: undefined },
-  ];
+    { i: Clock, t: info.hours, href: undefined as string | undefined },
+    { i: Phone, t: info.phone, href: `tel:${info.phone.replace(/[^\d+]/g, "")}` },
+    { i: Mail, t: info.email.toUpperCase(), href: `mailto:${info.email}` },
+    { i: MapPin, t: `آدرس: ${info.address}`, href: undefined },
+  ].filter((r) => r.t.trim());
   return (
     <footer className="mt-10 pb-32 md:pb-24">
       <Container>
         <div className="grid gap-8 border-t border-border py-10 text-sm sm:grid-cols-2 lg:grid-cols-[1.3fr_0.7fr_1.1fr_0.8fr]">
           <div>
             <Logo />
-            <p className="mt-4 leading-8 text-muted">در <b className="text-primary">کیس‌لاین</b>، لوازم جانبی موبایل را اورجینال، با ضمانت سازگاری با مدل گوشی و پرداخت مطمئن تهیه کنید. تیم پشتیبانی ما هر روز پاسخ‌گوی شماست.</p>
+            <p className="mt-4 leading-8 text-muted">{info.footerText}</p>
           </div>
           <div>
             <h4 className="mb-3 font-extrabold">خدمات ما</h4>
-            <ul className="space-y-2 text-muted">{[["محصولات", "/shop"], ["بلاگ", "/blog"], ["حساب کاربری", "/account"], ["تماس با ما", "/support"], ["پشتیبانی", "/support"]].map(([x, h]) => <li key={x}><Link href={h} {...(h === "/account" ? { "data-account-link": "" } : {})} className="inline-block transition-all duration-150 hover:-translate-x-0.5 hover:text-primary">{x}</Link></li>)}</ul>
+            <ul className="space-y-2 text-muted">
+              {links.map((l) => (
+                <li key={l.id}><Link href={l.link ?? "/"} {...(l.link === "/account" ? { "data-account-link": "" } : {})} className="inline-block transition-all duration-150 hover:-translate-x-0.5 hover:text-primary">{l.label}</Link></li>
+              ))}
+            </ul>
           </div>
           <div>
             <h4 className="mb-3 font-extrabold">اطلاعات تماس</h4>
@@ -36,7 +42,7 @@ export function Footer() {
             <div className="grid h-24 w-28 place-items-center rounded-lg border border-dashed border-border bg-surface p-2 text-center text-[11px] text-muted">محل نماد اعتماد الکترونیکی</div>
           </div>
         </div>
-        <p className="text-center text-xs text-muted">© ۱۴۰۵ CaseLine — نسخه دمو طراحی</p>
+        <p className="text-center text-xs text-muted">© {new Date().toLocaleDateString("fa-IR", { year: "numeric" })} {info.name}</p>
       </Container>
     </footer>
   );

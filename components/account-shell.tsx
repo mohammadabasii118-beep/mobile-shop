@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LogOut, MessagesSquare, ShoppingBag, User } from "lucide-react";
-import { BottomNav, Header } from "@/components/header";
+import { BottomNav } from "@/components/header";
+import { Header } from "@/components/site-header";
 import { Footer } from "@/components/footer";
 import { Container } from "@/components/ui";
 import { cn } from "@/lib/utils";

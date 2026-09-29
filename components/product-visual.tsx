@@ -1,7 +1,10 @@
-import type { Kind } from "@/lib/data";
+export type Kind = "case" | "glass" | "charger" | "cable" | "earbuds" | "powerbank" | "holder" | "flash" | "lens" | "airpods" | "watch";
+
+const KINDS = { case: 1, glass: 1, charger: 1, cable: 1, earbuds: 1, powerbank: 1, holder: 1, flash: 1, lens: 1, airpods: 1, watch: 1 };
 
 /** Original vector illustrations of accessories, tinted per product. */
-export function ProductVisual({ kind, hue, className }: { kind: Kind; hue: number; className?: string }) {
+export function ProductVisual({ kind: rawKind, hue, className }: { kind: Kind | string; hue: number; className?: string }) {
+  const kind = (rawKind in KINDS ? rawKind : "case") as Kind;
   const a = `hsl(${hue} 80% 58%)`;
   const b = `hsl(${(hue + 30) % 360} 70% 40%)`;
   const id = `g-${kind}-${hue}`;

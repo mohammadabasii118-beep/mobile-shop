@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { MessagesSquare, Plus } from "lucide-react";
 import { AccountShell } from "@/components/account-shell";
 
+export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "تیکت‌های پشتیبانی | CaseLine" };
 const field = "w-full rounded-xl border border-border bg-surface px-4 text-sm outline-none focus:border-primary";
 

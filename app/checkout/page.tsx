@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckCircle2, CreditCard, Send, Ticket } from "lucide-react";
-import { BottomNav, Header } from "@/components/header";
+import { BottomNav } from "@/components/header";
+import { Header } from "@/components/site-header";
 import { Footer } from "@/components/footer";
 import { Container } from "@/components/ui";
 
+export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "تسویه حساب | CaseLine" };
 
 const field = "h-12 w-full rounded-xl border border-border bg-surface-2 px-4 text-sm outline-none transition-colors focus:border-primary";

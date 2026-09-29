@@ -3,16 +3,15 @@ import { useState } from "react";
 import { ChevronDown, Minus, Plus } from "lucide-react";
 import { Badge, Container } from "@/components/ui";
 import { ProductVisual } from "@/components/product-visual";
-import { withBase } from "@/lib/base";
 import { formatToman } from "@/lib/utils";
-import { optionsFor, type Product } from "@/lib/data";
+import type { CardProduct } from "@/lib/types";
 
-export function Thumb({ p, className }: { p: Product; className?: string }) {
+export function Thumb({ p, className }: { p: Pick<CardProduct, "hue" | "kind" | "img" | "name">; className?: string }) {
   return (
     <span className={`relative block overflow-hidden ${className ?? ""}`} style={{ background: `linear-gradient(160deg, hsl(${p.hue} 80% 56%), hsl(${(p.hue + 40) % 360} 70% 30%))` }}>
       {p.img ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={withBase(p.img)} alt={p.name} className="absolute inset-0 size-full object-cover" />
+        <img src={p.img} alt={p.name} className="absolute inset-0 size-full object-cover" />
       ) : (
         <ProductVisual kind={p.kind} hue={(p.hue + 180) % 360} className="absolute inset-0 size-full p-1" />
       )}
@@ -20,13 +19,16 @@ export function Thumb({ p, className }: { p: Product; className?: string }) {
   );
 }
 
-export function BuyBox({ p }: { p: Product }) {
-  const opt = optionsFor(p);
+export function BuyBox({ p, opt, inStock }: { p: CardProduct; opt: { label: string; options: string[] }; inStock: boolean }) {
   const [choice, setChoice] = useState("");
   const [qty, setQty] = useState(1);
   return (
-    <div data-product data-id={p.id} data-name={`${p.name}${p.compat ? ` ${p.compat}` : ""}`} data-price={p.price} data-hue={p.hue} data-img={p.img ?? ""} className="space-y-4">
-      <span className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-medium text-success">موجود و آماده تحویل سریع <i className="size-2 rounded-full bg-success" /></span>
+    <div data-product data-id={p.slug} data-name={p.name} data-price={p.price} data-hue={p.hue} data-img={p.img ?? ""} className="space-y-4">
+      {inStock ? (
+        <span className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-medium text-success">موجود و آماده تحویل سریع <i className="size-2 rounded-full bg-success" /></span>
+      ) : (
+        <span className="inline-flex items-center gap-2 rounded-full border border-hot/30 bg-hot/10 px-3 py-1 text-xs font-medium text-hot">ناموجود <i className="size-2 rounded-full bg-hot" /></span>
+      )}
       <ul className="space-y-3 text-[13px] leading-7">
         {[["نسخه اختصاصی با", "بهترین قیمت", "ممکن عرضه می‌شود."], ["محصول کاملاً", "اورجینال", "بوده و مرجوعی ۷ روزه دارد."], ["ارسال سفارش در", "سریع‌ترین زمان", "ممکن انجام می‌شود."], ["سازگاری کامل با مدل گوشی شما با", "ضمانت بازگشت", "وجه."]].map(([a, b, c]) => (
           <li key={b} className="flex gap-2"><i className="mt-2.5 size-1.5 shrink-0 rounded-full bg-foreground" /><span>{a} <b>{b}</b> {c}</span></li>
@@ -45,8 +47,8 @@ export function BuyBox({ p }: { p: Product }) {
         <span data-price data-base={p.price} className="text-xl font-black">{choice ? "" : "از "}{formatToman(p.price * qty)}</span>
       </div>
       <div className="flex items-center gap-2">
-        <button data-buy disabled={!choice} className="h-12 flex-1 cursor-pointer rounded-md bg-primary text-sm font-bold text-primary-fg shadow-md transition-colors enabled:hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-primary/15 disabled:text-primary disabled:shadow-none">
-          {choice ? "افزودن به سبد خرید" : "اول مدل رو انتخاب کن"}
+        <button data-buy disabled={!choice || !inStock} className="h-12 flex-1 cursor-pointer rounded-md bg-primary text-sm font-bold text-primary-fg shadow-md transition-colors enabled:hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-primary/15 disabled:text-primary disabled:shadow-none">
+          {!inStock ? "ناموجود" : choice ? "افزودن به سبد خرید" : "اول مدل رو انتخاب کن"}
         </button>
         <div className="flex h-12 items-center gap-1 rounded-md bg-surface-2 px-1">
           <button data-qty-inc aria-label="افزایش" onClick={() => setQty((q) => q + 1)} className="grid size-9 cursor-pointer place-items-center rounded"><Plus className="size-4" /></button>
@@ -58,14 +60,14 @@ export function BuyBox({ p }: { p: Product }) {
   );
 }
 
-export function StickyBar({ p }: { p: Product }) {
+export function StickyBar({ p }: { p: CardProduct }) {
   return (
     <div className="fixed inset-x-0 bottom-3 z-40 hidden md:block">
       <Container>
         <div className="glass flex items-center gap-4 rounded-lg p-3 shadow-lg">
           <Thumb p={p} className="size-11 shrink-0 rounded-md" />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-xs"><span className="text-muted">شما در حال مشاهده هستید: </span><b>{p.name} {p.compat}</b></div>
+            <div className="truncate text-xs"><span className="text-muted">شما در حال مشاهده هستید: </span><b>{p.name}</b></div>
             <div className="text-[11px] font-bold text-primary">{formatToman(p.price)}</div>
           </div>
           <a href="#model-select" className="rounded-md bg-primary px-5 py-2.5 text-sm font-bold text-primary-fg">انتخاب مدل</a>

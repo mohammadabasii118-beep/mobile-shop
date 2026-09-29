@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft, Phone, Send } from "lucide-react";
-import { BottomNav, Header } from "@/components/header";
+import { BottomNav } from "@/components/header";
+import { Header } from "@/components/site-header";
 import { Footer } from "@/components/footer";
 import { Container } from "@/components/ui";
 import { CopyChip } from "@/components/copy-chip";
 
+export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "پشتیبانی | CaseLine" };
 
 function SupportArt() {

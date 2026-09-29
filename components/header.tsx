@@ -5,6 +5,7 @@ import { Search, ShoppingBag, Smartphone, Headphones, PenLine, Store, User } fro
 import { Container } from "@/components/ui";
 import { NightButton } from "@/components/theme";
 import { CategoryMenu, MobileMenu } from "@/components/category-menu";
+import type { MenuCategory, SiteInfo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function Logo({ className }: { className?: string }) {
@@ -17,6 +18,7 @@ export function Logo({ className }: { className?: string }) {
 }
 
 const iconBtn = "grid size-10 cursor-pointer place-items-center rounded-full bg-surface text-foreground/80 shadow-sm ring-1 ring-transparent transition-all duration-200 hover:bg-primary/10 hover:text-primary hover:shadow-md hover:ring-primary/35";
+export interface HeaderProps { menu: MenuCategory[]; info: SiteInfo; links: { label: string; link: string }[] }
 const navLink = "rounded-full px-3.5 py-2 transition-colors hover:bg-primary/10 hover:text-primary";
 
 function CartBtn() {
@@ -29,27 +31,25 @@ function CartBtn() {
 }
 
 /** Header 1: static, lives at the top of the page and scrolls away. */
-export function TopHeader() {
+export function TopHeader({ menu, info, links }: HeaderProps) {
   return (
     <header>
       <div className="bg-primary/10 text-center text-[11px] leading-7 text-muted sm:text-xs">
-        <span dir="ltr" className="font-bold text-primary">@Caseline_shop</span> در تلگرام | کد تخفیف خرید اول: <b className="text-foreground">CASE10</b>
+        <span dir="ltr" className="font-bold text-primary">@Caseline_shop</span> {info.topBar}
       </div>
       <Container className="py-2 sm:py-4">
         <div className="flex h-12 items-center gap-3 sm:glass sm:h-14 sm:rounded-full sm:px-5 sm:shadow-sm">
           <Logo />
           <nav className="hidden items-center gap-1 text-sm font-medium sm:ms-6 sm:flex" aria-label="منوی اصلی">
-            <CategoryMenu />
-            <Link href="/shop" className={navLink}>فروشگاه</Link>
-            <Link href="/blog" className={navLink}>وبلاگ</Link>
-            <Link href="/support" className={navLink}>پشتیبانی</Link>
+            <CategoryMenu menu={menu} />
+            {links.map((l) => <Link key={l.link + l.label} href={l.link} className={navLink}>{l.label}</Link>)}
           </nav>
           <div className="ms-auto flex items-center gap-1">
             <button data-search-btn className={iconBtn} aria-label="جستجو"><Search className="size-5" /></button>
             <Link href="/account" data-account-link className={cn(iconBtn, "relative hidden sm:grid")} aria-label="حساب کاربری"><User className="size-5" /><i data-user-dot hidden className="absolute end-2 top-2 size-2 rounded-full bg-accent" /></Link>
             <NightButton iconOnly className={cn(iconBtn, "hidden sm:grid")} />
             <CartBtn />
-            <MobileMenu className="sm:hidden" />
+            <MobileMenu menu={menu} className="sm:hidden" />
           </div>
         </div>
       </Container>
@@ -58,7 +58,7 @@ export function TopHeader() {
 }
 
 /** Header 2: floating pill that slides in once the page is scrolled. */
-export function FloatingHeader() {
+export function FloatingHeader({ menu, links }: HeaderProps) {
   const [show, setShow] = useState(false);
   useEffect(() => {
     const on = () => setShow(window.scrollY > 140);
@@ -73,17 +73,15 @@ export function FloatingHeader() {
         <div className="glass flex h-14 items-center gap-2 rounded-full px-3 shadow-md sm:px-5">
           <Logo className="text-xl sm:text-2xl" />
           <nav className="hidden items-center gap-1 text-sm font-medium sm:flex sm:ms-6" aria-label="منوی اصلی">
-            <CategoryMenu />
-            <Link href="/shop" className={navLink}>فروشگاه</Link>
-            <Link href="/blog" className={navLink}>وبلاگ</Link>
-            <Link href="/support" className={navLink}>پشتیبانی</Link>
+            <CategoryMenu menu={menu} />
+            {links.map((l) => <Link key={l.link + l.label} href={l.link} className={navLink}>{l.label}</Link>)}
           </nav>
           <div className="ms-auto flex items-center">
             <Link href="/account" data-account-link className={cn(iconBtn, "relative hidden sm:grid")} aria-label="حساب کاربری"><User className="size-5" /><i data-user-dot hidden className="absolute end-2 top-2 size-2 rounded-full bg-accent" /></Link>
             <CartBtn />
             <NightButton iconOnly className={cn(iconBtn, "hidden sm:grid")} />
             <button data-search-btn className={iconBtn} aria-label="جستجو"><Search className="size-5" /></button>
-            <MobileMenu className="sm:hidden" />
+            <MobileMenu menu={menu} className="sm:hidden" />
           </div>
         </div>
       </Container>
@@ -91,11 +89,11 @@ export function FloatingHeader() {
   );
 }
 
-export function Header() {
+export function HeaderView(props: HeaderProps) {
   return (
     <>
-      <TopHeader />
-      <FloatingHeader />
+      <TopHeader {...props} />
+      <FloatingHeader {...props} />
     </>
   );
 }

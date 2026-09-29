@@ -3,3 +3,8 @@ node_modules
 next-env.d.ts
 *.tsbuildinfo
 out
+.env
+.env.*
+!.env.example
+storage
+lib/generated

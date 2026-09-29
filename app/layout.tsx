@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /></head>
-      <body>{children}<Script src={`${process.env.PAGES === "1" ? "/mobile-shop" : ""}/site.js`} strategy="afterInteractive" /></body>
+      <body>{children}<Script src="/site.js" strategy="afterInteractive" /></body>
     </html>
   );
 }
