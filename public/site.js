@@ -136,17 +136,31 @@
   /* ---------- demo login ---------- */
   function initLogin() {
     var f = $("[data-login-form]"); if (!f) return;
-    var s1 = $("[data-step1]", f), s2 = $("[data-step2]", f), done = $("[data-login-done]"), err = $("[data-login-err]", f);
+    var s1 = $("[data-step1]", f), s2 = $("[data-step2]", f), done = $("[data-login-done]"), err = $("[data-login-err]", f), btn = $("[data-login-btn]", f), timer = $("[data-login-timer]", f), tick;
+    function latin(v) { return v.replace(/[۰-۹]/g, function (d) { return "۰۱۲۳۴۵۶۷۸۹".indexOf(d); }).trim(); }
+    function startTimer() {
+      var n = 60; clearInterval(tick);
+      function draw() { timer.innerHTML = n > 0 ? "ارسال مجدد تا " + fa(n) + " ثانیه دیگر" : '<button type="button" data-login-resend class="cl-link">ارسال مجدد کد</button>'; }
+      draw(); tick = setInterval(function () { n--; draw(); if (n <= 0) clearInterval(tick); }, 1000);
+    }
+    function back() { s2.hidden = true; s1.hidden = false; btn.textContent = "ارسال کد"; err.textContent = ""; clearInterval(tick); $("[name=phone]", f).focus(); }
+    f.addEventListener("click", function (e) {
+      if (e.target.closest("[data-login-edit]")) back();
+      if (e.target.closest("[data-login-resend]")) startTimer();
+    });
     f.addEventListener("submit", function (e) {
       e.preventDefault();
-      if (!s2.hidden) { f.hidden = true; done.hidden = false; return; }
-      var v = $("[name=phone]", f).value.replace(/[۰-۹]/g, function (d) { return "۰۱۲۳۴۵۶۷۸۹".indexOf(d); }).trim();
+      if (!s2.hidden) {
+        if (!latin($("[name=code]", f).value)) { err.textContent = "کد تایید را وارد کنید."; return; }
+        try { localStorage.setItem("caseline-user", latin($("[name=phone]", f).value)); } catch (x) {}
+        f.hidden = true; done.hidden = false; return;
+      }
+      var v = latin($("[name=phone]", f).value);
       if (!/^09\d{9}$/.test(v)) { err.textContent = "شماره موبایل را به‌صورت ۰۹۱۲۳۴۵۶۷۸۹ وارد کنید."; return; }
       err.textContent = ""; s1.hidden = true; s2.hidden = false;
-      $("[data-login-btn]", f).textContent = "ورود"; $("[name=code]", f).focus();
+      $("[data-login-phone]", f).textContent = v; btn.textContent = "تایید و ورود"; startTimer(); $("[name=code]", f).focus();
     });
   }
-
 
   /* ---------- support chat widget ---------- */
   var chat, chatMsgs = [];
