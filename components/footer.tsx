@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Clock, Mail, MapPin, Phone } from "lucide-react";
 import { Container } from "@/components/ui";
 import { Logo } from "@/components/header";
@@ -19,7 +20,7 @@ export function Footer() {
           </div>
           <div>
             <h4 className="mb-3 font-extrabold">خدمات ما</h4>
-            <ul className="space-y-2 text-muted">{["محصولات", "بلاگ", "حساب کاربری", "تماس با ما"].map((x) => <li key={x}><a href="#" className="hover:text-primary">{x}</a></li>)}</ul>
+            <ul className="space-y-2 text-muted">{[["محصولات", "/"], ["بلاگ", "/"], ["حساب کاربری", "/"], ["تماس با ما", "/support"], ["پشتیبانی", "/support"]].map(([x, h]) => <li key={x}><Link href={h} className="hover:text-primary">{x}</Link></li>)}</ul>
           </div>
           <div>
             <h4 className="mb-3 font-extrabold">اطلاعات تماس</h4>

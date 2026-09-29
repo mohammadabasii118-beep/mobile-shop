@@ -41,7 +41,7 @@ export function TopHeader() {
             <CategoryMenu />
             <a href="#iphone" className="hover:text-primary">فروشگاه</a>
             <a href="#blog" className="hover:text-primary">وبلاگ</a>
-            <a href="#" className="hover:text-primary">پشتیبانی</a>
+            <Link href="/support" className="hover:text-primary">پشتیبانی</Link>
           </nav>
           <div className="ms-auto flex items-center gap-1">
             <button className={iconBtn} aria-label="جستجو"><Search className="size-5" /></button>
@@ -74,7 +74,7 @@ export function FloatingHeader() {
             <CategoryMenu />
             <a href="#iphone" className="hover:text-primary">فروشگاه</a>
             <a href="#blog" className="hover:text-primary">وبلاگ</a>
-            <a href="#" className="hover:text-primary">پشتیبانی</a>
+            <Link href="/support" className="hover:text-primary">پشتیبانی</Link>
           </nav>
           <div className="ms-auto flex items-center">
             <button className={cn(iconBtn, "hidden sm:grid")} aria-label="حساب کاربری"><User className="size-5" /></button>
@@ -103,9 +103,9 @@ export function BottomNav() {
   const item = "flex flex-1 cursor-pointer flex-col items-center gap-1 rounded-full py-2 text-[10px] font-medium text-muted";
   return (
     <>
-      <a href="#" aria-label="گفتگوی آنلاین" className="fixed bottom-24 start-4 z-40 grid size-12 place-items-center rounded-full bg-accent text-white shadow-lg md:bottom-6"><MessageCircle className="size-6" /></a>
+      <Link href="/support" aria-label="گفتگوی آنلاین" className="fixed bottom-24 start-4 z-40 grid size-12 place-items-center rounded-full bg-accent text-white shadow-lg md:bottom-6"><MessageCircle className="size-6" /></Link>
       <nav aria-label="منوی اصلی" className="glass fixed inset-x-3 bottom-3 z-40 mx-auto flex max-w-md rounded-full px-2 shadow-lg md:hidden">
-        <a href="#" className={item}><Headphones className="size-5" />پشتیبانی</a>
+        <Link href="/support" className={item}><Headphones className="size-5" />پشتیبانی</Link>
         <a href="#blog" className={item}><PenLine className="size-5" />بلاگ</a>
         <NightButton className={item} />
         <a href="#iphone" className={item}><Store className="size-5" />فروشگاه</a>
