@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ChevronDown, LayoutGrid, Menu, Search, ShoppingBag, Smartphone, Headphones, PenLine, Store, User, MessageCircle } from "lucide-react";
 import { Container } from "@/components/ui";
@@ -8,10 +9,10 @@ import { cn } from "@/lib/utils";
 
 export function Logo({ className }: { className?: string }) {
   return (
-    <a href="/" className={cn("flex items-center gap-1.5 text-2xl font-black tracking-tight text-primary", className)} aria-label="CaseLine">
+    <Link href="/" className={cn("flex items-center gap-1.5 text-2xl font-black tracking-tight text-primary", className)} aria-label="CaseLine">
       <Smartphone className="size-6" strokeWidth={2.6} />
       <span dir="ltr">Case<span className="text-foreground">line</span></span>
-    </a>
+    </Link>
   );
 }
 
@@ -33,12 +34,21 @@ export function TopHeader() {
       <div className="bg-primary/10 text-center text-[11px] leading-7 text-muted sm:text-xs">
         <span dir="ltr" className="font-bold text-primary">@Caseline_shop</span> در تلگرام | کد تخفیف خرید اول: <b className="text-foreground">CASE10</b>
       </div>
-      <Container className="flex h-16 items-center gap-3">
-        <Logo />
-        <div className="ms-auto flex items-center gap-1">
-          <button className={iconBtn} aria-label="جستجو"><Search className="size-5" /></button>
-          <CartBtn />
-          <button className={iconBtn} aria-label="منو"><Menu className="size-5" /></button>
+      <Container className="py-2 sm:py-4">
+        <div className="flex h-12 items-center gap-3 sm:glass sm:h-14 sm:rounded-full sm:px-5 sm:shadow-sm">
+          <Logo />
+          <nav className="hidden items-center gap-5 text-sm font-medium sm:ms-6 sm:flex" aria-label="منوی اصلی">
+            <a href="#iphone" className="rounded-full bg-primary/10 px-3 py-1.5 text-primary">دسته‌بندی‌ها</a>
+            <a href="#iphone" className="hover:text-primary">فروشگاه</a>
+            <a href="#blog" className="hover:text-primary">وبلاگ</a>
+            <a href="#" className="hover:text-primary">پشتیبانی</a>
+          </nav>
+          <div className="ms-auto flex items-center gap-1">
+            <button className={iconBtn} aria-label="جستجو"><Search className="size-5" /></button>
+            <NightButton iconOnly className={cn(iconBtn, "hidden sm:grid")} />
+            <CartBtn />
+            <button className={cn(iconBtn, "sm:hidden")} aria-label="منو"><Menu className="size-5" /></button>
+          </div>
         </div>
       </Container>
     </header>

@@ -100,3 +100,12 @@ body {
 }
 
 @keyframes marquee { to { transform: translateX(-50%); } }
+
+/* CSS-only product tabs (work without JS) */
+.tabs .panel { display: none; }
+.tabs:has(#tab-desc:checked) .panel-desc,
+.tabs:has(#tab-faq:checked) .panel-faq,
+.tabs:has(#tab-rev:checked) .panel-rev { display: block; }
+.tabs:has(#tab-desc:checked) label[for="tab-desc"],
+.tabs:has(#tab-faq:checked) label[for="tab-faq"],
+.tabs:has(#tab-rev:checked) label[for="tab-rev"] { background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--primary); font-weight: 700; }

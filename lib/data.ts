@@ -84,3 +84,28 @@ export const homeCategories = [
   { slug: "xiaomi", label: "قاب شیائومی", count: 29, logos: ["Mi", "R", "P"] },
   { slug: "other", label: "سایر لوازم جانبی", count: 84, logos: ["⚡", "🎧", "🔋"] },
 ];
+
+export const allProducts: Product[] = Array.from(
+  new Map([...products, ...rails.flatMap((r) => r.items)].map((p) => [p.id, p])).values(),
+);
+export const getProduct = (id: string) => allProducts.find((p) => p.id === id);
+
+const modelKinds: Kind[] = ["case", "glass", "lens"];
+export function optionsFor(p: Product): { label: string; options: string[] } {
+  if (modelKinds.includes(p.kind)) {
+    const list = phoneModels[p.brand] ?? Object.values(phoneModels).flat();
+    return { label: "مدل گوشی خود را انتخاب کنید", options: list };
+  }
+  return { label: "رنگ خود را انتخاب کنید", options: ["مشکی", "سفید", "آبی", "نقره‌ای"] };
+}
+
+export const productFaq = [
+  { q: "آیا محصول اورجینال و دارای ضمانت است؟", a: "بله، همه محصولات کیس‌لاین اورجینال هستند و تا ۷ روز امکان بازگشت دارند." },
+  { q: "چطور مطمئن شوم با گوشی من سازگار است؟", a: "قبل از خرید مدل گوشی را انتخاب کنید؛ فقط مدل‌های سازگار نمایش داده می‌شوند." },
+  { q: "ارسال سفارش چقدر طول می‌کشد؟", a: "در تهران همان روز و در سایر شهرها بین ۲ تا ۴ روز کاری." },
+];
+export const productReviews = [
+  { name: "محمد ج.", text: "کیفیت عالی بود و دقیقاً با گوشیم جفت شد. ارسال هم سریع بود.", rate: 5 },
+  { name: "سارا ر.", text: "رنگش از عکس هم قشنگ‌تره. پیشنهاد می‌کنم.", rate: 5 },
+  { name: "علی م.", text: "خوب بود، فقط بسته‌بندی می‌تونست بهتر باشه.", rate: 4 },
+];
