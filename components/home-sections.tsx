@@ -84,8 +84,8 @@ export function CategoryTiles() {
         <SectionHeader title="دسته‌بندی‌ها" />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {shopCats.map((c) => (
-            <Link key={c.slug} href={`/shop#${c.slug}`} className="flex flex-col items-center gap-2 rounded-lg bg-surface-2 px-3 py-4 text-center transition-shadow hover:shadow-md">
-              <span className="flex gap-1" dir="rtl">
+            <Link key={c.slug} href={`/shop#${c.slug}`} className="group flex flex-col items-center gap-2 rounded-lg border border-transparent bg-surface-2 px-3 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:bg-surface hover:shadow-md">
+              <span className="flex gap-1 transition-transform duration-200 group-hover:scale-105" dir="rtl">
                 {tileKinds[c.slug].map((k, i) => <span key={i} className="grid size-8 place-items-center rounded-full bg-surface shadow-sm"><ProductVisual kind={k} hue={tileHues[i]} className="size-6" /></span>)}
               </span>
               <span className="text-sm font-bold">{c.label}</span>

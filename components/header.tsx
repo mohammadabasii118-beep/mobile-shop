@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Search, ShoppingBag, Smartphone, Headphones, PenLine, Store, User, MessageCircle } from "lucide-react";
+import { Search, ShoppingBag, Smartphone, Headphones, PenLine, Store, User } from "lucide-react";
 import { Container } from "@/components/ui";
 import { NightButton } from "@/components/theme";
 import { CategoryMenu, MobileMenu } from "@/components/category-menu";
@@ -105,7 +105,13 @@ export function BottomNav() {
   const item = "flex flex-1 cursor-pointer flex-col items-center gap-1 rounded-full py-2 text-[10px] font-medium text-muted";
   return (
     <>
-      <button data-chat-btn aria-label="گفتگوی آنلاین" className="fixed bottom-24 start-4 z-[60] grid size-12 cursor-pointer place-items-center rounded-full bg-accent text-white shadow-lg md:bottom-6"><MessageCircle className="size-6" /></button>
+      <button data-chat-btn aria-label="گفتگوی آنلاین" className="chat-fab fixed bottom-24 start-4 z-[60] grid size-12 cursor-pointer place-items-center rounded-full md:bottom-6">
+        <svg viewBox="0 0 24 24" className="size-7" fill="none" aria-hidden>
+          <circle cx="12" cy="11" r="6.6" stroke="#fff" strokeWidth="3" />
+          <path d="M14.6 16.2 17.9 20.4 12.6 18.4Z" fill="#fff" stroke="#fff" strokeWidth="1" strokeLinejoin="round" />
+          <circle cx="9.3" cy="11" r="1" fill="#fff" /><circle cx="12" cy="11" r="1" fill="#fff" /><circle cx="14.7" cy="11" r="1" fill="#fff" />
+        </svg>
+      </button>
       <nav aria-label="منوی اصلی" className="glass fixed inset-x-3 bottom-3 z-40 mx-auto flex max-w-md rounded-full px-2 shadow-lg md:hidden">
         <Link href="/support" className={item}><Headphones className="size-5" />پشتیبانی</Link>
         <Link href="/blog" className={item}><PenLine className="size-5" />بلاگ</Link>

@@ -228,3 +228,9 @@ body {
 .ord-btns { display: flex; gap: 8px; justify-content: flex-start; flex-wrap: wrap; }
 .ord-btns .cl-btn { height: 42px; padding-inline: 20px; font-size: 13px; }
 .ord-list { display: flex; flex-direction: column; gap: 12px; border: 0 !important; padding: 0 !important; }
+
+/* Floating support button: solid sky circle, pulsing ring, lifts on hover */
+.chat-fab { background: var(--accent); color: #fff; box-shadow: 0 6px 16px rgb(60 160 220 / .35); transition: transform .2s ease; animation: fab-pulse 2.6s ease-out infinite, fab-float 3.2s ease-in-out infinite; }
+.chat-fab:hover { transform: scale(1.1); animation-play-state: paused; }
+@keyframes fab-pulse { 0% { box-shadow: 0 6px 16px rgb(60 160 220 / .35), 0 0 0 0 rgb(91 189 232 / .5); } 70% { box-shadow: 0 6px 16px rgb(60 160 220 / .35), 0 0 0 16px rgb(91 189 232 / 0); } 100% { box-shadow: 0 6px 16px rgb(60 160 220 / .35), 0 0 0 0 rgb(91 189 232 / 0); } }
+@keyframes fab-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -3px; } }

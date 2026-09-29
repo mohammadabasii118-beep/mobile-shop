@@ -5,10 +5,10 @@ import { Logo } from "@/components/header";
 
 export function Footer() {
   const rows = [
-    { i: Clock, t: "هر روز ساعت ۸ صبح تا ۱۰ شب" },
-    { i: Phone, t: "021-12345678" },
-    { i: Mail, t: "INFO@CASELINE.IR" },
-    { i: MapPin, t: "آدرس: تهران، میدان ونک، خیابان ملاصدرا" },
+    { i: Clock, t: "هر روز ساعت ۸ صبح تا ۱۰ شب", href: undefined as string | undefined },
+    { i: Phone, t: "021-12345678", href: "tel:02112345678" },
+    { i: Mail, t: "INFO@CASELINE.IR", href: "mailto:info@caseline.ir" },
+    { i: MapPin, t: "آدرس: تهران، میدان ونک، خیابان ملاصدرا", href: undefined },
   ];
   return (
     <footer className="mt-10 pb-32 md:pb-24">
@@ -20,12 +20,15 @@ export function Footer() {
           </div>
           <div>
             <h4 className="mb-3 font-extrabold">خدمات ما</h4>
-            <ul className="space-y-2 text-muted">{[["محصولات", "/shop"], ["بلاگ", "/blog"], ["حساب کاربری", "/account"], ["تماس با ما", "/support"], ["پشتیبانی", "/support"]].map(([x, h]) => <li key={x}><Link href={h} {...(h === "/account" ? { "data-account-link": "" } : {})} className="hover:text-primary">{x}</Link></li>)}</ul>
+            <ul className="space-y-2 text-muted">{[["محصولات", "/shop"], ["بلاگ", "/blog"], ["حساب کاربری", "/account"], ["تماس با ما", "/support"], ["پشتیبانی", "/support"]].map(([x, h]) => <li key={x}><Link href={h} {...(h === "/account" ? { "data-account-link": "" } : {})} className="inline-block transition-all duration-150 hover:-translate-x-0.5 hover:text-primary">{x}</Link></li>)}</ul>
           </div>
           <div>
             <h4 className="mb-3 font-extrabold">اطلاعات تماس</h4>
             <ul className="space-y-3">
-              {rows.map(({ i: I, t }) => <li key={t} className="flex items-center gap-2 text-muted"><span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/12 text-primary"><I className="size-4" /></span><span dir="auto">{t}</span></li>)}
+              {rows.map(({ i: I, t, href }) => {
+                const inner = (<><span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/12 text-primary transition-colors group-hover:bg-primary/20"><I className="size-4" /></span><span dir="auto">{t}</span></>);
+                return <li key={t}>{href ? <a href={href} className="group flex items-center gap-2 text-muted transition-colors hover:text-primary">{inner}</a> : <span className="group flex cursor-default items-center gap-2 text-muted transition-colors hover:text-primary">{inner}</span>}</li>;
+              })}
             </ul>
           </div>
           <div>
