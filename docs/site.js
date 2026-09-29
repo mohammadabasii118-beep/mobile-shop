@@ -27,7 +27,7 @@
   function ensureDrawer() {
     if (drawer) return drawer;
     drawer = document.createElement("div");
-    drawer.className = "cl-layer"; drawer.hidden = true;
+    drawer.className = "cl-layer"; drawer.dir = "rtl"; drawer.hidden = true;
     drawer.innerHTML = '<div class="cl-backdrop" data-close></div><aside class="cl-sheet" role="dialog" aria-label="سبد خرید"><header><b>سبد خرید</b><button class="cl-x" data-close aria-label="بستن">✕</button></header><div class="cl-body" data-cart-body></div><footer data-cart-foot></footer></aside>';
     document.body.appendChild(drawer);
     return drawer;
@@ -54,7 +54,7 @@
   function ensureSearch() {
     if (search) return search;
     search = document.createElement("div");
-    search.className = "cl-layer"; search.hidden = true;
+    search.className = "cl-layer"; search.dir = "rtl"; search.hidden = true;
     search.innerHTML = '<div class="cl-backdrop" data-close></div><div class="cl-search" role="dialog" aria-label="جستجو"><div class="cl-sbar"><input id="cl-search-input" type="search" placeholder="جستجوی محصول، برند یا مدل گوشی…" autocomplete="off"><button class="cl-x" data-close aria-label="بستن">✕</button></div><div class="cl-results" data-results></div></div>';
     document.body.appendChild(search);
     $("#cl-search-input", search).addEventListener("input", function () { runSearch(this.value); });
@@ -146,10 +146,49 @@
     });
   }
 
+
+  /* ---------- support chat widget ---------- */
+  var chat, chatMsgs = [];
+  var EMOJI = "\u{1F60A}";
+  function ensureChat() {
+    if (chat) return chat;
+    chat = document.createElement("div");
+    chat.className = "cl-chat"; chat.dir = "rtl"; chat.hidden = true;
+    chat.innerHTML = '<header><span class="cl-av"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg></span><div><b>پشتیبانی سایت</b><small>پاسخگوی سوالات شما هستیم</small></div><button class="cl-chat-x" data-chat-close aria-label="بستن">✕</button></header>' +
+      '<div class="cl-chat-body" data-chat-body></div>' +
+      '<form class="cl-chat-form" data-chat-form><button type="submit" class="cl-send" aria-label="ارسال" hidden>➤</button><input id="cl-chat-input" placeholder="پیامی بنویسید…" autocomplete="off"><button type="button" class="cl-ico" data-chat-emoji aria-label="ایموجی">☺</button><button type="button" class="cl-ico" data-chat-attach aria-label="پیوست">📎</button></form>';
+    document.body.appendChild(chat);
+    chatMsgs = [{ from: "bot", text: "سلام! 👋 به پشتیبانی کیس‌لاین خوش آمدید. چطور می‌توانیم کمکتان کنیم؟" }];
+    var input = $("#cl-chat-input", chat), send = $(".cl-send", chat);
+    input.addEventListener("input", function () { send.hidden = !input.value.trim(); });
+    $("[data-chat-emoji]", chat).addEventListener("click", function () { input.value += EMOJI; send.hidden = false; input.focus(); });
+    $("[data-chat-form]", chat).addEventListener("submit", function (e) {
+      e.preventDefault();
+      var v = input.value.trim(); if (!v) return;
+      chatMsgs.push({ from: "me", text: v }); input.value = ""; send.hidden = true; renderChat();
+      setTimeout(function () {
+        chatMsgs.push({ from: "bot", text: "پیام شما دریافت شد. برای پاسخ سریع‌تر می‌توانید از تلگرام پشتیبانی هم استفاده کنید: @caseline_support" }); renderChat();
+      }, 900);
+    });
+    return chat;
+  }
+  function renderChat() {
+    var b = $("[data-chat-body]", chat);
+    b.innerHTML = chatMsgs.map(function (m) { return '<div class="cl-msg cl-' + m.from + '">' + esc(m.text) + '</div>'; }).join("");
+    b.scrollTop = b.scrollHeight;
+  }
+  function toggleChat() {
+    ensureChat();
+    chat.hidden = !chat.hidden;
+    if (!chat.hidden) { renderChat(); setTimeout(function () { $("#cl-chat-input", chat).focus(); }, 30); }
+  }
+
   /* ---------- delegation ---------- */
   document.addEventListener("click", function (e) {
     var t = e.target.closest ? e.target : e.target.parentNode, el;
     if ((el = t.closest("[data-cart-btn]"))) { e.preventDefault(); return openCart(); }
+    if ((el = t.closest("[data-chat-btn]"))) { e.preventDefault(); return toggleChat(); }
+    if ((el = t.closest("[data-chat-close]"))) { chat.hidden = true; return; }
     if ((el = t.closest("[data-search-btn]"))) { e.preventDefault(); return openSearch(); }
     if ((el = t.closest("[data-buy]"))) { if (!el.disabled) add(); return; }
     if ((el = t.closest("[data-close]"))) { return closeAll(); }

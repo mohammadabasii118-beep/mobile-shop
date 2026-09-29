@@ -162,3 +162,24 @@ body {
 .cl-oline em { font-style: normal; font-weight: 700; white-space: nowrap; }
 @keyframes cl-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes cl-drop { from { transform: translateY(-12px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ---------- support chat widget ---------- */
+.cl-chat { position: fixed; z-index: 70; inset-inline-start: 24px; bottom: 88px; width: min(340px, calc(100vw - 24px)); height: min(520px, 72vh); display: flex; flex-direction: column; overflow: hidden; border-radius: 18px; background: var(--surface); color: var(--foreground); box-shadow: var(--shadow-lg); border: 1px solid var(--border); animation: cl-pop .2s ease-out; }
+.cl-chat[hidden] { display: none; }
+@media (max-width: 767px) { .cl-chat { inset-inline: 12px; width: auto; bottom: 160px; height: min(480px, 62vh); } }
+.cl-chat header { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--accent); color: #0b2233; }
+.cl-chat header div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.cl-chat header b { font-size: 14px; }
+.cl-chat header small { font-size: 11px; opacity: .8; }
+.cl-av { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 999px; background: #fff; color: var(--primary); flex: none; }
+.cl-chat-x { width: 28px; height: 28px; border-radius: 999px; border: 0; background: rgb(255 255 255 / .45); color: #0b2233; cursor: pointer; font-size: 12px; }
+.cl-chat-body { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 8px; background-color: var(--surface-2); background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 90 90' fill='none' stroke='%23778' stroke-opacity='.12' stroke-width='2'><path d='M12 14l10 4-6 8z'/><circle cx='62' cy='18' r='5'/><path d='M20 62h12M56 66l8 8M70 52l10-2'/><rect x='40' y='36' width='9' height='9' rx='2'/></svg>"); }
+.cl-msg { max-width: 82%; padding: 9px 12px; border-radius: 14px; font-size: 12.5px; line-height: 1.9; word-break: break-word; }
+.cl-bot { align-self: flex-start; background: var(--surface); border: 1px solid var(--border); border-end-start-radius: 4px; }
+.cl-me { align-self: flex-end; background: var(--primary); color: var(--primary-fg); border-end-end-radius: 4px; }
+.cl-chat-form { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--border); background: var(--surface); }
+.cl-chat-form input { flex: 1; min-width: 0; height: 38px; border: 0; background: transparent; color: inherit; font: inherit; font-size: 13px; outline: none; }
+.cl-ico { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 18px; width: 30px; height: 30px; }
+.cl-send { width: 34px; height: 34px; border-radius: 999px; border: 0; background: var(--primary); color: var(--primary-fg); cursor: pointer; transform: scaleX(-1); }
+.cl-send[hidden] { display: none; }
+@keyframes cl-pop { from { transform: translateY(10px) scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }

@@ -104,7 +104,7 @@ export function BottomNav() {
   const item = "flex flex-1 cursor-pointer flex-col items-center gap-1 rounded-full py-2 text-[10px] font-medium text-muted";
   return (
     <>
-      <Link href="/support" aria-label="گفتگوی آنلاین" className="fixed bottom-24 start-4 z-40 grid size-12 place-items-center rounded-full bg-accent text-white shadow-lg md:bottom-6"><MessageCircle className="size-6" /></Link>
+      <button data-chat-btn aria-label="گفتگوی آنلاین" className="fixed bottom-24 start-4 z-[60] grid size-12 cursor-pointer place-items-center rounded-full bg-accent text-white shadow-lg md:bottom-6"><MessageCircle className="size-6" /></button>
       <nav aria-label="منوی اصلی" className="glass fixed inset-x-3 bottom-3 z-40 mx-auto flex max-w-md rounded-full px-2 shadow-lg md:hidden">
         <Link href="/support" className={item}><Headphones className="size-5" />پشتیبانی</Link>
         <Link href="/blog" className={item}><PenLine className="size-5" />بلاگ</Link>
