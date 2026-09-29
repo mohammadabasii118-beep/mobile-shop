@@ -19,7 +19,7 @@ export function BuyBox({ p }: { p: Product }) {
   const [choice, setChoice] = useState("");
   const [qty, setQty] = useState(1);
   return (
-    <div className="space-y-4">
+    <div data-product data-id={p.id} data-name={`${p.name}${p.compat ? ` ${p.compat}` : ""}`} data-price={p.price} data-hue={p.hue} className="space-y-4">
       <span className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-medium text-success">موجود و آماده تحویل سریع <i className="size-2 rounded-full bg-success" /></span>
       <ul className="space-y-3 text-[13px] leading-7">
         {[["نسخه اختصاصی با", "بهترین قیمت", "ممکن عرضه می‌شود."], ["محصول کاملاً", "اورجینال", "بوده و مرجوعی ۷ روزه دارد."], ["ارسال سفارش در", "سریع‌ترین زمان", "ممکن انجام می‌شود."], ["سازگاری کامل با مدل گوشی شما با", "ضمانت بازگشت", "وجه."]].map(([a, b, c]) => (

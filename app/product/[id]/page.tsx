@@ -99,7 +99,7 @@ export default async function ProductPage({ params }: { params: Promise<{ id: st
           </div>
 
           <aside className="rounded-xl border border-border bg-surface p-3 shadow-sm lg:sticky lg:top-20">
-            <div className="mb-3 flex items-center justify-between px-1"><h2 className="text-sm font-black">پیشنهادهای ویژه</h2><Link href="/" className="text-[11px] font-bold text-primary">همه</Link></div>
+            <div className="mb-3 flex items-center justify-between px-1"><h2 className="text-sm font-black">پیشنهادهای ویژه</h2><Link href="/shop" className="text-[11px] font-bold text-primary">همه</Link></div>
             <ul className="space-y-2">
               {others.map((x) => (
                 <li key={x.id}><Link href={`/product/${x.id}`} className="flex items-center gap-2 rounded-lg bg-surface-2 p-2 hover:shadow-sm">

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "./globals.css";
 import { themeScript } from "@/components/theme";
 
@@ -14,7 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /></head>
-      <body>{children}</body>
+      <body>{children}<Script src={`${process.env.PAGES === "1" ? "/mobile-shop" : ""}/site.js`} strategy="afterInteractive" /></body>
     </html>
   );
 }

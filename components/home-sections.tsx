@@ -22,7 +22,7 @@ export function Hero() {
           <br />سریع و مطمئن، با ضمانت بازگشت
         </h1>
         <p className="mx-auto mt-3 max-w-xl text-sm leading-8 text-muted sm:text-base">لوازم جانبی محبوب موبایل، قاب، گلس، شارژر، هندزفری و بیشتر، با تضمین سازگاری کامل با مدل گوشی شما.</p>
-        <form role="search" className="glass relative mx-auto mt-6 flex h-14 items-center rounded-full px-5 shadow-md" onSubmit={(e) => e.preventDefault()}>
+        <form role="search" data-search-form className="glass relative mx-auto mt-6 flex h-14 items-center rounded-full px-5 shadow-md" onSubmit={(e) => e.preventDefault()}>
           <input id="hero-search" type="search" placeholder="اسم محصول یا مدل گوشی رو بنویس… مثلا iPhone 15" className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted" />
           <Search className="size-5 text-primary" />
         </form>
@@ -102,7 +102,7 @@ export function TelegramBanner() {
   return (
     <section className="py-6">
       <Container>
-        <a href="#" className="relative flex min-h-44 items-center overflow-hidden rounded-[28px] p-6 text-white shadow-lg sm:min-h-56 sm:p-10" style={{ background: "linear-gradient(110deg,#1f9bea 0%,#1465c0 100%)" }}>
+        <a href="https://t.me/caseline_shop" target="_blank" rel="noopener noreferrer" className="relative flex min-h-44 items-center overflow-hidden rounded-[28px] p-6 text-white shadow-lg sm:min-h-56 sm:p-10" style={{ background: "linear-gradient(110deg,#1f9bea 0%,#1465c0 100%)" }}>
           <span className="absolute -start-6 top-1/2 grid size-40 -translate-y-1/2 place-items-center rounded-full bg-gradient-to-br from-[#7fd3ff] to-[#1a7fc4] shadow-2xl sm:size-52"><Send className="size-16 -rotate-12 sm:size-24" /></span>
           <span className="absolute start-44 top-5 size-8 rounded-full bg-white/25 sm:start-60" />
           <span className="absolute bottom-4 start-8 size-5 rounded-full bg-white/25" />

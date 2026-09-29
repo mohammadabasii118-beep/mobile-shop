@@ -20,9 +20,9 @@ const iconBtn = "grid size-10 cursor-pointer place-items-center rounded-full tex
 
 function CartBtn() {
   return (
-    <button className={cn(iconBtn, "relative")} aria-label="سبد خرید">
+    <button data-cart-btn className={cn(iconBtn, "relative")} aria-label="سبد خرید">
       <ShoppingBag className="size-5" />
-      <span className="absolute end-1 top-1 grid size-4 place-items-center rounded-full bg-hot text-[10px] font-bold text-white">۱</span>
+      <span data-cart-count hidden className="absolute end-0.5 top-0.5 grid min-w-4 place-items-center rounded-full bg-hot px-1 text-[10px] font-bold leading-4 text-white">0</span>
     </button>
   );
 }
@@ -44,7 +44,8 @@ export function TopHeader() {
             <Link href="/support" className="hover:text-primary">پشتیبانی</Link>
           </nav>
           <div className="ms-auto flex items-center gap-1">
-            <button className={iconBtn} aria-label="جستجو"><Search className="size-5" /></button>
+            <button data-search-btn className={iconBtn} aria-label="جستجو"><Search className="size-5" /></button>
+            <Link href="/account" className={cn(iconBtn, "hidden sm:grid")} aria-label="حساب کاربری"><User className="size-5" /></Link>
             <NightButton iconOnly className={cn(iconBtn, "hidden sm:grid")} />
             <CartBtn />
             <MobileMenu className="sm:hidden" />
@@ -77,10 +78,10 @@ export function FloatingHeader() {
             <Link href="/support" className="hover:text-primary">پشتیبانی</Link>
           </nav>
           <div className="ms-auto flex items-center">
-            <button className={cn(iconBtn, "hidden sm:grid")} aria-label="حساب کاربری"><User className="size-5" /></button>
+            <Link href="/account" className={cn(iconBtn, "hidden sm:grid")} aria-label="حساب کاربری"><User className="size-5" /></Link>
             <CartBtn />
             <NightButton iconOnly className={cn(iconBtn, "hidden sm:grid")} />
-            <button className={iconBtn} aria-label="جستجو"><Search className="size-5" /></button>
+            <button data-search-btn className={iconBtn} aria-label="جستجو"><Search className="size-5" /></button>
             <MobileMenu className="sm:hidden" />
           </div>
         </div>
@@ -109,7 +110,7 @@ export function BottomNav() {
         <Link href="/blog" className={item}><PenLine className="size-5" />بلاگ</Link>
         <NightButton className={item} />
         <Link href="/shop" className={item}><Store className="size-5" />فروشگاه</Link>
-        <a href="#" className={item}><User className="size-5" />داشبورد</a>
+        <Link href="/account" className={item}><User className="size-5" />داشبورد</Link>
       </nav>
     </>
   );

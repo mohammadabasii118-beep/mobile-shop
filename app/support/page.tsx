@@ -46,11 +46,11 @@ export default function SupportPage() {
               <div><SupportArt /></div>
             </div>
             <div className="mt-8 grid gap-4 border-t border-border pt-8 md:grid-cols-2">
-              <a href="#" className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/10 p-3 text-sm font-bold transition-shadow hover:shadow-md">
+              <a href="https://t.me/caseline_support" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 rounded-xl border border-primary/30 bg-primary/10 p-3 text-sm font-bold transition-shadow hover:shadow-md">
                 <span className="grid size-11 place-items-center rounded-lg bg-primary text-primary-fg"><Send className="size-5" /></span>
                 <span className="flex-1">ارسال پیام در تلگرام</span><ChevronLeft className="size-4 text-muted" />
               </a>
-              <a href="#" className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 text-sm font-bold shadow-sm transition-shadow hover:shadow-md">
+              <a href="tel:02112345678" className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 text-sm font-bold shadow-sm transition-shadow hover:shadow-md">
                 <span className="grid size-11 place-items-center rounded-lg bg-primary/12 text-primary"><Phone className="size-5" /></span>
                 <span dir="ltr" className="flex-1 text-end text-base">021-12345678</span><ChevronLeft className="size-4 text-muted" />
               </a>
