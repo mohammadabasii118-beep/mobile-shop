@@ -35,7 +35,7 @@ export function Badge({ className, tone = "primary", ...props }: React.HTMLAttri
 }
 
 export function Container({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8", className)} {...props} />;
+  return <div className={cn("mx-auto w-full max-w-[980px] px-4 sm:px-6 lg:px-8", className)} {...props} />;
 }
 
 export function SectionHeader({ title, href, sub }: { title: string; href?: string; sub?: string }) {

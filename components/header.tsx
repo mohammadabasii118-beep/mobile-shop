@@ -1,43 +1,97 @@
-import { Menu, Search, ShoppingBag, Smartphone, Headphones, PenLine, Store, User, MessageCircle } from "lucide-react";
+"use client";
+import { useEffect, useState } from "react";
+import { ChevronDown, LayoutGrid, Menu, Search, ShoppingBag, Smartphone, Headphones, PenLine, Store, User, MessageCircle } from "lucide-react";
 import { Container } from "@/components/ui";
 import { NightButton, ThemeToggle } from "@/components/theme";
-import { categories } from "@/lib/data";
+import { homeCategories } from "@/lib/data";
+import { cn } from "@/lib/utils";
 
-export function Logo() {
+export function Logo({ className }: { className?: string }) {
   return (
-    <a href="/" className="flex items-center gap-1.5 text-2xl font-black tracking-tight text-primary" aria-label="CaseLine">
+    <a href="/" className={cn("flex items-center gap-1.5 text-2xl font-black tracking-tight text-primary", className)} aria-label="CaseLine">
       <Smartphone className="size-6" strokeWidth={2.6} />
       <span dir="ltr">Case<span className="text-foreground">line</span></span>
     </a>
   );
 }
 
-export function Header() {
+const iconBtn = "grid size-10 cursor-pointer place-items-center rounded-full text-primary hover:bg-primary/10";
+
+function CartBtn() {
   return (
-    <header className="sticky top-0 z-40">
-      <div className="bg-primary/12 text-center text-[11px] leading-7 text-muted sm:text-xs">
+    <button className={cn(iconBtn, "relative")} aria-label="سبد خرید">
+      <ShoppingBag className="size-5" />
+      <span className="absolute end-1 top-1 grid size-4 place-items-center rounded-full bg-hot text-[10px] font-bold text-white">۱</span>
+    </button>
+  );
+}
+
+/** Header 1: static, lives at the top of the page and scrolls away. */
+export function TopHeader() {
+  return (
+    <header>
+      <div className="bg-primary/10 text-center text-[11px] leading-7 text-muted sm:text-xs">
         <span dir="ltr" className="font-bold text-primary">@Caseline_shop</span> در تلگرام | کد تخفیف خرید اول: <b className="text-foreground">CASE10</b>
       </div>
-      <div className="glass border-x-0 border-t-0">
-        <Container className="flex h-14 items-center gap-3 sm:h-16 lg:gap-8">
-          <Logo />
-          <nav className="hidden items-center gap-5 text-sm font-medium lg:flex" aria-label="دسته‌بندی‌ها">
-            {categories.slice(0, 6).map((c) => <a key={c.slug} href={`#${c.slug}`} className="text-foreground/80 hover:text-primary">{c.label}</a>)}
-            <a href="#phone-picker" className="font-bold text-primary">مدل گوشی</a>
-            <a href="/wholesale" className="text-foreground/80 hover:text-primary">همکاری عمده</a>
-          </nav>
-          <div className="ms-auto flex items-center gap-1">
-            <span className="hidden sm:block"><ThemeToggle /></span>
-            <button className="grid size-10 cursor-pointer place-items-center rounded-full text-primary hover:bg-primary/10" aria-label="جستجو"><Search className="size-5" /></button>
-            <button className="relative grid size-10 cursor-pointer place-items-center rounded-full text-primary hover:bg-primary/10" aria-label="سبد خرید">
-              <ShoppingBag className="size-5" />
-              <span className="absolute end-1 top-1 grid size-4 place-items-center rounded-full bg-hot text-[10px] font-bold text-white">۱</span>
-            </button>
-            <button className="grid size-10 cursor-pointer place-items-center rounded-full text-primary hover:bg-primary/10 lg:hidden" aria-label="منو"><Menu className="size-5" /></button>
-          </div>
-        </Container>
-      </div>
+      <Container className="flex h-16 items-center gap-3">
+        <Logo />
+        <div className="ms-auto flex items-center gap-1">
+          <button className={iconBtn} aria-label="جستجو"><Search className="size-5" /></button>
+          <CartBtn />
+          <button className={iconBtn} aria-label="منو"><Menu className="size-5" /></button>
+        </div>
+      </Container>
     </header>
+  );
+}
+
+/** Header 2: floating pill that slides in once the page is scrolled. */
+export function FloatingHeader() {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const on = () => setShow(window.scrollY > 140);
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, []);
+  return (
+    <div data-float-header data-show={show} aria-hidden={!show}
+      className="pointer-events-none fixed inset-x-0 top-3 z-50 -translate-y-24 opacity-0 transition-all duration-300 data-[show=true]:pointer-events-auto data-[show=true]:translate-y-0 data-[show=true]:opacity-100">
+      <Container>
+        <div className="glass flex h-14 items-center gap-2 rounded-full px-3 shadow-md sm:px-5">
+          <Logo className="text-xl sm:text-2xl" />
+          <nav className="hidden items-center gap-5 text-sm font-medium sm:flex sm:ms-6" aria-label="منوی اصلی">
+            <details className="group relative">
+              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-full bg-primary/10 px-3 py-1.5 text-primary [&::-webkit-details-marker]:hidden">
+                <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />دسته‌بندی‌ها<LayoutGrid className="size-4" />
+              </summary>
+              <div className="glass absolute end-0 top-11 w-48 rounded-lg p-2 shadow-lg">
+                {homeCategories.map((c) => <a key={c.slug} href={`#${c.slug}`} className="block rounded-md px-3 py-2 hover:bg-primary/10">{c.label}</a>)}
+              </div>
+            </details>
+            <a href="#iphone" className="hover:text-primary">فروشگاه</a>
+            <a href="#blog" className="hover:text-primary">وبلاگ</a>
+            <a href="#" className="hover:text-primary">پشتیبانی</a>
+          </nav>
+          <div className="ms-auto flex items-center">
+            <button className={cn(iconBtn, "hidden sm:grid")} aria-label="حساب کاربری"><User className="size-5" /></button>
+            <CartBtn />
+            <NightButton iconOnly className={cn(iconBtn, "hidden sm:grid")} />
+            <button className={iconBtn} aria-label="جستجو"><Search className="size-5" /></button>
+            <button className={cn(iconBtn, "sm:hidden")} aria-label="منو"><Menu className="size-5" /></button>
+          </div>
+        </div>
+      </Container>
+    </div>
+  );
+}
+
+export function Header() {
+  return (
+    <>
+      <TopHeader />
+      <FloatingHeader />
+    </>
   );
 }
 
@@ -51,7 +105,7 @@ export function BottomNav() {
         <a href="#" className={item}><Headphones className="size-5" />پشتیبانی</a>
         <a href="#blog" className={item}><PenLine className="size-5" />بلاگ</a>
         <NightButton className={item} />
-        <a href="#featured" className={item}><Store className="size-5" />فروشگاه</a>
+        <a href="#iphone" className={item}><Store className="size-5" />فروشگاه</a>
         <a href="#" className={item}><User className="size-5" />داشبورد</a>
       </nav>
     </>

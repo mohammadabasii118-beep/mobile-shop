@@ -1,6 +1,6 @@
 import { BottomNav, Header } from "@/components/header";
 import { Footer } from "@/components/footer";
-import { BestSellers, Blog, CategoryGrid, CategoryPills, Featured, Hero, Newest, PhonePicker, TelegramBanner } from "@/components/home-sections";
+import { Blog, BrandMarquee, CategoryTiles, Hero, PhonePicker, Rails, TelegramBanner } from "@/components/home-sections";
 
 export default function Home() {
   return (
@@ -8,12 +8,11 @@ export default function Home() {
       <Header />
       <main>
         <Hero />
-        <CategoryPills />
-        <Featured />
+        <BrandMarquee />
+        <Rails only="first" />
         <PhonePicker />
-        <Newest />
-        <CategoryGrid />
-        <BestSellers />
+        <Rails only="rest" />
+        <CategoryTiles />
         <TelegramBanner />
         <Blog />
       </main>

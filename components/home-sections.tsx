@@ -3,8 +3,7 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, Search, Send } from "lucide-react";
 import { Button, Container, SectionHeader, Badge } from "@/components/ui";
 import { ProductCard } from "@/components/product-card";
-import { ProductVisual } from "@/components/product-visual";
-import { blogPosts, brands, categories, categoryCounts, heroWords, phoneModels, products, quickChips } from "@/lib/data";
+import { blogPosts, brands, heroWords, homeCategories, phoneModels, quickChips, rails } from "@/lib/data";
 import { toFa } from "@/lib/utils";
 
 export function Hero() {
@@ -29,61 +28,56 @@ export function Hero() {
           <span className="text-muted">پیشنهادها:</span>
           {quickChips.map((c) => <a key={c} href="#featured" className="glass rounded-full px-3 py-1.5 font-medium hover:border-primary">{c}</a>)}
         </div>
-        <div className="mt-8 flex items-center justify-center gap-2 text-xs text-muted"><span className="h-px w-8 bg-border" />برندهای موجود در کیس‌لاین<span className="h-px w-8 bg-border" /></div>
-        <div className="no-scrollbar mt-3 flex justify-center gap-2 overflow-x-auto">
-          {brands.slice(0, 6).map((b) => <span key={b} dir="ltr" className="glass shrink-0 rounded-full px-4 py-2 text-sm font-bold">{b}</span>)}
-        </div>
       </Container>
     </section>
   );
 }
 
-export function CategoryPills() {
+export function BrandMarquee() {
+  const row = [...brands, ...brands];
   return (
-    <section className="pb-2">
+    <section className="py-3">
+      <p className="mb-3 text-center text-[11px] text-muted">برندهایی که در <b className="text-primary">کیس‌لاین</b> پیدا می‌کنی</p>
+      <div className="overflow-hidden [mask-image:linear-gradient(90deg,transparent,#000_12%,#000_88%,transparent)]" dir="ltr">
+        <div className="flex w-max animate-[marquee_28s_linear_infinite] gap-10 text-xl font-extrabold text-muted/70 sm:gap-14 sm:text-2xl">
+          {row.map((b, i) => <span key={i} className="flex items-center gap-2"><span className="size-2.5 rounded-full bg-primary/50" />{b}</span>)}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ProductRail({ slug, title, items }: { slug: string; title: string; items: (typeof rails)[number]["items"] }) {
+  return (
+    <section id={slug} className="scroll-mt-24 py-5">
       <Container>
-        <div className="no-scrollbar flex gap-2 overflow-x-auto pb-2">
-          <a href="#featured" className="flex shrink-0 items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-bold text-primary-fg shadow-md">همه محصولات</a>
-          {categories.map((c) => (
-            <a key={c.slug} id={c.slug} href="#featured" className="glass flex shrink-0 items-center gap-2 rounded-full py-1.5 pe-4 ps-1.5 text-sm font-medium hover:border-primary">
-              <span className="grid size-8 place-items-center rounded-full bg-primary/12"><ProductVisual kind={c.kind} hue={210} className="size-6" /></span>{c.label}
-            </a>
-          ))}
+        <SectionHeader title={title} href="#" />
+        <div className="no-scrollbar -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:px-0">
+          {items.map((p) => <div key={p.id} className="w-[42%] shrink-0 snap-start sm:w-[calc((100%-3rem)/5)]"><ProductCard p={p} /></div>)}
         </div>
       </Container>
     </section>
   );
 }
 
-function Carousel({ items }: { items: typeof products }) {
-  return (
-    <div className="no-scrollbar -mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-3 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 lg:grid-cols-4 xl:grid-cols-5">
-      {items.map((p) => <div key={p.id} className="w-[46%] shrink-0 snap-start sm:w-auto"><ProductCard p={p} /></div>)}
-    </div>
-  );
+export function Rails({ only }: { only: "first" | "rest" }) {
+  const list = only === "first" ? rails.slice(0, 1) : rails.slice(1);
+  return <>{list.map((r) => <ProductRail key={r.slug} {...r} />)}</>;
 }
 
-export function ProductRow({ id, title, items }: { id?: string; title: string; items: typeof products }) {
+export function CategoryTiles() {
   return (
-    <section id={id} className="py-4"><Container><SectionHeader title={title} href="#" /><Carousel items={items} /></Container></section>
-  );
-}
-
-export const Featured = () => <ProductRow id="featured" title="محصولات ویژه" items={products.slice(0, 5)} />;
-export const Newest = () => <ProductRow title="تازه‌ترین محصولات" items={[...products].reverse().slice(0, 5)} />;
-export const BestSellers = () => <ProductRow title="پرفروش‌ترین‌ها" items={[products[0], products[4], products[11], products[5], products[2]]} />;
-
-export function CategoryGrid() {
-  return (
-    <section className="py-4">
+    <section className="py-5">
       <Container>
         <SectionHeader title="دسته‌بندی‌ها" />
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          {categories.map((c) => (
-            <a key={c.slug} href="#featured" className="glass flex flex-col items-center gap-2 rounded-lg p-4 text-center transition-shadow hover:shadow-md">
-              <span className="flex h-12 items-center gap-1"><ProductVisual kind={c.kind} hue={210} className="size-11" /></span>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {homeCategories.map((c) => (
+            <a key={c.slug} href={`#${c.slug}`} className="flex flex-col items-center gap-3 rounded-lg bg-surface-2 p-4 pt-5 text-center transition-shadow hover:shadow-md">
+              <span className="flex -space-x-2 space-x-reverse" dir="rtl">
+                {c.logos.map((l, i) => <span key={i} className="grid size-9 place-items-center rounded-full border-2 border-surface-2 bg-surface text-xs font-black text-primary shadow-sm">{l}</span>)}
+              </span>
               <span className="text-sm font-bold">{c.label}</span>
-              <span className="text-[11px] text-muted">{toFa(categoryCounts[c.kind])} محصول</span>
+              <span className="text-[11px] text-muted">{toFa(c.count)} محصول</span>
             </a>
           ))}
         </div>

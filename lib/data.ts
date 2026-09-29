@@ -62,3 +62,25 @@ export const kindLabel: Record<Kind, string> = {
 export const categoryCounts: Record<Kind, number> = { case: 48, glass: 32, charger: 17, cable: 21, earbuds: 14, powerbank: 12, holder: 9, flash: 7, lens: 11 };
 export const heroWords = ["قاب", "گلس", "شارژر", "هندزفری", "پاوربانک"];
 export const quickChips = ["قاب آیفون", "گلس", "شارژر", "کابل", "ایرپاد", "پاوربانک"];
+
+const caseNames = ["قاب سیلیکونی MagSafe", "قاب شفاف ضدضربه", "قاب چرمی لوکس", "قاب رینگ‌دار ضدضربه", "قاب Armor سه‌لایه"];
+const mk = (prefix: string, brand: string, models: string[], hue: number, base: number): Product[] =>
+  caseNames.map((n, i) => ({
+    id: `${prefix}${i}`, name: n, brand, kind: "case", hue: (hue + i * 28) % 360,
+    price: base + i * 45_000, oldPrice: i % 2 === 0 ? Math.round((base + i * 45_000) * 1.25 / 1000) * 1000 : undefined,
+    rating: 4.3 + (i % 4) / 10, reviews: 60 + i * 37, compat: models[i % models.length],
+  }));
+
+export const rails = [
+  { slug: "iphone", title: "قاب آیفون", items: mk("ip", "Apple", ["iPhone 15 Pro Max", "iPhone 15", "iPhone 14 Pro", "iPhone 13", "iPhone 12"], 14, 290_000) },
+  { slug: "samsung", title: "قاب سامسونگ", items: mk("sm", "Samsung", ["Galaxy S24 Ultra", "Galaxy S24", "Galaxy A55", "Galaxy A35", "Galaxy S23"], 200, 240_000) },
+  { slug: "xiaomi", title: "قاب شیائومی", items: mk("xi", "Xiaomi", ["Redmi Note 13 Pro", "Poco X6", "Xiaomi 14", "Redmi 13C", "Poco F5"], 30, 180_000) },
+  { slug: "other", title: "سایر لوازم جانبی", items: [products[1], products[2], products[4], products[5], products[6]] },
+];
+
+export const homeCategories = [
+  { slug: "iphone", label: "قاب آیفون", count: 48, logos: ["", "15", "14"] },
+  { slug: "samsung", label: "قاب سامسونگ", count: 36, logos: ["S", "A", "Z"] },
+  { slug: "xiaomi", label: "قاب شیائومی", count: 29, logos: ["Mi", "R", "P"] },
+  { slug: "other", label: "سایر لوازم جانبی", count: 84, logos: ["⚡", "🎧", "🔋"] },
+];

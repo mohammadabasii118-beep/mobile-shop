@@ -51,16 +51,16 @@ export function ThemeToggle() {
 }
 
 /** One-tap night mode button used in the mobile bottom bar. */
-export function NightButton({ className }: { className?: string }) {
+export function NightButton({ className, iconOnly }: { className?: string; iconOnly?: boolean }) {
   const toggle = () => {
     const next: Mode = document.documentElement.classList.contains("dark") ? "light" : "dark";
     try { localStorage.setItem(THEME_KEY, next); } catch {}
     apply(next);
   };
   return (
-    <button data-night onClick={toggle} className={className}>
+    <button data-night aria-label="حالت شب" onClick={toggle} className={className}>
       <Moon className="size-5 dark:hidden" /><Sun className="hidden size-5 dark:block" />
-      <span>حالت شب</span>
+      {!iconOnly && <span>حالت شب</span>}
     </button>
   );
 }

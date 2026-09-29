@@ -3,24 +3,24 @@
 
 /* ---------- CaseLine design tokens (see docs/design-system.md) ---------- */
 :root {
-  --primary: #1f9bea;
-  --primary-hover: #1585d0;
+  --primary: #2497d4;
+  --primary-hover: #1a82bb;
   --primary-fg: #ffffff;
   --secondary: #0f2a44;
   --secondary-fg: #ffffff;
-  --accent: #22c5e0;
-  --hot: #ef4444;
-  --background: #eaf5fc;
+  --accent: #58c0e8;
+  --hot: #f5460a;
+  --background: #ffffff;
   --surface: #ffffff;
-  --surface-2: #e3f0fa;
+  --surface-2: #f2f8fd;
   --foreground: #0f2233;
-  --muted: #64809a;
-  --border: #d3e6f3;
+  --muted: #6b8296;
+  --border: #e6eef5;
   --success: #12a150;
   --warning: #d98a06;
   --error: #dc2f3c;
-  --glass: rgb(255 255 255 / 0.72);
-  --page-bg: linear-gradient(180deg, #d6ecfb 0%, #eaf5fc 30%, #f6fbff 100%);
+  --glass: rgb(249 251 252 / 0.96);
+  --page-bg: linear-gradient(180deg, #d8eefa 0, #ffffff 560px);
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 22px;
@@ -47,8 +47,8 @@
   --success: #34d27b;
   --warning: #f0b23a;
   --error: #ff6b76;
-  --glass: rgb(17 29 43 / 0.72);
-  --page-bg: linear-gradient(180deg, #0d2238 0%, #0a121c 35%, #0a121c 100%);
+  --glass: rgb(17 29 43 / 0.94);
+  --page-bg: linear-gradient(180deg, #0d2238 0, #0a121c 560px);
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
   --shadow-md: 0 10px 28px -10px rgb(0 0 0 / 0.6);
   --shadow-lg: 0 28px 56px -18px rgb(0 0 0 / 0.7);
@@ -98,3 +98,5 @@ body {
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+@keyframes marquee { to { transform: translateX(-50%); } }
