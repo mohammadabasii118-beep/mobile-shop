@@ -9,6 +9,8 @@ import { Container } from "@/components/ui";
 import { ProductCard } from "@/components/product-card";
 import { BuyBox, HotBadge, StickyBar, Thumb } from "@/components/product-detail";
 import { getProductBySlug, getRelatedProducts, getSidebarProducts, toCard } from "@/lib/queries";
+import { getCurrentUser } from "@/lib/server/auth/session";
+import { unitPriceFor } from "@/lib/server/pricing";
 import { formatToman, toFa } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -37,15 +39,19 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   const row = await getProductBySlug(decodeURIComponent(slug));
   if (!row) notFound();
-  const [related, others] = await Promise.all([getRelatedProducts(row.id, row.categoryId), getSidebarProducts(row.id)]);
+  const [related, others, user] = await Promise.all([getRelatedProducts(row.id, row.categoryId), getSidebarProducts(row.id), getCurrentUser()]);
   const card = { ...toCard({ ...row, variants: row.variants }), brand: row.brand?.name ?? null };
   const models = row.phoneModels.map((m) => m.phoneModel.name);
   const stock = row.variants.reduce((a, v) => a + (v.inventory?.quantity ?? 0), 0);
-  const opt = models.length
-    ? { label: "مدل گوشی خود را انتخاب کنید", options: models }
+  const variant = row.variants[0];
+  const opt = row.phoneModels.length
+    ? { label: "مدل گوشی خود را انتخاب کنید", options: row.phoneModels.map((m) => ({ value: `m:${m.phoneModelId}`, label: m.phoneModel.name })) }
     : row.variants.length > 1
-      ? { label: "گزینه مورد نظر را انتخاب کنید", options: row.variants.map((v) => v.name) }
-      : { label: "رنگ خود را انتخاب کنید", options: ["مشکی", "سفید", "آبی", "نقره‌ای"] };
+      ? { label: "گزینه مورد نظر را انتخاب کنید", options: row.variants.map((v) => ({ value: `v:${v.id}`, label: v.name })) }
+      : null;
+  // Wholesale price is decided on the server from the signed-in user's approved role; anonymous visitors never receive it.
+  const ws = user?.wholesale && row.wholesalePrice != null && variant ? unitPriceFor(row, variant, Math.max(1, row.minWholesaleQty), user) : null;
+  const wholesale = ws && ws.priceType === "wholesale" ? { unit: ws.unitPrice, min: row.minWholesaleQty } : null;
   const title = `خرید ${row.name}${models[0] ? ` ${models[0]}` : ""} با ضمانت اصالت | ارسال فوری`;
   const specs = (row.specifications ?? {}) as Record<string, string>;
   const cats = [row.category.parent, row.category].filter(Boolean);
@@ -74,7 +80,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                 </div>
                 <div className="md:order-1">
                   {row.retailDiscount > 0 && <p className="mb-2 text-xs text-muted">قیمت قبل: <s>{formatToman(row.retailPrice)}</s></p>}
-                  <BuyBox p={card} opt={opt} inStock={stock > 0} />
+                  <BuyBox p={card} opt={opt} inStock={stock > 0} maxQty={Math.max(1, Math.min(99, stock))} wholesale={wholesale} />
                 </div>
               </div>
               <p className="mt-5 text-sm text-muted">دسته‌بندی: <b className="text-foreground">{row.category.name}</b></p>

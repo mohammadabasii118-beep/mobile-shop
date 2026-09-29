@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { LogOut, MessagesSquare, ShoppingBag, User } from "lucide-react";
+import { MessagesSquare, ShoppingBag, User } from "lucide-react";
+import { LogoutButton } from "@/components/account/logout-button";
 import { BottomNav } from "@/components/header";
 import { Header } from "@/components/site-header";
 import { Footer } from "@/components/footer";
@@ -17,7 +18,7 @@ export function AccountShell({ active, children }: { active: string; children: R
   return (
     <>
       <Header />
-      <main data-account-page className="py-6">
+      <main className="py-6">
         <Container className="max-w-[790px]">
           <div className="rounded-[28px] border border-border bg-surface/90 p-3 shadow-md sm:p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -28,7 +29,7 @@ export function AccountShell({ active, children }: { active: string; children: R
                   </Link>
                 ))}
               </nav>
-              <button data-logout className="flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-surface px-3.5 py-2.5 text-xs font-medium text-muted hover:text-hot sm:text-[13px]">خروج<LogOut className="size-4" /></button>
+              <LogoutButton />
             </div>
             <div className="p-1 pt-5 sm:p-2 sm:pt-6">{children}</div>
           </div>

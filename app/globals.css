@@ -234,3 +234,6 @@ body {
 .chat-fab:hover { transform: scale(1.1); animation-play-state: paused; }
 @keyframes fab-pulse { 0% { box-shadow: 0 6px 16px rgb(60 160 220 / .35), 0 0 0 0 rgb(91 189 232 / .5); } 70% { box-shadow: 0 6px 16px rgb(60 160 220 / .35), 0 0 0 16px rgb(91 189 232 / 0); } 100% { box-shadow: 0 6px 16px rgb(60 160 220 / .35), 0 0 0 0 rgb(91 189 232 / 0); } }
 @keyframes fab-float { 0%, 100% { translate: 0 0; } 50% { translate: 0 -3px; } }
+.cl-note { border-radius: 12px; padding: 10px 12px; font-size: 12px; background: color-mix(in srgb, var(--hot) 12%, var(--surface)); color: var(--hot); }
+.cl-ws { color: var(--success) !important; font-weight: 700; }
+.cl-bad { color: var(--hot) !important; font-weight: 700; }

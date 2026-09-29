@@ -24,7 +24,7 @@ export async function Footer() {
             <h4 className="mb-3 font-extrabold">خدمات ما</h4>
             <ul className="space-y-2 text-muted">
               {links.map((l) => (
-                <li key={l.id}><Link href={l.link ?? "/"} {...(l.link === "/account" ? { "data-account-link": "" } : {})} className="inline-block transition-all duration-150 hover:-translate-x-0.5 hover:text-primary">{l.label}</Link></li>
+                <li key={l.id}><Link href={l.link ?? "/"} className="inline-block transition-all duration-150 hover:-translate-x-0.5 hover:text-primary">{l.label}</Link></li>
               ))}
             </ul>
           </div>

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
-import { ArrowDownUp, Watch, ChevronDown, Headphones, LayoutGrid, Loader2, Smartphone, ShieldCheck, Sparkles, Zap } from "lucide-react";
+import { ArrowDownUp, Watch, ChevronDown, Headphones, LayoutGrid, Loader2, Smartphone, Sparkles, Zap } from "lucide-react";
 import { BottomNav } from "@/components/header";
 import { Header } from "@/components/site-header";
 import { Footer } from "@/components/footer";

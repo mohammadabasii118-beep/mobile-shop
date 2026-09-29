@@ -20,6 +20,7 @@ model User {
   displayName     String?
   isActive        Boolean   @default(true)
   phoneVerifiedAt DateTime?
+  passwordChangedAt DateTime?
   lastLoginAt     DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -96,6 +97,8 @@ model Session {
 model OtpCode {
   id        String   @id @default(cuid())
   phone     String
+  purpose   String   @default("login") // login | reset
+  ip        String?
   codeHash  String
   attempts  Int      @default(0)
   expiresAt DateTime
@@ -364,7 +367,7 @@ enum OrderStatus {
 }
 
 enum PaymentStatus {
-  UNPAID
+  PENDING
   REVIEW
   PAID
   REJECTED
@@ -407,7 +410,7 @@ model Order {
   user             User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   type             OrderType     @default(RETAIL)
   status           OrderStatus   @default(PENDING_PAYMENT)
-  paymentStatus    PaymentStatus @default(UNPAID)
+  paymentStatus    PaymentStatus @default(PENDING)
   customerName     String
   customerPhone    String
   customerEmail    String?
@@ -419,6 +422,7 @@ model Order {
   shippingCost     Int           @default(0)
   total            Int
   couponCode       String?
+  paymentMethod    String        @default("card_to_card")
   walletUsed       Int           @default(0)
   note             String?
   shippingCompany  String?
@@ -448,6 +452,7 @@ model OrderItem {
   image     String?
   option    String?
   unitPrice Int
+  priceType String          @default("retail") // retail | wholesale (price snapshot type)
   quantity  Int
   total     Int
 }
@@ -470,11 +475,14 @@ model Payment {
   order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
   amount        Int
   method        String        @default("card_to_card")
-  status        PaymentStatus @default(UNPAID)
+  status        PaymentStatus @default(PENDING)
+  provider      String        @default("card_to_card")
   referenceNumber String?
   rejectReason  String?
   reviewedById  String?
   reviewedAt    DateTime?
+  submittedAt   DateTime?
+  paidAt        DateTime?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   proofs        PaymentProof[]
@@ -817,4 +825,11 @@ model AdminLog {
 
   @@index([entity, entityId])
   @@index([createdAt])
+}
+
+/* Fixed-window rate limiter shared by every app instance (works on a plain VPS). */
+model RateLimit {
+  key     String   @id
+  count   Int      @default(0)
+  resetAt DateTime
 }

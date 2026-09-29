@@ -1,0 +1,91 @@
+import { db } from "@/lib/db";
+import { badRequest, conflict } from "@/lib/server/errors";
+import { rateLimit } from "@/lib/server/rate-limit";
+import { issueOtp, verifyOtp, type OtpPurpose } from "@/lib/server/auth/otp";
+import { dummyVerify, hashPassword, verifyPassword } from "@/lib/server/auth/password";
+import { createSession, currentTokenHash, destroyAllSessions } from "@/lib/server/auth/session";
+import { signTicket, verifyTicket } from "@/lib/server/auth/tickets";
+import { mergeGuestCart } from "@/lib/server/cart";
+
+const BAD_CREDENTIALS = () => badRequest("شماره موبایل یا رمز عبور نادرست است.", "bad_credentials");
+
+async function finishLogin(userId: string) {
+  await createSession(userId);
+  await mergeGuestCart(userId);
+  const u = await db.user.findUniqueOrThrow({ where: { id: userId }, select: { firstName: true, lastName: true, passwordHash: true } });
+  return { needsProfile: !u.firstName || !u.lastName, hasPassword: !!u.passwordHash };
+}
+
+export const requestOtp = (phone: string, purpose: OtpPurpose, ip: string) => issueOtp(phone, purpose, ip);
+
+/** OTP login. A first successful verification registers the account with the "customer" role. */
+export async function loginWithOtp(phone: string, code: string, ip: string) {
+  await verifyOtp(phone, "login", code, ip);
+  let user = await db.user.findUnique({ where: { phone } });
+  if (user && !user.isActive) throw badRequest("این حساب غیرفعال است.", "account_disabled");
+  let registered = false;
+  if (!user) {
+    const role = await db.role.findUniqueOrThrow({ where: { key: "customer" } });
+    user = await db.user.create({ data: { phone, phoneVerifiedAt: new Date(), roles: { create: { roleId: role.id } } } });
+    registered = true;
+  } else if (!user.phoneVerifiedAt) {
+    await db.user.update({ where: { id: user.id }, data: { phoneVerifiedAt: new Date() } });
+  }
+  return { registered, ...(await finishLogin(user.id)) };
+}
+
+export async function loginWithPassword(phone: string, password: string, ip: string) {
+  await rateLimit(`login:ip:${ip}`, 40, 900);
+  await rateLimit(`login:phone:${phone}`, 8, 900);
+  const user = await db.user.findUnique({ where: { phone } });
+  if (!user || !user.passwordHash || !user.isActive) {
+    await dummyVerify(password);
+    throw BAD_CREDENTIALS();
+  }
+  if (!(await verifyPassword(password, user.passwordHash))) throw BAD_CREDENTIALS();
+  return { registered: false, ...(await finishLogin(user.id)) };
+}
+
+/** Always answers the same way, so it cannot be used to discover registered numbers. */
+export async function requestPasswordReset(phone: string, ip: string) {
+  const user = await db.user.findUnique({ where: { phone }, select: { id: true, isActive: true } });
+  if (user?.isActive) await issueOtp(phone, "reset", ip);
+  else await rateLimit(`otp:req:ip:${ip}`, 15, 3600);
+  return { expiresIn: 120 };
+}
+
+export async function verifyResetCode(phone: string, code: string, ip: string) {
+  await verifyOtp(phone, "reset", code, ip);
+  return { ticket: await signTicket("password-reset", phone, 600) };
+}
+
+export async function resetPassword(ticket: string, password: string) {
+  const { phone } = await verifyTicket(ticket, "password-reset");
+  const user = await db.user.findUnique({ where: { phone } });
+  if (!user) throw badRequest("حساب پیدا نشد.");
+  await db.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(password), passwordChangedAt: new Date() } });
+  await destroyAllSessions(user.id); // every device must sign in again
+  return { ok: true };
+}
+
+export async function updateProfile(userId: string, data: { firstName: string; lastName: string; displayName?: string; email?: string }) {
+  if (data.email) {
+    const taken = await db.user.findFirst({ where: { email: data.email, NOT: { id: userId } }, select: { id: true } });
+    if (taken) throw conflict("این ایمیل قبلاً استفاده شده است.", "email_taken");
+  }
+  return db.user.update({
+    where: { id: userId },
+    data: { firstName: data.firstName, lastName: data.lastName, displayName: data.displayName ?? `${data.firstName} ${data.lastName}`, email: data.email ?? null },
+    select: { id: true, firstName: true, lastName: true, displayName: true, email: true },
+  });
+}
+
+export async function changePassword(userId: string, oldPassword: string | undefined, newPassword: string) {
+  await rateLimit(`pwchange:${userId}`, 8, 900);
+  const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
+  if (user.passwordHash) {
+    if (!oldPassword || !(await verifyPassword(oldPassword, user.passwordHash))) throw badRequest("رمز عبور فعلی نادرست است.", "bad_password");
+  }
+  await db.user.update({ where: { id: userId }, data: { passwordHash: await hashPassword(newPassword), passwordChangedAt: new Date() } });
+  await destroyAllSessions(userId, await currentTokenHash()); // keep only this device signed in
+}

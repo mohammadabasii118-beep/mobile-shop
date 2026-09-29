@@ -18,6 +18,8 @@ function apply(mode: Mode) {
 export function ThemeToggle() {
   const [mode, setMode] = useState<Mode>("system");
   useEffect(() => {
+    // Read after mount so server and client markup match (no hydration mismatch).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     try { setMode((localStorage.getItem(THEME_KEY) as Mode) || "system"); } catch {}
   }, []);
   useEffect(() => {

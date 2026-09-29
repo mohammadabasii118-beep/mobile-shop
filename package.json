@@ -12,7 +12,9 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset --force",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "test:e2e": "tsx --test scripts/e2e-phase2.test.ts",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@fontsource-variable/vazirmatn": "^5.3.0",
@@ -40,9 +42,11 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.7",
     "postcss": "^8.5.28",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "5.9"
   }
 }

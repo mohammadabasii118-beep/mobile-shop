@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { MessagesSquare, Plus } from "lucide-react";
 import { AccountShell } from "@/components/account-shell";
+import { requirePageUser } from "@/lib/server/auth/guard";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "تیکت‌های پشتیبانی | CaseLine" };
 const field = "w-full rounded-xl border border-border bg-surface px-4 text-sm outline-none focus:border-primary";
 
-export default function TicketsPage() {
+export default async function TicketsPage() {
+  await requirePageUser("/account/tickets");
   return (
     <AccountShell active="tickets">
       <div data-tickets-root>

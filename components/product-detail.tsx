@@ -19,11 +19,15 @@ export function Thumb({ p, className }: { p: Pick<CardProduct, "hue" | "kind" | 
   );
 }
 
-export function BuyBox({ p, opt, inStock }: { p: CardProduct; opt: { label: string; options: string[] }; inStock: boolean }) {
+export interface BuyOption { value: string; label: string }
+
+export function BuyBox({ p, opt, inStock, maxQty, wholesale }: { p: CardProduct; opt: { label: string; options: BuyOption[] } | null; inStock: boolean; maxQty: number; wholesale?: { unit: number; min: number } | null }) {
   const [choice, setChoice] = useState("");
   const [qty, setQty] = useState(1);
+  const ready = !opt || !!choice;
+  const unit = wholesale && qty >= wholesale.min ? wholesale.unit : p.price; // display only: the server recomputes the real price
   return (
-    <div data-product data-id={p.slug} data-name={p.name} data-price={p.price} data-hue={p.hue} data-img={p.img ?? ""} className="space-y-4">
+    <div data-product data-id={p.slug} data-name={p.name} data-hue={p.hue} data-img={p.img ?? ""} className="space-y-4">
       {inStock ? (
         <span className="inline-flex items-center gap-2 rounded-full border border-success/30 bg-success/10 px-3 py-1 text-xs font-medium text-success">موجود و آماده تحویل سریع <i className="size-2 rounded-full bg-success" /></span>
       ) : (
@@ -34,24 +38,27 @@ export function BuyBox({ p, opt, inStock }: { p: CardProduct; opt: { label: stri
           <li key={b} className="flex gap-2"><i className="mt-2.5 size-1.5 shrink-0 rounded-full bg-foreground" /><span>{a} <b>{b}</b> {c}</span></li>
         ))}
       </ul>
-      <label className="relative block">
-        <select id="model-select" data-model-select value={choice} onChange={(e) => setChoice(e.target.value)} dir="ltr"
-          className="h-12 w-full cursor-pointer appearance-none rounded-md border border-primary/30 bg-surface ps-10 pe-4 text-start text-sm text-foreground outline-none focus:border-primary">
-          <option value="">{opt.label}</option>
-          {opt.options.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>
-        <ChevronDown className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-primary" />
-      </label>
+      {opt && (
+        <label className="relative block">
+          <select id="model-select" data-model-select value={choice} onChange={(e) => setChoice(e.target.value)} dir="ltr"
+            className="h-12 w-full cursor-pointer appearance-none rounded-md border border-primary/30 bg-surface ps-10 pe-4 text-start text-sm text-foreground outline-none focus:border-primary">
+            <option value="">{opt.label}</option>
+            {opt.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          <ChevronDown className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-primary" />
+        </label>
+      )}
       <div className="relative rounded-md border border-primary/25 bg-primary/8 py-4 text-center">
         <span className="absolute -top-2.5 end-4 rounded-md bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-fg">قیمت محصول</span>
-        <span data-price data-base={p.price} className="text-xl font-black">{choice ? "" : "از "}{formatToman(p.price * qty)}</span>
+        <span data-price className="text-xl font-black">{formatToman(unit * qty)}</span>
+        {wholesale && <span className="mt-1 block text-[11px] font-bold text-success">قیمت همکار: {formatToman(wholesale.unit)} برای خرید حداقل {qty >= wholesale.min ? "" : ""}{wholesale.min.toLocaleString("fa-IR")} عدد</span>}
       </div>
       <div className="flex items-center gap-2">
-        <button data-buy disabled={!choice || !inStock} className="h-12 flex-1 cursor-pointer rounded-md bg-primary text-sm font-bold text-primary-fg shadow-md transition-colors enabled:hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-primary/15 disabled:text-primary disabled:shadow-none">
-          {!inStock ? "ناموجود" : choice ? "افزودن به سبد خرید" : "اول مدل رو انتخاب کن"}
+        <button data-buy disabled={!ready || !inStock} className="h-12 flex-1 cursor-pointer rounded-md bg-primary text-sm font-bold text-primary-fg shadow-md transition-colors enabled:hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-primary/15 disabled:text-primary disabled:shadow-none">
+          {!inStock ? "ناموجود" : ready ? "افزودن به سبد خرید" : "اول مدل رو انتخاب کن"}
         </button>
         <div className="flex h-12 items-center gap-1 rounded-md bg-surface-2 px-1">
-          <button data-qty-inc aria-label="افزایش" onClick={() => setQty((q) => q + 1)} className="grid size-9 cursor-pointer place-items-center rounded"><Plus className="size-4" /></button>
+          <button data-qty-inc aria-label="افزایش" onClick={() => setQty((q) => Math.min(maxQty, q + 1))} className="grid size-9 cursor-pointer place-items-center rounded"><Plus className="size-4" /></button>
           <span data-qty className="w-5 text-center text-sm font-bold">{qty}</span>
           <button data-qty-dec aria-label="کاهش" onClick={() => setQty((q) => Math.max(1, q - 1))} className="grid size-9 cursor-pointer place-items-center rounded"><Minus className="size-4" /></button>
         </div>
