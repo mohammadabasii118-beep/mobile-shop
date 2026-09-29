@@ -109,3 +109,11 @@ body {
 .tabs:has(#tab-desc:checked) label[for="tab-desc"],
 .tabs:has(#tab-faq:checked) label[for="tab-faq"],
 .tabs:has(#tab-rev:checked) label[for="tab-rev"] { background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--primary); font-weight: 700; }
+
+/* Mega menu hover tabs (CSS only) */
+.mega li:hover > .mega-panel,
+.mega li:focus-within > .mega-panel,
+.mega ul:not(:hover):not(:focus-within) li:first-child > .mega-panel { display: flex; }
+.mega li:hover > .mega-item,
+.mega li:focus-within > .mega-item,
+.mega ul:not(:hover):not(:focus-within) li:first-child > .mega-item { background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--primary); }
