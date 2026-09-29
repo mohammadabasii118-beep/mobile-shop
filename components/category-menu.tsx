@@ -42,13 +42,13 @@ export function CategoryMenu() {
         <ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />دسته‌بندی‌ها<LayoutGrid className="size-4" />
       </summary>
       <div className="mega border border-border bg-surface absolute start-0 top-[calc(100%+1.1rem)] z-50 w-[min(92vw,760px)] rounded-xl p-4 shadow-lg">
-        <ul className="relative grid min-h-[330px] grid-cols-[210px_1fr] content-start gap-1">
+        <ul className="relative grid min-h-[330px] grid-cols-[210px_1fr] content-start gap-x-0 gap-y-1">
           {menu.map((c) => (
             <li key={c.slug} tabIndex={0} className="col-start-1">
               <a href={`#${c.slug}`} className="mega-item flex items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium">
                 <span>{c.label}</span><c.icon className="size-4 text-primary" />
               </a>
-              <div className="mega-panel absolute inset-y-0 end-0 hidden w-[calc(100%-226px)] flex-col">
+              <div className="mega-panel absolute inset-y-0 end-0 hidden w-[calc(100%-210px)] flex-col ps-5">
                 <div className="mb-3 text-[11px] text-muted">محصولات پرطرفدار {c.label}</div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   {c.items.slice(0, 6).map((p) => (
