@@ -28,7 +28,8 @@ export default function CheckoutPage() {
               <CheckCircle2 className="mx-auto size-14 text-success" />
               <h1 className="mt-4 text-xl font-black">سفارش شما ثبت شد</h1>
               <p className="mt-2 text-sm leading-7 text-muted">این یک نسخه دمو است و پرداختی انجام نشد. کد پیگیری نمونه: <b dir="ltr" data-order-code className="text-foreground" /></p>
-              <Link href="/shop" className="mt-6 flex h-12 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-fg">بازگشت به فروشگاه</Link>
+              <Link href="/account/orders" data-account-link className="mt-6 flex h-12 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-fg">مشاهده سفارش‌ها</Link>
+              <Link href="/shop" className="mt-3 flex h-12 items-center justify-center rounded-xl bg-surface-2 text-sm text-muted">بازگشت به فروشگاه</Link>
             </div>
 
             <div data-checkout-main className="grid items-start gap-4 lg:grid-cols-[1fr_360px]">

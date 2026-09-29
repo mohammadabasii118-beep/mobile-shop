@@ -4,9 +4,16 @@
   var cs = document.currentScript, base = "";
   if (!art && cs && cs.src) base = cs.src.replace(/\/site\.js(\?.*)?$/, "").replace(location.origin, "");
   function L(kind, id) {
-    if (art) return { product: "product.html", shop: "shop.html", checkout: "checkout.html", account: "account.html", home: "index.html" }[kind];
-    return base + { product: "/product/" + id, shop: "/shop", checkout: "/checkout", account: "/account", home: "/" }[kind];
+    if (art) return { product: "product.html", shop: "shop.html", checkout: "checkout.html", account: "account.html", profile: "profile.html", orders: "orders.html", tickets: "tickets.html", edit: "edit.html", support: "support.html", home: "index.html" }[kind];
+    return base + { product: "/product/" + id, shop: "/shop", checkout: "/checkout", account: "/account", profile: "/account/profile", orders: "/account/orders", tickets: "/account/tickets", edit: "/account/edit", support: "/support", home: "/" }[kind];
   }
+  function J(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
+  function W(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function session() { return J("caseline-session", null); }
+  function users() { return J("caseline-users", {}); }
+  function me() { return users()[session()] || null; }
+  function go(kind) { location.href = L(kind); }
+  function today() { return new Date().toLocaleDateString("fa-IR", { year: "numeric", month: "2-digit", day: "2-digit" }); }
   var fa = function (n) { return Number(n).toLocaleString("fa-IR"); };
   var toman = function (n) { return fa(n) + " تومان"; };
   var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
@@ -123,7 +130,9 @@
     $("[data-checkout-form]", root).addEventListener("submit", function (e) {
       e.preventDefault();
       if (!cart().length) { msg.textContent = "سبد خرید شما خالی است."; msg.dataset.ok = ""; return; }
-      var code = "CL-" + Math.floor(100000 + Math.random() * 900000);
+      var c0 = cart(), oid = Math.floor(30000 + Math.random() * 60000), t0 = totals();
+      var ords = J("caseline-orders", []); ords.unshift({ id: oid, date: today(), total: t0.t, title: c0[0].name + (c0.length > 1 ? " و " + fa(c0.length - 1) + " مورد دیگر" : ""), opt: c0[0].opt || "", status: "pending" }); W("caseline-orders", ords);
+      var code = "CL-" + oid;
       $("[data-order-code]", root).textContent = code;
       $("[data-checkout-main]", root).hidden = true; $("[data-order-done]", root).hidden = false;
       save([]); window.scrollTo(0, 0);
@@ -171,8 +180,9 @@
         if (code.length < otp.length) { err.textContent = "کد تایید ۴ رقمی را کامل وارد کنید."; return; }
         err.textContent = ""; busy(true);
         setTimeout(function () {
-          try { localStorage.setItem("caseline-user", latin($("[name=phone]", f).value)); } catch (x) {}
-          busy(false); f.hidden = true; done.hidden = false;
+          var ph = latin($("[name=phone]", f).value), us = users();
+          W("caseline-session", ph); if (!us[ph]) { us[ph] = {}; W("caseline-users", us); }
+          go(us[ph].first ? "orders" : "profile");
         }, 1200);
         return;
       }
@@ -184,6 +194,93 @@
         $("[data-login-phone]", f).textContent = v; btn.textContent = "تایید"; startTimer(); otp[0].focus();
       }, 1200);
     });
+  }
+
+
+  /* ---------- account panel ---------- */
+  function initAccount() {
+    var page = $("[data-account-page]"); if (!page) return;
+    if (!session()) { go("account"); return; }
+    var lo = $("[data-logout]"); if (lo) lo.addEventListener("click", function () { W("caseline-session", null); go("home"); });
+
+    var pf = $("[data-profile-form]");
+    if (pf) {
+      var m = me() || {};
+      pf.first.value = m.first || ""; pf.last.value = m.last || "";
+      pf.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var us = users(), cur = us[session()] || {};
+        cur.first = pf.first.value.trim(); cur.last = pf.last.value.trim(); cur.display = cur.display || (cur.first + " " + cur.last);
+        us[session()] = cur; W("caseline-users", us); go("orders");
+      });
+      $("[data-profile-later]").addEventListener("click", function () { go("orders"); });
+    }
+
+    var oroot = $("[data-orders-root]");
+    if (oroot) {
+      var orders = J("caseline-orders", null);
+      if (orders === null) { orders = [{ id: 30654, date: today(), total: 448000, title: "قاب سیلیکونی MagSafe iPhone 15 Pro Max", opt: "iPhone 15 Pro Max", status: "pending", sample: true }]; W("caseline-orders", orders); }
+      var ST = { pending: "در انتظار پرداخت", processing: "در حال آماده‌سازی", done: "تحویل شد" };
+      var card = function (o) {
+        var btns = o.status === "pending" ? '<button class="cl-btn ord-pay" data-pay="' + o.id + '">پرداخت</button>' : o.status === "processing" ? '<button class="cl-btn ord-pay" data-recv="' + o.id + '">تایید دریافت</button>' : "";
+        var note = o.status === "pending" ? '<div class="ord-note ord-warn">این سفارش هنوز پرداخت نشده است.</div>' : o.status === "processing" ? '<div class="ord-note ord-info">پرداخت انجام شد و سفارش شما در حال آماده‌سازی است.</div>' : "";
+        return '<article class="ord" data-s="' + o.status + '"><header><div><h3>سفارش <b>#' + esc(o.id) + '</b>' + (o.sample ? '<em class="ord-tag">نمونه</em>' : "") + '</h3><div class="ord-meta"><span>' + o.date + '</span><span>' + toman(o.total) + '</span></div></div><span class="ord-st">' + ST[o.status] + '</span></header><p class="ord-title">' + esc(o.title) + '</p>' + (o.opt ? '<span class="ord-chip">' + esc(o.opt) + '</span>' : "") + note +
+          '<div class="ord-btns">' + btns + '<a class="cl-btn cl-btn-ghost ord-sup" href="' + L("support") + '">پشتیبانی این سفارش</a></div></article>';
+      };
+      var drawOrders = function () {
+        var act = orders.filter(function (o) { return o.status !== "done"; }), dn = orders.filter(function (o) { return o.status === "done"; });
+        $("[data-orders-count]").textContent = fa(act.length);
+        $("[data-orders-active]").innerHTML = act.length ? act.map(card).join("") : '<div class="cl-empty">سفارش فعالی ندارید. <a href="' + L("shop") + '">مشاهده فروشگاه</a></div>';
+        var d = $("[data-orders-done]"); d.innerHTML = dn.length ? dn.map(card).join("") : "سفارش تمام‌شده‌ای ندارید.";
+        d.classList.toggle("ord-list", dn.length > 0);
+      };
+      oroot.addEventListener("click", function (e) {
+        var b = e.target.closest("[data-pay],[data-recv]"); if (!b) return;
+        var id = +(b.dataset.pay || b.dataset.recv);
+        orders.forEach(function (o) { if (o.id === id) o.status = b.dataset.pay ? "processing" : "done"; });
+        W("caseline-orders", orders); drawOrders();
+      });
+      drawOrders();
+    }
+
+    var troot = $("[data-tickets-root]");
+    if (troot) {
+      var tickets = J("caseline-tickets", []), tf = $("[data-ticket-form]", troot);
+      var drawTickets = function () {
+        $("[data-ticket-list]", troot).innerHTML = tickets.map(function (t) { return '<article class="ord"><header><div><h3>' + esc(t.subject) + '</h3><div class="ord-meta"><span>' + t.date + '</span><span>تیکت #' + esc(t.id) + '</span></div></div><span class="ord-st" data-tk="1">در انتظار پاسخ</span></header><p class="ord-title" style="font-weight:400;color:var(--muted)">' + esc(t.message) + '</p></article>'; }).join("");
+        $("[data-ticket-empty]", troot).hidden = tickets.length > 0;
+      };
+      $("[data-ticket-new]", troot).addEventListener("click", function () { tf.hidden = !tf.hidden; if (!tf.hidden) tf.subject.focus(); });
+      $("[data-ticket-cancel]", troot).addEventListener("click", function () { tf.hidden = true; });
+      tf.addEventListener("submit", function (e) {
+        e.preventDefault();
+        tickets.unshift({ id: Math.floor(1000 + Math.random() * 9000), subject: tf.subject.value.trim(), message: tf.message.value.trim(), date: today() });
+        W("caseline-tickets", tickets); tf.reset(); tf.hidden = true; drawTickets();
+      });
+      drawTickets();
+    }
+
+    var ef = $("[data-edit-form]");
+    if (ef) {
+      var m2 = me() || {};
+      ef.first.value = m2.first || ""; ef.last.value = m2.last || ""; ef.display.value = m2.display || ""; ef.email.value = m2.email || "";
+      var msg = $("[data-edit-msg]", ef);
+      $$("[data-eye]", ef).forEach(function (b) { b.addEventListener("click", function () { var i = b.parentNode.querySelector("input"); i.type = i.type === "password" ? "text" : "password"; }); });
+      ef.addEventListener("submit", function (e) {
+        e.preventDefault(); msg.dataset.ok = "";
+        if (!ef.first.value.trim() || !ef.last.value.trim() || !ef.display.value.trim() || !ef.email.value.trim()) { msg.textContent = "لطفاً همه فیلدهای الزامی را پر کنید."; return; }
+        if (ef.new.value || ef.new2.value) {
+          if (ef.new.value.length < 6) { msg.textContent = "رمز عبور جدید باید حداقل ۶ کاراکتر باشد."; return; }
+          if (ef.new.value !== ef.new2.value) { msg.textContent = "تکرار رمز عبور جدید یکسان نیست."; return; }
+        }
+        var us = users(); us[session()] = { first: ef.first.value.trim(), last: ef.last.value.trim(), display: ef.display.value.trim(), email: ef.email.value.trim() };
+        W("caseline-users", us); ef.old.value = ef.new.value = ef.new2.value = "";
+        msg.textContent = "تغییرات با موفقیت ذخیره شد."; msg.dataset.ok = "1";
+      });
+    }
+  }
+  function initHeaderUser() {
+    $$("[data-user-dot]").forEach(function (d) { d.hidden = !session(); });
   }
 
   /* ---------- support chat widget ---------- */
@@ -236,11 +333,15 @@
     }
     if ((el = t.closest("[data-rm]"))) { var c2 = cart().slice(); c2.splice(+el.dataset.rm, 1); return save(c2); }
   });
+  document.addEventListener("click", function (e) {
+    var a = e.target.closest && e.target.closest("[data-account-link]");
+    if (a && session()) { e.preventDefault(); e.stopPropagation(); go(me() && me().first ? "orders" : "profile"); }
+  }, true);
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeAll(); });
   document.addEventListener("submit", function (e) {
     var f = e.target;
     if (f.matches && f.matches("[data-search-form]")) { e.preventDefault(); openSearch($("input", f).value); }
   });
   window.addEventListener("storage", function () { mem = load(); refresh(); });
-  refresh(); initCheckout(); initLogin();
+  refresh(); initCheckout(); initLogin(); initAccount(); initHeaderUser();
 })();

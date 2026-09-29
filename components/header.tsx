@@ -45,7 +45,7 @@ export function TopHeader() {
           </nav>
           <div className="ms-auto flex items-center gap-1">
             <button data-search-btn className={iconBtn} aria-label="جستجو"><Search className="size-5" /></button>
-            <Link href="/account" className={cn(iconBtn, "hidden sm:grid")} aria-label="حساب کاربری"><User className="size-5" /></Link>
+            <Link href="/account" data-account-link className={cn(iconBtn, "relative hidden sm:grid")} aria-label="حساب کاربری"><User className="size-5" /><i data-user-dot hidden className="absolute end-2 top-2 size-2 rounded-full bg-accent" /></Link>
             <NightButton iconOnly className={cn(iconBtn, "hidden sm:grid")} />
             <CartBtn />
             <MobileMenu className="sm:hidden" />
@@ -78,7 +78,7 @@ export function FloatingHeader() {
             <Link href="/support" className="hover:text-primary">پشتیبانی</Link>
           </nav>
           <div className="ms-auto flex items-center">
-            <Link href="/account" className={cn(iconBtn, "hidden sm:grid")} aria-label="حساب کاربری"><User className="size-5" /></Link>
+            <Link href="/account" data-account-link className={cn(iconBtn, "relative hidden sm:grid")} aria-label="حساب کاربری"><User className="size-5" /><i data-user-dot hidden className="absolute end-2 top-2 size-2 rounded-full bg-accent" /></Link>
             <CartBtn />
             <NightButton iconOnly className={cn(iconBtn, "hidden sm:grid")} />
             <button data-search-btn className={iconBtn} aria-label="جستجو"><Search className="size-5" /></button>
@@ -110,7 +110,7 @@ export function BottomNav() {
         <Link href="/blog" className={item}><PenLine className="size-5" />بلاگ</Link>
         <NightButton className={item} />
         <Link href="/shop" className={item}><Store className="size-5" />فروشگاه</Link>
-        <Link href="/account" className={item}><User className="size-5" />داشبورد</Link>
+        <Link href="/account" data-account-link className={item}><User className="size-5" />داشبورد</Link>
       </nav>
     </>
   );

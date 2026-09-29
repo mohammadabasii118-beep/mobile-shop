@@ -209,3 +209,22 @@ body {
 .login-dots i:nth-child(2) { animation-delay: .15s; }
 .login-dots i:nth-child(3) { animation-delay: .3s; }
 @keyframes login-bounce { 0%, 80%, 100% { transform: scale(.6); opacity: .5; } 40% { transform: scale(1.1); opacity: 1; } }
+
+/* ---------- account panel (rendered by public/site.js) ---------- */
+.ord { border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--border)); background: color-mix(in srgb, var(--primary) 5%, var(--surface)); border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.ord header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.ord h3 { font-size: 14px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+.ord h3 b { color: var(--primary); }
+.ord-tag { font-style: normal; font-size: 10px; font-weight: 600; color: var(--muted); background: var(--surface-2); border-radius: 999px; padding: 2px 8px; }
+.ord-meta { display: flex; gap: 14px; margin-top: 6px; font-size: 11px; color: var(--muted); }
+.ord-st { font-size: 11px; font-weight: 700; padding: 5px 11px; border-radius: 999px; white-space: nowrap; background: color-mix(in srgb, var(--primary) 14%, transparent); color: var(--primary); }
+.ord[data-s="pending"] .ord-st { background: color-mix(in srgb, var(--warning) 18%, transparent); color: var(--warning); }
+.ord[data-s="done"] .ord-st { background: color-mix(in srgb, var(--success) 16%, transparent); color: var(--success); }
+.ord-title { font-size: 13px; font-weight: 800; line-height: 1.9; }
+.ord-chip { align-self: flex-start; font-size: 11px; border: 1px solid var(--border); background: var(--surface); border-radius: 10px; padding: 4px 10px; }
+.ord-note { border-radius: 12px; padding: 12px 14px; font-size: 12px; }
+.ord-warn { background: color-mix(in srgb, var(--warning) 14%, var(--surface)); color: var(--warning); }
+.ord-info { background: color-mix(in srgb, var(--primary) 10%, var(--surface)); color: var(--primary); }
+.ord-btns { display: flex; gap: 8px; justify-content: flex-start; flex-wrap: wrap; }
+.ord-btns .cl-btn { height: 42px; padding-inline: 20px; font-size: 13px; }
+.ord-list { display: flex; flex-direction: column; gap: 12px; border: 0 !important; padding: 0 !important; }
