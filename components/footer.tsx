@@ -1,28 +1,29 @@
+import { Clock, Mail, MapPin, Phone } from "lucide-react";
 import { Container } from "@/components/ui";
 import { Logo } from "@/components/header";
 
-const cols = [
-  { t: "فروشگاه", l: ["قاب و کاور", "گلس", "شارژر و کابل", "هندزفری", "پاوربانک"] },
-  { t: "خدمات مشتریان", l: ["پیگیری سفارش", "شرایط بازگشت", "سوالات متداول", "تماس با ما"] },
-  { t: "CaseLine", l: ["درباره ما", "مجله", "همکاری عمده", "قوانین و مقررات"] },
-];
-
 export function Footer() {
+  const rows = [
+    { i: Clock, t: "هر روز ساعت ۸ صبح تا ۱۰ شب" },
+    { i: Phone, t: "021-12345678" },
+    { i: Mail, t: "INFO@CASELINE.IR" },
+    { i: MapPin, t: "آدرس: تهران، میدان ونک، خیابان ملاصدرا" },
+  ];
   return (
-    <footer className="mt-12 border-t border-border bg-surface">
-      <Container className="grid gap-10 py-12 md:grid-cols-[1.4fr_repeat(3,1fr)]">
-        <div>
-          <Logo />
-          <p className="mt-4 max-w-xs text-sm leading-7 text-muted">CaseLine؛ فروشگاه تخصصی لوازم جانبی موبایل با تمرکز بر سازگاری دقیق با مدل گوشی شما.</p>
+    <footer className="mt-10 pb-28 md:pb-10">
+      <Container className="grid gap-8 py-8 md:grid-cols-2">
+        <div className="text-center md:text-start">
+          <div className="flex justify-center md:justify-start"><Logo /></div>
+          <p className="mt-4 text-sm leading-8 text-muted">در <b className="text-primary">کیس‌لاین</b>، لوازم جانبی موبایل را اورجینال، با ضمانت سازگاری با مدل گوشی و پرداخت مطمئن تهیه کنید. تیم پشتیبانی ما هر روز پاسخ‌گوی شماست.</p>
         </div>
-        {cols.map((c) => (
-          <div key={c.t}>
-            <h4 className="mb-3 text-sm font-extrabold">{c.t}</h4>
-            <ul className="space-y-2 text-sm text-muted">{c.l.map((x) => <li key={x}><a href="#" className="hover:text-primary">{x}</a></li>)}</ul>
-          </div>
-        ))}
+        <div>
+          <h4 className="mb-3 text-center text-sm font-extrabold md:text-start">اطلاعات تماس</h4>
+          <ul className="space-y-3 text-sm">
+            {rows.map(({ i: I, t }) => <li key={t} className="flex items-center gap-2 text-muted"><span className="grid size-8 place-items-center rounded-full bg-primary/12 text-primary"><I className="size-4" /></span><span dir="auto">{t}</span></li>)}
+          </ul>
+        </div>
       </Container>
-      <div className="border-t border-border py-4 text-center text-xs text-muted">© ۱۴۰۵ CaseLine — نسخه دمو طراحی</div>
+      <p className="text-center text-xs text-muted">© ۱۴۰۵ CaseLine — نسخه دمو طراحی</p>
     </footer>
   );
 }

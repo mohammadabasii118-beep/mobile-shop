@@ -54,3 +54,11 @@ export const blogPosts = [
   { title: "گلس ساده یا آنتی‌استاتیک؛ کدام بهتر است؟", tag: "مقایسه", read: "۴ دقیقه" },
   { title: "شارژ سریع چطور کار می‌کند و چه کابلی لازم است؟", tag: "آموزش", read: "۶ دقیقه" },
 ];
+
+export const kindLabel: Record<Kind, string> = {
+  case: "قاب و کاور", glass: "گلس", charger: "شارژر", cable: "کابل", earbuds: "هندزفری",
+  powerbank: "پاوربانک", holder: "هولدر", flash: "فلش", lens: "محافظ لنز",
+};
+export const categoryCounts: Record<Kind, number> = { case: 48, glass: 32, charger: 17, cable: 21, earbuds: 14, powerbank: 12, holder: 9, flash: 7, lens: 11 };
+export const heroWords = ["قاب", "گلس", "شارژر", "هندزفری", "پاوربانک"];
+export const quickChips = ["قاب آیفون", "گلس", "شارژر", "کابل", "ایرپاد", "پاوربانک"];

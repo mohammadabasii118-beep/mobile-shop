@@ -1,6 +1,6 @@
-import { Header } from "@/components/header";
+import { BottomNav, Header } from "@/components/header";
 import { Footer } from "@/components/footer";
-import { Benefits, BestSellers, Blog, BrandsStrip, Categories, Featured, Hero, PhonePicker, PromoBanners, Recommended } from "@/components/home-sections";
+import { BestSellers, Blog, CategoryGrid, CategoryPills, Featured, Hero, Newest, PhonePicker, TelegramBanner } from "@/components/home-sections";
 
 export default function Home() {
   return (
@@ -8,17 +8,17 @@ export default function Home() {
       <Header />
       <main>
         <Hero />
-        <Categories />
-        <PhonePicker />
+        <CategoryPills />
         <Featured />
-        <PromoBanners />
+        <PhonePicker />
+        <Newest />
+        <CategoryGrid />
         <BestSellers />
-        <BrandsStrip />
-        <Benefits />
-        <Recommended />
+        <TelegramBanner />
         <Blog />
       </main>
       <Footer />
+      <BottomNav />
     </>
   );
 }
