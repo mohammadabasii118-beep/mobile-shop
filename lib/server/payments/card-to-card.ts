@@ -23,10 +23,10 @@ export const cardToCard: PaymentProvider = {
   label: "کارت به کارت",
   description: "واریز به کارت فروشگاه و ارسال رسید پرداخت",
   enabled: () => true,
-  async instructions(order): Promise<PaymentInstructions> {
+  async instructions(order, amount): Promise<PaymentInstructions> {
     const s = await getPaymentSettings();
     const fields = [
-      { label: "مبلغ قابل پرداخت", value: formatToman(order.total), copy: false },
+      { label: "مبلغ قابل پرداخت", value: formatToman(amount ?? order.total), copy: false },
       { label: "بانک", value: s.bankName },
       { label: "به نام", value: s.accountHolder },
       { label: "شماره کارت", value: s.cardNumber, copy: true },

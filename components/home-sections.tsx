@@ -83,7 +83,7 @@ export function BlogSection({ title, posts }: { title: string; posts: { slug: st
         <SectionHeader title={title} href="/blog" />
         <div className="grid gap-3 md:grid-cols-3">
           {posts.map((b) => (
-            <Link key={b.slug} href="/blog" className="flex min-h-36 flex-col gap-3 rounded-xl border border-border bg-surface-2 p-4 transition-shadow hover:shadow-md">
+            <Link key={b.slug} href={`/blog/${b.slug}`} className="flex min-h-36 flex-col gap-3 rounded-xl border border-border bg-surface-2 p-4 transition-shadow hover:shadow-md">
               <div className="flex items-center justify-between text-[11px] text-muted"><span className="rounded-md bg-primary/10 px-2 py-1 font-medium text-primary">{b.category}</span><span>{b.date}</span></div>
               <h3 className="line-clamp-2 text-sm font-black leading-7">{b.title}</h3>
               <span className="mt-auto text-[11px] font-bold text-primary">ادامه مطلب ‹</span>

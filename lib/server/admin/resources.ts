@@ -98,14 +98,14 @@ export const RESOURCES: Record<string, Resource> = {
   },
   banners: {
     model: "banner", perm: "banner.write", label: "بنر", auditName: "banner", hasSort: true,
-    create: z.object({ title: req(120), subtitle: opt(200), description: opt(600), desktopImage: image, mobileImage: image, buttonText: opt(40), buttonLink: link, placement: z.enum(["home_telegram", "shop_top"]).optional(), startsAt: dateOpt, endsAt: dateOpt, isActive: bool.optional(), sortOrder: int(0, 100000).optional() }),
+    create: z.object({ title: req(120), subtitle: opt(200), description: opt(600), desktopImage: image, mobileImage: image, buttonText: opt(40), buttonLink: link, placement: z.string().trim().toLowerCase().regex(/^[a-z][a-z0-9_-]{1,39}$/, "کلید محل نمایش: حروف کوچک انگلیسی، عدد و _ -").optional(), startsAt: dateOpt, endsAt: dateOpt, isActive: bool.optional(), sortOrder: int(0, 100000).optional() }),
     orderBy: [{ placement: "asc" }, { sortOrder: "asc" }], search: ["title"], filters: ["isActive", "placement"],
   },
   homepage: {
     model: "homepageSection", perm: "homepage.write", label: "بخش صفحه اصلی", auditName: "homepage_section", hasSort: true, immutable: ["key", "type"],
     create: z.object({
       key: keyish, type: z.enum(["hero", "marquee", "product_rail", "categories", "newest", "banner", "blog"]), title: opt(120), subtitle: opt(200), link,
-      config: z.object({ categorySlug: z.string().trim().max(120).optional(), productIds: z.array(z.string().max(40)).max(24).optional(), limit: z.coerce.number().int().min(1).max(24).optional() }).nullable().optional(),
+      config: z.object({ categorySlug: z.string().trim().max(120).optional(), placement: z.string().trim().max(40).regex(/^([a-z][a-z0-9_-]{1,39})?$/).optional(), productIds: z.array(z.string().max(40)).max(24).optional(), limit: z.coerce.number().int().min(1).max(24).optional() }).nullable().optional(),
       isActive: bool.optional(), sortOrder: int(0, 100000).optional(),
     }),
     orderBy: [{ sortOrder: "asc" }], search: ["title", "key"], filters: ["isActive"],
@@ -131,8 +131,16 @@ export const RESOURCES: Record<string, Resource> = {
   },
   blog: {
     model: "blogPost", perm: "blog.write", label: "مقاله", auditName: "blog_post",
-    create: z.object({ title: req(160), slug, excerpt: opt(400), content: req(50000), featuredImage: image, authorName: opt(60), isPublished: bool.optional(), publishedAt: dateOpt, seoTitle: opt(120), seoDescription: opt(300) }),
-    orderBy: [{ createdAt: "desc" }], search: ["title", "slug"], filters: ["isPublished"],
+    create: z.object({ title: req(160), slug, excerpt: opt(400), content: req(50000), featuredImage: image, categoryId: z.string().max(40).nullable().optional().transform((v) => v || null), tags: z.array(z.string().trim().min(1).max(30)).max(10).optional(), authorName: opt(60), isPublished: bool.optional(), publishedAt: dateOpt, seoTitle: opt(120), seoDescription: opt(300), canonical: link }),
+    orderBy: [{ createdAt: "desc" }], search: ["title", "slug"], filters: ["isPublished", "categoryId"], include: { category: { select: { name: true } } },
     guard: async (_tx, d, ex) => { if (d.isPublished && !d.publishedAt && !ex?.publishedAt) d.publishedAt = new Date(); },
+  },
+  "blog-categories": {
+    model: "blogCategory", perm: "blog.write", label: "دسته وبلاگ", auditName: "blog_category",
+    create: z.object({ name: req(60), slug }),
+    orderBy: [{ name: "asc" }], search: ["name", "slug"], include: { _count: { select: { posts: true } } },
+    beforeDelete: async (tx, id) => {
+      if (await tx.blogPost.count({ where: { categoryId: id } })) throw conflict("این دسته مقاله دارد؛ ابتدا مقاله‌ها را به دسته دیگری ببرید.");
+    },
   },
 };

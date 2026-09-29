@@ -12,15 +12,17 @@ export async function dashboardData() {
   const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const since14 = new Date(startDay.getTime() - 13 * 86400_000);
   const since30 = new Date(now.getTime() - 30 * 86400_000);
-  const paid = { status: "PAID" as const, order: { status: { notIn: ["CANCELLED", "REFUNDED"] as ("CANCELLED" | "REFUNDED")[] } } };
+  // Revenue = order totals of paid, not cancelled/refunded orders (wallet-paid and card-paid parts both count).
+  const live = { paymentStatus: "PAID" as const, status: { notIn: ["CANCELLED", "REFUNDED"] as ("CANCELLED" | "REFUNDED")[] } };
+  const paidSince = (d: Date) => ({ ...live, payments: { some: { status: "PAID" as const, paidAt: { gte: d } } } });
   const [totalOrders, pendingOrders, reviewOrders, paidOrders, rev, revToday, revMonth, lowStock, pendingWholesale, pendingReviews, newCustomers, recentOrders, recentPayments, lowList, series] = await Promise.all([
     db.order.count(),
     db.order.count({ where: { status: "PENDING_PAYMENT" } }),
     db.order.count({ where: { status: "PAYMENT_REVIEW" } }),
     db.order.count({ where: { paymentStatus: "PAID", status: { notIn: ["CANCELLED", "REFUNDED"] } } }),
-    db.payment.aggregate({ where: paid, _sum: { amount: true } }),
-    db.payment.aggregate({ where: { ...paid, paidAt: { gte: startDay } }, _sum: { amount: true } }),
-    db.payment.aggregate({ where: { ...paid, paidAt: { gte: startMonth } }, _sum: { amount: true } }),
+    db.order.aggregate({ where: live, _sum: { total: true } }),
+    db.order.aggregate({ where: paidSince(startDay), _sum: { total: true } }),
+    db.order.aggregate({ where: paidSince(startMonth), _sum: { total: true } }),
     db.$queryRaw<{ c: bigint }[]>`SELECT count(*) AS c FROM "Inventory" WHERE "quantity" <= "lowStockThreshold"`,
     db.wholesaleApplication.count({ where: { status: "PENDING" } }),
     db.review.count({ where: { status: "pending" } }),
@@ -28,12 +30,12 @@ export async function dashboardData() {
     db.order.findMany({ orderBy: { createdAt: "desc" }, take: 6, select: { number: true, customerName: true, total: true, status: true, createdAt: true } }),
     db.payment.findMany({ where: { status: { in: ["REVIEW", "PAID"] } }, orderBy: { updatedAt: "desc" }, take: 6, select: { id: true, amount: true, status: true, updatedAt: true, order: { select: { number: true, customerName: true } } } }),
     db.$queryRaw<{ sku: string; name: string; quantity: number; threshold: number; variantId: string }[]>`SELECT v."id" AS "variantId", v."sku", p."name", i."quantity", i."lowStockThreshold" AS threshold FROM "Inventory" i JOIN "ProductVariant" v ON v."id" = i."variantId" JOIN "Product" p ON p."id" = v."productId" WHERE i."quantity" <= i."lowStockThreshold" ORDER BY i."quantity" ASC LIMIT 6`,
-    db.$queryRaw<{ d: Date; s: bigint }[]>`SELECT date_trunc('day', "paidAt") AS d, sum("amount") AS s FROM "Payment" p JOIN "Order" o ON o."id" = p."orderId" WHERE p."status" = 'PAID' AND o."status" NOT IN ('CANCELLED','REFUNDED') AND p."paidAt" >= ${since14} GROUP BY 1`,
+    db.$queryRaw<{ d: Date; s: bigint }[]>`SELECT date_trunc('day', "paidAt") AS d, sum(o."total") AS s FROM "Payment" p JOIN "Order" o ON o."id" = p."orderId" WHERE p."status" = 'PAID' AND o."status" NOT IN ('CANCELLED','REFUNDED') AND p."paidAt" >= ${since14} GROUP BY 1`,
   ]);
   const byDay = new Map(series.map((r) => [new Date(r.d).toDateString(), Number(r.s)]));
   const chart = Array.from({ length: 14 }, (_, i) => { const d = new Date(since14.getTime() + i * 86400_000); return { date: d.toISOString().slice(0, 10), value: byDay.get(d.toDateString()) ?? 0 }; });
   return {
-    totalOrders, pendingOrders, reviewOrders, paidOrders, revenue: rev._sum.amount ?? 0, revenueToday: revToday._sum.amount ?? 0, revenueMonth: revMonth._sum.amount ?? 0,
+    totalOrders, pendingOrders, reviewOrders, paidOrders, revenue: rev._sum.total ?? 0, revenueToday: revToday._sum.total ?? 0, revenueMonth: revMonth._sum.total ?? 0,
     lowStock: Number(lowStock[0]?.c ?? 0), pendingWholesale, pendingReviews, newCustomers, recentOrders, recentPayments, lowList, chart,
   };
 }
@@ -45,6 +47,7 @@ export async function listReviews(req: NextRequest) {
   const st = sp.get("status") ?? "pending";
   if (["pending", "approved", "rejected"].includes(st)) where.status = st;
   if (q) where.OR = [{ body: { contains: q, mode: "insensitive" } }, { product: { name: { contains: q, mode: "insensitive" } } }];
+  if (sp.get("productId")) where.productId = sp.get("productId")!;
   const [items, total] = await Promise.all([
     db.review.findMany({ where, orderBy: { createdAt: "desc" }, take, skip, include: { product: { select: { name: true, slug: true } }, user: { select: { displayName: true, phone: true } } } }),
     db.review.count({ where }),
@@ -90,27 +93,3 @@ export async function listAudit(req: NextRequest) {
 }
 
 /* ───────── read-only wallet / loyalty / support views (full flows arrive in later phases) ───────── */
-export async function listWallets(req: NextRequest) {
-  const { take, skip, page } = pageParams(req, 30);
-  const [items, total] = await Promise.all([
-    db.wallet.findMany({ orderBy: { balance: "desc" }, take, skip, include: { user: { select: { id: true, displayName: true, phone: true } }, transactions: { orderBy: { createdAt: "desc" }, take: 3 } } }),
-    db.wallet.count(),
-  ]);
-  return { items, total, page, pages: Math.max(1, Math.ceil(total / take)) };
-}
-export async function listLoyalty(req: NextRequest) {
-  const { take, skip, page } = pageParams(req, 30);
-  const [items, total] = await Promise.all([
-    db.loyaltyAccount.findMany({ orderBy: { points: "desc" }, take, skip, include: { user: { select: { id: true, displayName: true, phone: true } }, transactions: { orderBy: { createdAt: "desc" }, take: 3 } } }),
-    db.loyaltyAccount.count(),
-  ]);
-  return { items, total, page, pages: Math.max(1, Math.ceil(total / take)) };
-}
-export async function listTickets(req: NextRequest) {
-  const { take, skip, page } = pageParams(req, 30);
-  const [items, total] = await Promise.all([
-    db.supportTicket.findMany({ orderBy: { updatedAt: "desc" }, take, skip, include: { user: { select: { displayName: true, phone: true } }, _count: { select: { messages: true } } } }),
-    db.supportTicket.count(),
-  ]);
-  return { items, total, page, pages: Math.max(1, Math.ceil(total / take)) };
-}

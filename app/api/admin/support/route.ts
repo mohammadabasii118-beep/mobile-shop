@@ -1,4 +1,7 @@
-import { adminRoute } from "@/lib/server/admin/core";
-import { listTickets } from "@/lib/server/admin/misc";
+import { adminRoute, pageParams } from "@/lib/server/admin/core";
+import { adminListTickets } from "@/lib/server/support";
 
-export const GET = adminRoute("support.read", (req) => listTickets(req));
+export const GET = adminRoute(["support.read", "support.reply"], async (req) => {
+  const { take, skip, q, sp, page } = pageParams(req, 25);
+  return { ...(await adminListTickets({ status: sp.get("status"), priority: sp.get("priority"), assignee: sp.get("assignee"), search: q, take, skip })), page };
+});

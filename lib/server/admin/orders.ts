@@ -6,6 +6,9 @@ import { badRequest, conflict, notFound } from "@/lib/server/errors";
 import { audit, pageParams, type AdminCtx } from "@/lib/server/admin/core";
 import { ORDER_STATUS_LABEL, ORDER_TRANSITIONS } from "@/lib/server/orders";
 import { approvePayment, cancelOrder, rejectPayment } from "@/lib/server/payments/service";
+import { notify } from "@/lib/server/notify";
+import { refundSummary } from "@/lib/server/finance/refunds";
+import { earnForOrder } from "@/lib/server/finance/loyalty";
 import { toLatinDigits } from "@/lib/server/validation";
 
 const STATUSES = Object.keys(ORDER_STATUS_LABEL) as OrderStatus[];
@@ -35,12 +38,14 @@ export async function getOrder(number: number) {
       items: true, history: { orderBy: { createdAt: "asc" } }, shippingMethod: { select: { id: true, name: true } },
       payments: { orderBy: { createdAt: "desc" }, include: { proofs: { orderBy: { createdAt: "asc" }, select: { id: true, originalName: true, mime: true, size: true, createdAt: true } } } },
       user: { select: { id: true, phone: true, displayName: true, isActive: true } },
+      refunds: { orderBy: { createdAt: "desc" } },
     },
   });
   if (!o) throw notFound("سفارش پیدا نشد.");
+  const money = await refundSummary(db, o.id);
   const ids = [...new Set(o.history.map((h) => h.createdById).filter((x): x is string => !!x))];
   const admins = await db.user.findMany({ where: { id: { in: ids } }, select: { id: true, displayName: true, phone: true } });
-  return { ...o, history: o.history.map((h) => ({ ...h, by: admins.find((u) => u.id === h.createdById)?.displayName ?? null })) };
+  return { ...o, money: { cardPaid: money.cardPaid, walletPaid: money.walletPaid, totalPaid: money.totalPaid, refundable: money.refundable, bankRefundable: Math.max(0, money.bankRefundable), completed: money.completed }, history: o.history.map((h) => ({ ...h, by: admins.find((u) => u.id === h.createdById)?.displayName ?? null })) };
 }
 
 const statusSchema = z.object({ status: z.enum(STATUSES as [OrderStatus, ...OrderStatus[]]), note: z.string().trim().max(300).optional() });
@@ -59,7 +64,8 @@ export async function changeStatus(number: number, body: unknown, a: AdminCtx) {
     if (status === "PROCESSING" && o.paymentStatus !== "PAID") throw conflict("سفارش بدون پرداخت تأییدشده قابل پردازش نیست.", "unpaid");
     await tx.order.update({ where: { id: o.id }, data: { status } });
     await tx.orderStatusHistory.create({ data: { orderId: o.id, status, description: note ?? ORDER_STATUS_LABEL[status], createdById: a.admin.id } });
-    if (o.userId && NOTIFY[status]) await tx.notification.create({ data: { userId: o.userId, type: "order_status", title: ORDER_STATUS_LABEL[status], body: NOTIFY[status], link: `/account/orders/${o.number}` } });
+    if (o.userId && NOTIFY[status]) await notify(tx, o.userId, "order_status", { title: ORDER_STATUS_LABEL[status], body: NOTIFY[status], link: `/account/orders/${o.number}`, data: { orderNumber: o.number, status } });
+    if (status === "DELIVERED") await earnForOrder(tx, o.id, "delivery");
     await audit(a, "order.status", "order", o.id, { status: o.status }, { status, note: note ?? null, number: o.number }, tx);
     return { status };
   });
@@ -83,6 +89,7 @@ export async function updateShipping(number: number, body: unknown, a: AdminCtx)
     if (d.shippingCompany !== undefined) patch.shippingCompany = d.shippingCompany;
     if (d.trackingNumber !== undefined) patch.trackingNumber = d.trackingNumber;
     await tx.order.update({ where: { id: o.id }, data: patch });
+    if (o.userId && d.trackingNumber && d.trackingNumber !== o.trackingNumber) await notify(tx, o.userId, "order_tracking", { title: "کد رهگیری سفارش ثبت شد", body: `${d.shippingCompany ?? o.shippingCompany ?? "شرکت حمل"} — کد رهگیری: ${d.trackingNumber}`, link: `/account/orders/${o.number}`, data: { orderNumber: o.number, tracking: d.trackingNumber } });
     await audit(a, "order.shipping", "order", o.id, { shippingMethodId: o.shippingMethodId, shippingCompany: o.shippingCompany, trackingNumber: o.trackingNumber }, d, tx);
     return { ok: true };
   });
@@ -95,29 +102,6 @@ export async function adminCancel(number: number, body: unknown, a: AdminCtx) {
   if (!o) throw notFound("سفارش پیدا نشد.");
   if (o.paymentStatus === "PAID") throw conflict("سفارش پرداخت‌شده را از مسیر «بازگشت وجه» ببندید.", "use_refund");
   return cancelOrder(o.id, a.admin.id, reason, (tx) => audit(a, "order.cancel", "order", o.id, { status: o.status }, { status: "CANCELLED", reason, number }, tx));
-}
-
-const refundSchema = reasonSchema.extend({ restock: z.boolean().default(true) });
-/** Starts a refund: order + payment become REFUNDED (stock optionally returned). The money is returned manually until wallet refunds exist. */
-export async function adminRefund(number: number, body: unknown, a: AdminCtx) {
-  const { reason, restock } = refundSchema.parse(body);
-  return db.$transaction(async (tx) => {
-    const o = await tx.order.findUnique({ where: { number }, include: { items: true } });
-    if (!o) throw notFound("سفارش پیدا نشد.");
-    if (!ORDER_TRANSITIONS[o.status].includes("REFUNDED")) throw conflict("این سفارش قابل بازگشت وجه نیست.", "invalid_transition");
-    if (o.paymentStatus !== "PAID") throw conflict("فقط سفارش پرداخت‌شده قابل بازگشت وجه است.", "unpaid");
-    if (restock) for (const it of o.items) {
-      if (!it.variantId) continue;
-      const inv = await tx.inventory.update({ where: { variantId: it.variantId }, data: { quantity: { increment: it.quantity } } });
-      await tx.inventoryMovement.create({ data: { inventoryId: inv.id, delta: it.quantity, balanceAfter: inv.quantity, reason: "refund", orderId: o.id, note: reason, createdById: a.admin.id } });
-    }
-    await tx.payment.updateMany({ where: { orderId: o.id, status: "PAID" }, data: { status: "REFUNDED" } });
-    await tx.order.update({ where: { id: o.id }, data: { status: "REFUNDED", paymentStatus: "REFUNDED" } });
-    await tx.orderStatusHistory.create({ data: { orderId: o.id, status: "REFUNDED", description: `بازگشت وجه: ${reason}`, createdById: a.admin.id } });
-    if (o.userId) await tx.notification.create({ data: { userId: o.userId, type: "order_refund", title: "بازگشت وجه سفارش", body: reason, link: `/account/orders/${o.number}` } });
-    await audit(a, "order.refund", "order", o.id, { status: o.status, paymentStatus: o.paymentStatus }, { status: "REFUNDED", reason, restock, number }, tx);
-    return { status: "REFUNDED" };
-  });
 }
 
 /* ───────── payment review ───────── */

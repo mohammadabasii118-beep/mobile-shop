@@ -1,5 +1,6 @@
 import { BottomNav } from "@/components/header";
 import { Header } from "@/components/site-header";
+import { BannerSlot } from "@/components/banner-slot";
 import { Footer } from "@/components/footer";
 import { Hero } from "@/components/hero";
 import { BlogSection, BrandMarquee, CategoryTiles, ProductRail, TelegramBanner } from "@/components/home-sections";
@@ -12,7 +13,7 @@ export default async function Home() {
   const [sections, tree] = await Promise.all([getHomeSections(), getCategoryTree()]);
   const blocks = await Promise.all(
     sections.map(async (s) => {
-      const cfg = (s.config ?? {}) as { categorySlug?: string; productIds?: string[]; limit?: number };
+      const cfg = (s.config ?? {}) as { categorySlug?: string; productIds?: string[]; limit?: number; placement?: string };
       switch (s.type) {
         case "hero":
           return <Hero key={s.key} chips={["قاب آیفون", "گلس", "شارژر", "کابل", "ایرپاد"]} />;
@@ -28,6 +29,8 @@ export default async function Home() {
         case "categories":
           return <CategoryTiles key={s.key} title={s.title ?? "دسته‌بندی‌ها"} categories={tree} />;
         case "banner": {
+          // A homepage banner section shows whatever banners are assigned to its placement (default: the Telegram strip).
+          if (cfg.placement && cfg.placement !== "home_telegram") return <div key={s.key} className="mx-auto w-full max-w-[980px] px-4 sm:px-6 lg:px-8"><BannerSlot placement={cfg.placement} className="my-4 space-y-3" /></div>;
           const b = await getBanner("home_telegram");
           return b ? <TelegramBanner key={s.key} title={b.title} subtitle={b.subtitle} buttonText={b.buttonText} link={b.buttonLink} /> : null;
         }

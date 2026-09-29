@@ -13,9 +13,11 @@
     "db:seed": "prisma db seed",
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
-    "test:e2e": "tsx --test --test-concurrency=1 scripts/e2e-phase2.test.ts scripts/e2e-phase3.test.ts",
+    "test:e2e": "tsx --test --test-concurrency=1 scripts/e2e-phase2.test.ts scripts/e2e-phase3.test.ts scripts/e2e-phase4.test.ts",
     "lint": "eslint .",
-    "test:phase3": "tsx --test scripts/e2e-phase3.test.ts"
+    "test:phase3": "tsx --test scripts/e2e-phase3.test.ts",
+    "test:phase4": "tsx --test scripts/e2e-phase4.test.ts",
+    "notify:flush": "tsx scripts/flush-notifications.ts"
   },
   "dependencies": {
     "@fontsource-variable/vazirmatn": "^5.3.0",

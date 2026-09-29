@@ -1,31 +1,41 @@
 import type { Metadata } from "next";
-import { MessagesSquare, Plus } from "lucide-react";
+import Link from "next/link";
+import { MessagesSquare } from "lucide-react";
+import { db } from "@/lib/db";
 import { AccountShell } from "@/components/account-shell";
+import { NewTicketForm } from "@/components/account/ticket-forms";
 import { requirePageUser } from "@/lib/server/auth/guard";
+import { listMyTickets } from "@/lib/server/support";
+import { TICKET_STATUS, faDate, orderNo } from "@/lib/account-format";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "تیکت‌های پشتیبانی | CaseLine" };
-const field = "w-full rounded-xl border border-border bg-surface px-4 text-sm outline-none focus:border-primary";
+export const metadata: Metadata = { title: "تیکت‌های پشتیبانی | CaseLine", robots: { index: false } };
 
-export default async function TicketsPage() {
-  await requirePageUser("/account/tickets");
+export default async function TicketsPage({ searchParams }: { searchParams: Promise<{ order?: string; category?: string }> }) {
+  const sp = await searchParams;
+  const user = await requirePageUser("/account/tickets");
+  const [tickets, orders] = await Promise.all([listMyTickets(user.id), db.order.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 30, select: { number: true, createdAt: true, total: true } })]);
   return (
     <AccountShell active="tickets">
-      <div data-tickets-root>
-        <button data-ticket-new className="flex cursor-pointer items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-fg shadow-md hover:bg-primary-hover">تیکت جدید<Plus className="size-4" /></button>
-        <form data-ticket-form hidden className="mt-4 space-y-3 rounded-2xl border border-border bg-surface-2 p-4">
-          <input name="subject" required placeholder="موضوع تیکت" className={`${field} h-11`} />
-          <textarea name="message" required rows={4} placeholder="پیام خود را بنویسید…" className={`${field} py-3 leading-7`} />
-          <div className="flex gap-2">
-            <button type="submit" className="h-11 flex-1 cursor-pointer rounded-xl bg-primary text-sm font-bold text-primary-fg hover:bg-primary-hover">ارسال تیکت</button>
-            <button type="button" data-ticket-cancel className="h-11 cursor-pointer rounded-xl bg-surface px-5 text-sm text-muted">انصراف</button>
+      <div className="space-y-4">
+        <NewTicketForm defaults={sp.order ? { order: sp.order, category: sp.category } : undefined} orders={orders.map((o) => ({ number: o.number, label: `سفارش ${orderNo(o.number)} — ${faDate(o.createdAt)}` }))} />
+        {tickets.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-primary/30 px-4 py-9 text-center">
+            <span className="mx-auto grid size-12 place-items-center rounded-xl bg-primary/10 text-primary"><MessagesSquare className="size-6" /></span>
+            <p className="mt-3 text-xs text-muted">هنوز تیکتی نساخته‌اید. اگر سوال یا مشکلی دارید، از دکمه بالا تیکت بزنید.</p>
           </div>
-        </form>
-        <div data-ticket-list className="mt-4 space-y-3" />
-        <div data-ticket-empty className="mt-4 rounded-2xl border border-dashed border-primary/30 px-4 py-9 text-center">
-          <span className="mx-auto grid size-12 place-items-center rounded-xl bg-primary/10 text-primary"><MessagesSquare className="size-6" /></span>
-          <p className="mt-3 text-xs text-muted">هنوز تیکتی نساخته‌اید. اگر سوال یا مشکلی دارید، از دکمه بالا تیکت بزنید.</p>
-        </div>
+        ) : (
+          <ul className="space-y-3">
+            {tickets.map((t) => (
+              <li key={t.id}>
+                <Link href={`/account/tickets/${t.number}`} className="block rounded-2xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
+                  <div className="flex items-start justify-between gap-3"><b className="text-[14px]">{t.subject}</b><span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold ${TICKET_STATUS[t.status]?.[1]}`}>{TICKET_STATUS[t.status]?.[0]}</span></div>
+                  <p className="mt-1 text-[11px] text-muted">تیکت #{orderNo(t.number)} · {faDate(t.updatedAt)} · {t._count.messages.toLocaleString("fa-IR")} پیام</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </AccountShell>
   );

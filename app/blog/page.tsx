@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { BottomNav } from "@/components/header";
 import { Header } from "@/components/site-header";
 import { Footer } from "@/components/footer";
+import { BannerSlot } from "@/components/banner-slot";
 import { Container } from "@/components/ui";
 import { ProductVisual } from "@/components/product-visual";
 import { getBlogCategories, getBlogPosts } from "@/lib/queries";
@@ -36,6 +37,7 @@ export default async function BlogPage() {
       <main className="py-6">
         <Container>
           <div data-blog>
+            <BannerSlot placement="blog_top" />
             <section className="rounded-[28px] border border-border bg-surface px-5 py-6 text-center shadow-md">
               <h1 className="text-xl font-black sm:text-2xl">وبلاگ</h1>
               <div className="mt-4 flex flex-wrap justify-center gap-2 text-xs">
@@ -51,12 +53,12 @@ export default async function BlogPage() {
             <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {posts.map((p) => (
                 <article key={p.slug} data-post data-cat={p.category?.name ?? ""} className="flex flex-col rounded-[22px] border border-border bg-surface p-2 shadow-sm transition-shadow hover:shadow-md">
-                  <Cover title={p.title.split(/[؟?،:]/)[0].slice(0, 34)} kind={KINDS[hash(p.slug) % KINDS.length]} hue={hash(p.slug) % 360} />
+                  {p.featuredImage ? <div className="aspect-[16/10] overflow-hidden rounded-[18px]"><img src={p.featuredImage} alt={p.title} loading="lazy" className="size-full object-cover" /></div> : <Cover title={p.title.split(/[؟?،:]/)[0].slice(0, 34)} kind={KINDS[hash(p.slug) % KINDS.length]} hue={hash(p.slug) % 360} />}
                   <div className="flex flex-1 flex-col gap-3 p-3">
                     <div className="flex items-center justify-between text-[11px] text-muted"><span className="rounded-md bg-primary/10 px-2 py-1 font-medium text-primary">{p.category?.name}</span><span>{faDate(p.publishedAt)}</span></div>
                     <h2 className="line-clamp-2 text-[15px] font-black leading-7">{p.title}</h2>
                     <p className="line-clamp-2 text-xs leading-6 text-muted">{p.excerpt}</p>
-                    <Link href="/blog" className="mt-auto text-xs font-bold text-primary">ادامه مطلب ‹</Link>
+                    <Link href={`/blog/${p.slug}`} className="mt-auto text-xs font-bold text-primary">ادامه مطلب ‹</Link>
                   </div>
                 </article>
               ))}

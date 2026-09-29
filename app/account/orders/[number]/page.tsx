@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { Check } from "lucide-react";
 import { AccountShell } from "@/components/account-shell";
 import { CopyField, ReceiptForm } from "@/components/account/receipt-form";
+import { db } from "@/lib/db";
+import { OrderExtras, RefundBox, ReviewForm } from "@/components/account/order-extras";
 import { requirePageUser } from "@/lib/server/auth/guard";
 import { getUserOrder, ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL, TIMELINE } from "@/lib/server/orders";
 import { getProvider } from "@/lib/server/payments";
@@ -23,7 +25,8 @@ export default async function OrderPage({ params }: { params: Promise<{ number: 
   if (!order) notFound();
   const payment = order.payments[0];
   const provider = getProvider(order.paymentMethod);
-  const instructions = provider && payment ? await provider.instructions(order) : null;
+  const instructions = provider && payment ? await provider.instructions(order, payment.amount) : null;
+  const reviewed = order.status === "DELIVERED" ? new Set((await db.review.findMany({ where: { userId: user.id, orderId: order.id }, select: { productId: true } })).map((r) => r.productId)) : new Set<string>();
   const canPay = order.status === "PENDING_PAYMENT" && payment && ["PENDING", "REJECTED"].includes(payment.status);
   const ended = order.status === "CANCELLED" || order.status === "REFUNDED";
   // The timeline highlights the current step; PAID is displayed as the "payment approved" step.
@@ -115,9 +118,15 @@ export default async function OrderPage({ params }: { params: Promise<{ number: 
             <div className="flex justify-between"><dt className="text-muted">جمع اقلام</dt><dd className="font-bold">{formatToman(order.subtotal)}</dd></div>
             {order.discountTotal > 0 && <div className="flex justify-between"><dt className="text-muted">تخفیف{order.couponCode ? ` (${order.couponCode})` : ""}</dt><dd className="font-bold text-success">−{formatToman(order.discountTotal)}</dd></div>}
             <div className="flex justify-between"><dt className="text-muted">ارسال ({order.shippingMethod?.name ?? "—"})</dt><dd className="font-bold">{order.shippingCost ? formatToman(order.shippingCost) : "رایگان"}</dd></div>
+            {order.loyaltyPointsUsed > 0 && <div className="flex justify-between"><dt className="text-muted">شامل تخفیف امتیاز ({toFa(order.loyaltyPointsUsed)} امتیاز)</dt><dd className="font-bold text-success">−{formatToman(order.loyaltyDiscount)}</dd></div>}
             <div className="flex justify-between border-t border-border pt-3 text-base"><dt className="font-black">مبلغ نهایی</dt><dd className="font-black text-primary">{formatToman(order.total)}</dd></div>
+            {order.walletUsed > 0 && <div className="flex justify-between"><dt className="text-muted">پرداخت از کیف پول</dt><dd className="font-bold">{formatToman(order.walletUsed)}</dd></div>}
+            {order.walletUsed > 0 && order.walletUsed < order.total && <div className="flex justify-between"><dt className="text-muted">مبلغ کارت به کارت</dt><dd className="font-bold">{formatToman(order.total - order.walletUsed)}</dd></div>}
           </dl>
         </section>
+
+        {order.refunds.length > 0 && <RefundBox refunds={order.refunds.map((r) => ({ id: r.id, method: r.method, amount: r.amount, status: r.status, reason: r.reason, bankReference: r.bankReference }))} />}
+        {order.status === "DELIVERED" && <ReviewForm orderNumber={order.number} items={order.items.filter((i) => i.productId && !reviewed.has(i.productId)).map((i) => ({ productId: i.productId!, name: i.name }))} />}
 
         <section aria-label="آدرس تحویل" className="rounded-2xl border border-border p-4 text-[13px] leading-7">
           <h2 className="mb-1 text-sm font-black">آدرس تحویل</h2>
@@ -125,7 +134,8 @@ export default async function OrderPage({ params }: { params: Promise<{ number: 
           <p className="text-muted">{addr.province}، {addr.city}، {addr.address}{addr.postalCode ? ` — کد پستی ${addr.postalCode}` : ""}</p>
         </section>
 
-        <div className="flex flex-wrap gap-2"><Link href="/account/orders" className="cl-btn cl-btn-ghost !inline-flex px-5">بازگشت به سفارش‌ها</Link><Link href="/support" className="cl-btn cl-btn-ghost !inline-flex px-5">پشتیبانی این سفارش</Link></div>
+        {order.status === "PENDING_PAYMENT" && <OrderExtras number={order.number} />}
+        <div className="flex flex-wrap gap-2"><Link href="/account/orders" className="cl-btn cl-btn-ghost !inline-flex px-5">بازگشت به سفارش‌ها</Link><Link href={`/account/tickets?order=${order.number}${order.paymentStatus === "PAID" && !ended ? "&category=return" : ""}`} className="cl-btn cl-btn-ghost !inline-flex px-5">پشتیبانی این سفارش</Link></div>
       </div>
     </AccountShell>
   );

@@ -339,17 +339,20 @@ describe("Phase 3 — admin panel", () => {
       ok(await admin.post(`/api/admin/orders/${number}/cancel`, { reason: "لغو توسط مدیر" }));
       assert.equal(ok(await admin.get(`/api/admin/payments?status=REVIEW&q=${number}`)).items.length, 0);
     });
-    it("refund of a paid order marks order+payment REFUNDED and can restock", async () => {
-      const { number, variantId } = await placeOrder(true);
+    it("refund (Phase 4 flow): REFUNDED only after the money really moved; wallet refund needs the customer's confirmation", async () => {
+      const { c, number, variantId } = await placeOrder(true);
       const pay = await db.payment.findFirstOrThrow({ where: { order: { number } } });
       ok(await admin.post(`/api/admin/payments/${pay.id}/approve`));
       const stock = (await db.inventory.findUniqueOrThrow({ where: { variantId } })).quantity;
-      assert.equal((await admin.post(`/api/admin/orders/${number}/refund`, { reason: "" })).status, 422);
-      ok(await admin.post(`/api/admin/orders/${number}/refund`, { reason: "کالا معیوب بود", restock: true }));
+      assert.equal((await admin.post(`/api/admin/orders/${number}/refunds`, { method: "wallet", amount: pay.amount, reason: "" })).status, 422);
+      const r = ok(await admin.post(`/api/admin/orders/${number}/refunds`, { method: "wallet", amount: pay.amount, reason: "کالا معیوب بود", restock: true }));
+      const mid = await db.order.findUniqueOrThrow({ where: { number } });
+      assert.equal(mid.status, "PROCESSING"); assert.equal(mid.paymentStatus, "PAID"); // requesting a refund alone changes nothing
+      ok(await c.post(`/api/refunds/${r.id}/accept`));
       const o = await db.order.findUniqueOrThrow({ where: { number }, include: { payments: true } });
       assert.equal(o.status, "REFUNDED"); assert.equal(o.paymentStatus, "REFUNDED"); assert.equal(o.payments[0].status, "REFUNDED");
       assert.equal((await db.inventory.findUniqueOrThrow({ where: { variantId } })).quantity, stock + 1);
-      assert.equal((await admin.post(`/api/admin/orders/${number}/refund`, { reason: "دوباره" })).status, 409);
+      assert.equal((await admin.post(`/api/admin/orders/${number}/refunds`, { method: "wallet", amount: 1000, reason: "دوباره" })).status, 409);
     });
   });
 

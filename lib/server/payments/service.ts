@@ -7,6 +7,9 @@ import { getStorage } from "@/lib/server/storage";
 import { validateReceipt } from "@/lib/server/upload";
 import { ORDER_TRANSITIONS } from "@/lib/server/orders";
 import { hasPermission } from "@/lib/server/auth/guard";
+import { notify } from "@/lib/server/notify";
+import { releaseUnpaidOrder } from "@/lib/server/finance/lifecycle";
+import { earnForOrder } from "@/lib/server/finance/loyalty";
 import type { SessionUser } from "@/lib/server/auth/session";
 
 const MAX_PROOFS_PER_PAYMENT = 5;
@@ -65,7 +68,8 @@ export async function approvePayment(paymentId: string, adminId: string, after?:
     await tx.payment.update({ where: { id: paymentId }, data: { status: "PAID", paidAt: now, reviewedById: adminId, reviewedAt: now, rejectReason: null } });
     await tx.order.update({ where: { id: payment.orderId }, data: { status: "PROCESSING", paymentStatus: "PAID" } });
     await tx.orderStatusHistory.create({ data: { orderId: payment.orderId, status: "PROCESSING", description: "پرداخت تأیید شد. سفارش در حال پردازش است.", createdById: adminId } });
-    if (payment.order.userId) await tx.notification.create({ data: { userId: payment.order.userId, type: "payment_approved", title: "پرداخت شما تأیید شد", body: `سفارش ${payment.order.number.toLocaleString("fa-IR")} در حال پردازش است.`, link: `/account/orders/${payment.order.number}` } });
+    if (payment.order.userId) await notify(tx, payment.order.userId, "payment_approved", { title: "پرداخت شما تأیید شد", body: `سفارش ${payment.order.number.toLocaleString("fa-IR")} در حال پردازش است.`, link: `/account/orders/${payment.order.number}`, data: { orderNumber: payment.order.number } });
+    await earnForOrder(tx, payment.orderId, "payment");
     await after?.(tx, { orderId: payment.orderId, orderNumber: payment.order.number });
     return { ok: true };
   });
@@ -79,25 +83,26 @@ export async function rejectPayment(paymentId: string, adminId: string, reason: 
     await tx.payment.update({ where: { id: paymentId }, data: { status: "REJECTED", rejectReason: reason, reviewedById: adminId, reviewedAt: new Date() } });
     await tx.order.update({ where: { id: payment.orderId }, data: { status: "PENDING_PAYMENT", paymentStatus: "REJECTED" } });
     await tx.orderStatusHistory.create({ data: { orderId: payment.orderId, status: "PENDING_PAYMENT", description: `پرداخت رد شد: ${reason}`, createdById: adminId } });
-    if (payment.order.userId) await tx.notification.create({ data: { userId: payment.order.userId, type: "payment_rejected", title: "پرداخت شما رد شد", body: reason, link: `/account/orders/${payment.order.number}` } });
+    if (payment.order.userId) await notify(tx, payment.order.userId, "payment_rejected", { title: "پرداخت شما رد شد", body: reason, link: `/account/orders/${payment.order.number}`, data: { orderNumber: payment.order.number } });
     await after?.(tx, { orderId: payment.orderId, orderNumber: payment.order.number });
     return { ok: true };
   });
 }
 
-/** Cancels an order and returns its stock (Business Rule: unshipped orders restock; wallet refund arrives with the wallet phase). */
+/**
+ * Cancels an UNPAID order and undoes everything it consumed: stock, coupon use, loyalty points and any wallet
+ * amount already deducted at checkout (each exactly once). A paid order is closed through the refund flow instead.
+ */
 export async function cancelOrder(orderId: string, byId: string, reason: string, after?: (tx: Prisma.TransactionClient) => Promise<void>) {
   return db.$transaction(async (tx) => {
-    const order = await tx.order.findUnique({ where: { id: orderId }, include: { items: true } });
+    const order = await tx.order.findUnique({ where: { id: orderId } });
     if (!order) throw notFound("سفارش پیدا نشد.");
+    if (order.paymentStatus === "PAID") throw conflict("سفارش پرداخت‌شده را باید از مسیر «بازگشت وجه» ببندید.", "use_refund");
     if (!ORDER_TRANSITIONS[order.status].includes("CANCELLED")) throw conflict("این سفارش قابل لغو نیست.");
-    for (const it of order.items) {
-      if (!it.variantId) continue;
-      const inv = await tx.inventory.update({ where: { variantId: it.variantId }, data: { quantity: { increment: it.quantity } } });
-      await tx.inventoryMovement.create({ data: { inventoryId: inv.id, delta: it.quantity, reason: "cancel", orderId, note: reason, createdById: byId } });
-    }
+    await releaseUnpaidOrder(tx, orderId, reason, byId);
     await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLED" } });
     await tx.orderStatusHistory.create({ data: { orderId, status: "CANCELLED", description: reason, createdById: byId } });
+    if (order.userId) await notify(tx, order.userId, "order_cancelled", { title: `سفارش ${order.number.toLocaleString("fa-IR")} لغو شد`, body: reason, link: `/account/orders/${order.number}`, data: { orderNumber: order.number } });
     await after?.(tx);
     return { ok: true };
   });

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { notFound } from "@/lib/server/errors";
 import { audit, diff, type AdminCtx } from "@/lib/server/admin/core";
+import { loyaltySchema } from "@/lib/server/admin/loyalty-rules";
 
 const t = (max: number) => z.string().trim().max(max).default("");
 const url = z.string().trim().max(300).refine((v) => v === "" || /^(https?:\/\/|\/(?!\/)|#)/.test(v), "آدرس نامعتبر است.").default("");
@@ -15,6 +16,7 @@ export const SETTING_SCHEMAS = {
     accountNumber: t(40), iban: z.string().trim().toUpperCase().max(34).refine((v) => v === "" || /^IR[0-9A-Z]{22,26}$/.test(v), "شماره شبا با IR شروع می‌شود.").default(""), description: t(400),
   }),
   shipping: z.object({ freeThreshold: z.coerce.number().int().min(0).max(2_000_000_000).default(0) }),
+  loyalty: loyaltySchema,
   general: z.object({ currency: t(20), lowStockNotify: z.boolean().default(true) }),
 } as const;
 export type SettingKey = keyof typeof SETTING_SCHEMAS;

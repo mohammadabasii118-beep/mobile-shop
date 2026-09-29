@@ -50,12 +50,14 @@ export const addressSchema = z.object({
   isDefault: z.boolean().optional(),
 });
 
-export const quoteQuerySchema = z.object({ shippingMethodId: z.string().max(40).optional(), couponCode: z.string().trim().max(40).optional() });
+export const quoteQuerySchema = z.object({ shippingMethodId: z.string().max(40).optional(), couponCode: z.string().trim().max(40).optional(), useWallet: z.enum(["1", "0", "true", "false"]).optional().transform((v) => v === "1" || v === "true"), redeemPoints: z.coerce.number().int().min(0).max(100_000_000).optional() });
 export const createOrderSchema = z.object({
   addressId: z.string().min(1).max(40),
   shippingMethodId: z.string().min(1).max(40),
   couponCode: z.string().trim().max(40).optional().nullable(),
   paymentMethod: z.string().min(1).max(40).default("card_to_card"),
+  useWallet: z.boolean().default(false),
+  redeemPoints: z.coerce.number().int().min(0).max(100_000_000).default(0),
   note: z.string().trim().max(300).optional(),
 });
 export const referenceSchema = z.string().transform(toLatinDigits).transform((v) => v.trim()).refine((v) => /^[A-Za-z0-9\-_/.]{4,40}$/.test(v), "شماره پیگیری را درست وارد کنید (۴ تا ۴۰ حرف یا عدد).");

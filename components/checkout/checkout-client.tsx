@@ -11,6 +11,9 @@ interface Quote {
   subtotal: number; discount: number; couponCode: string | null; couponError: string | null;
   shippingMethods: { id: string; name: string; description: string | null; cost: number; freeThreshold: number | null }[];
   shipping: number; total: number; issues: string[]; isWholesale: boolean;
+  loyalty: { available: number; requested: number; applied: number; discount: number; error: string | null; enabled: boolean; pointValue: number; minPoints: number; maxPercent: number };
+  wallet: { balance: number; applied: number };
+  payable: number;
 }
 interface Provider { key: string; label: string; description: string }
 
@@ -26,6 +29,9 @@ export function CheckoutClient({ initialAddresses, providers, initialCoupon }: {
   const [shippingId, setShippingId] = useState("");
   const [couponInput, setCouponInput] = useState(initialCoupon ?? "");
   const [couponMsg, setCouponMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [useWallet, setUseWallet] = useState(false);
+  const [pointsInput, setPointsInput] = useState("");
+  const [redeem, setRedeem] = useState(0);
   const [payment, setPayment] = useState(providers[0]?.key ?? "card_to_card");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -40,14 +46,15 @@ export function CheckoutClient({ initialAddresses, providers, initialCoupon }: {
   useEffect(() => {
     let alive = true;
     (async () => {
-      const r = await api<Quote>("GET", `/api/checkout/quote${shippingId ? `?shippingMethodId=${encodeURIComponent(shippingId)}` : ""}`);
+      const qs = new URLSearchParams(); if (shippingId) qs.set("shippingMethodId", shippingId); if (useWallet) qs.set("useWallet", "1"); if (redeem > 0) qs.set("redeemPoints", String(redeem));
+      const r = await api<Quote>("GET", `/api/checkout/quote?${qs}`);
       if (!alive) return;
       if (!r.ok) { if (r.error.code === "cart_empty") setEmpty(true); else setErr(r.error.message); return; }
       setQuote(r.data);
       setShippingId((cur) => cur || r.data.shippingMethods[0]?.id || "");
     })();
     return () => { alive = false; };
-  }, [shippingId, refreshKey]);
+  }, [shippingId, refreshKey, useWallet, redeem]);
 
   async function applyCoupon() {
     setCouponMsg(null);
@@ -74,7 +81,7 @@ export function CheckoutClient({ initialAddresses, providers, initialCoupon }: {
     if (!addressId) return setErr("آدرس تحویل را انتخاب کنید.");
     if (!shippingId) return setErr("روش ارسال را انتخاب کنید.");
     setBusy(true);
-    const r = await api<{ number: number }>("POST", "/api/checkout/orders", { addressId, shippingMethodId: shippingId, paymentMethod: payment, note: note || undefined, couponCode: quote?.couponCode ?? undefined });
+    const r = await api<{ number: number }>("POST", "/api/checkout/orders", { addressId, shippingMethodId: shippingId, paymentMethod: payment, useWallet, redeemPoints: redeem, note: note || undefined, couponCode: quote?.couponCode ?? undefined });
     if (r.ok) { window.dispatchEvent(new Event("cl:cart-changed")); // Full navigation so the header cart badge and server data are fresh.
  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
  window.location.href = `/account/orders/${r.data.number}`; return; }
@@ -128,6 +135,7 @@ export function CheckoutClient({ initialAddresses, providers, initialCoupon }: {
 
         <section className={card}>
           <h2 className="mb-4 flex items-center gap-2 text-base font-black"><CreditCard className="size-5 text-primary" />روش پرداخت</h2>
+          {quote && quote.payable === 0 && quote.total > 0 && <p className="mb-3 rounded-xl bg-success/12 px-3 py-2 text-xs font-bold text-success">کل مبلغ سفارش از کیف پول شما پرداخت می‌شود و نیازی به کارت‌به‌کارت نیست.</p>}
           <div className="space-y-2">
             {providers.map((p) => (
               <label key={p.key} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 text-[13px] ${payment === p.key ? "border-primary bg-primary/5" : "border-border"}`}>
@@ -157,11 +165,27 @@ export function CheckoutClient({ initialAddresses, providers, initialCoupon }: {
             )}
             {(couponMsg || quote?.couponError) && <p className={`text-[11px] ${couponMsg?.ok ? "text-success" : "text-hot"}`}>{couponMsg?.text ?? quote?.couponError}</p>}
           </div>
+          {quote && quote.wallet.balance > 0 && (
+            <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-xl border border-border p-3 text-xs">
+              <input type="checkbox" checked={useWallet} onChange={(e) => setUseWallet(e.target.checked)} className="mt-0.5 accent-[var(--primary)]" />
+              <span><b>پرداخت از کیف پول</b><span className="block text-muted">موجودی: {formatToman(quote.wallet.balance)}{useWallet && quote.wallet.applied > 0 ? ` — کسر می‌شود: ${formatToman(quote.wallet.applied)}` : ""}</span></span>
+            </label>
+          )}
+          {quote && quote.loyalty.enabled && quote.loyalty.available > 0 && (
+            <div className="mt-3 space-y-1.5 rounded-xl border border-border p-3 text-xs">
+              <b>استفاده از امتیاز باشگاه</b> <span className="text-muted">(موجودی: {toFa(quote.loyalty.available)} امتیاز — هر امتیاز {formatToman(quote.loyalty.pointValue)})</span>
+              <div className="flex gap-2"><input value={pointsInput} onChange={(e) => setPointsInput(e.target.value.replace(/\D/g, ""))} inputMode="numeric" dir="ltr" placeholder={`حداقل ${quote.loyalty.minPoints}`} className={field} /><button type="button" onClick={() => setRedeem(Number(pointsInput) || 0)} className="h-11 shrink-0 cursor-pointer rounded-xl bg-primary/10 px-4 text-xs font-bold text-primary">اعمال</button></div>
+              {redeem > 0 && !quote.loyalty.error && <p className="text-success">{toFa(quote.loyalty.applied)} امتیاز اعمال شد ({formatToman(quote.loyalty.discount)} تخفیف){quote.loyalty.applied < redeem ? ` — سقف مجاز ${toFa(quote.loyalty.maxPercent)}٪ مبلغ کالا` : ""}. <button type="button" onClick={() => { setRedeem(0); setPointsInput(""); }} className="cursor-pointer underline">حذف</button></p>}
+              {quote.loyalty.error && <p className="text-hot">{quote.loyalty.error}</p>}
+            </div>
+          )}
           <dl className="mt-4 space-y-2 text-sm">
             <div className="flex justify-between"><dt className="text-muted">جمع جزء</dt><dd className="font-bold">{formatToman(quote?.subtotal ?? 0)}</dd></div>
             <div className="flex justify-between"><dt className="text-muted">تخفیف</dt><dd className="font-bold text-success">{quote?.discount ? `−${formatToman(quote.discount)}` : "—"}</dd></div>
             <div className="flex justify-between"><dt className="text-muted">هزینه ارسال</dt><dd className="font-bold">{quote ? (quote.shipping ? formatToman(quote.shipping) : "رایگان") : "—"}</dd></div>
             <div className="flex justify-between border-t border-border pt-3 text-base"><dt className="font-black">مجموع</dt><dd className="font-black text-primary">{formatToman(quote?.total ?? 0)}</dd></div>
+            {quote && quote.wallet.applied > 0 && <div className="flex justify-between"><dt className="text-muted">از کیف پول</dt><dd className="font-bold">−{formatToman(quote.wallet.applied)}</dd></div>}
+            {quote && quote.wallet.applied > 0 && <div className="flex justify-between"><dt className="text-muted">قابل پرداخت با کارت</dt><dd className="font-bold">{formatToman(quote.payable)}</dd></div>}
           </dl>
           {quote?.issues.map((i) => <p key={i} className="mt-2 text-[11px] font-bold text-hot">{i}</p>)}
         </div>

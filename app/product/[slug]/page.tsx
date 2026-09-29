@@ -1,3 +1,4 @@
+import { BannerSlot } from "@/components/banner-slot";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -67,6 +68,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               <span>‹ {row.name}</span>
             </nav>
             <section className="rounded-xl border border-border bg-surface p-4 shadow-sm sm:p-6">
+              <BannerSlot placement="product_top" />
               <h1 className="text-lg font-black leading-9 sm:text-xl">{title}</h1>
               <p className="mt-1 text-xs text-muted">(دیدگاه کاربر {toFa(row.reviews.length)}) · <span className="inline-flex items-center gap-1"><Star className="size-3 fill-warning text-warning" />{toFa(row.ratingAvg)}</span> · SKU: <span dir="ltr">{row.sku}</span></p>
               <div className="mt-5 grid gap-6 md:grid-cols-2">
@@ -114,7 +116,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                   {row.questions.length ? row.questions.map((q) => <div key={q.id}><h3 className="font-black">{q.question}</h3><p className="text-muted">{q.answer}</p></div>) : <p className="text-muted">هنوز سوالی برای این محصول ثبت نشده است.</p>}
                 </div>
                 <div className="panel panel-rev space-y-4">
-                  {row.reviews.length ? row.reviews.map((r) => <div key={r.id} className="rounded-md bg-surface-2 p-4"><div className="flex items-center justify-between"><b>{r.user.displayName ?? r.user.firstName ?? "کاربر"}</b><span className="text-warning">{"★".repeat(r.rating)}</span></div><p className="mt-1 text-muted">{r.body}</p></div>) : <p className="text-muted">هنوز نظری ثبت نشده است.</p>}
+                  {row.reviews.length ? row.reviews.map((r) => <div key={r.id} className="rounded-md bg-surface-2 p-4"><div className="flex items-center justify-between"><b>{r.user.displayName ?? r.user.firstName ?? "کاربر"}</b><span className="text-warning">{"★".repeat(r.rating)}</span></div><p className="mt-1 text-muted">{r.body}</p>{r.adminReply && <p className="mt-2 rounded-md bg-primary/10 p-2 text-xs"><b className="text-primary">پاسخ فروشگاه: </b>{r.adminReply}</p>}</div>) : <p className="text-muted">هنوز نظری ثبت نشده است.</p>}
                 </div>
               </div>
             </div>

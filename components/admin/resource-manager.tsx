@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 export interface Opt { value: string; label: string }
 export interface FieldDef {
-  key: string; label: string; type: "text" | "textarea" | "number" | "select" | "bool" | "date" | "image" | "products";
+  key: string; label: string; type: "text" | "textarea" | "number" | "select" | "bool" | "date" | "image" | "products" | "tags" | "combo";
   options?: Opt[]; hint?: string; required?: boolean; nullable?: boolean; ltr?: boolean; lockOnEdit?: boolean; full?: boolean; placeholder?: string;
 }
 export interface ColDef { key: string; label: string; kind?: "text" | "bool" | "money" | "num" | "date" | "image" | "code"; map?: Record<string, string> }
@@ -58,6 +58,7 @@ function FormModal({ p, row, onClose, onSaved }: { p: ManagerProps; row: Record<
     for (const f of p.fields) {
       const cur = row ? get(row, f.key) : get(init, f.key);
       let val: unknown = cur ?? (f.type === "bool" ? true : f.type === "products" ? [] : "");
+      if (f.type === "tags") val = Array.isArray(cur) ? (cur as string[]).join("، ") : "";
       if (f.type === "date") val = toLocalInput(cur);
       Object.assign(init, setDeep(init, f.key, val));
     }
@@ -76,6 +77,7 @@ function FormModal({ p, row, onClose, onSaved }: { p: ManagerProps; row: Record<
       let val = get(v, f.key);
       if (f.type === "number") val = val === "" || val == null ? (f.nullable ? null : undefined) : Number(val);
       if (f.type === "date") val = val ? new Date(String(val)).toISOString() : null;
+      if (f.type === "tags") val = String(val ?? "").split(/[,،]/).map((x) => x.trim()).filter(Boolean);
       if (f.type === "select" && (val === "" || val == null) && f.nullable) val = null;
       if (f.type === "products") { const ids = val as string[]; body = setDeep(body, f.key, ids.length ? ids : undefined); continue; }
       if (val !== undefined) body = setDeep(body, f.key, val);
@@ -99,6 +101,7 @@ function FormModal({ p, row, onClose, onSaved }: { p: ManagerProps; row: Record<
                 : f.type === "select" ? <select className={inputCls} value={String(val ?? "")} disabled={dis} onChange={(e) => set(f.key, e.target.value)}>{f.nullable && <option value="">— بدون —</option>}{f.options?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
                 : f.type === "bool" ? <span className="flex h-10 items-center gap-2"><input type="checkbox" className="size-4 accent-[var(--primary)]" checked={!!val} onChange={(e) => set(f.key, e.target.checked)} /><span className="text-sm">{val ? "فعال" : "غیرفعال"}</span></span>
                 : f.type === "image" ? <ImageInput value={(val as string) || null} onChange={(u) => set(f.key, u ?? "")} label={f.label} />
+                : f.type === "combo" ? <><input className={inputCls} dir="ltr" list={`dl-${f.key}`} value={String(val ?? "")} onChange={(e) => set(f.key, e.target.value)} disabled={dis} /><datalist id={`dl-${f.key}`}>{f.options?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</datalist></>
                 : f.type === "products" ? <ProductPicker value={(val as string[]) ?? []} onChange={(ids) => set(f.key, ids)} />
                 : <input className={inputCls} type={f.type === "number" ? "number" : f.type === "date" ? "datetime-local" : "text"} dir={f.ltr || f.type === "number" ? "ltr" : undefined} value={String(val ?? "")} disabled={dis} placeholder={f.placeholder} required={f.required && f.type !== "number"} onChange={(e) => set(f.key, e.target.value)} />}
             </Label>
@@ -147,7 +150,7 @@ export function ResourceManager(p: ManagerProps) {
                   {p.canWrite !== false && (
                     <span className="inline-flex items-center gap-1">
                       {canReorder && <><button className="grid size-8 cursor-pointer place-items-center rounded-md hover:bg-surface-2 disabled:opacity-30" disabled={i === 0} onClick={() => move(i, -1)} aria-label="بالا"><ArrowUp className="size-4" /></button><button className="grid size-8 cursor-pointer place-items-center rounded-md hover:bg-surface-2 disabled:opacity-30" disabled={i === data.items.length - 1} onClick={() => move(i, 1)} aria-label="پایین"><ArrowDown className="size-4" /></button></>}
-                      {(p.toggleKey || "isActive" in row) && <button className={cn(btnGhost, "h-8 px-2 text-xs")} onClick={() => toggle(row)}>{row[p.toggleKey ?? "isActive"] ? "غیرفعال" : "فعال"}</button>}
+                      {((p.toggleKey ?? "isActive") in row) && <button className={cn(btnGhost, "h-8 px-2 text-xs")} onClick={() => toggle(row)}>{row[p.toggleKey ?? "isActive"] ? "غیرفعال" : "فعال"}</button>}
                       <button className="grid size-8 cursor-pointer place-items-center rounded-md hover:bg-primary/10 hover:text-primary" onClick={() => setEdit(row)} aria-label="ویرایش"><Pencil className="size-4" /></button>
                       <button className={cn(btnDanger, "size-8 p-0")} onClick={() => del(row)} aria-label="حذف"><Trash2 className="size-4" /></button>
                     </span>

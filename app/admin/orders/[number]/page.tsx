@@ -8,6 +8,8 @@ import { getOrder } from "@/lib/server/admin/orders";
 import { ORDER_STATUS_LABEL, ORDER_TRANSITIONS } from "@/lib/server/orders";
 import { requireAdminPage } from "@/lib/server/admin/page";
 
+const REFUND_STATUS_LABEL: Record<string, string> = { AWAITING_CUSTOMER: "در انتظار تأیید مشتری", PENDING_BANK: "در انتظار واریز بانکی", COMPLETED: "انجام شد", REJECTED: "رد توسط مشتری", CANCELLED: "لغو شد" };
+
 export default async function Page({ params }: { params: Promise<{ number: string }> }) {
   const { number } = await params;
   const u = await requireAdminPage("order.read", `/admin/orders/${number}`);
@@ -30,9 +32,10 @@ export default async function Page({ params }: { params: Promise<{ number: strin
               <tbody className="divide-y divide-border">{o.items.map((i) => <tr key={i.id}><td className="py-2">{i.name}{i.option && <span className="text-xs text-muted"> — {i.option}</span>}<div dir="ltr" className="text-start text-[11px] text-muted">{i.sku}{i.priceType === "wholesale" ? " · عمده" : ""}</div></td><td>{fmtToman(i.unitPrice)}</td><td>{fmtNum(i.quantity)}</td><td className="font-bold">{fmtToman(i.total)}</td></tr>)}</tbody></table></div>
             <dl className="mt-3 space-y-1 border-t border-border pt-3 text-sm">
               <div className="flex justify-between"><dt className="text-muted">جمع اقلام</dt><dd>{fmtToman(o.subtotal)}</dd></div>
-              <div className="flex justify-between"><dt className="text-muted">تخفیف{o.couponCode ? ` (${o.couponCode})` : ""}</dt><dd>{fmtToman(o.discountTotal)}</dd></div>
+              <div className="flex justify-between"><dt className="text-muted">تخفیف{o.couponCode ? ` (${o.couponCode})` : ""}{o.loyaltyPointsUsed > 0 ? ` · ${o.loyaltyPointsUsed} امتیاز` : ""}</dt><dd>{fmtToman(o.discountTotal)}</dd></div>
               <div className="flex justify-between"><dt className="text-muted">ارسال ({o.shippingMethod?.name ?? "—"})</dt><dd>{fmtToman(o.shippingCost)}</dd></div>
               <div className="flex justify-between text-base font-black"><dt>مبلغ نهایی</dt><dd>{fmtToman(o.total)}</dd></div>
+              {o.walletUsed > 0 && <div className="flex justify-between"><dt className="text-muted">پرداخت از کیف پول</dt><dd>{fmtToman(o.walletUsed)}</dd></div>}
             </dl>
           </Card>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -42,9 +45,15 @@ export default async function Page({ params }: { params: Promise<{ number: strin
           {payment && (
             <Card>
               <div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-black">پرداخت</h2>{o.paymentStatus === "REVIEW" && u.permissions.includes("payment.review") && <Link href="/admin/payments" className="text-xs font-bold text-primary">رفتن به بررسی پرداخت</Link>}</div>
-              <p className="text-sm">مبلغ: <b>{fmtToman(payment.amount)}</b> · روش: کارت‌به‌کارت · شماره پیگیری: <b dir="ltr">{payment.referenceNumber ?? "—"}</b></p>
+              <p className="text-sm">مبلغ: <b>{fmtToman(payment.amount)}</b> · روش: {payment.provider === "wallet" ? "کیف پول" : "کارت‌به‌کارت"} · شماره پیگیری: <b dir="ltr">{payment.referenceNumber ?? "—"}</b></p>
               {payment.rejectReason && <p className="mt-1 text-xs text-error">دلیل رد: {payment.rejectReason}</p>}
               {u.permissions.includes("payment.review") && payment.proofs.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{payment.proofs.map((p) => <a key={p.id} className="rounded-md border border-border px-3 py-1.5 text-xs font-bold hover:border-primary" target="_blank" rel="noreferrer" href={`/api/orders/${o.number}/payment/proof/${p.id}`}>{p.originalName}</a>)}</div>}
+            </Card>
+          )}
+          {o.refunds.length > 0 && (
+            <Card>
+              <div className="mb-2 flex items-center justify-between"><h2 className="text-sm font-black">بازگشت وجه</h2><Link href="/admin/refunds" className="text-xs font-bold text-primary">صف بازگشت وجه</Link></div>
+              <ul className="divide-y divide-border text-sm">{o.refunds.map((r) => <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2"><span><b>{fmtToman(r.amount)}</b> — {r.method === "wallet" ? "کیف پول" : "بانکی"}<span className="block text-xs text-muted">{r.reason}{r.bankReference ? ` · پیگیری ${r.bankReference}` : ""}</span></span><span className="text-xs font-bold">{REFUND_STATUS_LABEL[r.status]}</span></li>)}</ul>
             </Card>
           )}
           <Card>
@@ -52,7 +61,7 @@ export default async function Page({ params }: { params: Promise<{ number: strin
             <ol className="space-y-3 border-s-2 border-border ps-4">{o.history.map((h) => <li key={h.id} className="relative"><i className="absolute -start-[21px] top-1.5 size-2.5 rounded-full bg-primary" /><div className="text-sm font-bold">{ORDER_STATUS_LABEL[h.status]}</div><div className="text-xs text-muted">{h.description}{h.by ? ` — ${h.by}` : ""} · {fmtDate(h.createdAt)}</div></li>)}</ol>
           </Card>
         </div>
-        <OrderActions number={o.number} status={o.status} paymentStatus={o.paymentStatus} canWrite={u.permissions.includes("order.write")} allowed={allowed} methods={methods.map((m) => ({ value: m.id, label: m.name }))} shipping={{ methodId: o.shippingMethodId ?? "", company: o.shippingCompany ?? "", tracking: o.trackingNumber ?? "" }} />
+        <OrderActions number={o.number} status={o.status} paymentStatus={o.paymentStatus} canWrite={u.permissions.includes("order.write")} canRefund={u.permissions.includes("refund.manage")} money={o.money} allowed={allowed} methods={methods.map((m) => ({ value: m.id, label: m.name }))} shipping={{ methodId: o.shippingMethodId ?? "", company: o.shippingCompany ?? "", tracking: o.trackingNumber ?? "" }} />
       </div>
     </>
   );

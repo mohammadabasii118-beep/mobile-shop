@@ -95,29 +95,8 @@
     var i = $("#cl-search-input", search); i.value = q || ""; runSearch(q); setTimeout(function () { i.focus(); }, 30);
   }
 
-
-  /* ---------- support tickets (Phase 4: still stored in the browser) ---------- */
-  function initTickets() {
-    var troot = $("[data-tickets-root]");
-    if (troot) {
-      var tickets = J("caseline-tickets", []), tf = $("[data-ticket-form]", troot);
-      var drawTickets = function () {
-        $("[data-ticket-list]", troot).innerHTML = tickets.map(function (t) { return '<article class="ord"><header><div><h3>' + esc(t.subject) + '</h3><div class="ord-meta"><span>' + t.date + '</span><span>تیکت #' + esc(t.id) + '</span></div></div><span class="ord-st" data-tk="1">در انتظار پاسخ</span></header><p class="ord-title" style="font-weight:400;color:var(--muted)">' + esc(t.message) + '</p></article>'; }).join("");
-        $("[data-ticket-empty]", troot).hidden = tickets.length > 0;
-      };
-      $("[data-ticket-new]", troot).addEventListener("click", function () { tf.hidden = !tf.hidden; if (!tf.hidden) tf.subject.focus(); });
-      $("[data-ticket-cancel]", troot).addEventListener("click", function () { tf.hidden = true; });
-      tf.addEventListener("submit", function (e) {
-        e.preventDefault();
-        tickets.unshift({ id: Math.floor(1000 + Math.random() * 9000), subject: tf.subject.value.trim(), message: tf.message.value.trim(), date: today() });
-        W("caseline-tickets", tickets); tf.reset(); tf.hidden = true; drawTickets();
-      });
-      drawTickets();
-    }
-
-  }
   /* ---------- support chat widget ---------- */
-  var chat, chatMsgs = [];
+  var chat, chatMsgs = [], chatTicket = 0;
   var EMOJI = "\u{1F60A}";
   function ensureChat() {
     if (chat) return chat;
@@ -127,7 +106,7 @@
       '<div class="cl-chat-body" data-chat-body></div>' +
       '<form class="cl-chat-form" data-chat-form><button type="submit" class="cl-send" aria-label="ارسال" hidden>➤</button><input id="cl-chat-input" placeholder="پیامی بنویسید…" autocomplete="off"><button type="button" class="cl-ico" data-chat-emoji aria-label="ایموجی">☺</button><button type="button" class="cl-ico" data-chat-attach aria-label="پیوست">📎</button></form>';
     document.body.appendChild(chat);
-    chatMsgs = [{ from: "bot", text: "سلام! 👋 به پشتیبانی کیس‌لاین خوش آمدید. چطور می‌توانیم کمکتان کنیم؟" }];
+    chatMsgs = [{ from: "bot", text: "سلام! 👋 پیام شما به‌صورت تیکت پشتیبانی ثبت می‌شود و پاسخ را در حساب کاربری‌تان می‌بینید." }];
     var input = $("#cl-chat-input", chat), send = $(".cl-send", chat);
     input.addEventListener("input", function () { send.hidden = !input.value.trim(); });
     $("[data-chat-emoji]", chat).addEventListener("click", function () { input.value += EMOJI; send.hidden = false; input.focus(); });
@@ -135,9 +114,19 @@
       e.preventDefault();
       var v = input.value.trim(); if (!v) return;
       chatMsgs.push({ from: "me", text: v }); input.value = ""; send.hidden = true; renderChat();
-      setTimeout(function () {
-        chatMsgs.push({ from: "bot", text: "پیام شما دریافت شد. برای پاسخ سریع‌تر می‌توانید از تلگرام پشتیبانی هم استفاده کنید: @caseline_support" }); renderChat();
-      }, 900);
+      // Messages are real support tickets: the first message opens one, the next ones are added to it.
+      var fd = new FormData(); fd.append("message", v);
+      var url = "/api/support/tickets";
+      if (chatTicket) url += "/" + chatTicket + "/messages"; else { fd.append("subject", "گفتگو از سایت: " + v.slice(0, 60)); fd.append("category", "general"); }
+      fetch(url, { method: "POST", body: fd, credentials: "same-origin" }).then(function (r) { return r.json(); }).then(function (r) {
+        if (r.ok) {
+          if (!chatTicket && r.data && r.data.number) chatTicket = r.data.number;
+          chatMsgs.push({ from: "bot", text: "پیام شما ثبت شد (تیکت " + fa(chatTicket) + "). پاسخ پشتیبانی را در بخش «تیکت‌های پشتیبانی» حساب کاربری می‌بینید." });
+        } else if (r.error && r.error.code === "unauthorized") {
+          chatMsgs.push({ from: "bot", text: "برای ارسال پیام به پشتیبانی ابتدا وارد حساب کاربری شوید: /account?next=/account/tickets" });
+        } else chatMsgs.push({ from: "bot", text: (r.error && r.error.message) || "ارسال پیام انجام نشد." });
+        renderChat();
+      }).catch(function () { chatMsgs.push({ from: "bot", text: "ارتباط با سرور برقرار نشد." }); renderChat(); });
     });
     return chat;
   }
@@ -170,5 +159,5 @@
     if (f.matches && f.matches("[data-search-form]")) { e.preventDefault(); openSearch($("input", f).value); }
   });
   window.addEventListener("cl:cart-changed", loadCart);
-  loadCart(); initTickets();
+  loadCart();
 })();

@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import type { Prisma, WholesaleStatus } from "@/lib/generated/prisma/client";
 import { badRequest, conflict, notFound } from "@/lib/server/errors";
 import { audit, pageParams, type AdminCtx } from "@/lib/server/admin/core";
+import { notify } from "@/lib/server/notify";
 
 const STATUSES = ["PENDING", "APPROVED", "REJECTED", "CHANGES_REQUESTED"] as const;
 
@@ -14,7 +15,7 @@ export async function listApplications(req: NextRequest) {
   if (st && (STATUSES as readonly string[]).includes(st)) where.status = st as WholesaleStatus;
   if (q) where.OR = [{ name: { contains: q, mode: "insensitive" } }, { phone: { contains: q } }, { storeName: { contains: q, mode: "insensitive" } }];
   const [items, total, counts] = await Promise.all([
-    db.wholesaleApplication.findMany({ where, orderBy: { createdAt: "desc" }, take, skip }),
+    db.wholesaleApplication.findMany({ where, orderBy: { createdAt: "desc" }, take, skip, include: { files: { select: { id: true, originalName: true, mime: true, size: true } } } }),
     db.wholesaleApplication.count({ where }),
     db.wholesaleApplication.groupBy({ by: ["status"], _count: true }),
   ]);
@@ -22,11 +23,11 @@ export async function listApplications(req: NextRequest) {
 }
 
 export async function getApplication(id: string) {
-  const app = await db.wholesaleApplication.findUnique({ where: { id }, include: { user: { select: { id: true, phone: true, displayName: true, wholesaleProfile: { select: { tierId: true } } } } } });
+  const app = await db.wholesaleApplication.findUnique({ where: { id }, include: { user: { select: { id: true, phone: true, displayName: true, wholesaleProfile: { select: { tierId: true } } } }, files: { select: { id: true, originalName: true, mime: true, size: true } } } });
   if (!app) throw notFound("درخواست پیدا نشد.");
-  // Document keys point at private storage; only the count is exposed here.
   const { documents, ...rest } = app;
-  return { ...rest, documentCount: Array.isArray(documents) ? documents.length : 0 };
+  void documents;
+  return rest;
 }
 
 const approveSchema = z.object({ tierId: z.string().min(1).max(40), note: z.string().trim().max(400).optional() });
@@ -56,19 +57,19 @@ export async function approveApplication(id: string, body: unknown, a: AdminCtx)
     await tx.wholesaleProfile.upsert({ where: { userId: user.id }, update: { tierId, storeName: app.storeName }, create: { userId: user.id, tierId, storeName: app.storeName } });
     await tx.userRole.upsert({ where: { userId_roleId: { userId: user.id, roleId: role.id } }, update: {}, create: { userId: user.id, roleId: role.id } });
     await tx.wholesaleApplication.update({ where: { id: app.id }, data: { userId: user.id } });
-    await tx.notification.create({ data: { userId: user.id, type: "wholesale_approved", title: "درخواست همکاری شما تأیید شد", body: `سطح ${tier.name} برای شما فعال شد.`, link: "/shop" } });
+    await notify(tx, user.id, "wholesale_approved", { title: "درخواست همکاری شما تأیید شد", body: `سطح ${tier.name} برای شما فعال شد.`, link: "/account/wholesale" });
   });
 }
 export async function rejectApplication(id: string, body: unknown, a: AdminCtx) {
   const { note } = noteSchema.parse(body);
   return decide(id, "REJECTED", note, a, async (tx, app) => {
-    if (app.userId) await tx.notification.create({ data: { userId: app.userId, type: "wholesale_rejected", title: "درخواست همکاری رد شد", body: note } });
+    if (app.userId) await notify(tx, app.userId, "wholesale_rejected", { title: "درخواست همکاری رد شد", body: note, link: "/account/wholesale" });
   });
 }
 export async function requestChanges(id: string, body: unknown, a: AdminCtx) {
   const { note } = noteSchema.parse(body);
   return decide(id, "CHANGES_REQUESTED", note, a, async (tx, app) => {
-    if (app.userId) await tx.notification.create({ data: { userId: app.userId, type: "wholesale_changes", title: "درخواست همکاری نیاز به اصلاح دارد", body: note } });
+    if (app.userId) await notify(tx, app.userId, "wholesale_changes", { title: "درخواست همکاری نیاز به اصلاح دارد", body: note, link: "/account/wholesale" });
   });
 }
 

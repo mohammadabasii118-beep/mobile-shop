@@ -18,5 +18,6 @@ export interface PaymentProvider {
   description: string;
   /** Disabled providers are registered but never offered at checkout. */
   enabled(): boolean;
-  instructions(order: Pick<Order, "number" | "total">): Promise<PaymentInstructions>;
+  /** `amount` is what is still to be paid by this method (the order total minus any wallet payment). */
+  instructions(order: Pick<Order, "number" | "total">, amount?: number): Promise<PaymentInstructions>;
 }

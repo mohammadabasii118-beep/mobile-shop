@@ -55,6 +55,7 @@ export async function getUserOrder(userId: string, number: number) {
       history: { orderBy: { createdAt: "asc" } },
       payments: { orderBy: { createdAt: "desc" }, include: { proofs: { orderBy: { createdAt: "asc" }, select: { id: true, originalName: true, mime: true, size: true, createdAt: true } } } },
       shippingMethod: { select: { name: true } },
+      refunds: { orderBy: { createdAt: "desc" }, select: { id: true, method: true, amount: true, status: true, reason: true, bankReference: true, completedAt: true, createdAt: true } },
     },
   });
 }

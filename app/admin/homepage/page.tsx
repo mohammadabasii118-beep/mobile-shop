@@ -19,6 +19,7 @@ export default async function Page() {
           { key: "link", label: "لینک «مشاهده همه»", type: "text", ltr: true }, { key: "isActive", label: "وضعیت", type: "bool" },
           { key: "config.categorySlug", label: "دسته‌بندی (برای ردیف محصولات)", type: "select", nullable: true, options: cats.map((c) => ({ value: c.slug, label: c.name })) },
           { key: "config.limit", label: "تعداد محصول", type: "number", nullable: true },
+          { key: "config.placement", label: "محل بنر (برای بخش نوع «بنر»)", type: "text", ltr: true, hint: "کلید محل بنرها، مثلاً promo_summer؛ خالی = بنر تلگرام" },
           { key: "config.productIds", label: "محصولات دستی", type: "products" },
         ]} />
     </>

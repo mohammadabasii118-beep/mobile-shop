@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Card, ErrorBox, ImageInput, Label, Spinner, act, btnPrimary, inputCls, useApi } from "@/components/admin/kit";
 import { cn } from "@/lib/utils";
 
-type F = { key: string; label: string; type?: "text" | "textarea" | "number" | "image" | "bool"; ltr?: boolean; hint?: string };
+type F = { key: string; label: string; type?: "text" | "textarea" | "number" | "image" | "bool" | "select"; ltr?: boolean; hint?: string; options?: [string, string][] };
 const SECTIONS: { key: string; title: string; desc?: string; fields: F[] }[] = [
   { key: "site", title: "اطلاعات سایت", fields: [
     { key: "name", label: "نام سایت" }, { key: "tagline", label: "شعار" }, { key: "logo", label: "لوگو", type: "image" }, { key: "favicon", label: "فاویکون", type: "image" },
@@ -15,6 +15,16 @@ const SECTIONS: { key: string; title: string; desc?: string; fields: F[] }[] = [
     { key: "bankName", label: "نام بانک" }, { key: "accountHolder", label: "به نام" }, { key: "cardNumber", label: "شماره کارت", ltr: true }, { key: "accountNumber", label: "شماره حساب", ltr: true }, { key: "iban", label: "شماره شبا", ltr: true }, { key: "description", label: "توضیح برای مشتری", type: "textarea" },
   ] },
   { key: "shipping", title: "تنظیمات ارسال", desc: "روش‌ها و هزینه‌ها در بخش «روش‌های ارسال» مدیریت می‌شود.", fields: [{ key: "freeThreshold", label: "آستانه پیش‌فرض ارسال رایگان (تومان)", type: "number", ltr: true }] },
+  { key: "loyalty", title: "قوانین باشگاه مشتریان (امتیاز وفاداری)", desc: "امتیاز مستقل از کیف پول است. تغییر قوانین فقط روی سفارش‌های بعدی اثر دارد.", fields: [
+    { key: "enabled", label: "باشگاه فعال باشد", type: "bool" },
+    { key: "amountPerPoint", label: "هر چند تومان خرید کالا = ۱ امتیاز", type: "number", ltr: true },
+    { key: "earnOn", label: "زمان اختصاص امتیاز", type: "select", options: [["payment", "پس از تأیید پرداخت"], ["delivery", "پس از تحویل سفارش"]] },
+    { key: "minOrderTotal", label: "حداقل مبلغ کالا برای کسب امتیاز (تومان)", type: "number", ltr: true },
+    { key: "redeemEnabled", label: "تبدیل امتیاز به تخفیف فعال باشد", type: "bool" },
+    { key: "pointValue", label: "ارزش هر امتیاز (تومان تخفیف)", type: "number", ltr: true },
+    { key: "minRedeemPoints", label: "حداقل امتیاز برای استفاده", type: "number", ltr: true },
+    { key: "maxRedeemPercent", label: "حداکثر درصدی از مبلغ کالا که با امتیاز قابل پرداخت است", type: "number", ltr: true },
+  ] },
   { key: "general", title: "تنظیمات عمومی", fields: [{ key: "currency", label: "واحد پول" }, { key: "lowStockNotify", label: "هشدار کم‌موجودی", type: "bool" }] },
 ];
 
@@ -31,6 +41,7 @@ function Section({ s, initial }: { s: (typeof SECTIONS)[number]; initial: Record
             <Label key={f.key} label={f.label} error={errs[f.key]} className={cn((f.type === "textarea" || f.type === "image") && "sm:col-span-2")}>
               {f.type === "textarea" ? <textarea className={cn(inputCls, "h-24 py-2")} value={String(v[f.key] ?? "")} onChange={(e) => set(f.key, e.target.value)} />
                 : f.type === "image" ? <ImageInput value={(v[f.key] as string) || null} onChange={(u) => set(f.key, u ?? "")} label={f.label} />
+                : f.type === "select" ? <select className={inputCls} value={String(v[f.key] ?? "")} onChange={(e) => set(f.key, e.target.value)}>{f.options?.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
                 : f.type === "bool" ? <span className="flex h-10 items-center gap-2"><input type="checkbox" className="size-4 accent-[var(--primary)]" checked={!!v[f.key]} onChange={(e) => set(f.key, e.target.checked)} />فعال</span>
                 : <input className={inputCls} dir={f.ltr ? "ltr" : undefined} type={f.type === "number" ? "number" : "text"} value={String(v[f.key] ?? "")} onChange={(e) => set(f.key, f.type === "number" ? Number(e.target.value) : e.target.value)} />}
             </Label>

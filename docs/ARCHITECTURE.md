@@ -147,3 +147,36 @@ lib/admin/nav.ts, format.ts, product-map.ts
 * Refund marks the order/payment and restocks; returning the money is manual until wallet refunds exist.
 * Changing an order's shipping method after checkout does not recompute its shipping cost (the quote stays as a snapshot).
 * Wholesale application *documents* are not uploadable/viewable yet (count only).
+
+
+## Phase 4 — business systems
+
+```
+lib/server/finance/
+  wallet.ts     walletApply(): the ONLY writer of wallet balances (advisory lock per reference → idempotent; one atomic
+                conditional UPDATE → never negative; stores direction, balanceBefore/After, reference, actor)
+  loyalty.ts    pointsApply() (separate ledger), rules (SiteSetting "loyalty"), earnForOrder(), reverseOrderPoints(), quoteRedeem()
+  lifecycle.ts  restockOrder() (claimed once via Order.restockedAt), rollbackCoupon(), releaseUnpaidOrder()
+  refunds.ts    Refund workflow (wallet = customer confirms, bank = approver + bank reference), refundSummary()
+lib/server/notify/        notify() → in-app row + queued NotificationDelivery per enabled channel; channels.ts (sms/email/telegram)
+lib/server/support.ts     tickets, private attachments, internal notes, assignment
+lib/server/wholesale-portal.ts   applications' private documents, partner overview (tier, allowed prices, orders, savings)
+lib/server/admin/finance.ts      admin wallet / loyalty views and idempotent adjustments
+```
+
+**Money rules.** Order total = goods − coupon − loyalty discount + shipping. At checkout (one DB transaction) the server re-prices, takes stock, applies the coupon, redeems points (`redeem:<orderId>`), debits the wallet (`order-pay:<orderId>`) and, if the wallet covers everything, marks the order PAID/PROCESSING at once. Otherwise the card payment amount is `total − wallet`. Client-sent numbers are never trusted.
+
+**Loyalty** is fully independent from the wallet. Earning (`earn:<orderId>`, once) happens on payment approval or on delivery, per the admin rule; cancel/full refund reverses earned points and restores spent ones (both idempotent via unique references).
+
+**Cancel vs refund.** Unpaid orders are cancelled (stock, coupon, points and wallet portion are all returned, each once). Paid orders are never "cancelled": staff request a refund. `REFUNDED` is set only when the completed refunds equal everything that was paid. Wallet refund → `AWAITING_CUSTOMER` → the customer confirms → wallet credit (`refund:<id>`). Bank refund → `PENDING_BANK` → a user with `refund.approve` confirms the transfer and must enter the bank tracking number. The wallet-paid part can only return to the wallet; the bank limit is the card-paid part. Concurrent double-clicks are safe (row claims with `updateMany … WHERE status = …`, unique references).
+
+**Audit.** Every financial operation writes an `AdminLog` (actor may be the customer for wallet payment, refund confirmation and points redemption) in the same transaction.
+
+**Notifications.** Events: order created/cancelled, payment approved/rejected, status change, tracking code, support reply, wholesale decision, wallet/loyalty change, refund requested/completed, review reply. Shown at `/account/notifications` (read/unread). External channels are OFF unless listed in `NOTIFY_CHANNELS`; an enabled channel without credentials is recorded as `skipped`.
+
+**Support.** Customer: `/account/tickets` (+ order link, category, up to 3 private attachments). Staff: `/admin/support` (filters, priority, assignment, status, internal notes). Attachments are stored privately and streamed only to the ticket owner (never internal notes) or staff with support access.
+
+**Content.** Blog: categories, scheduled publishing, featured image, tags, SEO and a public `/blog/<slug>` page. Banners: any placement key; `BannerSlot` renders shop/product/blog slots and homepage "banner" sections bound to a placement. Reviews: verified buyers (delivered orders) submit, staff moderate and reply publicly.
+
+### Tests
+`npm run test:e2e` runs all three suites sequentially: **113 integration tests** (27 auth/checkout, 48 admin, 38 business systems).

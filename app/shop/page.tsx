@@ -6,7 +6,8 @@ import { Header } from "@/components/site-header";
 import { Footer } from "@/components/footer";
 import { Container } from "@/components/ui";
 import { ProductCard } from "@/components/product-card";
-import { getBanner, getCategoryTree, getPhoneModels, getShopProducts } from "@/lib/queries";
+import { BannerSlot } from "@/components/banner-slot";
+import { getCategoryTree, getPhoneModels, getShopProducts } from "@/lib/queries";
 import { toFa } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "فروشگاه | CaseLine" };
@@ -15,7 +16,7 @@ const icons = { cases: Smartphone, airpods: Headphones, watch: Watch, electric: 
 const sorts: [string, string][] = [["default", "مرتب سازی پیش فرض"], ["popular", "مرتب سازی بر اساس محبوبیت"], ["rating", "مرتب سازی بر اساس میانگین رتبه"], ["newest", "مرتب سازی بر اساس جدیدترین"], ["asc", "مرتب سازی بر اساس هزینه: کم به زیاد"], ["desc", "مرتب سازی بر اساس هزینه: زیاد به کم"]];
 
 export default async function ShopPage() {
-  const [rows, tree, phones, banner] = await Promise.all([getShopProducts(), getCategoryTree(), getPhoneModels(), getBanner("shop_top")]);
+  const [rows, tree, phones] = await Promise.all([getShopProducts(), getCategoryTree(), getPhoneModels()]);
   const total = rows.length;
   const btn = "flex w-full shrink-0 cursor-pointer items-center gap-3 rounded-lg border border-transparent px-2 py-2 text-[13px] font-bold transition-colors hover:bg-primary/5 data-[active=true]:border-primary/30 data-[active=true]:bg-primary/10 data-[active=true]:text-primary";
   return (
@@ -23,13 +24,7 @@ export default async function ShopPage() {
       <Header />
       <main className="py-6">
         <Container>
-          {banner && (
-            <a href={banner.buttonLink ?? "#"} className="mb-4 block overflow-hidden rounded-xl border border-border bg-primary/10 p-4 text-center">
-              {banner.desktopImage && <img src={banner.desktopImage} alt={banner.title} className="mx-auto mb-2 max-h-40 w-full rounded-lg object-cover" />}
-              <b className="block text-sm">{banner.title}</b>
-              {banner.subtitle && <span className="text-xs text-muted">{banner.subtitle}</span>}
-            </a>
-          )}
+          <BannerSlot placement="shop_top" />
           <div data-shop className="grid items-start gap-4 lg:grid-cols-[230px_1fr]">
             <aside className="space-y-4 lg:sticky lg:top-20">
               <div className="rounded-xl border border-border bg-surface p-3 shadow-sm">

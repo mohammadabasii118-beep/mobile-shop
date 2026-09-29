@@ -17,14 +17,14 @@ const PERMISSIONS: [string, string][] = [
   ["customer.write", "مدیریت مشتریان"], ["wholesale.review", "بررسی درخواست عمده"], ["coupon.write", "مدیریت کوپن"], ["review.moderate", "مدیریت نظرات"],
   ["banner.write", "مدیریت بنر"], ["homepage.write", "مدیریت صفحه اصلی"], ["menu.write", "مدیریت منو"], ["blog.write", "مدیریت وبلاگ"],
   ["support.reply", "پاسخ به پشتیبانی"], ["wallet.adjust", "مدیریت کیف پول"], ["loyalty.adjust", "مدیریت امتیاز"], ["shipping.write", "مدیریت ارسال"],
-  ["wallet.read", "مشاهده کیف پول"], ["loyalty.read", "مشاهده امتیاز وفاداری"], ["support.read", "مشاهده پشتیبانی"],
+  ["refund.manage", "ثبت درخواست بازگشت وجه"], ["refund.approve", "تأیید و تکمیل بازگشت وجه بانکی"], ["wallet.read", "مشاهده کیف پول"], ["loyalty.read", "مشاهده امتیاز وفاداری"], ["support.read", "مشاهده پشتیبانی"],
   ["seo.write", "مدیریت سئو"], ["settings.write", "تنظیمات سایت"], ["audit.read", "مشاهده لاگ‌ها"], ["role.manage", "مدیریت نقش‌ها"],
 ];
 const ROLES: { key: string; name: string; staff: boolean; perms: string[] | "all" | "all-but-roles" }[] = [
   { key: "super_admin", name: "مدیر ارشد", staff: true, perms: "all" },
   { key: "admin", name: "مدیر", staff: true, perms: "all-but-roles" },
   { key: "product_manager", name: "مدیر محصول", staff: true, perms: ["dashboard.view", "product.read", "product.write", "product.delete", "category.write", "brand.write", "phone.write", "inventory.write"] },
-  { key: "order_manager", name: "مدیر سفارش", staff: true, perms: ["dashboard.view", "order.read", "order.write", "payment.review", "shipping.write", "customer.read"] },
+  { key: "order_manager", name: "مدیر سفارش", staff: true, perms: ["dashboard.view", "order.read", "order.write", "payment.review", "refund.manage", "shipping.write", "customer.read"] },
   { key: "content_manager", name: "مدیر محتوا", staff: true, perms: ["dashboard.view", "blog.write", "banner.write", "homepage.write", "menu.write", "seo.write"] },
   { key: "support", name: "پشتیبان", staff: true, perms: ["dashboard.view", "support.reply", "support.read", "customer.read", "review.moderate", "order.read"] },
   { key: "wholesale_manager", name: "مدیر همکاران عمده", staff: true, perms: ["dashboard.view", "wholesale.review", "customer.read", "order.read"] },
@@ -188,22 +188,15 @@ async function main() {
     payment: { bankName: "بانک نمونه", accountHolder: "فروشگاه کیس‌لاین", cardNumber: "6037-0000-0000-0000", accountNumber: "0000000000", iban: "IR000000000000000000000000", description: "لطفاً مبلغ را به کارت زیر واریز و رسید را بارگذاری کنید." },
     shipping: { freeThreshold: 2_000_000 },
     general: { currency: "تومان", lowStockNotify: true },
+    loyalty: { enabled: true, amountPerPoint: 10000, earnOn: "payment", minOrderTotal: 0, redeemEnabled: true, pointValue: 100, minRedeemPoints: 100, maxRedeemPercent: 30 },
   };
   for (const [key, value] of Object.entries(settings)) await db.siteSetting.upsert({ where: { key }, update: {}, create: { key, value: value as object } });
   await db.sEOSetting.upsert({ where: { scope: "global" }, update: {}, create: { scope: "global", title: "CaseLine | فروشگاه لوازم جانبی موبایل", description: "قاب، گلس، شارژر، کابل و هندزفری اورجینال با ضمانت سازگاری با مدل گوشی شما", robots: "index,follow" } });
 
-  /* demo wallet, loyalty, address */
+  /* accounts start empty: no placeholder money or points are stored as real data */
   const cust = users.customer;
-  const wallet = await db.wallet.upsert({ where: { userId: cust }, update: {}, create: { userId: cust } });
-  if ((await db.walletTransaction.count({ where: { walletId: wallet.id } })) === 0) {
-    await db.walletTransaction.create({ data: { walletId: wallet.id, type: "credit", amount: 500_000, balanceAfter: 500_000, description: "شارژ اولیه نمونه" } });
-    await db.wallet.update({ where: { id: wallet.id }, data: { balance: 500_000 } });
-  }
-  const loy = await db.loyaltyAccount.upsert({ where: { userId: cust }, update: {}, create: { userId: cust } });
-  if ((await db.loyaltyTransaction.count({ where: { accountId: loy.id } })) === 0) {
-    await db.loyaltyTransaction.create({ data: { accountId: loy.id, type: "earn", points: 250, pointsAfter: 250, description: "امتیاز خوشامدگویی" } });
-    await db.loyaltyAccount.update({ where: { id: loy.id }, data: { points: 250 } });
-  }
+  await db.wallet.upsert({ where: { userId: cust }, update: {}, create: { userId: cust } });
+  await db.loyaltyAccount.upsert({ where: { userId: cust }, update: {}, create: { userId: cust } });
   if ((await db.address.count({ where: { userId: cust } })) === 0) await db.address.create({ data: { userId: cust, title: "خانه", receiver: "مشتری نمونه", phone: "09120000002", province: "تهران", city: "تهران", postalCode: "1234567890", address: "خیابان ولیعصر، پلاک ۱", isDefault: true } });
 
   /* pending reviews for the moderation queue */

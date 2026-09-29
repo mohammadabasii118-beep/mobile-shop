@@ -1,4 +1,4 @@
-import { Award, BarChart3, BookOpen, Boxes, CreditCard, Crown, FileText, Home, Image as ImageIcon, LayoutGrid, ListTree, Megaphone, MessageSquare, Package, Percent, Receipt, ScrollText, Search, Settings, ShoppingCart, Smartphone, Star, Store, Tag, Truck, Users, Wallet, type LucideIcon } from "lucide-react";
+import { Award, Undo2, BarChart3, BookOpen, Boxes, CreditCard, Crown, FileText, Home, Image as ImageIcon, LayoutGrid, ListTree, Megaphone, MessageSquare, Package, Percent, Receipt, ScrollText, Search, Settings, ShoppingCart, Smartphone, Star, Store, Tag, Truck, Users, Wallet, type LucideIcon } from "lucide-react";
 
 export interface NavItem { href: string; label: string; icon: LucideIcon; perms: string[] }
 
@@ -6,6 +6,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin", label: "داشبورد", icon: BarChart3, perms: ["dashboard.view"] },
   { href: "/admin/orders", label: "سفارش‌ها", icon: ShoppingCart, perms: ["order.read"] },
   { href: "/admin/payments", label: "بررسی پرداخت‌ها", icon: CreditCard, perms: ["payment.review"] },
+  { href: "/admin/refunds", label: "بازگشت وجه", icon: Undo2, perms: ["refund.manage", "refund.approve"] },
   { href: "/admin/products", label: "محصولات", icon: Package, perms: ["product.read"] },
   { href: "/admin/categories", label: "دسته‌بندی‌ها", icon: ListTree, perms: ["category.write"] },
   { href: "/admin/brands", label: "برندها", icon: Tag, perms: ["brand.write"] },

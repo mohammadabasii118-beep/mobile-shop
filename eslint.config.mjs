@@ -6,6 +6,6 @@ export default defineConfig([
   ...nextVitals,
   ...nextTs,
   // Admin screens show admin-uploaded images at arbitrary sizes; next/image optimisation adds nothing there.
-  { files: ["components/admin/**", "app/shop/page.tsx"], rules: { "@next/next/no-img-element": "off" } },
+  { files: ["components/admin/**", "components/banner-slot.tsx", "app/shop/page.tsx", "app/blog/**"], rules: { "@next/next/no-img-element": "off" } },
   globalIgnores([".next/**", "out/**", "lib/generated/**", "public/**", "docs/**", "scripts/**", "prisma/migrations/**"]),
 ]);

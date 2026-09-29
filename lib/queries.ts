@@ -101,6 +101,13 @@ export async function getBanner(placement: string) {
   const now = new Date();
   return db.banner.findFirst({ where: { placement, isActive: true, OR: [{ startsAt: null }, { startsAt: { lte: now } }], AND: [{ OR: [{ endsAt: null }, { endsAt: { gte: now } }] }] }, orderBy: { sortOrder: "asc" } });
 }
+export async function getBanners(placement: string) {
+  const now = new Date();
+  return db.banner.findMany({ where: { placement, isActive: true, OR: [{ startsAt: null }, { startsAt: { lte: now } }], AND: [{ OR: [{ endsAt: null }, { endsAt: { gte: now } }] }] }, orderBy: { sortOrder: "asc" }, take: 6 });
+}
+export async function getBlogPost(slug: string) {
+  return db.blogPost.findFirst({ where: { slug, isPublished: true, publishedAt: { lte: new Date() } }, include: { category: true } });
+}
 export async function getBrandNames() {
   return (await db.brand.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" }, select: { name: true } })).map((b) => b.name);
 }

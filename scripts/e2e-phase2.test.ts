@@ -79,6 +79,7 @@ describe("Phase 2", () => {
   // Seeded demo accounts are logged into by several tests; clear their login counters so reruns are stable.
   before(async () => {
     await db.rateLimit.deleteMany({}); // tests use fixed fake IPs; counters from earlier runs must not leak in
+    await db.inventory.updateMany({ where: { quantity: { lt: 50 } }, data: { quantity: 50 } }); // other suites drain stock in the shared dev DB
     await db.address.deleteMany({ where: { user: { phone: { in: ["09120000002", "09120000003"] } } } }); // the address cap (10) would otherwise trip on reruns
   });
   after(async () => { await db.$disconnect(); });
