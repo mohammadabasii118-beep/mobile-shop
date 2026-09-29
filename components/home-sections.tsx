@@ -28,7 +28,7 @@ export function Hero() {
         </form>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs">
           <span className="text-muted">پیشنهادها:</span>
-          {quickChips.map((c) => <Link key={c} href="/shop" className="glass rounded-full px-3 py-1.5 font-medium hover:border-primary">{c}</Link>)}
+          {quickChips.map((c) => <Link key={c} href="/shop" className="glass cursor-pointer rounded-full px-3.5 py-1.5 font-medium transition-all duration-200 hover:border-primary hover:bg-surface hover:text-primary hover:shadow-[0_0_0_3px_color-mix(in_srgb,var(--primary)_16%,transparent)]">{c}</Link>)}
         </div>
       </Container>
     </section>
