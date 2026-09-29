@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
-import { ArrowDownUp, ChevronDown, Headphones, LayoutGrid, Loader2, Smartphone, ShieldCheck, Sparkles, Zap } from "lucide-react";
+import { ArrowDownUp, BatteryCharging, ChevronDown, Headphones, LayoutGrid, Loader2, Smartphone, ShieldCheck, Sparkles, Zap } from "lucide-react";
 import { BottomNav, Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Container } from "@/components/ui";
@@ -10,7 +10,7 @@ import { toFa } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "فروشگاه | CaseLine" };
 const base = process.env.PAGES === "1" ? "/mobile-shop" : "";
-const icons = { phone: Smartphone, shield: ShieldCheck, zap: Zap, headphones: Headphones, sparkles: Sparkles };
+const icons = { phone: Smartphone, shield: ShieldCheck, zap: Zap, headphones: Headphones, sparkles: Sparkles, battery: BatteryCharging };
 const sorts: [string, string][] = [["default", "مرتب سازی پیش فرض"], ["popular", "مرتب سازی بر اساس محبوبیت"], ["rating", "مرتب سازی بر اساس میانگین رتبه"], ["newest", "مرتب سازی بر اساس جدیدترین"], ["asc", "مرتب سازی بر اساس هزینه: کم به زیاد"], ["desc", "مرتب سازی بر اساس هزینه: زیاد به کم"]];
 
 export default function ShopPage() {

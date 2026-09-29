@@ -161,7 +161,8 @@ export const shopCats: { slug: string; label: string; icon: string; test: (p: Pr
   { slug: "xiaomi", label: "قاب شیائومی", icon: "phone", test: (p) => p.kind === "case" && p.brand === "Xiaomi" },
   { slug: "glass", label: "گلس و محافظ لنز", icon: "shield", test: (p) => p.kind === "glass" || p.kind === "lens" },
   { slug: "charger", label: "شارژر و کابل", icon: "zap", test: (p) => p.kind === "charger" || p.kind === "cable" },
-  { slug: "audio", label: "هندزفری و پاوربانک", icon: "headphones", test: (p) => p.kind === "earbuds" || p.kind === "powerbank" },
+  { slug: "earbuds", label: "هندزفری", icon: "headphones", test: (p) => p.kind === "earbuds" },
+  { slug: "powerbank", label: "پاوربانک", icon: "battery", test: (p) => p.kind === "powerbank" },
   { slug: "other", label: "سایر لوازم جانبی", icon: "sparkles", test: (p) => p.kind === "holder" || p.kind === "flash" },
 ];
 export const shopCatOf = (p: Product) => shopCats.find((c) => c.test(p))?.slug ?? "other";
