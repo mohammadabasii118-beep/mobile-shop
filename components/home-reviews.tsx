@@ -11,9 +11,10 @@ export function HomeReviews({ reviews }: { reviews: HomeReview[] }) {
     <section id="home-reviews" aria-label="نظرات مشتریان" className="py-4" data-testid="home-reviews">
       <Container>
         <SectionHeader title="نظرات مشتریان" sub="تجربه‌های واقعی خریداران CaseLine" />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {/* Mobile: one swipeable rail (like the other home sections); from sm: two columns, from lg: three. */}
+        <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 lg:grid-cols-3" data-review-rail>
           {reviews.map((r) => (
-            <article key={r.id} className="flex flex-col gap-2 rounded-xl border border-border bg-surface-2 p-4" data-testid="home-review">
+            <article key={r.id} className="flex w-[80%] shrink-0 snap-start flex-col gap-2 rounded-xl border border-border bg-surface-2 p-4 sm:w-auto sm:shrink" data-testid="home-review">
               <div className="flex items-center justify-between gap-2"><b className="truncate text-sm">{r.name}</b><Stars value={r.rating} /></div>
               {r.verified && <div><VerifiedBadge /></div>}
               <p className="line-clamp-4 whitespace-pre-line text-[13px] leading-7 text-muted">{r.body}</p>

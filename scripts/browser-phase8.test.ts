@@ -158,6 +158,10 @@ describe("Phase 8 — browser flows", () => {
     const info = await rail.evaluate((el: HTMLElement) => ({ scrollable: el.scrollWidth > el.clientWidth, cards: el.children.length, noPageOverflow: document.documentElement.scrollWidth <= window.innerWidth + 1, rowY: [...el.children].map((c) => Math.round(c.getBoundingClientRect().top)) }));
     assert.ok(info.cards >= 2 && info.scrollable && info.noPageOverflow, JSON.stringify(info));
     assert.equal(new Set(info.rowY).size, 1, "all cards on one row (a rail, not stacked)");
-    await shot(mp, "11-blog-rail-mobile"); await m.close();
+    await shot(mp, "11-blog-rail-mobile");
+    const rv = mp.locator("[data-review-rail]"); await rv.scrollIntoViewIfNeeded();
+    const ri = await rv.evaluate((el: HTMLElement) => ({ cards: el.children.length, scrollable: el.scrollWidth > el.clientWidth, noPageOverflow: document.documentElement.scrollWidth <= window.innerWidth + 1, rowY: [...el.children].map((c) => Math.round(c.getBoundingClientRect().top)) }));
+    assert.ok(ri.cards >= 2 && ri.scrollable && ri.noPageOverflow, JSON.stringify(ri)); assert.equal(new Set(ri.rowY).size, 1, "reviews are one swipeable row on mobile");
+    await shot(mp, "12-reviews-rail-mobile"); await m.close();
   });
 });
