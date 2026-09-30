@@ -37,7 +37,7 @@ export function WholesaleForm({ initial, applicationId, docs, editing }: { initi
       <div className="grid gap-3 sm:grid-cols-2">
         {F("name", "نام و نام خانوادگی", { required: true })}{F("storeName", "نام فروشگاه / برند", { required: true })}
         <label className="block space-y-1.5 text-xs font-medium"><span>نوع کسب‌وکار</span><select value={v.businessType} onChange={(e) => set("businessType", e.target.value)} className={`${field} h-11`}>{TYPES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
-        {F("phone", "شماره موبایل (برای تماس)", { dir: "ltr", inputMode: "numeric" })}{F("province", "استان", { required: true })}{F("city", "شهر", { required: true })}{F("instagram", "اینستاگرام (اختیاری)", { dir: "ltr" })}{F("website", "وب‌سایت (اختیاری)", { dir: "ltr" })}
+        {F("phone", "شماره موبایل (برای تماس)", { dir: "ltr", inputMode: "numeric", required: !initial.phone })}{F("province", "استان", { required: true })}{F("city", "شهر", { required: true })}{F("instagram", "اینستاگرام (اختیاری)", { dir: "ltr" })}{F("website", "وب‌سایت (اختیاری)", { dir: "ltr" })}
       </div>
       <label className="block space-y-1.5 text-xs font-medium"><span>آدرس فروشگاه (برای فروشگاه فیزیکی)</span><input required={v.businessType === "physical_store"} value={v.address} onChange={(e) => set("address", e.target.value)} className={`${field} h-11`} /></label>
       <label className="block space-y-1.5 text-xs font-medium"><span>توضیحات (حجم فروش، نوع محصولات…)</span><textarea rows={3} value={v.description} onChange={(e) => set("description", e.target.value)} className={`${field} py-3 leading-7`} /></label>

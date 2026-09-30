@@ -10,7 +10,7 @@ import { faDate, orderNo } from "@/lib/account-format";
 import { formatToman, toFa } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "همکاری عمده | CaseLine", robots: { index: false } };
+export const metadata: Metadata = { title: "همکاری با CaseLine | CaseLine", robots: { index: false } };
 const STATUS: Record<string, [string, string]> = { PENDING: ["در حال بررسی", "bg-warning/15 text-warning"], CHANGES_REQUESTED: ["نیازمند اصلاح", "bg-primary/15 text-primary"], APPROVED: ["تأیید شده", "bg-success/15 text-success"], REJECTED: ["رد شده", "bg-hot/10 text-hot"] };
 
 export default async function WholesalePage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
@@ -59,7 +59,7 @@ export default async function WholesalePage({ searchParams }: { searchParams: Pr
   return (
     <AccountShell active="wholesale">
       <div className="space-y-4">
-        <div><h2 className="text-base font-black">همکاری عمده</h2><p className="mt-1 text-xs leading-6 text-muted">فروشندگان می‌توانند با ثبت درخواست و ارسال مدارک، پس از تأیید از قیمت‌های عمده و سطوح همکاری استفاده کنند. قیمت‌ها همیشه سمت سرور و بر اساس سطح تأییدشده شما محاسبه می‌شود.</p></div>
+        <div><h2 className="text-base font-black">درخواست همکاری</h2><p className="mt-1 text-xs leading-6 text-muted">فروشندگان می‌توانند با ثبت درخواست و ارسال مدارک، پس از تأیید از قیمت‌های عمده و سطوح همکاری استفاده کنند. قیمت‌ها همیشه سمت سرور و بر اساس سطح تأییدشده شما محاسبه می‌شود.</p></div>
         {app && st && (
           <section className="rounded-2xl border border-border p-4 text-[13px]">
             <div className="flex items-center justify-between"><b>{app.storeName}</b><span className={`rounded-full px-3 py-1 text-[11px] font-bold ${st[1]}`}>{st[0]}</span></div>
