@@ -65,7 +65,9 @@ export function MobileMenu({ menu, links = [], loggedIn, logo, name, className }
   const close = () => setOpen(false);
   const row = "flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-medium transition-colors hover:bg-primary/10 hover:text-primary";
   const chip = "grid size-10 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary";
-  const extra = links.length ? links : [{ label: "فروشگاه", link: "/shop" }, { label: "وبلاگ", link: "/blog" }, { label: "پشتیبانی", link: "/support" }];
+  // Always: shop, blog, support (independent of what the admin put in the header menu); other admin menu links are appended.
+  const fixed = [{ label: "فروشگاه", link: "/shop" }, { label: "وبلاگ", link: "/blog" }, { label: "پشتیبانی", link: "/support" }];
+  const extra = [...fixed, ...links.filter((l) => l.link && l.link !== "/" && !fixed.some((f) => f.link === l.link || l.link.startsWith(f.link + "?") || l.link.startsWith(f.link + "/")))];
   const extraIcon = (l: string) => (l.startsWith("/blog") ? PenLine : l.startsWith("/support") ? Headphones : l.startsWith("/shop") ? Store : Sparkles);
   return (
     <div className={className}>

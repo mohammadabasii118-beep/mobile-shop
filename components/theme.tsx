@@ -75,7 +75,7 @@ export function NightButton({ className, iconOnly, tab, withSwitch }: { classNam
   };
   return (
     <button type="button" data-night aria-label="حالت شب" aria-pressed={dark} onClick={toggle} className={cn(tab && "night-tab", className)}>
-      {tab ? <Moon className="size-5" /> : <><Moon className="size-5 dark:hidden" /><Sun className="hidden size-5 dark:block" /></>}
+      {tab ? <Moon className="size-5" /> : withSwitch ? <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary"><Moon className="size-5" /></span> : <><Moon className="size-5 dark:hidden" /><Sun className="hidden size-5 dark:block" /></>}
       {!iconOnly && <span className={withSwitch ? "flex-1 text-start" : undefined}>حالت شب</span>}
       {withSwitch && <span aria-hidden className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors", dark ? "bg-primary" : "bg-border")}><span className={cn("absolute top-0.5 size-5 rounded-full bg-white shadow transition-all", dark ? "start-[22px]" : "start-0.5")} /></span>}
     </button>
