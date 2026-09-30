@@ -42,3 +42,9 @@ Public sign-up is full name + e-mail + password (`POST /api/auth/register`) and 
 
 ## Password reset by e-mail
 `POST /api/auth/forgot {email}` always answers `{sent:true}` (no enumeration; per-IP 10/h and per-address 3/h, checked before the address is looked up). For a registered active account a 256-bit random token is stored **only as SHA-256**, valid 60 minutes, single use, and only the newest link works; the link is built from `APP_URL`. `POST /api/auth/reset {token,password}` claims the token atomically, sets the password (same bcrypt/policy) and signs every device out. Mail goes through `EMAIL_SMTP_URL`; without it nothing is sent and a warning is logged.
+
+## Phase 13 — live chat and tickets are two systems
+`ChatConversation/ChatMessage/ChatAttachment` (live chat) and `SupportTicket/SupportMessage/SupportAttachment` (tickets) share no rows; a ticket may only REFERENCE a chat (`SupportTicket.sourceChatId`, set when staff choose «ایجاد تیکت از این گفتگو»; the chat is not changed).
+Customers reach only their own chats/tickets (404 otherwise); staff need `chat.read`/`chat.reply` (chat) or `support.read`/`support.reply` (tickets); the migration gives `chat.*` to every role that already had the matching `support.*`.
+Chat attachments use the same strict image/PDF validation and private storage as ticket files. Real time = cursor-based polling (3 s while the page is visible); "support online" = a staff heartbeat in the last 2 minutes. Chat notifications use event `chat_message` (one unread at a time per conversation), tickets keep `support_reply`.
+Ticket statuses: open, in_progress, waiting_for_user, answered, closed. Chat statuses: waiting, active, closed.

@@ -9,10 +9,11 @@ import { validateReceipt } from "@/lib/server/upload";
 import { notify } from "@/lib/server/notify";
 import { audit, type AdminCtx } from "@/lib/server/admin/core";
 import type { SessionUser } from "@/lib/server/auth/session";
+import { CATEGORIES, TICKET_STATUSES } from "@/lib/support-meta";
 
 export interface UploadedFile { name: string; type: string; size: number; buffer: Buffer }
 export const MAX_FILES = 3;
-export const CATEGORIES = { general: "عمومی", order: "سفارش", payment: "پرداخت", product: "محصول", return: "مرجوعی / لغو", wholesale: "همکاری عمده" } as const;
+export { CATEGORIES, TICKET_STATUSES } from "@/lib/support-meta";
 export const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
 
 export const ticketSchema = z.object({
@@ -36,13 +37,13 @@ export async function readForm(req: Request) {
   return { fields, files };
 }
 
-async function storeFiles(ticketId: string, files: UploadedFile[]) {
+export async function storeFiles(scope: string, files: UploadedFile[]) {
   const stored: { storageKey: string; originalName: string; mime: string; size: number }[] = [];
   const storage = getStorage();
   try {
     for (const f of files) {
       const v = validateReceipt(f, f.buffer); // same strict rules as receipts: real image/PDF, ≤5 MB, matching extension
-      const storageKey = `support/${ticketId}/${randomUUID()}.${v.ext}`;
+      const storageKey = `${scope}/${randomUUID()}.${v.ext}`;
       await storage.put(storageKey, f.buffer);
       stored.push({ storageKey, originalName: v.originalName, mime: v.mime, size: v.size });
     }
@@ -52,7 +53,7 @@ async function storeFiles(ticketId: string, files: UploadedFile[]) {
   }
   return stored;
 }
-const cleanup = (keys: string[]) => Promise.all(keys.map((k) => getStorage().delete(k).catch(() => {})));
+export const cleanup = (keys: string[]) => Promise.all(keys.map((k) => getStorage().delete(k).catch(() => {})));
 
 const messageInclude = (internal: boolean) => ({
   messages: { where: internal ? {} : { isInternal: false }, orderBy: { createdAt: "asc" as const }, include: { files: { select: { id: true, originalName: true, mime: true, size: true } }, author: { select: { displayName: true, phone: true } } } },
@@ -72,7 +73,7 @@ export async function createTicket(user: SessionUser, fields: Record<string, str
     orderId = o.id;
   }
   const ticketId = randomUUID();
-  const stored = await storeFiles(ticketId, files);
+  const stored = await storeFiles(`support/${ticketId}`, files);
   try {
     return await db.$transaction(async (tx) => {
       const t = await tx.supportTicket.create({ data: { userId: user.id, subject: d.subject, category: d.category, orderId, messages: { create: { authorId: user.id, body: d.message } } }, include: { messages: true } });
@@ -86,7 +87,8 @@ export async function getMyTicket(user: SessionUser, number: number) {
   const t = await db.supportTicket.findFirst({ where: { number, userId: user.id }, include: messageInclude(false) });
   if (!t) throw notFound("تیکت پیدا نشد.");
   const order = t.orderId ? await db.order.findUnique({ where: { id: t.orderId }, select: { number: true } }) : null;
-  return { ...t, orderNumber: order?.number ?? null };
+  const chat = t.sourceChatId ? await db.chatConversation.findFirst({ where: { id: t.sourceChatId, userId: user.id }, select: { id: true, number: true } }) : null;
+  return { ...t, orderNumber: order?.number ?? null, sourceChat: chat };
 }
 
 export async function customerReply(user: SessionUser, number: number, fields: Record<string, string>, files: UploadedFile[]) {
@@ -95,12 +97,12 @@ export async function customerReply(user: SessionUser, number: number, fields: R
   const t = await db.supportTicket.findFirst({ where: { number, userId: user.id } });
   if (!t) throw notFound("تیکت پیدا نشد.");
   if (t.status === "closed" && Date.now() - (t.closedAt?.getTime() ?? 0) > 14 * 86400_000) throw conflict("این تیکت بسته شده است؛ تیکت جدید ثبت کنید.", "ticket_closed");
-  const stored = await storeFiles(t.id, files);
+  const stored = await storeFiles(`support/${t.id}`, files);
   try {
     await db.$transaction(async (tx) => {
       const m = await tx.supportMessage.create({ data: { ticketId: t.id, authorId: user.id, body: message } });
       if (stored.length) await tx.supportAttachment.createMany({ data: stored.map((s) => ({ ...s, messageId: m.id })) });
-      await tx.supportTicket.update({ where: { id: t.id }, data: { status: "open", closedAt: null } });
+      await tx.supportTicket.update({ where: { id: t.id }, data: { status: t.status === "in_progress" ? "in_progress" : "open", closedAt: null } });
     });
   } catch (e) { await cleanup(stored.map((s) => s.storageKey)); throw e; }
   return { ok: true };
@@ -125,12 +127,18 @@ export async function openAttachment(user: SessionUser, id: string) {
 }
 
 /* ───────── staff side ───────── */
-export async function adminListTickets(q: { status?: string | null; priority?: string | null; assignee?: string | null; search?: string; take: number; skip: number }) {
+export async function adminListTickets(q: { status?: string | null; priority?: string | null; assignee?: string | null; category?: string | null; order?: string | null; userId?: string | null; from?: string | null; to?: string | null; search?: string; take: number; skip: number }) {
   const where: Prisma.SupportTicketWhereInput = {};
-  if (q.status && ["open", "answered", "closed"].includes(q.status)) where.status = q.status;
+  if (q.status && (TICKET_STATUSES as readonly string[]).includes(q.status)) where.status = q.status;
+  if (q.category && q.category in CATEGORIES) where.category = q.category;
+  if (q.userId) where.userId = q.userId;
+  if (q.order && /^\d{1,9}$/.test(q.order)) { const o = await db.order.findUnique({ where: { number: Number(q.order) }, select: { id: true } }); where.orderId = o?.id ?? "none"; }
+  const day = (v: string | null | undefined, end: boolean) => { if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return undefined; const d = new Date(`${v}T${end ? "23:59:59.999" : "00:00:00"}Z`); return Number.isNaN(d.getTime()) ? undefined : d; };
+  const from = day(q.from, false), to = day(q.to, true);
+  if (from || to) where.createdAt = { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) };
   if (q.priority && (PRIORITIES as readonly string[]).includes(q.priority)) where.priority = q.priority;
   if (q.assignee === "none") where.assignedToId = null; else if (q.assignee) where.assignedToId = q.assignee;
-  if (q.search) { const n = Number(q.search); where.OR = [{ subject: { contains: q.search, mode: "insensitive" } }, ...(Number.isInteger(n) ? [{ number: n }] : []), { user: { phone: { contains: q.search } } }, { user: { displayName: { contains: q.search, mode: "insensitive" } } }]; }
+  if (q.search) { const n = Number(q.search); where.OR = [{ subject: { contains: q.search, mode: "insensitive" } }, ...(/^\d{1,9}$/.test(q.search) ? [{ number: n }] : []), { user: { phone: { contains: q.search } } }, { user: { displayName: { contains: q.search, mode: "insensitive" } } }]; }
   const [items, total, counts] = await Promise.all([
     db.supportTicket.findMany({ where, orderBy: [{ updatedAt: "desc" }], take: q.take, skip: q.skip, include: { user: { select: { displayName: true, phone: true } }, _count: { select: { messages: true } } } }),
     db.supportTicket.count({ where }),
@@ -142,7 +150,7 @@ export async function adminListTickets(q: { status?: string | null; priority?: s
 }
 
 export async function adminGetTicket(number: number) {
-  const t = await db.supportTicket.findUnique({ where: { number }, include: { ...messageInclude(true), user: { select: { id: true, displayName: true, phone: true } } } });
+  const t = await db.supportTicket.findUnique({ where: { number }, include: { ...messageInclude(true), user: { select: { id: true, displayName: true, phone: true } }, sourceChat: { select: { id: true, number: true } } } });
   if (!t) throw notFound("تیکت پیدا نشد.");
   const order = t.orderId ? await db.order.findUnique({ where: { id: t.orderId }, select: { number: true, status: true, total: true } }) : null;
   const staff = await db.user.findMany({ where: { isActive: true, roles: { some: { role: { isStaff: true, permissions: { some: { permission: { key: { in: ["support.reply", "support.read"] } } } } } } } }, select: { id: true, displayName: true, phone: true } });
@@ -154,13 +162,14 @@ export async function adminReply(number: number, fields: Record<string, string>,
   const internal = fields.internal === "true" || fields.internal === "1";
   const t = await db.supportTicket.findUnique({ where: { number } });
   if (!t) throw notFound("تیکت پیدا نشد.");
-  const stored = await storeFiles(t.id, files);
+  const stored = await storeFiles(`support/${t.id}`, files);
   try {
     await db.$transaction(async (tx) => {
       const m = await tx.supportMessage.create({ data: { ticketId: t.id, authorId: a.admin.id, isStaff: true, isInternal: internal, body: message } });
       if (stored.length) await tx.supportAttachment.createMany({ data: stored.map((s) => ({ ...s, messageId: m.id })) });
       if (!internal) {
-        await tx.supportTicket.update({ where: { id: t.id }, data: { status: "answered", closedAt: null, assignedToId: t.assignedToId ?? a.admin.id } });
+        const next = (TICKET_STATUSES as readonly string[]).includes(fields.status ?? "") && fields.status !== "open" ? (fields.status as string) : "answered";
+        await tx.supportTicket.update({ where: { id: t.id }, data: { status: next, closedAt: next === "closed" ? new Date() : null, assignedToId: t.assignedToId ?? a.admin.id } });
         await notify(tx, t.userId, "support_reply", { title: `پاسخ جدید به تیکت ${t.number.toLocaleString("fa-IR", { useGrouping: false })}`, body: message.slice(0, 140), link: `/account/tickets/${t.number}`, data: { ticketNumber: t.number } });
       }
       await audit(a, internal ? "support.note" : "support.reply", "support_ticket", t.id, undefined, { number: t.number, files: stored.length }, tx);
@@ -170,7 +179,7 @@ export async function adminReply(number: number, fields: Record<string, string>,
 }
 
 export const ticketUpdateSchema = z.object({
-  status: z.enum(["open", "answered", "closed"]).optional(),
+  status: z.enum(TICKET_STATUSES).optional(),
   priority: z.enum(PRIORITIES).optional(),
   assignedToId: z.string().max(40).nullable().optional(),
 });

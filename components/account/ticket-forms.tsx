@@ -3,9 +3,10 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Paperclip, Plus } from "lucide-react";
 import { api } from "@/lib/client/api";
+import { CATEGORIES } from "@/lib/support-meta";
 
 const field = "w-full rounded-xl border border-border bg-surface px-4 text-sm outline-none focus:border-primary";
-const CATS: [string, string][] = [["general", "عمومی"], ["order", "سفارش"], ["payment", "پرداخت"], ["product", "محصول"], ["return", "مرجوعی / لغو سفارش"], ["wholesale", "همکاری عمده"]];
+const CATS = Object.entries(CATEGORIES) as [string, string][];
 
 function Files({ files, setFiles }: { files: File[]; setFiles: (f: File[]) => void }) {
   return (

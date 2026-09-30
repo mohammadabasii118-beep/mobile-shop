@@ -1,6 +1,6 @@
-import { Award, BadgePercent, Calculator, Palette, Undo2, BarChart3, BookOpen, Boxes, CreditCard, Crown, FileText, Home, Image as ImageIcon, LayoutGrid, ListTree, Megaphone, MessageSquare, Package, Percent, Receipt, ScrollText, Search, Settings, ShoppingCart, Smartphone, Star, Store, Tag, Truck, Users, Wallet, type LucideIcon } from "lucide-react";
+import { MessageCircle, Ticket, Award, BadgePercent, Calculator, Palette, Undo2, BarChart3, BookOpen, Boxes, CreditCard, Crown, FileText, Home, Image as ImageIcon, LayoutGrid, ListTree, Megaphone, Package, Percent, Receipt, ScrollText, Search, Settings, ShoppingCart, Smartphone, Star, Store, Tag, Truck, Users, Wallet, type LucideIcon } from "lucide-react";
 
-export interface NavItem { href: string; label: string; icon: LucideIcon; perms: string[] }
+export interface NavItem { href: string; label: string; icon: LucideIcon; perms: string[]; group?: string }
 
 export const ADMIN_NAV: NavItem[] = [
   { href: "/admin", label: "داشبورد", icon: BarChart3, perms: ["dashboard.view"] },
@@ -26,7 +26,8 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/menus", label: "منوها", icon: LayoutGrid, perms: ["menu.write"] },
   { href: "/admin/blog", label: "وبلاگ", icon: BookOpen, perms: ["blog.write"] },
   { href: "/admin/reviews", label: "نظرات", icon: Star, perms: ["review.moderate"] },
-  { href: "/admin/support", label: "پشتیبانی", icon: MessageSquare, perms: ["support.read", "support.reply"] },
+  { href: "/admin/support/chat", label: "چت آنلاین", icon: MessageCircle, perms: ["chat.read", "chat.reply"], group: "پشتیبانی" },
+  { href: "/admin/support/tickets", label: "تیکت‌ها", icon: Ticket, perms: ["support.read", "support.reply"], group: "پشتیبانی" },
   { href: "/admin/wallet", label: "کیف پول", icon: Wallet, perms: ["wallet.read"] },
   { href: "/admin/loyalty", label: "باشگاه مشتریان", icon: Award, perms: ["loyalty.read"] },
   { href: "/admin/seo", label: "سئو", icon: Search, perms: ["seo.write"] },
@@ -36,4 +37,4 @@ export const ADMIN_NAV: NavItem[] = [
 export const ICON_FALLBACK = { Receipt, Crown, Megaphone, FileText };
 
 export const canSee = (perms: string[], item: NavItem) => item.perms.some((p) => perms.includes(p));
-export const BREADCRUMB: Record<string, string> = Object.fromEntries(ADMIN_NAV.map((n) => [n.href, n.label]));
+export const BREADCRUMB: Record<string, string> = { ...Object.fromEntries(ADMIN_NAV.map((n) => [n.href, n.label])), "/admin/support": "پشتیبانی" };

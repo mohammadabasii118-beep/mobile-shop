@@ -12,6 +12,8 @@ import { Toaster } from "@/components/admin/kit";
 export interface Notice { label: string; count: number; href: string }
 export interface ShellProps { user: { name: string; phone: string; roles: string[] }; perms: string[]; notices: Notice[]; children: React.ReactNode }
 
+const BADGED = new Set(["/admin/payments", "/admin/support/chat", "/admin/support/tickets"]);
+
 export function AdminShell({ user, perms, notices, children }: ShellProps) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
@@ -29,12 +31,15 @@ export function AdminShell({ user, perms, notices, children }: ShellProps) {
 
   const nav = (
     <nav aria-label="منوی مدیریت" className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
-      {items.map((n) => (
-        <Link key={n.href} href={n.href} onClick={() => setOpen(false)} aria-current={isActive(n.href) ? "page" : undefined}
-          className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-bold transition-colors", isActive(n.href) ? "bg-primary text-primary-fg shadow-sm" : "text-foreground/80 hover:bg-primary/10 hover:text-primary")}>
-          <n.icon className="size-[18px] shrink-0" />{n.label}
-          {n.href === "/admin/payments" && notices.find((x) => x.href === "/admin/payments")?.count ? <span className="ms-auto rounded-full bg-hot px-1.5 text-[10px] text-white">{notices.find((x) => x.href === "/admin/payments")!.count.toLocaleString("fa-IR")}</span> : null}
-        </Link>
+      {items.map((n, i) => (
+        <div key={n.href} className="contents">
+          {n.group && items[i - 1]?.group !== n.group && <div className="px-3 pb-1 pt-3 text-[11px] font-black text-muted">{n.group}</div>}
+          <Link href={n.href} onClick={() => setOpen(false)} aria-current={isActive(n.href) ? "page" : undefined}
+            className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-bold transition-colors", n.group && "ms-3", isActive(n.href) ? "bg-primary text-primary-fg shadow-sm" : "text-foreground/80 hover:bg-primary/10 hover:text-primary")}>
+            <n.icon className="size-[18px] shrink-0" />{n.label}
+            {BADGED.has(n.href) && notices.find((x) => x.href.split("?")[0] === n.href)?.count ? <span className="ms-auto rounded-full bg-hot px-1.5 text-[10px] text-white" data-testid={`badge-${n.href.split("/").pop()}`}>{notices.find((x) => x.href.split("?")[0] === n.href)!.count.toLocaleString("fa-IR")}</span> : null}
+          </Link>
+        </div>
       ))}
     </nav>
   );

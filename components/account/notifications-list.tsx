@@ -39,7 +39,7 @@ export function NotificationsList() {
           {data.items.map((n) => (
             <li key={n.id} className={cn("rounded-2xl border p-3.5 text-[13px]", n.readAt ? "border-border bg-surface" : "border-primary/40 bg-primary/5")}>
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0"><b className="block">{!n.readAt && <i className="me-1.5 inline-block size-2 rounded-full bg-primary align-middle" />}{n.title}</b>{n.body && <p className="mt-1 text-xs leading-6 text-muted">{n.body}</p>}
+                <div className="min-w-0"><b className="block">{!n.readAt && <i className="me-1.5 inline-block size-2 rounded-full bg-primary align-middle" />}{(n.event === "chat_message" || n.event === "support_reply") && <span className="me-1.5 rounded-full bg-primary/12 px-2 py-0.5 align-middle text-[10px] font-bold text-primary" data-testid="n-kind">{n.event === "chat_message" ? "چت آنلاین" : "تیکت"}</span>}{n.title}</b>{n.body && <p className="mt-1 text-xs leading-6 text-muted">{n.body}</p>}
                   <span className="mt-1 block text-[11px] text-muted">{fmt(n.createdAt)}</span></div>
                 <div className="flex shrink-0 flex-col items-end gap-1.5 text-[11px]">
                   {n.link && <Link href={n.link} onClick={() => !n.readAt && void api("POST", "/api/notifications", { ids: [n.id] })} className="font-bold text-primary">مشاهده</Link>}

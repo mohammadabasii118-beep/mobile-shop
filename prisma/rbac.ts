@@ -7,7 +7,7 @@ export const PERMISSIONS: [string, string][] = [
   ["order.read", "مشاهده سفارش‌ها"], ["order.write", "مدیریت سفارش‌ها"], ["payment.review", "بررسی پرداخت‌ها"], ["customer.read", "مشاهده مشتریان"],
   ["customer.write", "مدیریت مشتریان"], ["wholesale.review", "بررسی درخواست عمده"], ["coupon.write", "مدیریت کوپن"], ["review.moderate", "مدیریت نظرات"],
   ["banner.write", "مدیریت بنر"], ["homepage.write", "مدیریت صفحه اصلی"], ["menu.write", "مدیریت منو"], ["blog.write", "مدیریت وبلاگ"],
-  ["support.reply", "پاسخ به پشتیبانی"], ["wallet.adjust", "مدیریت کیف پول"], ["loyalty.adjust", "مدیریت امتیاز"], ["shipping.write", "مدیریت ارسال"],
+  ["support.reply", "پاسخ به پشتیبانی"], ["chat.read", "مشاهده چت آنلاین"], ["chat.reply", "پاسخ در چت آنلاین"], ["wallet.adjust", "مدیریت کیف پول"], ["loyalty.adjust", "مدیریت امتیاز"], ["shipping.write", "مدیریت ارسال"],
   ["refund.manage", "ثبت درخواست بازگشت وجه"], ["refund.approve", "تأیید و تکمیل بازگشت وجه بانکی"], ["wallet.read", "مشاهده کیف پول"], ["loyalty.read", "مشاهده امتیاز وفاداری"], ["support.read", "مشاهده پشتیبانی"],
   ["seo.write", "مدیریت سئو"], ["pricing.read", "مشاهده قیمت‌گذاری و هزینه خرید"], ["pricing.write", "مدیریت قیمت‌گذاری، قوانین و تغییر گروهی قیمت"], ["discount.write", "مدیریت تخفیف‌ها"], ["settings.write", "تنظیمات سایت"], ["audit.read", "مشاهده لاگ‌ها"], ["role.manage", "مدیریت نقش‌ها"],
 ];
@@ -17,7 +17,7 @@ export const ROLES: { key: string; name: string; staff: boolean; perms: string[]
   { key: "product_manager", name: "مدیر محصول", staff: true, perms: ["dashboard.view", "product.read", "product.write", "product.delete", "category.write", "brand.write", "phone.write", "inventory.write"] },
   { key: "order_manager", name: "مدیر سفارش", staff: true, perms: ["dashboard.view", "order.read", "order.write", "payment.review", "refund.manage", "shipping.write", "customer.read"] },
   { key: "content_manager", name: "مدیر محتوا", staff: true, perms: ["dashboard.view", "blog.write", "banner.write", "homepage.write", "menu.write", "seo.write"] },
-  { key: "support", name: "پشتیبان", staff: true, perms: ["dashboard.view", "support.reply", "support.read", "customer.read", "review.moderate", "order.read"] },
+  { key: "support", name: "پشتیبان", staff: true, perms: ["dashboard.view", "support.reply", "support.read", "chat.read", "chat.reply", "customer.read", "review.moderate", "order.read"] },
   { key: "wholesale_manager", name: "مدیر همکاران عمده", staff: true, perms: ["dashboard.view", "wholesale.review", "customer.read", "order.read"] },
   { key: "customer", name: "مشتری", staff: false, perms: [] },
   { key: "wholesale_partner", name: "همکار عمده", staff: false, perms: [] },

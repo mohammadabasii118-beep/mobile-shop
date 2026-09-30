@@ -21,13 +21,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     );
   }
   const has = (p: string) => user.permissions.includes(p);
-  const [pay, ws, rv, low, rf, tk] = await Promise.all([
+  const [pay, ws, rv, low, rf, tk, ch] = await Promise.all([
     has("payment.review") ? db.order.count({ where: { status: "PAYMENT_REVIEW" } }) : 0,
     has("wholesale.review") ? db.wholesaleApplication.count({ where: { status: "PENDING" } }) : 0,
     has("review.moderate") ? db.review.count({ where: { status: "pending" } }) : 0,
     has("inventory.write") ? db.$queryRaw<{ c: bigint }[]>`SELECT count(*) AS c FROM "Inventory" WHERE "quantity" <= "lowStockThreshold"`.then((r) => Number(r[0]?.c ?? 0)) : 0,
     has("refund.approve") ? db.refund.count({ where: { status: "PENDING_BANK" } }) : 0,
     has("support.read") || has("support.reply") ? db.supportTicket.count({ where: { status: "open" } }) : 0,
+    has("chat.read") || has("chat.reply") ? db.chatConversation.count({ where: { status: "waiting" } }) : 0,
   ]);
   const notices: Notice[] = [
     { label: "پرداخت در انتظار بررسی", count: pay, href: "/admin/payments" },
@@ -35,7 +36,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { label: "نظر در انتظار تأیید", count: rv, href: "/admin/reviews" },
     { label: "کالای کم‌موجودی", count: low, href: "/admin/inventory?low=1" },
     { label: "بازگشت وجه بانکی در انتظار واریز", count: rf, href: "/admin/refunds" },
-    { label: "تیکت در انتظار پاسخ", count: tk, href: "/admin/support?status=open" },
+    { label: "چت آنلاین منتظر پاسخ", count: ch, href: "/admin/support/chat?tab=waiting" },
+    { label: "تیکت در انتظار پاسخ", count: tk, href: "/admin/support/tickets?status=open" },
   ].filter((n) => n.count > 0);
   return (
     <AdminShell user={{ name: user.displayName ?? user.phone ?? user.email ?? "", phone: user.phone ?? user.email ?? "", roles: user.roles.map((r) => ROLE_NAMES[r] ?? r) }} perms={user.permissions} notices={notices}>
