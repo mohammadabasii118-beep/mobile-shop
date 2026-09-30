@@ -65,7 +65,9 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const ws = user?.wholesale && row.wholesalePrice != null && variant ? unitPriceFor(row, variant, Math.max(1, row.minWholesaleQty), user, undefined, policy.capAtRetail ? card.price : undefined) : null;
   const wholesale = ws && ws.priceType === "wholesale" ? { unit: ws.unitPrice, min: row.minWholesaleQty } : null;
   const title = `خرید ${row.name}${models[0] ? ` ${models[0]}` : ""} با ضمانت اصالت | ارسال فوری`;
-  const specs = (row.specifications ?? {}) as Record<string, string>;
+  const attrGroups = new Map<string, { order: number; vals: string[] }>();
+  for (const a of row.attributeValues) { const g = attrGroups.get(a.value.attribute.name) ?? { order: a.value.attribute.sortOrder, vals: [] }; g.vals.push(a.value.value); attrGroups.set(a.value.attribute.name, g); }
+  const specs = { ...Object.fromEntries([...attrGroups].sort((x, y) => x[1].order - y[1].order).map(([n, g]) => [n, g.vals.join("، ")])), ...((row.specifications ?? {}) as Record<string, string>) };
   const cats = [row.category.parent, row.category].filter(Boolean);
   const crumbs = [{ name: "خانه", path: "/" }, { name: "فروشگاه", path: "/shop" }, ...cats.map((c) => ({ name: c!.name, path: paths.category(c!.slug) })), { name: row.name, path: paths.product(row.slug) }];
   const images = row.images.filter((i) => i.type === "IMAGE").map((i) => abs(i.url)!).filter(Boolean);

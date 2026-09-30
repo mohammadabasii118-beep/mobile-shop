@@ -8,7 +8,8 @@ import type { VariantOption } from "@/lib/types";
 interface RowV {
   id: string; sku: string; isActive: boolean; retailPrice: number | null; wholesalePrice: number | null; name: string;
   phoneModelId: string | null; colorId: string | null;
-  phoneModel: { id: string; name: string; brandId: string; brand: { name: string } } | null;
+  phoneModel: { id: string; name: string; brandId: string; seriesId?: string | null; series?: { name: string } | null; brand: { name: string } } | null;
+  image?: { url: string } | null;
   colorRef: { name: string; hex: string | null } | null;
   inventory: { quantity: number } | null;
 }
@@ -27,7 +28,7 @@ export function buildVariantOptions(p: RowP, viewer: Viewer, discounts: Discount
     return {
       id: v.id, sku: v.sku, stock: v.inventory?.quantity ?? 0,
       brandId: v.phoneModel?.brandId ?? null, brandName: v.phoneModel?.brand.name ?? null,
-      modelId: v.phoneModelId, modelName: v.phoneModel?.name ?? null,
+      modelId: v.phoneModelId, modelName: v.phoneModel?.name ?? null, seriesId: v.phoneModel?.seriesId ?? null, seriesName: v.phoneModel?.series?.name ?? null, imageUrl: v.image?.url ?? null,
       colorId: v.colorId, colorName: v.colorRef?.name ?? null, colorHex: v.colorRef?.hex ?? null,
       price: retail.unitPrice, oldPrice: retail.discountAmount > 0 ? retail.originalPrice : undefined,
       wholesale: ws && ws.priceType === "wholesale" ? { unit: ws.unitPrice, min: p.minWholesaleQty } : null,

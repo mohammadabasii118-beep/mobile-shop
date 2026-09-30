@@ -21,8 +21,6 @@ export function Thumb({ p, className, priority }: { p: Pick<CardProduct, "hue" |
 
 export interface BuyOption { value: string; label: string }
 
-const selectCls = "h-12 w-full cursor-pointer appearance-none rounded-md border border-primary/30 bg-surface ps-10 pe-4 text-start text-sm text-foreground outline-none focus:border-primary disabled:cursor-not-allowed disabled:opacity-50";
-
 interface Opt { value: string; label: string; stock: number }
 const uniq = (arr: VariantOption[], key: (v: VariantOption) => string | null, label: (v: VariantOption) => string | null): Opt[] => {
   const m = new Map<string, Opt>();
@@ -30,36 +28,58 @@ const uniq = (arr: VariantOption[], key: (v: VariantOption) => string | null, la
   return [...m.values()];
 };
 
-function VariantSelect({ label, value, opts, onChange, disabled }: { label: string; value: string; opts: Opt[]; onChange: (v: string) => void; disabled?: boolean }) {
-  return (
-    <label className="relative block">
-      <select aria-label={label} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} dir="ltr" className={selectCls}>
-        <option value="">{label}</option>
-        {opts.map((o) => <option key={o.value} value={o.value} disabled={o.stock <= 0}>{o.label}{o.stock <= 0 ? " — ناموجود" : ""}</option>)}
-      </select>
-      <ChevronDown className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-primary" />
-    </label>
-  );
-}
+const chip = "min-h-9 cursor-pointer rounded-md border px-3 py-1.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:line-through";
+const chipOn = "border-primary bg-primary/12 font-bold text-primary";
+const chipOff = "border-border bg-surface hover:border-primary/50";
 
-/** Brand → model → colour pickers for variant products. Options that are out of stock stay visible but disabled. */
+/**
+ * Model → colour pickers for variable products, as chips. With many models there is a search box plus brand and series filters.
+ * A chip is disabled when no buyable (in stock) variant exists for it. Only active variants reach this component; the cart re-checks everything on the server.
+ */
 function VariantPicker({ variants, onPick }: { variants: VariantOption[]; onPick: (v: VariantOption | null) => void }) {
-  const [brand, setBrand] = useState(""); const [model, setModel] = useState(""); const [color, setColor] = useState("");
-  const hasBrand = variants.some((v) => v.brandId), hasModel = variants.some((v) => v.modelId), hasColor = variants.some((v) => v.colorId);
+  const [q, setQ] = useState(""); const [brand, setBrand] = useState(""); const [series, setSeries] = useState("");
+  const [model, setModel] = useState(""); const [color, setColor] = useState("");
+  const hasModel = variants.some((v) => v.modelId), hasColor = variants.some((v) => v.colorId);
   const brands = uniq(variants, (v) => v.brandId, (v) => v.brandName);
   const inBrand = variants.filter((v) => !brand || v.brandId === brand);
-  const models = uniq(inBrand, (v) => v.modelId, (v) => v.modelName);
-  const inModel = inBrand.filter((v) => !model || v.modelId === model);
-  const colors = uniq(inModel, (v) => v.colorId, (v) => v.colorName);
-  const pick = (b: string, m: string, c: string) => {
-    const complete = (!hasBrand || !!b) && (!hasModel || !!m) && (!hasColor || !!c);
-    onPick(complete ? variants.find((v) => (!hasBrand || v.brandId === b) && (!hasModel || v.modelId === m) && (!hasColor || v.colorId === c)) ?? null : null);
+  const seriesOpts = uniq(inBrand, (v) => v.seriesId ?? null, (v) => v.seriesName ?? null);
+  const inSeries = inBrand.filter((v) => !series || v.seriesId === series);
+  const models = uniq(inSeries, (v) => v.modelId, (v) => v.modelName).filter((m) => !q.trim() || m.label.toLowerCase().includes(q.trim().toLowerCase()));
+  const colorsAll = uniq(variants, (v) => v.colorId, (v) => v.colorName);
+  const hexOf = (id: string) => variants.find((v) => v.colorId === id)?.colorHex ?? null;
+  const modelVariants = variants.filter((v) => !hasModel || v.modelId === model);
+  const colorOk = (c: string) => modelVariants.some((v) => v.colorId === c && v.stock > 0);
+  const pick = (m: string, c: string) => {
+    const complete = (!hasModel || !!m) && (!hasColor || !!c);
+    onPick(complete ? variants.find((v) => (!hasModel || v.modelId === m) && (!hasColor || v.colorId === c)) ?? null : null);
   };
+  const many = uniq(variants, (v) => v.modelId, (v) => v.modelName).length > 8;
   return (
-    <div className="space-y-2">
-      {hasBrand && <VariantSelect label="برند گوشی را انتخاب کنید" value={brand} opts={brands} onChange={(v) => { setBrand(v); setModel(""); setColor(""); pick(v, "", ""); }} />}
-      {hasModel && <VariantSelect label="مدل گوشی را انتخاب کنید" value={model} opts={models} disabled={hasBrand && !brand} onChange={(v) => { setModel(v); setColor(""); pick(brand, v, ""); }} />}
-      {hasColor && <VariantSelect label="رنگ را انتخاب کنید" value={color} opts={colors} disabled={(hasBrand && !brand) || (hasModel && !model)} onChange={(v) => { setColor(v); pick(brand, model, v); }} />}
+    <div className="space-y-3" data-testid="variant-picker">
+      {hasModel && (
+        <div className="space-y-2">
+          <div className="text-xs font-bold">مدل گوشی{model && <span className="ms-1 font-normal text-muted">— {variants.find((v) => v.modelId === model)?.modelName}</span>}</div>
+          {many && <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="جستجوی مدل گوشی…" aria-label="جستجوی مدل گوشی" className="h-10 w-full rounded-md border border-primary/30 bg-surface px-3 text-sm outline-none focus:border-primary" />}
+          {brands.length > 1 && <div className="flex flex-wrap gap-1.5" role="group" aria-label="برند گوشی">{[{ value: "", label: "همه برندها", stock: 1 }, ...brands].map((b) => <button type="button" key={b.value} aria-pressed={brand === b.value} onClick={() => { setBrand(b.value); setSeries(""); }} className={`${chip} ${brand === b.value ? chipOn : chipOff}`}>{b.label}</button>)}</div>}
+          {seriesOpts.length > 1 && <div className="flex flex-wrap gap-1.5" role="group" aria-label="سری گوشی">{[{ value: "", label: "همه سری‌ها", stock: 1 }, ...seriesOpts].map((x) => <button type="button" key={x.value} aria-pressed={series === x.value} onClick={() => setSeries(x.value)} className={`${chip} ${series === x.value ? chipOn : chipOff}`}>{x.label}</button>)}</div>}
+          <div className={`flex flex-wrap gap-1.5 ${many ? "max-h-44 overflow-y-auto" : ""}`} role="group" aria-label="مدل گوشی">
+            {models.length === 0 && <p className="text-xs text-muted">مدلی پیدا نشد.</p>}
+            {models.map((m) => <button type="button" key={m.value} data-testid="model-chip" disabled={m.stock <= 0} aria-pressed={model === m.value} title={m.stock <= 0 ? "ناموجود" : undefined}
+              onClick={() => { const next = model === m.value ? "" : m.value; setModel(next); const still = next && hasColor && variants.some((v) => v.modelId === next && v.colorId === color && v.stock > 0) ? color : ""; setColor(still); pick(next, still); }}
+              className={`${chip} ${model === m.value ? chipOn : chipOff}`}>{m.label}</button>)}
+          </div>
+        </div>
+      )}
+      {hasColor && (
+        <div className="space-y-2">
+          <div className="text-xs font-bold">رنگ{color && <span className="ms-1 font-normal text-muted">— {colorsAll.find((c) => c.value === color)?.label}</span>}</div>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="رنگ">
+            {colorsAll.map((c) => <button type="button" key={c.value} data-testid="color-chip" disabled={(hasModel && !model) || !colorOk(c.value)} aria-pressed={color === c.value} title={hasModel && !model ? "اول مدل را انتخاب کنید" : !colorOk(c.value) ? "ناموجود" : undefined}
+              onClick={() => { const next = color === c.value ? "" : c.value; setColor(next); pick(model, next); }} className={`${chip} inline-flex items-center gap-1.5 ${color === c.value ? chipOn : chipOff}`}>
+              {hexOf(c.value) && <i className="size-3 rounded-full border border-border" style={{ background: hexOf(c.value)! }} />}{c.label}</button>)}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -86,7 +106,7 @@ export function BuyBox({ p, opt, variants, inStock, maxQty, wholesale }: { p: Ca
           <li key={b} className="flex gap-2"><i className="mt-2.5 size-1.5 shrink-0 rounded-full bg-foreground" /><span>{a} <b>{b}</b> {c}</span></li>
         ))}
       </ul>
-      {variants && <VariantPicker variants={variants} onPick={(v) => { setPicked(v); setQty(1); }} />}
+      {variants && <VariantPicker variants={variants} onPick={(v) => { setPicked(v); setQty(1); window.dispatchEvent(new CustomEvent("caseline:variant-image", { detail: v?.imageUrl ?? null })); }} />}
       {variants && <input type="hidden" data-model-select value={picked ? `v:${picked.id}` : ""} readOnly />}
       {opt && (
         <label className="relative block">

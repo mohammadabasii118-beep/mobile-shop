@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import type { Discount, Prisma } from "@/lib/generated/prisma/client";
 import { lineCtx } from "@/lib/server/price-engine/line";
-import { loadActiveDiscounts, resolveUnitDiscount } from "@/lib/server/price-engine/discounts";
+import { legacyFixedOf, loadActiveDiscounts, resolveUnitDiscount } from "@/lib/server/price-engine/discounts";
 import { queryHomeReviews } from "@/lib/server/reviews";
 import { cachedPublic } from "@/lib/server/public-cache";
 import type { CardProduct, MenuCategory, SiteInfo } from "@/lib/types";
@@ -26,7 +26,7 @@ export function toCard(p: Omit<CardRow, "variants"> & { variants: (Omit<CardRow[
   const active = p.variants.filter((v) => v.isActive);
   const options = (active.length ? active : []).map((v) => {
     const base = v.retailPrice ?? p.retailPrice;
-    const d = resolveUnitDiscount(discounts, lineCtx({ ...p, category: p.category }, v), base, p.retailDiscount);
+    const d = resolveUnitDiscount(discounts, lineCtx({ ...p, category: p.category }, v), base, legacyFixedOf(p.retailDiscount, base, v.salePrice));
     return { price: Math.max(0, base - d.amount), base, off: d.amount };
   });
   const best = options.length ? options.reduce((a, b) => (b.price < a.price ? b : a)) : (() => { const d = resolveUnitDiscount(discounts, lineCtx({ ...p, category: p.category }, { id: "", retailPrice: null, wholesalePrice: null }), p.retailPrice, p.retailDiscount); return { price: Math.max(0, p.retailPrice - d.amount), base: p.retailPrice, off: d.amount }; })();
@@ -125,7 +125,8 @@ export async function getProductBySlug(slug: string) {
       extraBrands: { include: { brand: { select: { id: true, name: true, slug: true } } }, orderBy: { createdAt: "asc" } },
       images: { orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }, { id: "asc" }] },
       phoneModels: { include: { phoneModel: true } },
-      variants: { where: { isActive: true }, orderBy: { sortOrder: "asc" }, include: { inventory: true, colorRef: true, phoneModel: { include: { brand: { select: { name: true } } } } } },
+      variants: { where: { isActive: true }, orderBy: { sortOrder: "asc" }, include: { inventory: true, image: { select: { url: true } }, colorRef: true, phoneModel: { include: { brand: { select: { name: true } }, series: { select: { name: true } } } } } },
+      attributeValues: { select: { value: { select: { value: true, attribute: { select: { name: true, sortOrder: true } } } } } },
       questions: { where: { isPublished: true }, orderBy: { createdAt: "desc" }, take: 10 },
     },
   });

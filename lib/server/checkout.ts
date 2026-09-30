@@ -19,7 +19,7 @@ import type { SessionUser } from "@/lib/server/auth/session";
 type Tx = Prisma.TransactionClient;
 
 const itemsInclude = {
-  items: { orderBy: { id: "asc" as const }, include: { variant: { include: { inventory: true, colorRef: { select: { name: true } }, phoneModel: { select: { name: true, brandId: true, brand: { select: { name: true } } } }, product: { include: { extraCategories: { select: { categoryId: true, category: { select: { parentId: true } } } }, extraBrands: { select: { brandId: true } }, category: { select: { parentId: true } }, images: { where: { type: "IMAGE" as const }, orderBy: [{ isPrimary: "desc" as const }, { sortOrder: "asc" as const }], take: 1 } } } } } } },
+  items: { orderBy: { id: "asc" as const }, include: { variant: { include: { inventory: true, image: { select: { url: true } }, colorRef: { select: { name: true } }, phoneModel: { select: { name: true, brandId: true, brand: { select: { name: true } } } }, product: { include: { extraCategories: { select: { categoryId: true, category: { select: { parentId: true } } } }, extraBrands: { select: { brandId: true } }, category: { select: { parentId: true } }, images: { where: { type: "IMAGE" as const }, orderBy: [{ isPrimary: "desc" as const }, { sortOrder: "asc" as const }], take: 1 } } } } } } },
 };
 
 export const shippingCost = (m: { cost: number; freeThreshold: number | null }, amountAfterDiscount: number) =>
@@ -43,7 +43,7 @@ async function priceCart(tx: Tx, user: SessionUser) {
     const price = prices[k]!;
     const pm = pms.find((m) => m.id === i.phoneModelId);
     return {
-      cartItemId: i.id, variantId: i.variantId, productId: p.id, name: p.name, sku: i.variant.sku, image: p.images[0]?.url ?? null,
+      cartItemId: i.id, variantId: i.variantId, productId: p.id, name: p.name, sku: i.variant.sku, image: i.variant.image?.url ?? p.images[0]?.url ?? null,
       option: variantOption(i.variant, pm?.name), quantity: i.quantity, stock: i.variant.inventory?.quantity ?? 0,
       unitPrice: price.unitPrice, priceType: price.priceType, total: price.unitPrice * i.quantity,
       retailUnit: price.priceType === "retail" ? price.unitPrice : Math.max(0, price.listPrice - p.retailDiscount),

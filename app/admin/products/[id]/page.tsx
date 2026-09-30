@@ -9,11 +9,12 @@ import { requireAdminPage } from "@/lib/server/admin/page";
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const u = await requireAdminPage("product.read", `/admin/products/${id}`);
-  const [cats, brands, models, colors] = await Promise.all([
+  const [cats, brands, models, colors, attrs] = await Promise.all([
     db.category.findMany({ orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }], select: { id: true, name: true, parent: { select: { name: true } } } }),
     db.brand.findMany({ orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
-    db.phoneModel.findMany({ orderBy: [{ brand: { sortOrder: "asc" } }, { sortOrder: "asc" }], select: { id: true, name: true, brand: { select: { name: true } } } }),
-    db.color.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
+    db.phoneModel.findMany({ orderBy: [{ brand: { sortOrder: "asc" } }, { series: { sortOrder: "asc" } }, { sortOrder: "asc" }], select: { id: true, name: true, slug: true, brandId: true, seriesId: true, brand: { select: { name: true } }, series: { select: { name: true } } } }),
+    db.color.findMany({ where: { isActive: true }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true, hex: true } }),
+    db.attribute.findMany({ where: { isSystem: false, isActive: true }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true, values: { where: { isActive: true }, orderBy: { sortOrder: "asc" }, select: { id: true, value: true } } } }),
   ]);
   const canCost = u.permissions.includes("pricing.read") || u.permissions.includes("pricing.write");
   const categories = cats.map((c) => ({ value: c.id, label: c.parent ? `${c.parent.name} › ${c.name}` : c.name }));
@@ -29,7 +30,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   return (
     <>
       <PageHead title={id === "new" ? "محصول جدید" : initial.name} />
-      <ProductForm key={id} initial={initial} categories={categories} brands={brands.map((b) => ({ value: b.id, label: b.name }))} phoneModels={models.map((m) => ({ value: m.id, label: m.name, group: m.brand.name }))} colors={colors.map((c) => ({ value: c.id, label: c.name }))}
+      <ProductForm key={id} initial={initial} categories={categories} brands={brands.map((b) => ({ value: b.id, label: b.name }))} phoneModels={models.map((m) => ({ value: m.id, label: m.name, slug: m.slug, brandId: m.brandId, brand: m.brand.name, seriesId: m.seriesId, series: m.series?.name ?? null }))} colors={colors.map((c) => ({ value: c.id, label: c.name, hex: c.hex }))} attributes={attrs.filter((a) => a.values.length)}
         canWrite={u.permissions.includes("product.write")} canDelete={u.permissions.includes("product.delete")} canStock={u.permissions.includes("inventory.write")} canPrice={u.permissions.includes("pricing.write")} canCost={canCost} />
     </>
   );

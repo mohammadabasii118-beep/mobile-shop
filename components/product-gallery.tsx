@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Play } from "lucide-react";
 import { SiteImage } from "@/components/site-image";
 import { Thumb } from "@/components/product-detail";
@@ -14,6 +14,12 @@ export interface GalleryItem { id: string; type: "IMAGE" | "VIDEO"; url: string;
  */
 export function ProductGallery({ items, fallback, brandName, hot, hotBadge }: { items: GalleryItem[]; fallback: Pick<CardProduct, "hue" | "kind" | "img" | "name">; brandName: string; hot: React.ReactNode; hotBadge: boolean }) {
   const [i, setI] = useState(0);
+  // A chosen variant with its own image switches the gallery to that image (null = back to the product's first image).
+  useEffect(() => {
+    const on = (e: Event) => { const url = (e as CustomEvent<string | null>).detail; const at = url ? items.findIndex((m) => m.type === "IMAGE" && m.url === url) : 0; setI(at >= 0 ? at : 0); };
+    window.addEventListener("caseline:variant-image", on);
+    return () => window.removeEventListener("caseline:variant-image", on);
+  }, [items]);
   const cur = items[i];
   const poster = items.find((m) => m.type === "IMAGE")?.url;
   return (

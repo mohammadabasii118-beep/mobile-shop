@@ -23,6 +23,8 @@ const variantSchema = z.object({
   costPrice: optMoney, pricingMode: z.enum(["AUTOMATIC", "MANUAL"]).optional(),
   color: txt(40), colorHex: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, "کد رنگ نامعتبر است.").nullable().optional().or(z.literal("").transform(() => null)),
   retailPrice: optMoney, wholesalePrice: optMoney,
+  salePrice: optMoney, // special final price (null = none); must be below the variant's price
+  imageUrl: z.string().trim().max(400).nullable().optional().transform((v) => v || null), // one of this product's images (null = use the product image)
   isActive: z.boolean().optional(),
   stock: money.optional(), // initial stock, only honoured when the variant is created
 });
@@ -36,14 +38,16 @@ const base = z.object({
   wholesalePrice: optMoney, wholesaleDiscount: money.optional(), minWholesaleQty: z.coerce.number().int().min(1).max(10000).optional(),
   seoTitle: txt(120), seoDescription: txt(300), canonical: txt(300),
   phoneModelIds: z.array(z.string().max(40)).max(200).optional(),
+  productType: z.enum(["SIMPLE", "VARIABLE"]).optional(),
+  attributeValueIds: z.array(z.string().max(40)).max(500).optional(), // descriptive custom attribute values
   // Additional categories/brands beyond the primary ones (no practical limit; the primary drives breadcrumbs and margin rules).
   extraCategoryIds: z.array(z.string().max(40)).max(2000).optional(),
   extraBrandIds: z.array(z.string().max(40)).max(2000).optional(),
   images: z.array(z.object({ url: imgUrl, alt: txt(160) })).max(12).optional(),
-  variants: z.array(variantSchema).max(60).optional(),
+  variants: z.array(variantSchema).max(600).optional(),
 });
 
-export const productCreateSchema = base.extend({ variants: z.array(variantSchema).min(1, "حداقل یک تنوع (SKU) لازم است.").max(60) })
+export const productCreateSchema = base.extend({ variants: z.array(variantSchema).min(1, "حداقل یک تنوع (SKU) لازم است.").max(600) })
   .superRefine((d, ctx) => { if (d.pricingMode !== "AUTOMATIC" && d.retailPrice === undefined) ctx.addIssue({ code: "custom", path: ["retailPrice"], message: "قیمت خرده لازم است." }); });
 export const productUpdateSchema = base.partial();
 
@@ -59,9 +63,9 @@ function checkPrices(d: { retailPrice?: number; retailDiscount?: number; wholesa
 
 const detailInclude = {
   brand: { select: { id: true, name: true } }, category: { select: { id: true, name: true } },
-  extraCategories: { select: { categoryId: true } }, extraBrands: { select: { brandId: true } },
+  extraCategories: { select: { categoryId: true } }, extraBrands: { select: { brandId: true } }, attributeValues: { select: { valueId: true } },
   images: { orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }] }, phoneModels: { select: { phoneModelId: true } },
-  variants: { orderBy: { sortOrder: "asc" }, include: { inventory: { select: { quantity: true, lowStockThreshold: true } }, phoneModel: { select: { id: true, name: true, brandId: true } }, colorRef: { select: { id: true, name: true, hex: true } } } },
+  variants: { orderBy: { sortOrder: "asc" }, include: { image: { select: { url: true } }, inventory: { select: { quantity: true, lowStockThreshold: true } }, phoneModel: { select: { id: true, name: true, brandId: true } }, colorRef: { select: { id: true, name: true, hex: true } } } },
 } satisfies Prisma.ProductInclude;
 
 type Caps = { cost: boolean };
@@ -114,7 +118,7 @@ export async function getProduct(id: string, caps: Caps = { cost: false }) {
   const p = await db.product.findUnique({ where: { id }, include: detailInclude });
   if (!p) throw notFound("محصول پیدا نشد.");
   const history = await db.priceHistory.findMany({ where: { productId: id }, orderBy: { createdAt: "desc" }, take: 30 });
-  return redactCost({ ...p, phoneModelIds: p.phoneModels.map((m) => m.phoneModelId), extraCategoryIds: p.extraCategories.map((c) => c.categoryId), extraBrandIds: p.extraBrands.map((b) => b.brandId), priceHistory: history }, caps);
+  return redactCost({ ...p, phoneModelIds: p.phoneModels.map((m) => m.phoneModelId), attributeValueIds: p.attributeValues.map((a) => a.valueId), extraCategoryIds: p.extraCategories.map((c) => c.categoryId), extraBrandIds: p.extraBrands.map((b) => b.brandId), priceHistory: history }, caps);
 }
 
 async function syncImages(tx: Prisma.TransactionClient, productId: string, images: { url: string; alt?: string | null }[]) {
@@ -151,24 +155,73 @@ async function syncExtras(tx: Prisma.TransactionClient, productId: string, categ
   } else if (brandId) await tx.productBrand.deleteMany({ where: { productId, brandId } });
 }
 
+/** A simple product has at most one variant and no model/colour axes; anything else is a variable product. */
+function assertTypeFits(type: "SIMPLE" | "VARIABLE", vs: { phoneModelId?: string | null; colorId?: string | null }[]) {
+  if (type === "SIMPLE" && (vs.length > 1 || vs.some((v) => v.phoneModelId || v.colorId))) throw badRequest("محصول ساده فقط یک تنوع بدون مدل/رنگ دارد؛ برای چند تنوع «محصول متغیر» را انتخاب کنید.", "validation");
+}
+
+/** The special sale price must undercut the variant's own (or the product's) manual price, otherwise it would be meaningless. */
+function assertSale(v: { salePrice?: number | null; retailPrice?: number | null; pricingMode?: string }, productRetail: number | undefined, sku: string) {
+  const base = v.retailPrice ?? productRetail;
+  if (v.salePrice != null && v.pricingMode !== "AUTOMATIC" && base != null && v.salePrice >= base) throw badRequest(`قیمت فروش ویژه «${sku}» باید کمتر از قیمت آن باشد.`, "validation");
+}
+
+/** Descriptive custom attributes of a product (they do not take part in the variant matrix). */
+async function syncAttributeValues(tx: Prisma.TransactionClient, productId: string, ids?: string[]) {
+  if (!ids) return;
+  const uniq = [...new Set(ids)];
+  if (uniq.length && (await tx.attributeValue.count({ where: { id: { in: uniq } } })) !== uniq.length) throw badRequest("یکی از مقادیر Attribute وجود ندارد.", "validation");
+  await tx.productAttributeValue.deleteMany({ where: { productId } });
+  if (uniq.length) await tx.productAttributeValue.createMany({ data: uniq.map((valueId) => ({ productId, valueId })) });
+}
+
+/** Points variants at one of the product's images (by URL); null clears. Runs after the product's images are final. */
+async function syncVariantImages(tx: Prisma.TransactionClient, productId: string, wanted: Map<string, string | null>) {
+  if (!wanted.size) return;
+  const imgs = await tx.productImage.findMany({ where: { productId, type: "IMAGE" }, select: { id: true, url: true } });
+  for (const [variantId, url] of wanted) {
+    const img = url ? imgs.find((i) => i.url === url) : null;
+    if (url && !img) throw badRequest("تصویر انتخاب‌شده برای تنوع جزو تصاویر این محصول نیست.", "validation");
+    await tx.productVariant.update({ where: { id: variantId }, data: { imageId: img?.id ?? null } });
+  }
+}
+
+/** Sets an existing variant's stock to an absolute value, with a movement record (optimistic: fails if an order changed it meanwhile). */
+async function setStock(tx: Prisma.TransactionClient, variantId: string, target: number, a: AdminCtx, sku: string) {
+  const inv = (await tx.inventory.findUnique({ where: { variantId } })) ?? (await tx.inventory.create({ data: { variantId, quantity: 0 } }));
+  if (inv.quantity === target) return;
+  const delta = target - inv.quantity;
+  const ok = await tx.inventory.updateMany({ where: { id: inv.id, quantity: inv.quantity }, data: { quantity: target } });
+  if (ok.count !== 1) throw conflict("موجودی همزمان تغییر کرد؛ صفحه را تازه کنید و دوباره تلاش کنید.", "stock_changed");
+  await tx.inventoryMovement.create({ data: { inventoryId: inv.id, delta, balanceAfter: target, reason: "correction", note: "ویرایش از ماتریس تنوع‌ها", createdById: a.admin.id } });
+  await audit(a, "inventory.adjust", "inventory", variantId, { quantity: inv.quantity }, { quantity: target, delta, reason: "correction", sku }, tx);
+}
+
 export async function createProduct(body: unknown, a: AdminCtx) {
   const d = stripPricingInput(productCreateSchema.parse(body), canPrice(a));
   if (d.pricingMode !== "AUTOMATIC") checkPrices(d);
-  const { phoneModelIds = [], extraCategoryIds, extraBrandIds, images = [], variants, retailPrice, ...fields } = d;
+  const { phoneModelIds = [], extraCategoryIds, extraBrandIds, attributeValueIds, images = [], variants, retailPrice, ...fields } = d;
+  assertTypeFits(d.productType ?? (variants.length > 1 || variants.some((v) => v.phoneModelId || v.colorId) ? "VARIABLE" : "SIMPLE"), variants);
+  const wantedImages = new Map<string, string | null>();
   const id = await db.$transaction(async (tx) => {
-    const p = await tx.product.create({ data: { ...fields, retailPrice: retailPrice ?? 0, visualKind: "case", visualHue: 210 } });
+    const productType = fields.productType ?? (variants.length > 1 || variants.some((v) => v.phoneModelId || v.colorId) ? "VARIABLE" : "SIMPLE");
+    const p = await tx.product.create({ data: { ...fields, productType, retailPrice: retailPrice ?? 0, visualKind: "case", visualHue: 210 } });
     const seen = new Set<string>();
     for (const [i, v] of variants.entries()) {
-      const { stock = 0, id: _ignored, ...vf } = v; void _ignored;
+      const { stock = 0, id: _ignored, imageUrl, ...vf } = v; void _ignored;
+      assertSale(vf, retailPrice, vf.sku);
       const axes = await resolveAxes(tx, vf);
       const key = `${vf.phoneModelId}|${vf.colorId}`; if ((vf.phoneModelId || vf.colorId) && seen.has(key)) throw conflict("این ترکیب مدل گوشی و رنگ تکراری است.", "variant_duplicate"); seen.add(key);
       const row = await tx.productVariant.create({ data: { ...vf, ...axes, productId: p.id, sortOrder: i, inventory: { create: { quantity: stock } } }, include: { inventory: true } });
       if (stock > 0) await tx.inventoryMovement.create({ data: { inventoryId: row.inventory!.id, delta: stock, balanceAfter: stock, reason: "restock", note: "موجودی اولیه", createdById: a.admin.id } });
       await audit(a, "variant.create", "variant", row.id, undefined, { sku: row.sku, name: row.name, phoneModelId: row.phoneModelId, colorId: row.colorId, pricingMode: row.pricingMode }, tx);
+      if (imageUrl) wantedImages.set(row.id, imageUrl);
     }
     if (phoneModelIds.length) await tx.productPhoneModel.createMany({ data: phoneModelIds.map((phoneModelId) => ({ productId: p.id, phoneModelId })) });
     await syncExtras(tx, p.id, p.categoryId, p.brandId, extraCategoryIds, extraBrandIds);
     await syncImages(tx, p.id, images);
+    await syncVariantImages(tx, p.id, wantedImages);
+    await syncAttributeValues(tx, p.id, attributeValueIds);
     await audit(a, "product.create", "product", p.id, undefined, { name: p.name, sku: p.sku, retailPrice: p.retailPrice, wholesalePrice: p.wholesalePrice, pricingMode: p.pricingMode }, tx);
     const policy = await getWholesalePolicy(tx);
     if (p.pricingMode === "AUTOMATIC" || variants.some((v) => v.pricingMode === "AUTOMATIC")) await recomputePrices(tx, { productIds: [p.id] }, { apply: true, adminId: a.admin.id, source: "manual", reason: "ایجاد محصول", wholesale: { policy, onConflict: "throw" } });
@@ -183,7 +236,8 @@ export async function createProduct(body: unknown, a: AdminCtx) {
 
 export async function updateProduct(id: string, body: unknown, a: AdminCtx) {
   const d = stripPricingInput(productUpdateSchema.parse(body), canPrice(a));
-  const { phoneModelIds, extraCategoryIds, extraBrandIds, images, variants, ...fields } = d;
+  const { phoneModelIds, extraCategoryIds, extraBrandIds, attributeValueIds, images, variants, ...fields } = d;
+  const wantedImages = new Map<string, string | null>();
   await db.$transaction(async (tx) => {
     const cur = await tx.product.findUnique({ where: { id } });
     if (!cur) throw notFound("محصول پیدا نشد.");
@@ -210,6 +264,10 @@ export async function updateProduct(id: string, body: unknown, a: AdminCtx) {
     }
     await syncExtras(tx, id, fields.categoryId ?? cur.categoryId, fields.brandId === undefined ? cur.brandId : fields.brandId, extraCategoryIds, extraBrandIds);
     if (images) await syncImages(tx, id, images);
+    await syncAttributeValues(tx, id, attributeValueIds);
+    const typeNow = fields.productType ?? cur.productType;
+    if (variants) assertTypeFits(typeNow, variants);
+    else if (fields.productType === "SIMPLE") assertTypeFits("SIMPLE", await tx.productVariant.findMany({ where: { productId: id }, select: { phoneModelId: true, colorId: true } }));
     if (variants) {
       const existing = await tx.productVariant.findMany({ where: { productId: id } });
       const keep = new Set(variants.filter((v) => v.id).map((v) => v.id!));
@@ -221,7 +279,8 @@ export async function updateProduct(id: string, body: unknown, a: AdminCtx) {
         await audit(a, "variant.remove", "variant", ex.id, { sku: ex.sku, name: ex.name }, undefined, tx);
       }
       for (const [i, v] of variants.entries()) {
-        const { id: vid, stock = 0, ...vf } = v;
+        const { id: vid, stock, imageUrl, ...vf } = v;
+        assertSale(vf, fields.retailPrice ?? cur.retailPrice, vf.sku);
         const axes = await resolveAxes(tx, vf);
         await assertUniqueAxes(tx, id, { id: vid, phoneModelId: vf.phoneModelId, colorId: vf.colorId });
         if (vid) {
@@ -230,22 +289,27 @@ export async function updateProduct(id: string, body: unknown, a: AdminCtx) {
           const mode = vf.pricingMode ?? before.pricingMode;
           const data = { ...vf, ...axes, sortOrder: i, ...(mode === "AUTOMATIC" ? { retailPrice: undefined } : {}) };
           await tx.productVariant.update({ where: { id: vid }, data });
+          if (imageUrl !== undefined) wantedImages.set(vid, imageUrl);
+          if (stock !== undefined && a.admin.permissions.includes("inventory.write")) await setStock(tx, vid, stock, a, vf.sku);
           const newRetail = mode === "AUTOMATIC" ? before.retailPrice : (vf.retailPrice === undefined ? before.retailPrice : vf.retailPrice);
           const newCost = vf.costPrice === undefined ? before.costPrice : vf.costPrice;
           if (mode !== "AUTOMATIC" && (newRetail ?? null) !== (before.retailPrice ?? null)) await tx.priceHistory.create({ data: { productId: id, variantId: vid, type: "retail", oldPrice: before.retailPrice ?? cur.retailPrice, newPrice: newRetail ?? fields.retailPrice ?? cur.retailPrice, oldCost: before.costPrice, newCost, adminId: a.admin.id, source: "manual" } });
           const ch = diff(before as unknown as Record<string, unknown>, { sku: vf.sku, name: axes.name, phoneModelId: vf.phoneModelId, colorId: vf.colorId, costPrice: vf.costPrice, pricingMode: vf.pricingMode, isActive: vf.isActive, retailPrice: vf.retailPrice, wholesalePrice: vf.wholesalePrice });
           if (ch.changed) await audit(a, "variant.update", "variant", vid, ch.old, ch.next, tx);
         } else {
-          const row = await tx.productVariant.create({ data: { ...vf, ...axes, productId: id, sortOrder: i, inventory: { create: { quantity: stock } } }, include: { inventory: true } });
-          if (stock > 0) await tx.inventoryMovement.create({ data: { inventoryId: row.inventory!.id, delta: stock, balanceAfter: stock, reason: "restock", note: "موجودی اولیه", createdById: a.admin.id } });
+          const initial = stock ?? 0;
+          const row = await tx.productVariant.create({ data: { ...vf, ...axes, productId: id, sortOrder: i, inventory: { create: { quantity: initial } } }, include: { inventory: true } });
+          if (imageUrl) wantedImages.set(row.id, imageUrl);
+          if (initial > 0) await tx.inventoryMovement.create({ data: { inventoryId: row.inventory!.id, delta: initial, balanceAfter: initial, reason: "restock", note: "موجودی اولیه", createdById: a.admin.id } });
           await audit(a, "variant.create", "variant", row.id, undefined, { sku: row.sku, name: row.name, phoneModelId: row.phoneModelId, colorId: row.colorId }, tx);
         }
       }
     }
+    await syncVariantImages(tx, id, wantedImages);
     const touchesPricing = "costPrice" in fields || "pricingMode" in fields || (variants ?? []).some((v) => v.costPrice !== undefined || v.pricingMode !== undefined);
     if (touchesPricing || nextMode === "AUTOMATIC" || variants) await recomputePrices(tx, { productIds: [id] }, { apply: true, adminId: a.admin.id, source: "manual", reason: "ویرایش محصول", oldCosts, wholesale: { policy, onConflict: "throw" } });
     await assertWholesaleConsistent(tx, id, statesBefore, policy);
-    const change = { ...df.next, ...(phoneModelIds ? { phoneModelIds } : {}), ...(extraCategoryIds ? { extraCategoryIds } : {}), ...(extraBrandIds ? { extraBrandIds } : {}), ...(images ? { images: images.length } : {}), ...(variants ? { variants: variants.length } : {}) };
+    const change = { ...df.next, ...(phoneModelIds ? { phoneModelIds } : {}), ...(extraCategoryIds ? { extraCategoryIds } : {}), ...(extraBrandIds ? { extraBrandIds } : {}), ...(attributeValueIds ? { attributeValueIds } : {}), ...(images ? { images: images.length } : {}), ...(variants ? { variants: variants.length } : {}) };
     if (Object.keys(change).length) await audit(a, "product.update", "product", id, { ...df.old, ...(priceLog.length ? { priceHistory: priceLog } : {}) }, change, tx);
   });
   return getProduct(id, capsOf(a));

@@ -19,7 +19,7 @@ const cartInclude = {
     include: {
       variant: {
         include: {
-          inventory: true, colorRef: { select: { name: true } }, phoneModel: { select: { name: true, brandId: true } },
+          inventory: true, image: { select: { url: true } }, colorRef: { select: { name: true } }, phoneModel: { select: { name: true, brandId: true } },
           product: { include: { extraCategories: { select: { categoryId: true, category: { select: { parentId: true } } } }, extraBrands: { select: { brandId: true } }, category: { select: { parentId: true } }, images: { where: { type: "IMAGE" as const }, orderBy: [{ isPrimary: "desc" as const }, { sortOrder: "asc" as const }], take: 1 }, brand: { select: { name: true } } } },
         },
       },
@@ -136,7 +136,7 @@ export async function getCartView(user: SessionUser | null): Promise<CartView> {
     const available = p.isActive && i.variant.isActive && stock >= i.quantity;
     if (!available) issues.push(`موجودی «${p.name}» کافی نیست (موجودی: ${stock}).`);
     return {
-      id: i.id, slug: p.slug, productId: p.id, variantId: i.variantId, name: p.name, image: p.images[0]?.url ?? null, hue: p.visualHue ?? 210,
+      id: i.id, slug: p.slug, productId: p.id, variantId: i.variantId, name: p.name, image: i.variant.image?.url ?? p.images[0]?.url ?? null, hue: p.visualHue ?? 210,
       option, phoneModelId: i.phoneModelId, unitPrice: price.unitPrice, listPrice: price.listPrice, priceType: price.priceType, quantity: i.quantity,
       lineTotal: price.unitPrice * i.quantity, stock, available, minWholesaleQty: user?.wholesale && p.wholesalePrice != null ? p.minWholesaleQty : null,
       originalPrice: price.originalPrice, discountAmount: price.discountAmount, discountLabel: price.discountLabel,

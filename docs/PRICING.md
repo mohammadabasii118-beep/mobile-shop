@@ -59,3 +59,10 @@ The migration `20261210000000_phase6_variants_pricing_discounts` is additive (ne
 A product keeps one **primary** category (required) and brand (optional), and can have any number of **extra** categories/brands (`ProductCategory`, `ProductBrand`).
 The primary drives the breadcrumb, the card label and automatic margin rules. Extras make the product appear in those category/brand pages, the shop filters and counts,
 and let category (including the parent of an extra category) and product-brand discounts match — in TypeScript (`matchesLine`) and in SQL (`effective-sql.ts`) alike.
+
+## Variable products (phase 11)
+`Product.productType` is SIMPLE (one axis-less variant) or VARIABLE (model × colour variants, managed only inside the product form's Variant Matrix).
+A variant's price = its own `retailPrice` or the product's base price; its `salePrice` (special final price) competes with the legacy product discount and promotions — best single reduction wins
+(`legacyFixedOf` in `discounts.ts`, mirrored in `effective-sql.ts`). Inactive or out-of-stock variants cannot be added to the cart or ordered (checked again on the server at cart and checkout);
+order items snapshot price and image. Generated variants start inactive. Phone models are grouped Brand → Series → Model (`PhoneSeries`, optional per model; nothing is auto-grouped).
+Custom attributes (`Attribute`/`AttributeValue`) are descriptive; `model` and `color` are system attributes; `usedForVariants` is reserved for future matrix axes.

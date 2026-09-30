@@ -1,3 +1,5 @@
+> **وضعیت: پیاده‌سازی شد (فاز ۱۱).** تست‌ها: `scripts/e2e-phase11.test.ts`، `scripts/browser-phase11.test.ts`. Migration: `20270150000000_phase11_variable_products` (فقط افزایشی).
+
 # طرح پیاده‌سازی سیستم Variable Product (برای تأیید — هیچ کدی اجرا نشده)
 
 ## ۱. نتیجهٔ بررسی کد فعلی

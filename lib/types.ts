@@ -44,6 +44,8 @@ export interface VariantOption {
   id: string; sku: string; stock: number;
   brandId: string | null; brandName: string | null;
   modelId: string | null; modelName: string | null;
+  seriesId?: string | null; seriesName?: string | null;
+  imageUrl?: string | null; // the variant's own image (one of the product's images); null = use the product's
   colorId: string | null; colorName: string | null; colorHex: string | null;
   price: number; oldPrice?: number;
   wholesale?: { unit: number; min: number } | null;

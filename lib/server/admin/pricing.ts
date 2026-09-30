@@ -5,7 +5,7 @@ import type { Prisma } from "@/lib/generated/prisma/client";
 import { badRequest, conflict, notFound } from "@/lib/server/errors";
 import { audit, pageParams, type AdminCtx, type Db } from "@/lib/server/admin/core";
 import { loadRuleIndex, recomputePrices, resolveRule, ruleLabel, type PriceChange } from "@/lib/server/price-engine/rules";
-import { loadActiveDiscounts, resolveUnitDiscount } from "@/lib/server/price-engine/discounts";
+import { legacyFixedOf, loadActiveDiscounts, resolveUnitDiscount } from "@/lib/server/price-engine/discounts";
 import { getWholesalePolicy, wholesaleProblem } from "@/lib/server/price-engine/wholesale";
 import { lineCtx } from "@/lib/server/price-engine/line";
 
@@ -134,7 +134,7 @@ export async function listPricing(req: NextRequest) {
     const price = v.retailPrice ?? p.retailPrice;
     const cost = v.costPrice ?? p.costPrice;
     const rule = v.pricingMode === "AUTOMATIC" ? resolveRule(idx, { variantId: v.id, productId: p.id, categoryId: p.categoryId }) : null;
-    const disc = resolveUnitDiscount(discounts, lineCtx(p, v), price, p.retailDiscount);
+    const disc = resolveUnitDiscount(discounts, lineCtx(p, v), price, legacyFixedOf(p.retailDiscount, price, v.salePrice));
     const qty = v.inventory?.quantity ?? 0;
     return {
       variantId: v.id, productId: p.id, product: p.name, variant: v.name, sku: v.sku, category: p.category.name,

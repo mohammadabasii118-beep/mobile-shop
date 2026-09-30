@@ -20,15 +20,17 @@ export const EFFECTIVE_PRICE_JOIN = Prisma.sql`
   LEFT JOIN LATERAL (
     SELECT MIN(GREATEST(0, b."base" - COALESCE(x."best", 0))) AS "price"
     FROM (
-      SELECT v."id" AS "vid", v."phoneModelId" AS "pm", COALESCE(v."retailPrice", p."retailPrice") AS "base"
+      SELECT v."id" AS "vid", v."phoneModelId" AS "pm", COALESCE(v."retailPrice", p."retailPrice") AS "base", v."salePrice" AS "sale"
       FROM "ProductVariant" v WHERE v."productId" = p."id" AND v."isActive" = true
       UNION ALL
-      SELECT NULL::text, NULL::text, p."retailPrice"
+      SELECT NULL::text, NULL::text, p."retailPrice", NULL::int
       WHERE NOT EXISTS (SELECT 1 FROM "ProductVariant" v2 WHERE v2."productId" = p."id" AND v2."isActive" = true)
     ) b
     LEFT JOIN LATERAL (
       SELECT MAX(c."cand") AS "best" FROM (
         SELECT LEAST(b."base", p."retailDiscount") AS "cand" WHERE p."retailDiscount" > 0
+        UNION ALL
+        SELECT b."base" - b."sale" WHERE b."sale" IS NOT NULL AND b."sale" < b."base"
         UNION ALL
         SELECT LEAST(b."base", CASE WHEN d."type" = 'PERCENT' THEN ((b."base"::bigint * d."value") / 100)::int ELSE d."value" END)
         FROM "Discount" d

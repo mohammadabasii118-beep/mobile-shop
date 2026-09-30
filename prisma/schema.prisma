@@ -126,22 +126,22 @@ model PasswordResetToken {
  */
 
 model Category {
-  id             String     @id @default(cuid())
-  slug           String     @unique
+  id             String            @id @default(cuid())
+  slug           String            @unique
   name           String
   parentId       String?
-  parent         Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
-  children       Category[] @relation("CategoryTree")
+  parent         Category?         @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children       Category[]        @relation("CategoryTree")
   description    String?
   image          String?
-  sortOrder      Int        @default(0)
-  isActive       Boolean    @default(true)
+  sortOrder      Int               @default(0)
+  isActive       Boolean           @default(true)
   seoTitle       String?
   seoDescription String?
   seoContent     String?
   canonical      String?
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
   products       Product[]
   extraProducts  ProductCategory[]
 
@@ -149,18 +149,19 @@ model Category {
 }
 
 model Brand {
-  id             String       @id @default(cuid())
-  slug           String       @unique
+  id             String         @id @default(cuid())
+  slug           String         @unique
   name           String
   description    String?
   logo           String?
-  isActive       Boolean      @default(true)
-  sortOrder      Int          @default(0)
+  isActive       Boolean        @default(true)
+  sortOrder      Int            @default(0)
   seoTitle       String?
   seoDescription String?
   products       Product[]
   extraProducts  ProductBrand[]
   phoneModels    PhoneModel[]
+  phoneSeries    PhoneSeries[]
 }
 
 model PhoneModel {
@@ -175,10 +176,69 @@ model PhoneModel {
   sortOrder      Int                 @default(0)
   seoTitle       String?
   seoDescription String?
+  seriesId       String?
+  series         PhoneSeries?        @relation(fields: [seriesId], references: [id], onDelete: SetNull)
   products       ProductPhoneModel[]
   variants       ProductVariant[]
 
   @@index([brandId, sortOrder])
+  @@index([seriesId])
+}
+
+/// Brand → Series → Model. Series are optional for a model (existing models stay ungrouped until the admin groups them).
+model PhoneSeries {
+  id        String       @id @default(cuid())
+  brandId   String
+  brand     Brand        @relation(fields: [brandId], references: [id], onDelete: Restrict)
+  name      String
+  slug      String       @unique
+  isActive  Boolean      @default(true)
+  sortOrder Int          @default(0)
+  models    PhoneModel[]
+
+  @@index([brandId, sortOrder])
+}
+
+enum ProductType {
+  SIMPLE
+  VARIABLE
+}
+
+/// Central attribute definitions. "model" and "color" are system attributes (their values are the phone models / colours managed elsewhere).
+model Attribute {
+  id              String           @id @default(cuid())
+  name            String
+  slug            String           @unique
+  isSystem        Boolean          @default(false)
+  systemKey       String?          @unique
+  usedForVariants Boolean          @default(false) // reserved: future attributes that take part in the variant matrix
+  isActive        Boolean          @default(true)
+  sortOrder       Int              @default(0)
+  values          AttributeValue[]
+}
+
+model AttributeValue {
+  id          String                  @id @default(cuid())
+  attributeId String
+  attribute   Attribute               @relation(fields: [attributeId], references: [id], onDelete: Cascade)
+  value       String
+  hex         String?
+  isActive    Boolean                 @default(true)
+  sortOrder   Int                     @default(0)
+  products    ProductAttributeValue[]
+
+  @@unique([attributeId, value])
+}
+
+model ProductAttributeValue {
+  productId String
+  product   Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  valueId   String
+  value     AttributeValue @relation(fields: [valueId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now())
+
+  @@id([productId, valueId])
+  @@index([valueId])
 }
 
 model Product {
@@ -218,19 +278,21 @@ model Product {
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
 
-  variants     ProductVariant[]
-  images       ProductImage[]
-  phoneModels  ProductPhoneModel[]
+  variants        ProductVariant[]
+  images          ProductImage[]
+  phoneModels     ProductPhoneModel[]
   /// Additional categories / brands besides the primary `categoryId` / `brandId` (unlimited). The primary ones still drive breadcrumbs and margin rules.
   extraCategories ProductCategory[]
   extraBrands     ProductBrand[]
-  reviews      Review[]
-  questions    ProductQuestion[]
-  wishlist     WishlistItem[]
-  priceHistory PriceHistory[]
-  backInStock  BackInStockRequest[]
-  related      ProductRelation[]    @relation("RelationFrom")
-  relatedTo    ProductRelation[]    @relation("RelationTo")
+  productType     ProductType             @default(SIMPLE)
+  attributeValues ProductAttributeValue[]
+  reviews         Review[]
+  questions       ProductQuestion[]
+  wishlist        WishlistItem[]
+  priceHistory    PriceHistory[]
+  backInStock     BackInStockRequest[]
+  related         ProductRelation[]       @relation("RelationFrom")
+  relatedTo       ProductRelation[]       @relation("RelationTo")
 
   @@index([categoryId, isActive])
   @@index([brandId])
@@ -275,6 +337,9 @@ model ProductVariant {
   colorRef       Color?         @relation(fields: [colorId], references: [id], onDelete: Restrict)
   costPrice      Int?
   pricingMode    PricingMode    @default(MANUAL)
+  salePrice      Int? // special final price of this variant (null = none); competes with the other discounts, best single wins
+  imageId        String?
+  image          ProductImage?  @relation(fields: [imageId], references: [id], onDelete: SetNull)
   inventory      Inventory?
   cartItems      CartItem[]
   orderItems     OrderItem[]
@@ -287,21 +352,22 @@ model ProductVariant {
 }
 
 model ProductImage {
-  id        String  @id @default(cuid())
+  id        String           @id @default(cuid())
   productId String
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
   url       String
   alt       String?
-  isPrimary Boolean @default(false)
-  sortOrder Int     @default(0)
-  type      MediaType @default(IMAGE)
+  isPrimary Boolean          @default(false)
+  sortOrder Int              @default(0)
+  type      MediaType        @default(IMAGE)
   caption   String?
   mimeType  String?
   fileSize  Int?
   width     Int?
   height    Int?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @default(now()) @updatedAt
+  variants  ProductVariant[]
 
   @@index([productId, sortOrder])
   @@index([productId, type])
@@ -743,25 +809,25 @@ model WholesaleProfile {
  */
 
 model Review {
-  id         String    @id @default(cuid())
-  productId  String
-  product    Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  userId     String
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orderId    String?
-  order      Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  orderItemId String?
-  rating     Int
-  title      String?
-  body       String
-  status     String    @default("pending") // pending | approved | rejected
-  verifiedPurchase Boolean @default(false)
+  id               String    @id @default(cuid())
+  productId        String
+  product          Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId          String?
+  order            Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderItemId      String?
+  rating           Int
+  title            String?
+  body             String
+  status           String    @default("pending") // pending | approved | rejected
+  verifiedPurchase Boolean   @default(false)
   rejectionReason  String?
   moderatedAt      DateTime?
-  adminReply String?
-  repliedAt  DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @default(now()) @updatedAt
+  adminReply       String?
+  repliedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @default(now()) @updatedAt
 
   @@unique([userId, productId, orderId])
   @@index([productId, status])

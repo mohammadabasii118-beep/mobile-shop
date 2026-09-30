@@ -37,6 +37,10 @@ export function matchesLine(d: Pick<Discount, "scope" | "targetId">, c: LineCtx)
   }
 }
 
+/** The per-product fixed discount competes with the variant's special sale price (base − salePrice); the larger one is the "legacy" candidate. */
+export const legacyFixedOf = (productDiscount: number, baseUnit: number, salePrice?: number | null) =>
+  Math.max(productDiscount, salePrice != null && salePrice < baseUnit ? baseUnit - salePrice : 0);
+
 export interface DiscountEnv {
   /** Cart retail subtotal BEFORE discounts. Omit on product/list pages: promotions with a minimum order then do not show. */
   cartRetailSubtotal?: number;

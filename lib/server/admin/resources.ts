@@ -69,8 +69,48 @@ export const RESOURCES: Record<string, Resource> = {
   },
   "phone-models": {
     model: "phoneModel", perm: "phone.write", label: "مدل گوشی", auditName: "phone_model", slugKind: "model", hasSort: true,
-    create: z.object({ name: req(80), slug, brandId: req(40), image, description: opt(1000), isActive: bool.optional(), sortOrder: int(0, 100000).optional(), seoTitle: opt(120), seoDescription: opt(300) }),
-    orderBy: [{ brand: { sortOrder: "asc" } }, { sortOrder: "asc" }], search: ["name", "slug"], filters: ["isActive", "brandId"], include: { brand: { select: { name: true } }, _count: { select: { products: true } } },
+    create: z.object({ name: req(80), slug, brandId: req(40), seriesId: z.string().trim().max(40).transform((v) => v || null).nullable().optional(), image, description: opt(1000), isActive: bool.optional(), sortOrder: int(0, 100000).optional(), seoTitle: opt(120), seoDescription: opt(300) }),
+    orderBy: [{ brand: { sortOrder: "asc" } }, { sortOrder: "asc" }], search: ["name", "slug"], filters: ["isActive", "brandId", "seriesId"], include: { brand: { select: { name: true } }, series: { select: { name: true } }, _count: { select: { products: true } } },
+    guard: async (tx, data, existing) => {
+      const seriesId = (data.seriesId !== undefined ? data.seriesId : existing?.seriesId) as string | null | undefined;
+      if (!seriesId) return;
+      const brandId = (data.brandId as string | undefined) ?? (existing?.brandId as string | undefined);
+      const sr = await tx.phoneSeries.findUnique({ where: { id: seriesId }, select: { brandId: true } });
+      if (!sr) throw conflict("سری انتخاب‌شده وجود ندارد.");
+      if (brandId && sr.brandId !== brandId) throw conflict("سری باید متعلق به همان برند مدل باشد.");
+    },
+  },
+  "phone-series": {
+    model: "phoneSeries", perm: "phone.write", label: "سری گوشی", auditName: "phone_series", hasSort: true,
+    create: z.object({ name: req(80), slug, brandId: req(40), isActive: bool.optional(), sortOrder: int(0, 100000).optional() }),
+    orderBy: [{ brand: { sortOrder: "asc" } }, { sortOrder: "asc" }], search: ["name", "slug"], filters: ["isActive", "brandId"], include: { brand: { select: { name: true } }, _count: { select: { models: true } } },
+    beforeDelete: async (tx, id) => {
+      if (await tx.phoneModel.count({ where: { seriesId: id } })) throw conflict("این سری مدل دارد؛ ابتدا مدل‌ها را به سری دیگری ببرید (یا سری را غیرفعال کنید).");
+    },
+  },
+  attributes: {
+    model: "attribute", perm: "product.write", label: "Attribute", auditName: "attribute", hasSort: true,
+    create: z.object({ name: req(60), slug, isActive: bool.optional(), sortOrder: int(0, 100000).optional() }),
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }], search: ["name", "slug"], filters: ["isActive"], include: { _count: { select: { values: true } } },
+    guard: async (_tx, data, existing) => {
+      if (existing?.isSystem && data.slug !== undefined && data.slug !== existing.slug) throw conflict("اسلاگ Attribute سیستمی قابل تغییر نیست.");
+    },
+    beforeDelete: async (tx, id) => {
+      const a = await tx.attribute.findUnique({ where: { id }, select: { isSystem: true } });
+      if (a?.isSystem) throw conflict("Attributeهای سیستمی (مدل گوشی و رنگ) قابل حذف نیستند.");
+    },
+  },
+  "attribute-values": {
+    model: "attributeValue", perm: "product.write", label: "مقدار Attribute", auditName: "attribute_value", hasSort: true,
+    create: z.object({ attributeId: req(40), value: req(80), hex: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, "کد رنگ نامعتبر است.").nullable().optional().or(z.literal("").transform(() => null)), isActive: bool.optional(), sortOrder: int(0, 100000).optional() }),
+    orderBy: [{ attribute: { sortOrder: "asc" } }, { sortOrder: "asc" }, { value: "asc" }], search: ["value"], filters: ["isActive", "attributeId"], immutable: ["attributeId"],
+    include: { attribute: { select: { name: true } }, _count: { select: { products: true } } },
+    guard: async (tx, data, existing) => {
+      const attributeId = (data.attributeId as string | undefined) ?? (existing?.attributeId as string | undefined);
+      const a = attributeId ? await tx.attribute.findUnique({ where: { id: attributeId }, select: { isSystem: true } }) : null;
+      if (!a) throw conflict("Attribute انتخاب‌شده وجود ندارد.");
+      if (a.isSystem) throw conflict("مقادیر مدل گوشی و رنگ از بخش «مدل‌های گوشی» و «رنگ‌ها» مدیریت می‌شوند.");
+    },
   },
   coupons: {
     model: "coupon", perm: "coupon.write", label: "کوپن", auditName: "coupon", immutable: ["code"],
