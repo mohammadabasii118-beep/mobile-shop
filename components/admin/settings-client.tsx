@@ -26,6 +26,11 @@ const SECTIONS: { key: string; title: string; desc?: string; fields: F[] }[] = [
     { key: "maxRedeemPercent", label: "حداکثر درصدی از مبلغ کالا که با امتیاز قابل پرداخت است", type: "number", ltr: true },
   ] },
   { key: "finance", title: "کنترل مالی", desc: "جداسازی وظایف: کسی که بازگشت وجه بانکی را ثبت کرده نمی‌تواند همان را تأیید کند. خاموش کردن فقط برای فروشگاه‌های تک‌نفره توصیه می‌شود.", fields: [{ key: "fourEyes", label: "تأیید بازگشت وجه بانکی توسط شخصی غیر از درخواست‌دهنده", type: "bool" }] },
+  { key: "wholesalePolicy", title: "رابطهٔ قیمت عمده و خرده", desc: "هنگام ذخیرهٔ قیمت (دستی یا خودکار) بررسی می‌شود. قیمت‌های موجود تغییر نمی‌کنند؛ فقط ذخیرهٔ قیمت ناسازگار جدید رد می‌شود و قیمت خودکارِ ناسازگار اعمال نمی‌شود.", fields: [
+    { key: "minDiscountPercent", label: "حداقل فاصلهٔ قیمت عمده تا خرده (٪) — ۰ یعنی «بیشتر از خرده نباشد»", type: "number", ltr: true },
+    { key: "maxDiscountPercent", label: "حداکثر فاصلهٔ قیمت عمده تا خرده (٪) — ۰ یعنی بدون محدودیت", type: "number", ltr: true },
+    { key: "capAtRetail", label: "همکار هرگز بیشتر از قیمت روز خرده (بعد از تخفیف) پرداخت نکند", type: "bool" },
+  ] },
   { key: "general", title: "تنظیمات عمومی", fields: [{ key: "currency", label: "واحد پول" }, { key: "lowStockNotify", label: "هشدار کم‌موجودی", type: "bool" }] },
 ];
 

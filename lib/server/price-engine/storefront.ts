@@ -2,6 +2,7 @@ import "server-only";
 import type { Discount } from "@/lib/generated/prisma/client";
 import { priceLines } from "@/lib/server/price-engine/line";
 import type { Viewer } from "@/lib/server/pricing";
+import type { WholesalePolicy } from "@/lib/server/price-engine/wholesale";
 import type { VariantOption } from "@/lib/types";
 
 interface RowV {
@@ -17,12 +18,12 @@ interface RowP { id: string; categoryId: string; category: { parentId: string | 
  * Selectable variants of a product for the product page: brand → model → colour, each with its own stock and its own
  * server-computed price (after the best discount). Display only: the cart and checkout recompute everything again.
  */
-export function buildVariantOptions(p: RowP, viewer: Viewer, discounts: Discount[]): VariantOption[] | null {
+export function buildVariantOptions(p: RowP, viewer: Viewer, discounts: Discount[], policy?: WholesalePolicy): VariantOption[] | null {
   const modelled = p.variants.filter((v) => v.isActive && (v.phoneModelId || v.colorId));
   if (!modelled.length) return null;
   return modelled.map((v) => {
     const retail = priceLines([{ qty: 1, product: p, variant: v }], null, discounts)[0]!;
-    const ws = viewer?.wholesale && p.wholesalePrice != null ? priceLines([{ qty: Math.max(1, p.minWholesaleQty), product: p, variant: v }], viewer, discounts)[0]! : null;
+    const ws = viewer?.wholesale && p.wholesalePrice != null ? priceLines([{ qty: Math.max(1, p.minWholesaleQty), product: p, variant: v }], viewer, discounts, undefined, policy)[0]! : null;
     return {
       id: v.id, sku: v.sku, stock: v.inventory?.quantity ?? 0,
       brandId: v.phoneModel?.brandId ?? null, brandName: v.phoneModel?.brand.name ?? null,

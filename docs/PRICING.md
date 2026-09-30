@@ -17,10 +17,20 @@ cost ── rule (margin) ──► selling price ─► best discount ─► co
 - AUTOMATIC without cost or without any rule is **skipped and reported**, never guessed.
 
 ## Discounts
-- `Discount` = automatic reduction per unit: percent or fixed; scope all / category / product / variant / brand / model; time window; minimum cart subtotal; total and per-user limits; on/off. *Brand* matches the product's brand **or** the phone brand of the variant's model. Coupons (a code typed by the customer) are unchanged and apply **after** discounts.
+- `Discount` = automatic reduction per unit: percent or fixed; scope all / category / product / variant / brand / model; time window; minimum cart subtotal; total and per-user limits; on/off. There are two separate brand targets: **برند محصول** (`PRODUCT_BRAND`, the maker of the product, e.g. Spigen) matches only `Product.brandId`; **برند گوشی** (`PHONE_BRAND`, e.g. Apple) matches only the brand of the variant's phone model. The admin pickers list each kind separately (with counts) and explain the difference. The old ambiguous scope `BRAND` (first Phase 6 cut) can no longer be created; existing rows keep their old meaning until re-targeted. Coupons (a code typed by the customer) are unchanged and apply **after** discounts.
 - **No stacking**: for each unit the single best reduction wins among the legacy per-product discount (`retailDiscount`) and matching promotions. Discounts are retail-only (wholesale prices are separate, as before).
 - Limits are enforced inside the order transaction (`UPDATE … usedCount < usageLimit`, per-user count) and given back when an unpaid order is cancelled or an order is fully refunded (same rollback path as coupons).
 - Product/list pages show a discount only when it needs no cart context (no minimum order); the cart and checkout apply the rest.
+
+## Wholesale ↔ retail relationship (setting «رابطهٔ قیمت عمده و خرده»)
+Configurable in *تنظیمات* (`wholesalePolicy`): **minimum distance** (wholesale must be at least X % below retail; 0 = "not above retail", the old rule), **maximum distance** (wholesale may not be more than Y % below retail; 0 = no limit), and **capAtRetail** (at checkout a partner never pays more than the public price of the day, i.e. retail after the discount shown to everyone).
+- Enforced when prices are **saved**: product/variant create and edit (retail, wholesale, cost, mode, rules) run in one transaction that is rolled back with a clear `wholesale_policy` (400) message that states the allowed range. Only pairs whose price changed are judged, so an unrelated edit of an already-inconsistent product is not blocked and nothing is rewritten.
+- Enforced when prices are **computed**: an automatic price (rule change, cost change, bulk operation) that would break the relationship is **not applied**, the old price stays, and it is reported (preview and result list them first, `wholesaleConflictCount`). A manual product edit that would cause it fails atomically instead.
+- Tightening the policy never rewrites existing prices. *قیمت‌گذاری › جدول* shows a «قیمت عمده» column with an «ناسازگار با خرده» badge and a banner listing current conflicts (`GET /api/admin/pricing/wholesale`).
+- Compatible with the existing wholesale system: tiers, minimum quantity, minimum order and the partner portal are unchanged; the tier discount only lowers the price further.
+
+## Storefront sort by effective price
+Sorting by price (low→high / high→low) orders by the **payable** price: cheapest active variant of *(base − best single discount)*. It is computed in SQL (`price-engine/effective-sql.ts`, lateral join, no new column, so time-based promotions and usage limits are always current) with exactly the same rules as the TypeScript engine (scope matching, time window, capacity, no-minimum-order, integer flooring, legacy discount, no-active-variant fallback). Prices printed on cards still come from the TypeScript engine; nothing is computed in the browser. An e2e test compares the SQL order with the prices shown by the pages for every discount scope.
 
 ## Checkout and snapshots
 - Prices are always recomputed on the server. The quote returns `priceHash`; the checkout page echoes it. If anything that affects the price changed in between, the order is refused with `price_changed` (409) and the page re-quotes; the old price can never be charged.
@@ -42,6 +52,5 @@ Purchase cost is business-sensitive: without `pricing.read` the API returns `nul
 The migration `20261210000000_phase6_variants_pricing_discounts` is additive (new columns nullable/defaulted, new tables) and also inserts the permissions `pricing.read`, `pricing.write`, `discount.write` for the roles `super_admin` and `admin`, and turns existing free-text variant colours into managed colours. Nothing is deleted. Other custom roles must be granted the new permissions in the role editor.
 
 ## Known limits
-- List sorting by price and the price filter use the stored base price minus the legacy discount; promotional discounts appear on cards and pages but are not part of the SQL sort.
 - Home-page product rails are cached ≤ 60 s, so a promotion that starts or ends can lag there by up to a minute; product page, cart and checkout are always live.
-- A rule/cost change can push an automatic retail price below a fixed wholesale price; the admin sees it in the table, the system does not block it.
+- Percent fields of the wholesale policy accept at most two decimals; the tier discount is not part of the policy check (it only lowers the partner price further).

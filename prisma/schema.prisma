@@ -1036,7 +1036,9 @@ enum DiscountScope {
   PRODUCT
   CATEGORY
   VARIANT
-  BRAND // product brand OR the phone brand of the variant's model
+  BRAND // LEGACY (Phase 6 first cut): matched the product brand OR the phone brand. Kept only so existing rows keep working; new discounts must use PRODUCT_BRAND or PHONE_BRAND.
+  PRODUCT_BRAND // the brand of the product itself (e.g. Spigen)
+  PHONE_BRAND // the brand of the variant's phone model (e.g. Apple)
   MODEL
 }
 

@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import { allocate } from "@/lib/server/price-engine/calc";
 import { priceLines } from "@/lib/server/price-engine/line";
 import { loadActiveDiscounts, reserveDiscounts, userDiscountUses } from "@/lib/server/price-engine/discounts";
+import { getWholesalePolicy } from "@/lib/server/price-engine/wholesale";
 import { getProvider } from "@/lib/server/payments";
 import { userCartId, variantOption } from "@/lib/server/cart";
 import { rateLimit } from "@/lib/server/rate-limit";
@@ -36,7 +37,7 @@ async function priceCart(tx: Tx, user: SessionUser) {
   }
   const discounts = await loadActiveDiscounts(tx);
   const userUses = await userDiscountUses(tx, user.id, discounts.map((d) => d.id));
-  const prices = priceLines(cart.items.map((i) => ({ qty: i.quantity, product: i.variant.product, variant: i.variant })), user, discounts, userUses);
+  const prices = priceLines(cart.items.map((i) => ({ qty: i.quantity, product: i.variant.product, variant: i.variant })), user, discounts, userUses, await getWholesalePolicy(tx));
   const lines = cart.items.map((i, k) => {
     const p = i.variant.product;
     const price = prices[k]!;

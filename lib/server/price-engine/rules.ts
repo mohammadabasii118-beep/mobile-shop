@@ -1,5 +1,7 @@
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { priceFromCost, type MarginRule } from "@/lib/server/price-engine/calc";
+import { wholesaleProblem, type WholesalePolicy } from "@/lib/server/price-engine/wholesale";
+import { badRequest } from "@/lib/server/errors";
 
 type Db = Prisma.TransactionClient;
 
@@ -48,7 +50,8 @@ export interface PriceChange {
   productId: string; productName: string; variantId: string | null; sku: string;
   oldPrice: number; newPrice: number; oldCost: number | null; newCost: number | null; oldRule: string; newRule: string;
 }
-export interface RecomputeResult { changes: PriceChange[]; skipped: { productId: string; variantId: string | null; sku: string; reason: string }[] }
+export interface SkippedItem { productId: string; variantId: string | null; sku: string; reason: string; code: "no_cost" | "no_rule" | "wholesale" }
+export interface RecomputeResult { changes: PriceChange[]; skipped: SkippedItem[] }
 
 /** Costs before the edit that triggered a recompute (variant-level and product-level), so history can show old → new. */
 export interface OldCosts { product: number | null; variants: Map<string, number | null> }
@@ -60,7 +63,9 @@ export interface RecomputeFilter { all?: boolean; productIds?: string[]; variant
  * MANUAL items are never touched. With `apply: false` nothing is written (preview). Every written change gets a PriceHistory row.
  */
 export async function recomputePrices(
-  tx: Db, filter: RecomputeFilter, o: { apply: boolean; adminId: string | null; reason?: string | null; source: "rule" | "bulk" | "manual"; idx?: RuleIndex; /** Rules as they were BEFORE the change being applied (for history). */ oldIdx?: RuleIndex; /** Write PriceHistory rows (default true). Bulk operations write their own richer rows. */ log?: boolean; /** Pre-edit costs, when the caller changed costs before recomputing. Only valid together with a single-product filter. */ oldCosts?: OldCosts },
+  tx: Db, filter: RecomputeFilter, o: { apply: boolean; adminId: string | null; reason?: string | null; source: "rule" | "bulk" | "manual"; idx?: RuleIndex; /** Rules as they were BEFORE the change being applied (for history). */ oldIdx?: RuleIndex; /** Write PriceHistory rows (default true). Bulk operations write their own richer rows. */ log?: boolean; /** Pre-edit costs, when the caller changed costs before recomputing. Only valid together with a single-product filter. */ oldCosts?: OldCosts;
+    /** Wholesale/retail relationship. A price that would break it is NOT applied (the old price stays): "skip" reports it, "throw" fails the caller's transaction. */
+    wholesale?: { policy: WholesalePolicy; onConflict: "skip" | "throw" } },
 ): Promise<RecomputeResult> {
   const idx = o.idx ?? (await loadRuleIndex(tx));
   const where: Prisma.ProductWhereInput = { OR: [{ pricingMode: "AUTOMATIC" }, { variants: { some: { pricingMode: "AUTOMATIC" } } }] };
@@ -82,7 +87,11 @@ export async function recomputePrices(
       if (v.pricingMode !== "AUTOMATIC") continue;
       if (filter.variantIds && !filter.variantIds.includes(v.id)) continue;
       const c = computeSelling(idx, { variantId: v.id, productId: p.id, categoryId: p.categoryId, cost: v.costPrice ?? p.costPrice });
-      if (!c.ok) { res.skipped.push({ productId: p.id, variantId: v.id, sku: v.sku, reason: c.reason === "no_cost" ? "هزینه خرید ثبت نشده است." : "هیچ قانون قیمت‌گذاری فعالی پیدا نشد." }); continue; }
+      if (!c.ok) { res.skipped.push({ productId: p.id, variantId: v.id, sku: v.sku, code: c.reason, reason: c.reason === "no_cost" ? "هزینه خرید ثبت نشده است." : "هیچ قانون قیمت‌گذاری فعالی پیدا نشد." }); continue; }
+      if (v.retailPrice !== c.price && o.wholesale) {
+        const msg = wholesaleProblem(c.price, v.wholesalePrice ?? p.wholesalePrice, o.wholesale.policy);
+        if (msg) { if (o.wholesale.onConflict === "throw") throw badRequest(`${v.sku}: قیمت خودکار جدید با قیمت عمده ناسازگار است. ${msg}`, "wholesale_policy"); res.skipped.push({ productId: p.id, variantId: v.id, sku: v.sku, code: "wholesale", reason: `قیمت جدید اعمال نشد؛ ${msg}` }); continue; }
+      }
       newVariantPrice.set(v.id, c.price);
       if (v.retailPrice !== c.price) {
         res.changes.push({ productId: p.id, productName: p.name, variantId: v.id, sku: v.sku, oldPrice: v.retailPrice ?? p.retailPrice, newPrice: c.price, oldCost: o.oldCosts && o.oldCosts.variants.has(v.id) ? (o.oldCosts.variants.get(v.id) ?? o.oldCosts.product) : v.costPrice, newCost: v.costPrice ?? p.costPrice, oldRule: before({ variantId: v.id, productId: p.id, categoryId: p.categoryId }), newRule: ruleLabel(c.rule) });
@@ -91,11 +100,15 @@ export async function recomputePrices(
     }
     if (p.pricingMode === "AUTOMATIC" && !filter.variantIds) {
       let price: number | null = null; let rule: RuleRow | null = null;
-      if (p.costPrice != null) { const c = computeSelling(idx, { productId: p.id, categoryId: p.categoryId, cost: p.costPrice }); if (c.ok) { price = c.price; rule = c.rule; } else res.skipped.push({ productId: p.id, variantId: null, sku: p.sku, reason: c.reason === "no_cost" ? "هزینه خرید ثبت نشده است." : "هیچ قانون قیمت‌گذاری فعالی پیدا نشد." }); }
+      if (p.costPrice != null) { const c = computeSelling(idx, { productId: p.id, categoryId: p.categoryId, cost: p.costPrice }); if (c.ok) { price = c.price; rule = c.rule; } else res.skipped.push({ productId: p.id, variantId: null, sku: p.sku, code: c.reason, reason: c.reason === "no_cost" ? "هزینه خرید ثبت نشده است." : "هیچ قانون قیمت‌گذاری فعالی پیدا نشد." }); }
       else {
         // A "container" product: the listing price is the cheapest active variant.
         const prices = p.variants.filter((v) => v.isActive).map((v) => newVariantPrice.get(v.id) ?? v.retailPrice).filter((x): x is number => x != null);
         if (prices.length) price = Math.min(...prices);
+      }
+      if (price != null && price !== p.retailPrice && o.wholesale && p.costPrice != null) {
+        const msg = wholesaleProblem(price, p.wholesalePrice, o.wholesale.policy);
+        if (msg) { if (o.wholesale.onConflict === "throw") throw badRequest(`${p.sku}: قیمت خودکار جدید با قیمت عمده ناسازگار است. ${msg}`, "wholesale_policy"); res.skipped.push({ productId: p.id, variantId: null, sku: p.sku, code: "wholesale", reason: `قیمت جدید اعمال نشد؛ ${msg}` }); price = null; }
       }
       if (price != null && price !== p.retailPrice) {
         res.changes.push({ productId: p.id, productName: p.name, variantId: null, sku: p.sku, oldPrice: p.retailPrice, newPrice: price, oldCost: o.oldCosts ? o.oldCosts.product : p.costPrice, newCost: p.costPrice, oldRule: before({ productId: p.id, categoryId: p.categoryId }), newRule: ruleLabel(rule) });

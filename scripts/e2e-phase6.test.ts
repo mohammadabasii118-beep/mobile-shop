@@ -60,6 +60,11 @@ describe("Phase 6 — variants, pricing engine, discounts", () => {
   // Promotions from one test must never leak into the next (brands/models/categories are shared across the file).
   afterEach(async () => { if (madeDiscounts.length) await db.discount.updateMany({ where: { id: { in: madeDiscounts.splice(0) } }, data: { isActive: false } }); });
   after(async () => {
+    // Keep the dev database's storefront small: test categories/brands/models/colours are retired (deactivated), not deleted.
+    await db.category.updateMany({ where: { id: { in: [catId, catId2] } }, data: { isActive: false } });
+    await db.brand.updateMany({ where: { id: { in: Object.values(brands) } }, data: { isActive: false } });
+    await db.phoneModel.updateMany({ where: { id: { in: Object.values(models) } }, data: { isActive: false } });
+    await db.color.updateMany({ where: { id: { in: Object.values(colors) } }, data: { isActive: false } });
     if (savedGlobal) await db.pricingRule.upsert({ where: { scope_targetId: { scope: "GLOBAL", targetId: "" } }, update: savedGlobal, create: { scope: "GLOBAL", targetId: "", ...savedGlobal } });
     else await db.pricingRule.deleteMany({ where: { scope: "GLOBAL" } });
     await db.$disconnect();
@@ -167,7 +172,7 @@ describe("Phase 6 — variants, pricing engine, discounts", () => {
       await discount({ type: "FIXED", value: 50_000, scope: "PRODUCT", targetId: P.id });
       assert.equal((await priced(P, "a")).line.unitPrice, 450_000);
       const Q = await mkProduct({ retailPrice: 300_000, variants: [{ key: "a", model: "i12", color: "white" }, { key: "s", model: "s23", color: "white" }] });
-      await discount({ type: "PERCENT", value: 10, scope: "BRAND", targetId: brands.Apple });
+      await discount({ type: "PERCENT", value: 10, scope: "PHONE_BRAND", targetId: brands.Apple });
       assert.equal((await priced(Q, "a")).line.unitPrice, 270_000, "phone brand applies to that brand's variants");
       assert.equal((await priced(Q, "s")).line.unitPrice, 300_000, "…and not to another brand");
       const R = await mkProduct({ retailPrice: 100_000, category: catId2, variants: [{ key: "a" }] });
@@ -229,14 +234,14 @@ describe("Phase 6 — variants, pricing engine, discounts", () => {
       const cartView = ok(await cu.c.get("/api/cart")); assert.equal(cartView.subtotal, q.subtotal, "cart and checkout agree to the Toman");
       assert.equal(ok(await place(cu)).total, 175_000);
     });
-    it("wholesale partners keep their own pricing (promotions are retail-only)", async () => {
+    it("wholesale partners keep their own pricing: promotions do not stack on it (the wholesale-policy cap at the public price is tested in phase 6b)", async () => {
       const P = await mkProduct({ retailPrice: 100_000, variants: [{ key: "a", stock: 50 }] });
       await admin.patch(`/api/admin/products/${P.id}`, { wholesalePrice: 70_000, minWholesaleQty: 2 });
-      await discount({ type: "PERCENT", value: 50, scope: "PRODUCT", targetId: P.id });
+      await discount({ type: "PERCENT", value: 10, scope: "PRODUCT", targetId: P.id }); // public price 90 000, still above the 70 000 wholesale price
       const partner = await loginWithPassword("09120000003", "Partner@12345");
       ok(await add({ c: partner } as Cust, P.slug, P.vid("a"), 2));
       const line = (ok(await partner.get("/api/cart")).lines as any[]).find((l) => l.variantId === P.vid("a"));
-      assert.equal(line.priceType, "wholesale"); assert.equal(line.unitPrice, 70_000);
+      assert.equal(line.priceType, "wholesale"); assert.equal(line.unitPrice, 70_000, "10 % promotion is not applied on top of wholesale");
     });
   });
 

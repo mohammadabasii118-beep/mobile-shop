@@ -102,18 +102,22 @@ export const RESOURCES: Record<string, Resource> = {
     model: "discount", perm: "discount.write", label: "تخفیف", auditName: "discount",
     create: z.object({
       name: req(80), type: z.enum(["PERCENT", "FIXED"]), value: int(1, 2_000_000_000),
-      scope: z.enum(["ALL", "PRODUCT", "CATEGORY", "VARIANT", "BRAND", "MODEL"]), targetId: z.string().trim().max(40).optional(),
+      scope: z.enum(["ALL", "PRODUCT", "CATEGORY", "VARIANT", "PRODUCT_BRAND", "PHONE_BRAND", "MODEL"]), targetId: z.string().trim().max(40).optional(),
       startsAt: dateOpt, endsAt: dateOpt, minOrder: int(0).optional(), usageLimit: optInt(1), perUserLimit: optInt(1), isActive: bool.optional(),
     }),
     orderBy: [{ createdAt: "desc" }], search: ["name"], filters: ["isActive", "scope"],
     guard: async (tx, d, ex) => {
       const type = (d.type ?? ex?.type) as string, value = (d.value ?? ex?.value) as number;
       if (type === "PERCENT" && value > 100) throw conflict("درصد تخفیف نمی‌تواند بیشتر از ۱۰۰ باشد.", "validation");
-      const scope = (d.scope ?? ex?.scope) as string; const targetId = ((d.targetId ?? (d.scope !== undefined ? "" : ex?.targetId)) ?? "") as string;
+      const scope = (d.scope ?? ex?.scope) as string;
+      // Re-targeting between brand kinds keeps the chosen brand; any other change of scope needs a new target.
+      const brandLike = (x: unknown) => x === "BRAND" || x === "PRODUCT_BRAND" || x === "PHONE_BRAND";
+      const keep = d.scope === undefined || (brandLike(ex?.scope) && brandLike(d.scope));
+      const targetId = ((d.targetId ?? (keep ? ex?.targetId : "")) ?? "") as string;
       if (scope === "ALL") d.targetId = "";
       else {
         if (!targetId) throw conflict("برای این نوع تخفیف باید هدف (محصول، دسته، تنوع، برند یا مدل) انتخاب شود.", "validation");
-        const found = scope === "PRODUCT" ? await tx.product.count({ where: { id: targetId } }) : scope === "CATEGORY" ? await tx.category.count({ where: { id: targetId } }) : scope === "VARIANT" ? await tx.productVariant.count({ where: { id: targetId } }) : scope === "BRAND" ? await tx.brand.count({ where: { id: targetId } }) : await tx.phoneModel.count({ where: { id: targetId } });
+        const found = scope === "PRODUCT" ? await tx.product.count({ where: { id: targetId } }) : scope === "CATEGORY" ? await tx.category.count({ where: { id: targetId } }) : scope === "VARIANT" ? await tx.productVariant.count({ where: { id: targetId } }) : scope === "PRODUCT_BRAND" || scope === "PHONE_BRAND" || scope === "BRAND" ? await tx.brand.count({ where: { id: targetId } }) : await tx.phoneModel.count({ where: { id: targetId } });
         if (!found) throw conflict("هدف انتخاب‌شده پیدا نشد.", "validation");
         d.targetId = targetId;
       }

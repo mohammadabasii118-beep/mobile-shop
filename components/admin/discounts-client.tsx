@@ -4,9 +4,14 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Empty, ErrorBox, Label, Modal, Pager, Pill, Spinner, Table, Td, act, btnDanger, btnGhost, btnPrimary, confirmAsk, fmtDate, fmtNum, fmtToman, inputCls, useApi } from "@/components/admin/kit";
 import { cn } from "@/lib/utils";
 
-type Scope = "ALL" | "PRODUCT" | "CATEGORY" | "VARIANT" | "BRAND" | "MODEL";
+type Scope = "ALL" | "PRODUCT" | "CATEGORY" | "VARIANT" | "BRAND" | "PRODUCT_BRAND" | "PHONE_BRAND" | "MODEL";
 interface Row { id: string; name: string; type: "PERCENT" | "FIXED"; value: number; scope: Scope; targetId: string; targetLabel: string; startsAt: string | null; endsAt: string | null; minOrder: number; usageLimit: number | null; perUserLimit: number | null; usedCount: number; isActive: boolean; status: string }
-const SCOPES: [Scope, string][] = [["ALL", "همهٔ محصولات"], ["CATEGORY", "دسته‌بندی"], ["PRODUCT", "محصول"], ["VARIANT", "تنوع (Variant)"], ["BRAND", "برند"], ["MODEL", "مدل گوشی"]];
+const SCOPES: [Scope, string][] = [["ALL", "همهٔ محصولات"], ["CATEGORY", "دسته‌بندی"], ["PRODUCT", "محصول"], ["VARIANT", "تنوع (Variant)"], ["PRODUCT_BRAND", "برند محصول (سازندهٔ کالا؛ مثل Spigen)"], ["PHONE_BRAND", "برند گوشی (از مدل Variant؛ مثل Apple)"], ["MODEL", "مدل گوشی"]];
+const LEGACY: [Scope, string] = ["BRAND", "برند (قدیمی؛ هم برند محصول و هم برند گوشی)"];
+const SCOPE_HELP: Partial<Record<Scope, string>> = {
+  PRODUCT_BRAND: "فقط کالاهایی که «برند محصول»شان همین برند است. برند گوشی در این تخفیف نقشی ندارد.",
+  PHONE_BRAND: "فقط تنوع‌هایی که «مدل گوشی»شان متعلق به این برند گوشی است، صرف‌نظر از سازندهٔ محصول.",
+};
 const STATUS: Record<string, ["ok" | "warn" | "mute" | "bad" | "info", string]> = { active: ["ok", "فعال"], scheduled: ["info", "زمان‌بندی‌شده"], expired: ["mute", "منقضی"], off: ["mute", "غیرفعال"], exhausted: ["warn", "ظرفیت تمام"] };
 
 const toLocal = (v: string | null) => { if (!v) return ""; const d = new Date(v); const p = (n: number) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
@@ -51,7 +56,9 @@ function Editor({ row, onClose, onDone }: { row: Row | null; onClose: () => void
         <Label label="نام تخفیف *" error={errs.name} className="sm:col-span-2"><input className={inputCls} required value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="مثلاً جشنواره مهر" /></Label>
         <Label label="نوع"><select className={inputCls} value={f.type} onChange={(e) => set("type", e.target.value as Form["type"])}><option value="PERCENT">درصدی</option><option value="FIXED">مبلغ ثابت (تومان، برای هر عدد)</option></select></Label>
         <Label label={f.type === "PERCENT" ? "درصد *" : "مبلغ (تومان) *"} error={errs.value}><input dir="ltr" type="number" min={1} max={f.type === "PERCENT" ? 100 : undefined} required className={inputCls} value={f.value} onChange={(e) => set("value", e.target.value)} /></Label>
-        <Label label="اعمال روی" className="sm:col-span-2"><select className={inputCls} value={f.scope} onChange={(e) => setF((o) => ({ ...o, scope: e.target.value as Scope, targetId: "", targetLabel: "" }))}>{SCOPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Label>
+        <Label label="اعمال روی" className="sm:col-span-2"><select className={inputCls} value={f.scope} onChange={(e) => setF((o) => ({ ...o, scope: e.target.value as Scope, targetId: "", targetLabel: "" }))}>{(row?.scope === "BRAND" ? [...SCOPES, LEGACY] : SCOPES).map(([v, l]) => <option key={v} value={v} disabled={v === "BRAND" && f.scope !== "BRAND"}>{l}</option>)}</select></Label>
+        {SCOPE_HELP[f.scope] && <p className="rounded-lg bg-primary/10 p-2 text-xs leading-6 sm:col-span-2">{SCOPE_HELP[f.scope]}</p>}
+        {f.scope === "BRAND" && <p className="rounded-lg bg-warning/15 p-2 text-xs leading-6 text-warning sm:col-span-2">این تخفیف قدیمی است و هر دو نوع برند را پوشش می‌دهد. برای دقیق شدن، نوع را به «برند محصول» یا «برند گوشی» تغییر دهید.</p>}
         <div className="sm:col-span-2"><TargetPicker scope={f.scope} value={f.targetId} label={f.targetLabel} onPick={(id, l) => setF((o) => ({ ...o, targetId: id, targetLabel: l }))} />{errs.targetId && <p className="mt-1 text-xs font-bold text-error">{errs.targetId}</p>}</div>
         <Label label="شروع" hint="خالی = از همین حالا"><input type="datetime-local" className={inputCls} value={f.startsAt} onChange={(e) => set("startsAt", e.target.value)} /></Label>
         <Label label="پایان" hint="خالی = بدون پایان" error={errs.endsAt}><input type="datetime-local" className={inputCls} value={f.endsAt} onChange={(e) => set("endsAt", e.target.value)} /></Label>
@@ -87,7 +94,7 @@ export function DiscountsClient() {
             {data.items.map((r) => (
               <tr key={r.id} className="hover:bg-surface-2/60">
                 <Td className="font-bold">{r.name}</Td>
-                <Td><span className="text-xs text-muted">{SCOPES.find(([v]) => v === r.scope)?.[1]}</span><br />{r.targetLabel}</Td>
+                <Td><span className="text-xs text-muted">{[...SCOPES, LEGACY].find(([v]) => v === r.scope)?.[1]}</span><br />{r.targetLabel}</Td>
                 <Td>{r.type === "PERCENT" ? `${fmtNum(r.value)}٪` : fmtToman(r.value)}</Td>
                 <Td className="text-xs">{r.startsAt ? fmtDate(r.startsAt) : "از هم‌اکنون"}<br />{r.endsAt ? fmtDate(r.endsAt) : "بدون پایان"}</Td>
                 <Td>{r.minOrder ? fmtToman(r.minOrder) : "—"}</Td>

@@ -6,6 +6,7 @@ import { badRequest, conflict, notFound } from "@/lib/server/errors";
 import { audit, pageParams, type AdminCtx, type Db } from "@/lib/server/admin/core";
 import { loadRuleIndex, recomputePrices, resolveRule, ruleLabel, type PriceChange } from "@/lib/server/price-engine/rules";
 import { loadActiveDiscounts, resolveUnitDiscount } from "@/lib/server/price-engine/discounts";
+import { getWholesalePolicy, wholesaleProblem } from "@/lib/server/price-engine/wholesale";
 import { lineCtx } from "@/lib/server/price-engine/line";
 
 /* ───────── "preview → confirm" without duplicating any logic: run the real operation, then roll the transaction back ───────── */
@@ -70,7 +71,7 @@ export async function saveRule(body: unknown, a: AdminCtx) {
       ? await tx.pricingRule.update({ where: { id: cur.id }, data: { marginType: d.marginType, marginValue, roundTo: d.roundTo, note: d.note ?? null, isActive: d.isActive } })
       : await tx.pricingRule.create({ data: { scope: d.scope, targetId: d.targetId, marginType: d.marginType, marginValue, roundTo: d.roundTo, note: d.note ?? null, isActive: d.isActive } });
     await audit(a, cur ? "pricing.rule.update" : "pricing.rule.create", "pricing_rule", rule.id, cur ?? undefined, rule, tx);
-    const res = await recomputePrices(tx, { all: true }, { apply: true, adminId: a.admin.id, source: "rule", reason: d.reason ?? `قانون ${ruleLabel(rule)}`, oldIdx });
+    const res = await recomputePrices(tx, { all: true }, { apply: true, adminId: a.admin.id, source: "rule", reason: d.reason ?? `قانون ${ruleLabel(rule)}`, oldIdx, wholesale: { policy: await getWholesalePolicy(tx), onConflict: "skip" } });
     if (res.changes.length) await audit(a, "pricing.recompute", "pricing_rule", rule.id, undefined, { changed: res.changes.length, skipped: res.skipped.length }, tx);
     return { rule, ...summarise(res) };
   });
@@ -84,13 +85,14 @@ export async function deleteRule(id: string, body: unknown, a: AdminCtx) {
     const oldIdx = await loadRuleIndex(tx);
     await tx.pricingRule.delete({ where: { id } });
     await audit(a, "pricing.rule.delete", "pricing_rule", id, cur, undefined, tx);
-    const res = await recomputePrices(tx, { all: true }, { apply: true, adminId: a.admin.id, source: "rule", reason: reason ?? "حذف قانون", oldIdx });
+    const res = await recomputePrices(tx, { all: true }, { apply: true, adminId: a.admin.id, source: "rule", reason: reason ?? "حذف قانون", oldIdx, wholesale: { policy: await getWholesalePolicy(tx), onConflict: "skip" } });
     return { rule: cur, ...summarise(res) };
   });
 }
 
-const summarise = (res: { changes: PriceChange[]; skipped: { productId: string; variantId: string | null; sku: string; reason: string }[] }) => ({
-  changedCount: res.changes.length, skippedCount: res.skipped.length, changes: res.changes.slice(0, 200), skipped: res.skipped.slice(0, 100),
+const summarise = (res: { changes: PriceChange[]; skipped: { productId: string; variantId: string | null; sku: string; reason: string; code: string }[] }) => ({
+  changedCount: res.changes.length, skippedCount: res.skipped.length, wholesaleConflictCount: res.skipped.filter((x) => x.code === "wholesale").length,
+  changes: res.changes.slice(0, 200), skipped: [...res.skipped].sort((a, b) => Number(b.code === "wholesale") - Number(a.code === "wholesale")).slice(0, 100), // conflicts first
 });
 
 /* ───────────────────────── pricing table ───────────────────────── */
@@ -120,6 +122,7 @@ export async function listPricing(req: NextRequest) {
   const dir = sp.get("dir") === "desc" ? "desc" : "asc";
   const base = SORTS[sortKey] ?? SORTS.name!;
   const orderBy = [Object.fromEntries(Object.entries(base).map(([k, v]) => [k, typeof v === "string" ? dir : Object.fromEntries(Object.entries(v as object).map(([k2]) => [k2, dir]))])) as Prisma.ProductVariantOrderByWithRelationInput, { id: "asc" as const }];
+  const policy = await getWholesalePolicy();
   const [rows, total, discounts, idx] = await Promise.all([
     db.productVariant.findMany({ where, orderBy, take, skip, include: { inventory: true, colorRef: true, phoneModel: { include: { brand: { select: { name: true } } } }, product: { include: { category: { select: { id: true, name: true, parentId: true } } } } } }),
     db.productVariant.count({ where }),
@@ -138,6 +141,7 @@ export async function listPricing(req: NextRequest) {
       brand: v.phoneModel?.brand.name ?? null, model: v.phoneModel?.name ?? null, color: v.colorRef?.name ?? v.color ?? null,
       mode: v.pricingMode, cost, marginPercent: cost && cost > 0 ? Math.round(((price - cost) / cost) * 1000) / 10 : null,
       rule: rule ? { label: ruleLabel(rule), scope: rule.scope, marginType: rule.marginType, margin: marginHuman(rule.marginType, rule.marginValue), roundTo: rule.roundTo } : null,
+      wholesale: v.wholesalePrice ?? p.wholesalePrice, wholesaleProblem: wholesaleProblem(price, v.wholesalePrice ?? p.wholesalePrice, policy),
       calculatedPrice: price, discount: disc.amount, discountLabel: disc.label, finalPrice: Math.max(0, price - disc.amount),
       stock: qty, lowStockThreshold: v.inventory?.lowStockThreshold ?? 5, isActive: v.isActive && p.isActive,
     };
@@ -188,6 +192,7 @@ export async function bulkPricing(body: unknown, a: AdminCtx) {
     if (targets.length > MAX_TARGETS) throw conflict(`تعداد تنوع‌های انتخاب‌شده از ${MAX_TARGETS.toLocaleString("fa-IR")} بیشتر است؛ فیلتر را محدودتر کنید.`, "too_many");
     if (!targets.length) throw notFound("هیچ تنوعی با این فیلتر پیدا نشد.");
 
+    const policy = await getWholesalePolicy(tx);
     const oldIdx = await loadRuleIndex(tx);
     const snap = (v: (typeof targets)[number], idx = oldIdx) => ({ price: v.retailPrice ?? v.product.retailPrice, cost: v.costPrice ?? v.product.costPrice, rule: v.pricingMode === "AUTOMATIC" ? ruleLabel(resolveRule(idx, { variantId: v.id, productId: v.productId, categoryId: v.product.categoryId })) : "MANUAL" });
     const before = new Map(targets.map((v) => [v.id, snap(v)]));
@@ -223,6 +228,8 @@ export async function bulkPricing(body: unknown, a: AdminCtx) {
         const cur = v.retailPrice ?? v.product.retailPrice;
         const next = op.kind === "price_delta" ? cur + op.value : Math.round((cur * (100 + op.value)) / 100);
         if (next < 0) { notes.set(v.id, "قیمت جدید منفی می‌شود."); continue; }
+        const wp = wholesaleProblem(next, v.wholesalePrice ?? v.product.wholesalePrice, policy);
+        if (wp) { notes.set(v.id, `اعمال نشد؛ ${wp}`); continue; }
         await tx.productVariant.update({ where: { id: v.id }, data: { retailPrice: next } });
       }
     } else if (op.kind === "mode_set") {
@@ -239,7 +246,8 @@ export async function bulkPricing(body: unknown, a: AdminCtx) {
 
     // Reprice everything automatic that these products contain (the product-level "cheapest variant" price included).
     const newIdx = await loadRuleIndex(tx);
-    await recomputePrices(tx, { productIds: [...new Set(targets.map((v) => v.productId))] }, { apply: true, adminId: a.admin.id, source: "bulk", reason: d.reason ?? null, idx: newIdx, log: false });
+    const rc = await recomputePrices(tx, { productIds: [...new Set(targets.map((v) => v.productId))] }, { apply: true, adminId: a.admin.id, source: "bulk", reason: d.reason ?? null, idx: newIdx, log: false, wholesale: { policy, onConflict: "skip" } });
+    for (const sk of rc.skipped) if (sk.variantId && !notes.has(sk.variantId) && targets.some((t) => t.id === sk.variantId)) notes.set(sk.variantId, sk.reason);
 
     const after = await tx.productVariant.findMany({ where: { id: { in: targets.map((v) => v.id) } }, include: { product: true } });
     const afterById = new Map(after.map((v) => [v.id, v]));
@@ -281,7 +289,9 @@ export async function targets(req: NextRequest) {
     case "PRODUCT": return (await db.product.findMany({ where: like ? { OR: [{ name: like }, { sku: like }] } : {}, orderBy: { name: "asc" }, take: 20, select: { id: true, name: true, sku: true } })).map((p) => ({ id: p.id, label: `${p.name} (${p.sku})` }));
     case "VARIANT": return (await db.productVariant.findMany({ where: like ? { OR: [{ sku: like }, { name: like }, { product: { name: like } }] } : {}, orderBy: { sku: "asc" }, take: 20, select: { id: true, sku: true, name: true, product: { select: { name: true } } } })).map((v) => ({ id: v.id, label: `${v.product.name} — ${v.name} (${v.sku})` }));
     case "CATEGORY": return (await db.category.findMany({ where: like ? { name: like } : {}, orderBy: { name: "asc" }, take: 30, select: { id: true, name: true, parent: { select: { name: true } } } })).map((c) => ({ id: c.id, label: c.parent ? `${c.parent.name} › ${c.name}` : c.name }));
-    case "BRAND": return (await db.brand.findMany({ where: like ? { name: like } : {}, orderBy: { name: "asc" }, take: 30, select: { id: true, name: true } })).map((b) => ({ id: b.id, label: b.name }));
+    // The two brand kinds are different things and are listed with what they contain, so the admin cannot mix them up.
+    case "PRODUCT_BRAND": return (await db.brand.findMany({ where: { ...(like ? { name: like } : {}), products: { some: {} } }, orderBy: { name: "asc" }, take: 30, select: { id: true, name: true, _count: { select: { products: true } } } })).map((b) => ({ id: b.id, label: `${b.name} — سازندهٔ ${b._count.products.toLocaleString("fa-IR")} محصول` }));
+    case "PHONE_BRAND": return (await db.brand.findMany({ where: { ...(like ? { name: like } : {}), phoneModels: { some: {} } }, orderBy: { name: "asc" }, take: 30, select: { id: true, name: true, _count: { select: { phoneModels: true } } } })).map((b) => ({ id: b.id, label: `${b.name} — برند گوشی، ${b._count.phoneModels.toLocaleString("fa-IR")} مدل` }));
     case "MODEL": return (await db.phoneModel.findMany({ where: like ? { name: like } : {}, orderBy: { name: "asc" }, take: 30, select: { id: true, name: true, brand: { select: { name: true } } } })).map((m) => ({ id: m.id, label: `${m.brand.name} › ${m.name}` }));
     default: throw badRequest("نوع هدف نامعتبر است.");
   }
@@ -306,10 +316,20 @@ export async function listDiscounts(req: NextRequest) {
     db.product.findMany({ where: { id: { in: ids("PRODUCT") } }, select: { id: true, name: true } }),
     db.category.findMany({ where: { id: { in: ids("CATEGORY") } }, select: { id: true, name: true } }),
     db.productVariant.findMany({ where: { id: { in: ids("VARIANT") } }, select: { id: true, sku: true, product: { select: { name: true } } } }),
-    db.brand.findMany({ where: { id: { in: ids("BRAND") } }, select: { id: true, name: true } }),
+    db.brand.findMany({ where: { id: { in: [...ids("BRAND"), ...ids("PRODUCT_BRAND"), ...ids("PHONE_BRAND")] } }, select: { id: true, name: true } }),
     db.phoneModel.findMany({ where: { id: { in: ids("MODEL") } }, select: { id: true, name: true } }),
   ]);
-  const label = (r: (typeof rows)[number]) => r.scope === "ALL" ? "همهٔ محصولات" : r.scope === "PRODUCT" ? prods.find((x) => x.id === r.targetId)?.name : r.scope === "CATEGORY" ? cats.find((x) => x.id === r.targetId)?.name : r.scope === "BRAND" ? brands.find((x) => x.id === r.targetId)?.name : r.scope === "MODEL" ? models.find((x) => x.id === r.targetId)?.name : (() => { const v = vars.find((x) => x.id === r.targetId); return v ? `${v.product.name} (${v.sku})` : undefined; })();
+  const label = (r: (typeof rows)[number]) => r.scope === "ALL" ? "همهٔ محصولات" : r.scope === "PRODUCT" ? prods.find((x) => x.id === r.targetId)?.name : r.scope === "CATEGORY" ? cats.find((x) => x.id === r.targetId)?.name : (r.scope === "BRAND" || r.scope === "PRODUCT_BRAND" || r.scope === "PHONE_BRAND") ? brands.find((x) => x.id === r.targetId)?.name : r.scope === "MODEL" ? models.find((x) => x.id === r.targetId)?.name : (() => { const v = vars.find((x) => x.id === r.targetId); return v ? `${v.product.name} (${v.sku})` : undefined; })();
   const status = (r: (typeof rows)[number]) => !r.isActive ? "off" : r.endsAt && r.endsAt < now ? "expired" : r.startsAt && r.startsAt > now ? "scheduled" : r.usageLimit != null && r.usedCount >= r.usageLimit ? "exhausted" : "active";
   return { items: rows.map((r) => ({ ...r, targetLabel: label(r) ?? "—", status: status(r) })), total, page, pages: Math.max(1, Math.ceil(total / take)) };
+}
+
+
+/* ───────────────────────── wholesale/retail consistency report ───────────────────────── */
+/** Every stored price pair that currently breaks the wholesale policy (e.g. after the policy was tightened). Read-only: nothing is changed. */
+export async function wholesaleConflicts() {
+  const policy = await getWholesalePolicy();
+  const rows = await db.productVariant.findMany({ where: { OR: [{ wholesalePrice: { not: null } }, { product: { wholesalePrice: { not: null } } }] }, include: { product: { select: { id: true, name: true, retailPrice: true, wholesalePrice: true } } }, orderBy: { sku: "asc" } });
+  const bad = rows.map((v) => { const retail = v.retailPrice ?? v.product.retailPrice; const wholesale = v.wholesalePrice ?? v.product.wholesalePrice; const unpriced = v.pricingMode === "AUTOMATIC" && retail <= 0; return { variantId: v.id, productId: v.product.id, product: v.product.name, sku: v.sku, retail, wholesale, problem: unpriced ? null : wholesaleProblem(retail, wholesale, policy) }; }).filter((x) => x.problem);
+  return { policy, checked: rows.length, conflictCount: bad.length, items: bad.slice(0, 200) };
 }

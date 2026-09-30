@@ -19,6 +19,12 @@ export const SETTING_SCHEMAS = {
   loyalty: loyaltySchema,
   // fourEyes: the staff member who requested a bank refund may not be the one who approves it (default on).
   finance: z.object({ fourEyes: z.boolean().default(true) }),
+  // Relationship between wholesale and retail price (checked when prices are saved/computed; see lib/server/price-engine/wholesale.ts).
+  wholesalePolicy: z.object({
+    minDiscountPercent: z.coerce.number().min(0, "نمی‌تواند منفی باشد.").max(99.99, "باید کمتر از ۱۰۰ باشد.").multipleOf(0.01, "حداکثر دو رقم اعشار.").default(0),
+    maxDiscountPercent: z.coerce.number().min(0).max(100).multipleOf(0.01, "حداکثر دو رقم اعشار.").default(0),
+    capAtRetail: z.boolean().default(true),
+  }).refine((v) => v.maxDiscountPercent === 0 || v.maxDiscountPercent >= v.minDiscountPercent, { path: ["maxDiscountPercent"], message: "حداکثر تخفیف عمده نمی‌تواند از حداقل کمتر باشد." }),
   general: z.object({ currency: t(20), lowStockNotify: z.boolean().default(true) }),
 } as const;
 export type SettingKey = keyof typeof SETTING_SCHEMAS;

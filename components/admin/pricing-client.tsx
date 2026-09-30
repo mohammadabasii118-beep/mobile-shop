@@ -20,18 +20,20 @@ const Sel = ({ value, onChange, opts, ph, cls }: { value: string; onChange: (v: 
 );
 
 /* ───────────── prices table ───────────── */
-interface PRow { variantId: string; productId: string; product: string; variant: string; sku: string; category: string; brand: string | null; model: string | null; color: string | null; mode: "AUTOMATIC" | "MANUAL"; cost: number | null; marginPercent: number | null; rule: { label: string } | null; calculatedPrice: number; discount: number; discountLabel: string | null; finalPrice: number; stock: number; lowStockThreshold: number; isActive: boolean }
+interface PRow { variantId: string; productId: string; product: string; variant: string; sku: string; category: string; brand: string | null; model: string | null; color: string | null; mode: "AUTOMATIC" | "MANUAL"; cost: number | null; marginPercent: number | null; rule: { label: string } | null; wholesale: number | null; wholesaleProblem: string | null; calculatedPrice: number; discount: number; discountLabel: string | null; finalPrice: number; stock: number; lowStockThreshold: number; isActive: boolean }
 
 function PricesTab({ p }: { p: PricingProps }) {
-  const [q, setQ] = useState(""); const [cat, setCat] = useState(""); const [brand, setBrand] = useState(""); const [model, setModel] = useState(""); const [mode, setMode] = useState(""); const [stock, setStock] = useState(""); const [sort, setSort] = useState("name"); const [dir, setDir] = useState("asc"); const [page, setPage] = useState(1);
-  const url = useMemo(() => { const u = new URLSearchParams({ page: String(page), sort, dir }); if (q) u.set("q", q); if (cat) u.set("categoryId", cat); if (brand) u.set("brandId", brand); if (model) u.set("modelId", model); if (mode) u.set("mode", mode); if (stock) u.set("stock", stock); return `/api/admin/pricing?${u}`; }, [q, cat, brand, model, mode, stock, sort, dir, page]);
+  const [q, setQ] = useState(""); const [cat, setCat] = useState(""); const [brand, setBrand] = useState(""); const [pbrand, setPbrand] = useState(""); const [model, setModel] = useState(""); const [mode, setMode] = useState(""); const [stock, setStock] = useState(""); const [sort, setSort] = useState("name"); const [dir, setDir] = useState("asc"); const [page, setPage] = useState(1);
+  const url = useMemo(() => { const u = new URLSearchParams({ page: String(page), sort, dir }); if (q) u.set("q", q); if (cat) u.set("categoryId", cat); if (brand) u.set("brandId", brand); if (pbrand) u.set("productBrandId", pbrand); if (model) u.set("modelId", model); if (mode) u.set("mode", mode); if (stock) u.set("stock", stock); return `/api/admin/pricing?${u}`; }, [q, cat, brand, pbrand, model, mode, stock, sort, dir, page]);
   const { data, error, loading } = useApi<{ items: PRow[]; total: number; page: number; pages: number }>(url);
   const reset = (fn: () => void) => { fn(); setPage(1); };
   return (
     <div>
+      <WholesaleBanner />
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <input className={cn(inputCls, "max-w-56")} placeholder="محصول یا SKU…" aria-label="جستجو" value={q} onChange={(e) => reset(() => setQ(e.target.value))} />
         <Sel value={cat} onChange={(v) => reset(() => setCat(v))} opts={p.categories} ph="همهٔ دسته‌ها" />
+        <Sel value={pbrand} onChange={(v) => reset(() => setPbrand(v))} opts={p.productBrands} ph="برند محصول" />
         <Sel value={brand} onChange={(v) => reset(() => { setBrand(v); setModel(""); })} opts={p.phoneBrands} ph="برند گوشی" />
         <Sel value={model} onChange={(v) => reset(() => setModel(v))} opts={p.models.filter((m) => !brand || p.phoneBrands.find((b) => b.value === brand)?.label === m.group)} ph="مدل گوشی" />
         <Sel value={mode} onChange={(v) => reset(() => setMode(v))} opts={[{ value: "AUTOMATIC", label: "خودکار" }, { value: "MANUAL", label: "دستی" }]} ph="روش قیمت" />
@@ -41,7 +43,7 @@ function PricesTab({ p }: { p: PricingProps }) {
       </div>
       {error ? <ErrorBox message={error} /> : loading ? <Spinner /> : !data?.items.length ? <Empty /> : (
         <>
-          <Table head={["محصول", "تنوع", "هزینه", "سود", "قیمت محاسبه‌شده", "تخفیف", "قیمت نهایی", "موجودی", "وضعیت"]}>
+          <Table head={["محصول", "تنوع", "هزینه", "سود", "قیمت محاسبه‌شده", "تخفیف", "قیمت نهایی", "قیمت عمده", "موجودی", "وضعیت"]}>
             {data.items.map((r) => (
               <tr key={r.variantId} className="hover:bg-surface-2/60">
                 <Td className="font-bold"><a className="hover:text-primary" href={`/admin/products/${r.productId}`}>{r.product}</a><div className="text-[11px] font-normal text-muted">{r.category}</div></Td>
@@ -51,6 +53,7 @@ function PricesTab({ p }: { p: PricingProps }) {
                 <Td>{fmtToman(r.calculatedPrice)}<div><Pill tone={r.mode === "AUTOMATIC" ? "info" : "mute"}>{r.mode === "AUTOMATIC" ? "خودکار" : "دستی"}</Pill></div></Td>
                 <Td className="text-xs">{r.discount ? <><b className="text-success">−{fmtToman(r.discount)}</b><div className="text-muted">{r.discountLabel}</div></> : "—"}</Td>
                 <Td className="font-black">{fmtToman(r.finalPrice)}</Td>
+                <Td className="text-xs">{r.wholesale == null ? <span className="text-muted">—</span> : fmtToman(r.wholesale)}{r.wholesaleProblem && <div title={r.wholesaleProblem}><Pill tone="bad">ناسازگار با خرده</Pill></div>}</Td>
                 <Td><Pill tone={r.stock === 0 ? "bad" : r.stock <= r.lowStockThreshold ? "warn" : "ok"}>{fmtNum(r.stock)}</Pill></Td>
                 <Td><Pill tone={r.isActive ? "ok" : "mute"}>{r.isActive ? "فعال" : "غیرفعال"}</Pill></Td>
               </tr>
@@ -59,6 +62,19 @@ function PricesTab({ p }: { p: PricingProps }) {
           <Pager page={data.page} pages={data.pages} total={data.total} onPage={setPage} />
         </>
       )}
+    </div>
+  );
+}
+
+/** Read-only report of stored price pairs that break the wholesale/retail policy (the policy lives in تنظیمات ‹ رابطهٔ قیمت عمده و خرده). */
+function WholesaleBanner() {
+  const { data } = useApi<{ conflictCount: number; checked: number; items: { variantId: string; productId: string; product: string; sku: string; problem: string }[] }>("/api/admin/pricing/wholesale");
+  const [open, setOpen] = useState(false);
+  if (!data || data.conflictCount === 0) return null;
+  return (
+    <div className="mb-3 rounded-xl border border-warning/40 bg-warning/10 p-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2"><span><b>{fmtNum(data.conflictCount)}</b> مورد قیمت عمده با قاعدهٔ رابطهٔ عمده/خرده ناسازگار است (قیمت‌ها تغییر نکرده‌اند؛ ذخیرهٔ قیمت ناسازگار جدید رد می‌شود).</span><button className={cn(btnGhost, "h-8 px-3 text-xs")} onClick={() => setOpen(!open)}>{open ? "بستن" : "مشاهده"}</button></div>
+      {open && <ul className="mt-2 max-h-48 space-y-1 overflow-y-auto text-xs">{data.items.map((i) => <li key={i.variantId}><a className="font-bold hover:text-primary" href={`/admin/products/${i.productId}`}>{i.product}</a> <code dir="ltr" className="text-muted">{i.sku}</code> — {i.problem}</li>)}</ul>}
     </div>
   );
 }
@@ -83,7 +99,7 @@ function ChangesTable({ rows, title }: { rows: { key: string; name: string; sku:
 
 /* ───────────── rules ───────────── */
 interface RuleRow { id: string; scope: string; targetId: string; targetLabel?: string; marginType: "PERCENT" | "FIXED"; marginValue: number; marginHuman: number; roundTo: number; isActive: boolean; note: string | null }
-interface RuleResult { rule: RuleRow; changedCount: number; skippedCount: number; changes: Change[]; skipped: { sku: string; reason: string }[] }
+interface RuleResult { rule: RuleRow; changedCount: number; skippedCount: number; wholesaleConflictCount?: number; changes: Change[]; skipped: { sku: string; reason: string }[] }
 
 function TargetSearch({ scope, value, label, onPick }: { scope: string; value: string; label: string; onPick: (id: string, l: string) => void }) {
   const [q, setQ] = useState(""); const [opts, setOpts] = useState<{ id: string; label: string }[]>([]);
@@ -123,7 +139,7 @@ function RuleEditor({ row, onClose, onDone }: { row: RuleRow | null; onClose: ()
       {err && <div className="mt-3"><ErrorBox message={err} /></div>}
       {res && (
         <div className="mt-4 space-y-3">
-          <div className="rounded-lg bg-primary/10 p-3 text-sm">با ذخیرهٔ این قانون قیمت <b>{fmtNum(res.changedCount)}</b> مورد تغییر می‌کند{res.skippedCount ? <> و <b>{fmtNum(res.skippedCount)}</b> مورد به‌دلیل نبود هزینه/قانون بدون تغییر می‌ماند</> : null}.</div>
+          <div className="rounded-lg bg-primary/10 p-3 text-sm">با ذخیرهٔ این قانون قیمت <b>{fmtNum(res.changedCount)}</b> مورد تغییر می‌کند{res.skippedCount ? <> و <b>{fmtNum(res.skippedCount)}</b> مورد بدون تغییر می‌ماند{res.wholesaleConflictCount ? <> (<b>{fmtNum(res.wholesaleConflictCount)}</b> مورد به‌خاطر ناسازگاری با قیمت عمده)</> : null}</> : null}.</div>
           <ChangesTable title="پیش‌نمایش تغییر قیمت" rows={res.changes.map((c) => ({ key: (c.variantId ?? c.productId) + c.sku, name: c.productName, sku: c.sku, oldPrice: c.oldPrice, newPrice: c.newPrice, oldCost: c.oldCost, newCost: c.newCost }))} />
         </div>
       )}

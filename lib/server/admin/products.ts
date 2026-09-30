@@ -7,6 +7,7 @@ import { audit, diff, pageParams, type AdminCtx } from "@/lib/server/admin/core"
 import { recordSlugChange } from "@/lib/server/redirects";
 import { slug } from "@/lib/server/admin/resources";
 import { recomputePrices, type OldCosts } from "@/lib/server/price-engine/rules";
+import { assertWholesaleConsistent, getWholesalePolicy, priceStates } from "@/lib/server/price-engine/wholesale";
 
 const txt = (max: number) => z.string().trim().max(max).transform((v) => (v === "" ? null : v)).nullable().optional();
 const money = z.coerce.number().int("عدد صحیح وارد کنید.").min(0).max(2_000_000_000);
@@ -49,7 +50,7 @@ function checkPrices(d: { retailPrice?: number; retailDiscount?: number; wholesa
   if (rd > retail) throw badRequest("تخفیف خرده نمی‌تواند بیشتر از قیمت باشد.", "validation");
   if (wp != null) {
     if (wd > wp) throw badRequest("تخفیف عمده نمی‌تواند بیشتر از قیمت عمده باشد.", "validation");
-    if (wp > retail) throw badRequest("قیمت عمده نباید بیشتر از قیمت خرده باشد.", "validation");
+    // wholesale vs retail is judged by the configurable wholesale policy (assertWholesaleConsistent), on the final stored prices.
   }
 }
 
@@ -143,7 +144,9 @@ export async function createProduct(body: unknown, a: AdminCtx) {
     if (phoneModelIds.length) await tx.productPhoneModel.createMany({ data: phoneModelIds.map((phoneModelId) => ({ productId: p.id, phoneModelId })) });
     await syncImages(tx, p.id, images);
     await audit(a, "product.create", "product", p.id, undefined, { name: p.name, sku: p.sku, retailPrice: p.retailPrice, wholesalePrice: p.wholesalePrice, pricingMode: p.pricingMode }, tx);
-    if (p.pricingMode === "AUTOMATIC" || variants.some((v) => v.pricingMode === "AUTOMATIC")) await recomputePrices(tx, { productIds: [p.id] }, { apply: true, adminId: a.admin.id, source: "manual", reason: "ایجاد محصول" });
+    const policy = await getWholesalePolicy(tx);
+    if (p.pricingMode === "AUTOMATIC" || variants.some((v) => v.pricingMode === "AUTOMATIC")) await recomputePrices(tx, { productIds: [p.id] }, { apply: true, adminId: a.admin.id, source: "manual", reason: "ایجاد محصول", wholesale: { policy, onConflict: "throw" } });
+    await assertWholesaleConsistent(tx, p.id, [], policy);
     const fresh = await tx.product.findUniqueOrThrow({ where: { id: p.id } });
     await tx.priceHistory.create({ data: { productId: p.id, type: "retail", oldPrice: 0, newPrice: fresh.retailPrice, adminId: a.admin.id, oldCost: null, newCost: fresh.costPrice, source: "manual", reason: "ایجاد محصول" } });
     if (p.wholesalePrice != null) await tx.priceHistory.create({ data: { productId: p.id, type: "wholesale", oldPrice: 0, newPrice: p.wholesalePrice, adminId: a.admin.id } });
@@ -160,6 +163,8 @@ export async function updateProduct(id: string, body: unknown, a: AdminCtx) {
     if (!cur) throw notFound("محصول پیدا نشد.");
     // Costs as they were before this edit, so price history can show old → new cost.
     const oldCosts: OldCosts = { product: cur.costPrice, variants: new Map((await tx.productVariant.findMany({ where: { productId: id }, select: { id: true, costPrice: true } })).map((v) => [v.id, v.costPrice])) };
+    const policy = await getWholesalePolicy(tx);
+    const statesBefore = await priceStates(tx, id);
     const nextMode = fields.pricingMode ?? cur.pricingMode;
     if (nextMode !== "AUTOMATIC") checkPrices(fields, cur);
     // In AUTOMATIC mode the selling price belongs to the engine; a typed value is ignored.
@@ -211,7 +216,8 @@ export async function updateProduct(id: string, body: unknown, a: AdminCtx) {
       }
     }
     const touchesPricing = "costPrice" in fields || "pricingMode" in fields || (variants ?? []).some((v) => v.costPrice !== undefined || v.pricingMode !== undefined);
-    if (touchesPricing || nextMode === "AUTOMATIC" || variants) await recomputePrices(tx, { productIds: [id] }, { apply: true, adminId: a.admin.id, source: "manual", reason: "ویرایش محصول", oldCosts });
+    if (touchesPricing || nextMode === "AUTOMATIC" || variants) await recomputePrices(tx, { productIds: [id] }, { apply: true, adminId: a.admin.id, source: "manual", reason: "ویرایش محصول", oldCosts, wholesale: { policy, onConflict: "throw" } });
+    await assertWholesaleConsistent(tx, id, statesBefore, policy);
     const change = { ...df.next, ...(phoneModelIds ? { phoneModelIds } : {}), ...(images ? { images: images.length } : {}), ...(variants ? { variants: variants.length } : {}) };
     if (Object.keys(change).length) await audit(a, "product.update", "product", id, { ...df.old, ...(priceLog.length ? { priceHistory: priceLog } : {}) }, change, tx);
   });

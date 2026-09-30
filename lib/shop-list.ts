@@ -2,6 +2,7 @@ import "server-only";
 import { Prisma } from "@/lib/generated/prisma/client";
 import { db } from "@/lib/db";
 import { getProducts } from "@/lib/queries";
+import { EFFECTIVE_PRICE_JOIN } from "@/lib/server/price-engine/effective-sql";
 import type { CardProduct } from "@/lib/types";
 
 export const SHOP_PAGE_SIZE = 12;
@@ -13,8 +14,9 @@ const ORDER: Record<ShopSort, Prisma.Sql> = {
   popular: Prisma.sql`p."ratingCount" DESC, p."soldCount" DESC`,
   rating: Prisma.sql`p."ratingAvg" DESC, p."ratingCount" DESC`,
   newest: Prisma.sql`p."createdAt" DESC`,
-  asc: Prisma.sql`(p."retailPrice" - p."retailDiscount") ASC`,
-  desc: Prisma.sql`(p."retailPrice" - p."retailDiscount") DESC`,
+  // Effective (payable) price after the best discount: see price-engine/effective-sql.ts
+  asc: Prisma.sql`eff."price" ASC`,
+  desc: Prisma.sql`eff."price" DESC`,
 };
 
 export interface ShopQuery { cat?: string; sub?: string; model?: string; brandSlug?: string; modelSlug?: string; q?: string; sort?: ShopSort; page?: number; size?: number }
@@ -38,7 +40,7 @@ export async function queryShop(input: ShopQuery): Promise<{ items: CardProduct[
   if (input.q) conds.push(Prisma.sql`p."name" ILIKE ${"%" + input.q.replace(/[%_\\]/g, "\\$&") + "%"}`);
   const where = Prisma.join(conds, " AND ");
   const [rows, count] = await Promise.all([
-    db.$queryRaw<{ id: string }[]>`SELECT p."id" FROM "Product" p WHERE ${where} ORDER BY ${ORDER[sort]}, p."id" LIMIT ${size} OFFSET ${(page - 1) * size}`,
+    db.$queryRaw<{ id: string }[]>`SELECT p."id" FROM "Product" p ${sort === "asc" || sort === "desc" ? EFFECTIVE_PRICE_JOIN : Prisma.empty} WHERE ${where} ORDER BY ${ORDER[sort]}, p."id" LIMIT ${size} OFFSET ${(page - 1) * size}`,
     db.$queryRaw<{ n: bigint }[]>`SELECT count(*) AS n FROM "Product" p WHERE ${where}`,
   ]);
   const ids = rows.map((r) => r.id);

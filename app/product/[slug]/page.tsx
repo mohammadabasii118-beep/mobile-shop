@@ -18,6 +18,7 @@ import { getCurrentUser } from "@/lib/server/auth/session";
 import { unitPriceFor } from "@/lib/server/pricing";
 import { loadActiveDiscounts } from "@/lib/server/price-engine/discounts";
 import { buildVariantOptions } from "@/lib/server/price-engine/storefront";
+import { getWholesalePolicy } from "@/lib/server/price-engine/wholesale";
 import { formatToman, toFa } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -46,10 +47,10 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   const row = await getProductBySlug(decodeURIComponent(slug));
   if (!row) { const to = await resolveSlugRedirect("product", decodeURIComponent(slug)); if (to) permanentRedirect(paths.product(to)); notFound(); }
-  const [related, others, user, discounts, stats] = await Promise.all([getRelatedProducts(row.id, row.categoryId), getSidebarProducts(row.id), getCurrentUser(), loadActiveDiscounts(), db.review.aggregate({ where: { productId: row.id, status: "approved" }, _avg: { rating: true }, _count: true })]);
+  const [related, others, user, discounts, policy, stats] = await Promise.all([getRelatedProducts(row.id, row.categoryId), getSidebarProducts(row.id), getCurrentUser(), loadActiveDiscounts(), getWholesalePolicy(), db.review.aggregate({ where: { productId: row.id, status: "approved" }, _avg: { rating: true }, _count: true })]);
   const realCount = stats._count, realAvg = stats._avg.rating ?? 0;
   const card = { ...toCard(row, discounts), brand: row.brand?.name ?? null };
-  const variantOptions = buildVariantOptions(row, user, discounts);
+  const variantOptions = buildVariantOptions(row, user, discounts, policy);
   const models = row.phoneModels.map((m) => m.phoneModel.name);
   const stock = row.variants.reduce((a, v) => a + (v.inventory?.quantity ?? 0), 0);
   const variant = row.variants[0];
@@ -59,7 +60,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
       ? { label: "گزینه مورد نظر را انتخاب کنید", options: row.variants.map((v) => ({ value: `v:${v.id}`, label: v.name })) }
       : null;
   // Wholesale price is decided on the server from the signed-in user's approved role; anonymous visitors never receive it.
-  const ws = user?.wholesale && row.wholesalePrice != null && variant ? unitPriceFor(row, variant, Math.max(1, row.minWholesaleQty), user) : null;
+  const ws = user?.wholesale && row.wholesalePrice != null && variant ? unitPriceFor(row, variant, Math.max(1, row.minWholesaleQty), user, undefined, policy.capAtRetail ? card.price : undefined) : null;
   const wholesale = ws && ws.priceType === "wholesale" ? { unit: ws.unitPrice, min: row.minWholesaleQty } : null;
   const title = `خرید ${row.name}${models[0] ? ` ${models[0]}` : ""} با ضمانت اصالت | ارسال فوری`;
   const specs = (row.specifications ?? {}) as Record<string, string>;

@@ -1,6 +1,7 @@
 import type { Discount } from "@/lib/generated/prisma/client";
 import { resolveUnitDiscount, type LineCtx } from "@/lib/server/price-engine/discounts";
 import { unitPriceFor, type UnitPrice, type Viewer } from "@/lib/server/pricing";
+import { DEFAULT_WHOLESALE_POLICY, type WholesalePolicy } from "@/lib/server/price-engine/wholesale";
 
 export interface PriceInput {
   qty: number;
@@ -18,8 +19,10 @@ export const lineCtx = (i: PriceInput["product"], v: PriceInput["variant"]): Lin
  * Pass 1 decides which lines are retail (wholesale eligibility depends on the viewer and quantity) and their
  * pre-discount subtotal; pass 2 resolves the single best discount per unit and prices the line.
  */
-export function priceLines(inputs: PriceInput[], viewer: Viewer, discounts: Discount[], userUses?: Map<string, number>): UnitPrice[] {
-  const first = inputs.map((i) => unitPriceFor(i.product, i.variant, i.qty, viewer));
+export function priceLines(inputs: PriceInput[], viewer: Viewer, discounts: Discount[], userUses?: Map<string, number>, policy: WholesalePolicy = DEFAULT_WHOLESALE_POLICY): UnitPrice[] {
+  // Public price of the day (best unconditional discount): the ceiling for a partner's unit price when the policy says so.
+  const publicRetail = (i: PriceInput) => { const base = i.variant.retailPrice ?? i.product.retailPrice; return Math.max(0, base - resolveUnitDiscount(discounts, lineCtx(i.product, i.variant), base, i.product.retailDiscount).amount); };
+  const first = inputs.map((i) => unitPriceFor(i.product, i.variant, i.qty, viewer, undefined, policy.capAtRetail && viewer?.wholesale ? publicRetail(i) : undefined));
   const cartRetailSubtotal = inputs.reduce((a, i, k) => a + (first[k]!.priceType === "retail" ? first[k]!.listPrice * i.qty : 0), 0);
   return inputs.map((i, k) => {
     if (first[k]!.priceType === "wholesale") return first[k]!;

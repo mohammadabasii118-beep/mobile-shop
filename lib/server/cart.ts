@@ -6,6 +6,7 @@ import { badRequest, conflict, notFound } from "@/lib/server/errors";
 import type { PriceType } from "@/lib/server/pricing";
 import { priceLines } from "@/lib/server/price-engine/line";
 import { loadActiveDiscounts, userDiscountUses } from "@/lib/server/price-engine/discounts";
+import { getWholesalePolicy } from "@/lib/server/price-engine/wholesale";
 import { evaluateCoupon } from "@/lib/server/coupons";
 import type { SessionUser } from "@/lib/server/auth/session";
 
@@ -122,7 +123,7 @@ export async function getCartView(user: SessionUser | null): Promise<CartView> {
   const full = await db.cart.findUniqueOrThrow({ where: { id: cart.id }, include: cartInclude });
   const discounts = await loadActiveDiscounts();
   const userUses = user ? await userDiscountUses(db, user.id, discounts.map((d) => d.id)) : undefined;
-  const priced = priceLines(full.items.map((i) => ({ qty: i.quantity, product: i.variant.product, variant: i.variant })), user, discounts, userUses);
+  const priced = priceLines(full.items.map((i) => ({ qty: i.quantity, product: i.variant.product, variant: i.variant })), user, discounts, userUses, await getWholesalePolicy());
   const pmIds = full.items.map((i) => i.phoneModelId).filter((x): x is string => !!x);
   const pms = pmIds.length ? await db.phoneModel.findMany({ where: { id: { in: pmIds } }, select: { id: true, name: true } }) : [];
   const issues: string[] = [];

@@ -28,7 +28,9 @@ export function matchesLine(d: Pick<Discount, "scope" | "targetId">, c: LineCtx)
     case "VARIANT": return !!c.variantId && d.targetId === c.variantId;
     case "CATEGORY": return c.categoryIds.includes(d.targetId);
     case "MODEL": return !!c.phoneModelId && d.targetId === c.phoneModelId;
-    case "BRAND": return d.targetId === c.productBrandId || (!!c.phoneBrandId && d.targetId === c.phoneBrandId);
+    case "PRODUCT_BRAND": return !!c.productBrandId && d.targetId === c.productBrandId; // the maker of the product (Spigen)
+    case "PHONE_BRAND": return !!c.phoneBrandId && d.targetId === c.phoneBrandId; // the brand of the variant's phone model (Apple)
+    case "BRAND": return d.targetId === c.productBrandId || (!!c.phoneBrandId && d.targetId === c.phoneBrandId); // legacy rows only
   }
 }
 

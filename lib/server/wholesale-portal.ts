@@ -5,6 +5,7 @@ import { rateLimit } from "@/lib/server/rate-limit";
 import { getStorage } from "@/lib/server/storage";
 import { validateReceipt } from "@/lib/server/upload";
 import { unitPriceFor } from "@/lib/server/pricing";
+import { getWholesalePolicy } from "@/lib/server/price-engine/wholesale";
 import type { SessionUser } from "@/lib/server/auth/session";
 import type { UploadedFile } from "@/lib/server/support";
 
@@ -58,8 +59,9 @@ export async function partnerOverview(user: SessionUser, q = "") {
     db.orderItem.findMany({ where: { priceType: "wholesale", listPrice: { not: null }, order: { userId: user.id, paymentStatus: "PAID" } }, select: { listPrice: true, unitPrice: true, quantity: true } }),
     db.order.aggregate({ where: { userId: user.id, paymentStatus: "PAID" }, _sum: { discountTotal: true } }),
   ]);
+  const policy = await getWholesalePolicy();
   const prices = products.map((p) => {
-    const priced = unitPriceFor(p, { retailPrice: null, wholesalePrice: null }, p.minWholesaleQty, { wholesale: w });
+    const priced = unitPriceFor(p, { retailPrice: null, wholesalePrice: null }, p.minWholesaleQty, { wholesale: w }, undefined, policy.capAtRetail ? Math.max(0, p.retailPrice - p.retailDiscount) : undefined);
     return { slug: p.slug, name: p.name, retail: Math.max(0, p.retailPrice - p.retailDiscount), wholesale: priced.priceType === "wholesale" ? priced.unitPrice : null, minQty: p.minWholesaleQty };
   });
   const wholesaleSavings = itemsAgg.reduce((a, i) => a + Math.max(0, (i.listPrice ?? 0) - i.unitPrice) * i.quantity, 0);
