@@ -41,7 +41,9 @@ export function CategoryTiles({ title, categories }: { title: string; categories
     <section className="py-5">
       <Container>
         <SectionHeader title={title} />
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {/* One swipeable rail with two rows (fills right-to-left); on wide screens five columns fit without scrolling. */}
+        <div className="no-scrollbar -mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0" data-category-rail>
+        <div className="grid auto-cols-[44%] grid-flow-col grid-rows-2 gap-3 sm:auto-cols-[calc((100%-3rem)/5)]">
           {categories.map((c) => (
             <Link key={c.slug} href={`/shop#${c.slug}`} className="group flex flex-col items-center gap-2 rounded-lg border border-transparent bg-surface-2 px-3 py-4 text-center transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:bg-surface hover:shadow-md">
               <span className="flex gap-1 transition-transform duration-200 group-hover:scale-105" dir="rtl">
@@ -51,6 +53,7 @@ export function CategoryTiles({ title, categories }: { title: string; categories
               <span className="text-[11px] text-muted">{toFa(c.productCount)} محصول</span>
             </Link>
           ))}
+        </div>
         </div>
       </Container>
     </section>

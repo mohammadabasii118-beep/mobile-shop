@@ -57,7 +57,7 @@ export function TopHeader({ menu, info, links, loggedIn }: HeaderProps) {
             <Link href="/account/orders" className={cn(iconBtn, "relative hidden sm:grid")} aria-label="حساب کاربری"><User className="size-5" />{loggedIn && <i className="absolute end-2 top-2 size-2 rounded-full bg-accent" />}</Link>
             <NightButton iconOnly className={cn(iconBtn, "hidden sm:grid")} />
             <CartBtn />
-            <MobileMenu menu={menu} className="sm:hidden" />
+            <MobileMenu menu={menu} links={links} loggedIn={loggedIn} logo={info.logo} name={info.name} className="sm:hidden" />
           </div>
         </div>
       </Container>
@@ -89,7 +89,7 @@ export function FloatingHeader({ menu, links, loggedIn, info }: HeaderProps) {
             <CartBtn />
             <NightButton iconOnly className={cn(iconBtn, "hidden sm:grid")} />
             <button data-search-btn className={iconBtn} aria-label="جستجو"><Search className="size-5" /></button>
-            <MobileMenu menu={menu} className="sm:hidden" />
+            <MobileMenu menu={menu} links={links} loggedIn={loggedIn} logo={info.logo} name={info.name} className="sm:hidden" />
           </div>
         </div>
       </Container>
