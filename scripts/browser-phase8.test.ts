@@ -118,4 +118,30 @@ describe("Phase 8 — browser flows", () => {
     assert.equal(await dark(), false);
     await ctx.close();
   });
+
+  it("mobile menu rows come from the admin menu «موبایل» (defaults present; admin can add/rename/remove), divider sits under the categories, login shows «حساب کاربری» when signed in", async () => {
+    const dflt = await db.menuItem.findMany({ where: { menu: "mobile" }, orderBy: { sortOrder: "asc" } });
+    assert.deepEqual(dflt.slice(0, 4).map((m) => m.link), ["/account", "/shop", "/blog", "/support"]);
+    const label = "تخفیف‌ها " + uid();
+    const made = ok(await admin.post("/api/admin/r/menus", { menu: "mobile", label, link: "/shop?sale=1", sortOrder: 50 }));
+    try {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: "fa-IR" });
+      const p = await ctx.newPage(); await p.goto(`${BASE}/`, { waitUntil: "networkidle" });
+      await p.getByLabel("منو", { exact: true }).first().tap();
+      const aside = p.locator("[data-mobile-menu] aside"); await aside.waitFor();
+      const texts = await aside.locator("li").allInnerTexts();
+      assert.ok(texts.some((t: string) => t.includes(label)), "admin-added row is shown");
+      const iAccount = texts.findIndex((t: string) => t.includes("ورود / ثبت‌نام")), iLast = texts.findIndex((t: string) => t.includes("پشتیبانی"));
+      assert.ok(iAccount >= 0 && iAccount < iLast, "login first, then the rest");
+      assert.ok(await aside.locator("div.border-t").count() >= 1, "divider between categories and the rows");
+      await ctx.close();
+      // signed-in users see «حساب کاربری»
+      const c = new Client(); ok(await c.post("/api/auth/register", { fullName: "کاربر منو", email: `m-${uid()}@example.com`, password: "Secret123x" }));
+      const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: "fa-IR" });
+      await ctx2.addCookies([...c.jar].map(([name, value]) => ({ name, value, url: BASE })));
+      const p2 = await ctx2.newPage(); await p2.goto(`${BASE}/`, { waitUntil: "networkidle" }); await p2.getByLabel("منو", { exact: true }).first().tap();
+      const t2 = await p2.locator("[data-mobile-menu] aside li").allInnerTexts(); assert.ok(t2.some((t: string) => t.includes("حساب کاربری")) && !t2.some((t: string) => t.includes("ورود / ثبت‌نام")));
+      await ctx2.close();
+    } finally { await admin.del(`/api/admin/r/menus/${made.id}`); }
+  });
 });

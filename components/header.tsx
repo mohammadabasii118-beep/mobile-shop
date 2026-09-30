@@ -26,7 +26,7 @@ export function Logo({ className, logo, name }: { className?: string; logo?: str
 }
 
 const iconBtn = "grid size-10 cursor-pointer place-items-center rounded-full bg-surface text-foreground/80 shadow-sm ring-1 ring-transparent transition-all duration-200 hover:bg-primary/10 hover:text-primary hover:shadow-md hover:ring-primary/35";
-export interface HeaderProps { menu: MenuCategory[]; info: SiteInfo; links: { label: string; link: string }[]; loggedIn?: boolean }
+export interface HeaderProps { menu: MenuCategory[]; info: SiteInfo; links: { label: string; link: string }[]; mobileLinks?: { label: string; link: string }[]; loggedIn?: boolean }
 const navLink = "rounded-full px-3.5 py-2 transition-colors hover:bg-primary/10 hover:text-primary";
 
 function CartBtn() {
@@ -39,7 +39,7 @@ function CartBtn() {
 }
 
 /** Header 1: static, lives at the top of the page and scrolls away. */
-export function TopHeader({ menu, info, links, loggedIn }: HeaderProps) {
+export function TopHeader({ menu, info, links, mobileLinks, loggedIn }: HeaderProps) {
   return (
     <header>
       <div className="bg-primary/10 text-center text-[11px] leading-7 text-muted sm:text-xs">
@@ -57,7 +57,7 @@ export function TopHeader({ menu, info, links, loggedIn }: HeaderProps) {
             <Link href="/account/orders" className={cn(iconBtn, "relative hidden sm:grid")} aria-label="حساب کاربری"><User className="size-5" />{loggedIn && <i className="absolute end-2 top-2 size-2 rounded-full bg-accent" />}</Link>
             <NightButton iconOnly className={cn(iconBtn, "hidden sm:grid")} />
             <CartBtn />
-            <MobileMenu menu={menu} links={links} loggedIn={loggedIn} logo={info.logo} name={info.name} className="sm:hidden" />
+            <MobileMenu menu={menu} links={mobileLinks} loggedIn={loggedIn} logo={info.logo} name={info.name} className="sm:hidden" />
           </div>
         </div>
       </Container>
@@ -66,7 +66,7 @@ export function TopHeader({ menu, info, links, loggedIn }: HeaderProps) {
 }
 
 /** Header 2: floating pill that slides in once the page is scrolled. */
-export function FloatingHeader({ menu, links, loggedIn, info }: HeaderProps) {
+export function FloatingHeader({ menu, links, mobileLinks, loggedIn, info }: HeaderProps) {
   const [show, setShow] = useState(false);
   useEffect(() => {
     const on = () => setShow(window.scrollY > 140);
@@ -89,7 +89,7 @@ export function FloatingHeader({ menu, links, loggedIn, info }: HeaderProps) {
             <CartBtn />
             <NightButton iconOnly className={cn(iconBtn, "hidden sm:grid")} />
             <button data-search-btn className={iconBtn} aria-label="جستجو"><Search className="size-5" /></button>
-            <MobileMenu menu={menu} links={links} loggedIn={loggedIn} logo={info.logo} name={info.name} className="sm:hidden" />
+            <MobileMenu menu={menu} links={mobileLinks} loggedIn={loggedIn} logo={info.logo} name={info.name} className="sm:hidden" />
           </div>
         </div>
       </Container>

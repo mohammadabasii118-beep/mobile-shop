@@ -65,9 +65,9 @@ export function MobileMenu({ menu, links = [], loggedIn, logo, name, className }
   const close = () => setOpen(false);
   const row = "flex items-center justify-between gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-medium transition-colors hover:bg-primary/10 hover:text-primary";
   const chip = "grid size-10 shrink-0 place-items-center rounded-xl bg-primary/12 text-primary";
-  // Always: shop, blog, support (independent of what the admin put in the header menu); other admin menu links are appended.
-  const fixed = [{ label: "فروشگاه", link: "/shop" }, { label: "وبلاگ", link: "/blog" }, { label: "پشتیبانی", link: "/support" }];
-  const extra = [...fixed, ...links.filter((l) => l.link && l.link !== "/" && !fixed.some((f) => f.link === l.link || l.link.startsWith(f.link + "?") || l.link.startsWith(f.link + "/")))];
+  // Rows under the divider come from /admin/menus → "موبایل"; if that menu is empty the four standard rows are used.
+  const extra = links.length ? links : [{ label: "ورود / ثبت‌نام", link: "/account" }, { label: "فروشگاه", link: "/shop" }, { label: "وبلاگ", link: "/blog" }, { label: "پشتیبانی", link: "/support" }];
+  const isAccount = (l: string) => l === "/account";
   const extraIcon = (l: string) => (l.startsWith("/blog") ? PenLine : l.startsWith("/support") ? Headphones : l.startsWith("/shop") ? Store : Sparkles);
   return (
     <div className={className}>
@@ -97,8 +97,7 @@ export function MobileMenu({ menu, links = [], loggedIn, logo, name, className }
             )}
             <div className="my-3 border-t border-border" />
             <ul className="space-y-1">
-              <li><Link href={loggedIn ? "/account/orders" : "/account"} onClick={close} className={row}><span className={chip}><User className="size-5" /></span><span className="flex-1 text-start">{loggedIn ? "حساب کاربری" : "ورود / ثبت‌نام"}</span></Link></li>
-              {extra.map((l) => { const I = extraIcon(l.link); return <li key={l.link + l.label}><Link href={l.link} onClick={close} className={row}><span className={chip}><I className="size-5" /></span><span className="flex-1 text-start">{l.label}</span></Link></li>; })}
+              {extra.map((l) => { const I = isAccount(l.link) ? User : extraIcon(l.link); return <li key={l.link + l.label}><Link href={isAccount(l.link) && loggedIn ? "/account/orders" : l.link} onClick={close} className={row}><span className={chip}><I className="size-5" /></span><span className="flex-1 text-start">{isAccount(l.link) && loggedIn ? "حساب کاربری" : l.label}</span></Link></li>; })}
               <li><NightButton withSwitch className={cn(row, "w-full cursor-pointer")} /></li>
             </ul>
           </aside>

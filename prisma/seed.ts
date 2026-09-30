@@ -148,7 +148,7 @@ async function main() {
   ];
   for (const [i, [key, type, title]] of sections.entries()) await db.homepageSection.upsert({ where: { key }, update: {}, create: { key, type, title, sortOrder: i, config: key.startsWith("rail:") ? { categorySlug: key.slice(5), limit: 5 } : undefined } });
 
-  if ((await db.menuItem.count()) === 0) {
+  if ((await db.menuItem.count({ where: { menu: { in: ["main", "footer"] } } })) === 0) {
     await db.menuItem.createMany({ data: [
       { menu: "main", label: "فروشگاه", link: "/shop", sortOrder: 0 }, { menu: "main", label: "وبلاگ", link: "/blog", sortOrder: 1 }, { menu: "main", label: "پشتیبانی", link: "/support", sortOrder: 2 },
       { menu: "footer", label: "محصولات", link: "/shop", sortOrder: 0 }, { menu: "footer", label: "بلاگ", link: "/blog", sortOrder: 1 }, { menu: "footer", label: "حساب کاربری", link: "/account", sortOrder: 2 },

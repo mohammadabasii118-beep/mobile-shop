@@ -9,7 +9,7 @@ export default async function Page() {
   const parents = await db.menuItem.findMany({ where: { parentId: null }, orderBy: [{ menu: "asc" }, { sortOrder: "asc" }], select: { id: true, label: true, menu: true } });
   return (
     <>
-      <PageHead title="منوها" sub="هدر و فوتر سایت از همین جدول خوانده می‌شود." />
+      <PageHead title="منوها" sub="هدر، فوتر و منوی کشویی موبایل از همین جدول خوانده می‌شود. برای منوی موبایل، آیتم‌های «موبایل» را (ورود، فروشگاه، وبلاگ، پشتیبانی و …) اضافه، حذف یا مرتب کنید؛ لینک «/account» برای کاربر واردشده «حساب کاربری» نشان داده می‌شود." />
       <ResourceManager resource="menus" noun="آیتم" sortable filters={[{ key: "menu", label: "منو", options: MENUS }]}
         columns={[{ key: "label", label: "عنوان" }, { key: "menu", label: "منو", map: Object.fromEntries(MENUS.map((m) => [m.value, m.label])) }, { key: "link", label: "لینک", kind: "code" }, { key: "parent.label", label: "والد" }, { key: "isActive", label: "وضعیت", kind: "bool" }]}
         defaults={{ menu: "main" }}
