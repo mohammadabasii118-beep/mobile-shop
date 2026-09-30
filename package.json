@@ -11,6 +11,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
+    "import:demo": "tsx scripts/import-demo-content.ts",
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
     "test:browser": "tsx --test --test-concurrency=1 scripts/browser-phase7.test.ts scripts/browser-phase8.test.ts",

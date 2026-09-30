@@ -59,3 +59,6 @@ server { listen 80; server_name shop.example.com; return 301 https://$host$reque
 
 ## 8. Launch checklist
 - [ ] `npm run preflight` = Ready · [ ] real SMS provider configured (OTP login is unusable with `console`) · [ ] payment card details filled in `/admin/settings` · [ ] shipping methods/costs real · [ ] `APP_URL` https, certificate auto-renews · [ ] nightly backup + a restore rehearsal · [ ] sitemap submitted · [ ] demo products/banners/blog reviewed or replaced · [ ] `finance.fourEyes` on and at least two staff hold `refund.approve`/`refund.manage` · [ ] firewall: only 80/443 (+ SSH) open, PostgreSQL bound to localhost.
+
+## 9. Optional: demo catalogue on an empty shop
+`npm run import:demo -- --yes` (run in `/srv/caseline` as the app user, then `systemctl restart caseline`) fills an EMPTY database with the demo catalogue: categories, brands, phone models, ~70 products with stock, homepage sections, menus, banner, blog posts, shipping methods and wholesale tiers. It creates **no** users/passwords, orders, reviews, ratings, coupons, bank-card details or contact details, and refuses to run if products already exist. Prices, stock and shipping costs are placeholders: edit or delete them in `/admin`, and fill `/admin/settings` (contact + bank card) before selling.
