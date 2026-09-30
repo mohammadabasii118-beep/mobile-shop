@@ -100,7 +100,8 @@ describe("Phase 11 — variants inside the product form", () => {
     await u.goto(`${BASE}/product/bp11-${tag}`, { waitUntil: "networkidle" });
     await u.getByTestId("variant-picker").waitFor();
     assert.equal(await u.getByTestId("model-chip").count(), 1, "only Alpha has active variants");
-    assert.equal(await u.getByTestId("color-chip").first().isDisabled(), true, "colours wait for a model");
+    assert.equal(await u.getByTestId("color-chip").filter({ hasText: "سرخ" }).isDisabled(), false, "two-way: a colour with a buyable variant is selectable before any model");
+    assert.equal(await u.getByTestId("color-chip").filter({ hasText: "آبی" }).isDisabled(), true, "out-of-stock colour is disabled from the start");
     assert.equal(await u.locator("[data-buy]").isDisabled(), true);
     await u.getByTestId("model-chip").click();
     const chips = u.getByTestId("color-chip");

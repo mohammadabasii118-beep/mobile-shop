@@ -19,6 +19,7 @@ const kOf = (v: Variant, i: number) => v.id ?? v._k ?? `i${i}`;
 
 type PriceOp = "set" | "inc" | "dec" | "incPct" | "decPct" | "clear";
 type SaleOp = "set" | "pctBelow" | "clear";
+type WsOp = "set" | "pctBelow" | "inherit";
 
 /**
  * Variant section of the product form (variable products): pick models and colours, generate the combinations (inactive
@@ -65,7 +66,7 @@ export function VariantMatrix({ p, setVariants, models, colors, canPrice, canCos
   const [q, setQ] = useState(""); const [fBrand, setFBrand] = useState(""); const [fSeries, setFSeries] = useState(""); const [status, setStatus] = useState("all"); const [page, setPage] = useState(0);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [edit, setEdit] = useState<string | null>(null);
-  const [bulk, setBulk] = useState<{ price: string; priceOp: PriceOp; sale: string; saleOp: SaleOp; stock: string; prefix: string }>({ price: "", priceOp: "set", sale: "", saleOp: "set", stock: "", prefix: "" });
+  const [bulk, setBulk] = useState<{ price: string; priceOp: PriceOp; sale: string; saleOp: SaleOp; ws: string; wsOp: WsOp; stock: string; prefix: string }>({ price: "", priceOp: "set", sale: "", saleOp: "set", ws: "", wsOp: "set", stock: "", prefix: "" });
   const [note, setNote] = useState("");
   const label = (v: Variant) => `${modelOf.get(v.phoneModelId)?.label ?? ""} ${colorOf.get(v.colorId)?.label ?? v.color} ${v.name} ${v.sku}`.toLowerCase();
   const rows = vs.map((v, i) => ({ v, i, k: kOf(v, i) })).filter(({ v }) => {
@@ -101,6 +102,21 @@ export function VariantMatrix({ p, setVariants, models, colors, canPrice, canCos
     });
     setNote("");
   };
+  // Wholesale: an empty value INHERITS the product's wholesale base price; a value overrides it for that variant only.
+  const applyWs = () => {
+    const x = Number(bulk.ws);
+    if (bulk.wsOp !== "inherit" && (bulk.ws === "" || !Number.isFinite(x) || x < 0 || (bulk.wsOp === "pctBelow" && x > 100))) { setNote("عدد معتبر وارد کنید (درصد بین ۰ تا ۱۰۰)."); return; }
+    let over = 0;
+    patchMany((v) => {
+      if (bulk.wsOp === "inherit") return { wholesalePrice: "" };
+      const price = v.retailPrice === "" ? baseRetail : Number(v.retailPrice);
+      const w = Math.max(0, Math.round(bulk.wsOp === "set" ? x : price * (1 - x / 100)));
+      if (w > price) over++;
+      return { wholesalePrice: String(w) };
+    });
+    setNote(over ? `${fmtNum(over)} تنوع قیمت همکاری بالاتر از قیمت خرده گرفتند؛ سیاست قیمت عمده هنگام ذخیره بررسی می‌شود.` : "");
+  };
+  const baseWs = p.wholesalePrice.trim() === "" ? null : Number(p.wholesalePrice);
   const applyStock = () => { const x = Math.max(0, Math.floor(Number(bulk.stock))); if (bulk.stock === "" || !Number.isFinite(x)) return; let skipped = 0; patchMany((v) => { if (stockLocked(v)) { skipped++; return {}; } return { stock: String(x) }; }); setNote(skipped ? `${fmtNum(skipped)} تنوع بدون دسترسی موجودی دست نخورد.` : ""); };
   const removeSel = () => {
     if (!sel.size || !confirmAsk(`${sel.size} تنوع انتخاب‌شده حذف شود؟ (تنوع‌هایی که در سفارش‌ها بوده‌اند فقط غیرفعال می‌شوند.)`)) return;
@@ -180,6 +196,9 @@ export function VariantMatrix({ p, setVariants, models, colors, canPrice, canCos
                     <label>قیمت فروش ویژه<select className={cn(small, "block")} value={bulk.saleOp} onChange={(e) => setBulk({ ...bulk, saleOp: e.target.value as SaleOp })} aria-label="عملیات قیمت ویژه"><option value="set">تعیین قیمت</option><option value="pctBelow">درصد کمتر از قیمت</option><option value="clear">حذف قیمت ویژه</option></select></label>
                     {bulk.saleOp !== "clear" && <input dir="ltr" type="number" min={0} className={cn(small, "w-28")} value={bulk.sale} onChange={(e) => setBulk({ ...bulk, sale: e.target.value })} aria-label="مقدار قیمت ویژه گروهی" />}
                     <button type="button" className={cn(btnGhost, "h-8 px-2 text-xs")} data-testid="bulk-sale" onClick={applySale}>اعمال قیمت ویژه</button>
+                    <label>قیمت همکاری<select className={cn(small, "block")} value={bulk.wsOp} onChange={(e) => setBulk({ ...bulk, wsOp: e.target.value as WsOp })} aria-label="عملیات قیمت همکاری"><option value="set">تعیین قیمت همکاری</option><option value="pctBelow">درصد کمتر از قیمت عادی</option><option value="inherit">بازگشت به قیمت همکاری محصول (Inherit)</option></select></label>
+                    {bulk.wsOp !== "inherit" && <input dir="ltr" type="number" min={0} className={cn(small, "w-28")} value={bulk.ws} onChange={(e) => setBulk({ ...bulk, ws: e.target.value })} aria-label="مقدار قیمت همکاری گروهی" />}
+                    <button type="button" className={cn(btnGhost, "h-8 px-2 text-xs")} data-testid="bulk-ws" onClick={applyWs}>اعمال قیمت همکاری</button>
                   </div>
                 )}
                 {sel.size > 0 && <button type="button" className={cn(btnDanger, "h-8 px-3 text-xs")} onClick={removeSel}><Trash2 className="size-3.5" />حذف {fmtNum(sel.size)} ردیف انتخاب‌شده</button>}
@@ -188,9 +207,9 @@ export function VariantMatrix({ p, setVariants, models, colors, canPrice, canCos
               </div>
             )}
             <div className="overflow-x-auto rounded-lg border border-border">
-              <table className="w-full min-w-[980px] text-xs"><thead className="bg-surface-2 text-muted"><tr>
+              <table className="w-full min-w-[1120px] text-xs"><thead className="bg-surface-2 text-muted"><tr>
                 <th className="p-2"><input type="checkbox" aria-label="انتخاب صفحه" className="size-4 accent-[var(--primary)]" checked={visible.length > 0 && visible.every((r) => sel.has(r.k))} onChange={(e) => setSel((s) => { const n = new Set(s); for (const r of visible) { if (e.target.checked) n.add(r.k); else n.delete(r.k); } return n; })} /></th>
-                <th className="p-2 text-start">مدل</th><th className="p-2 text-start">رنگ</th><th className="p-2 text-start">SKU</th><th className="p-2 text-start">قیمت (خالی = پایه)</th><th className="p-2 text-start">قیمت فروش ویژه</th><th className="p-2 text-start">موجودی</th><th className="p-2 text-start">تصویر</th><th className="p-2 text-start">وضعیت</th><th className="p-2" /></tr></thead>
+                <th className="p-2 text-start">مدل</th><th className="p-2 text-start">رنگ</th><th className="p-2 text-start">SKU</th><th className="p-2 text-start">قیمت (خالی = پایه)</th><th className="p-2 text-start">قیمت فروش ویژه</th><th className="p-2 text-start">قیمت همکاری</th><th className="p-2 text-start">موجودی</th><th className="p-2 text-start">تصویر</th><th className="p-2 text-start">وضعیت</th><th className="p-2" /></tr></thead>
                 <tbody className="divide-y divide-border/60">{visible.map(({ v, k }) => {
                   const m = modelOf.get(v.phoneModelId); const c = colorOf.get(v.colorId);
                   return (
@@ -201,6 +220,10 @@ export function VariantMatrix({ p, setVariants, models, colors, canPrice, canCos
                       <td className="p-2"><input dir="ltr" className={cn(small, "w-36")} value={v.sku} disabled={ro} onChange={(e) => patchOne(k, { sku: e.target.value })} aria-label="SKU" /></td>
                       <td className="p-2"><input dir="ltr" type="number" min={0} className={cn(small, "w-28")} placeholder={p.retailPrice || "—"} disabled={ro || !canPrice || v.pricingMode === "AUTOMATIC"} value={v.retailPrice} onChange={(e) => patchOne(k, { retailPrice: e.target.value })} aria-label="قیمت" title={v.pricingMode === "AUTOMATIC" ? "قیمت خودکار: از هزینه خرید و قانون سود محاسبه می‌شود" : undefined} /></td>
                       <td className="p-2"><input dir="ltr" type="number" min={0} className={cn(small, "w-28")} disabled={ro || !canPrice} value={v.salePrice} onChange={(e) => patchOne(k, { salePrice: e.target.value })} aria-label="قیمت فروش ویژه" /></td>
+                      <td className="p-2" data-testid="ws-cell">
+                        <input dir="ltr" type="number" min={0} className={cn(small, "w-28")} placeholder={baseWs == null ? "—" : String(baseWs)} disabled={ro || !canPrice} value={v.wholesalePrice} onChange={(e) => patchOne(k, { wholesalePrice: e.target.value })} aria-label="قیمت همکاری" />
+                        <span className={cn("mt-0.5 block text-[10px]", v.wholesalePrice === "" ? "text-muted" : "font-bold text-primary")} data-testid="ws-mode">{v.wholesalePrice === "" ? `ارث‌بری (${baseWs == null ? "بدون قیمت همکاری" : fmtNum(baseWs)})` : `اختصاصی (${fmtNum(Number(v.wholesalePrice))})`}</span>
+                      </td>
                       <td className="p-2"><input dir="ltr" type="number" min={0} className={cn(small, "w-20", Number(v.stock) === 0 && "border-warning")} disabled={ro || stockLocked(v)} value={v.stock} onChange={(e) => patchOne(k, { stock: e.target.value })} aria-label="موجودی" /></td>
                       <td className="p-2"><span className="flex items-center gap-1.5">{v.imageUrl && <img src={v.imageUrl} alt="" className="size-7 rounded object-cover" />}<select className={cn(small, "w-28")} disabled={ro} value={v.imageUrl} onChange={(e) => patchOne(k, { imageUrl: e.target.value })} aria-label="تصویر"><option value="">تصویر محصول</option>{p.images.map((im, n) => <option key={im.url} value={im.url}>تصویر {fmtNum(n + 1)}</option>)}</select></span></td>
                       <td className="p-2"><label className="inline-flex cursor-pointer items-center gap-1.5"><input type="checkbox" aria-label="فعال" className="size-4 accent-[var(--primary)]" disabled={ro} checked={v.isActive} onChange={(e) => patchOne(k, { isActive: e.target.checked })} /><span className={v.isActive ? (Number(v.stock) > 0 ? "font-bold text-success" : "font-bold text-warning") : "text-muted"}>{v.isActive ? (Number(v.stock) > 0 ? "✓ فعال" : "✓ فعال · ناموجود") : "× غیرفعال"}</span></label></td>
@@ -225,7 +248,7 @@ export function VariantMatrix({ p, setVariants, models, colors, canPrice, canCos
             {canCost && <Label label="هزینه خرید"><input dir="ltr" type="number" min={0} className={inputCls} disabled={!canPrice} value={editing.v.costPrice} onChange={(e) => patchOne(editing.k, { costPrice: e.target.value })} /></Label>}
             <Label label={editing.v.pricingMode === "AUTOMATIC" ? "قیمت محاسبه‌شده" : "قیمت خرده (خالی = قیمت پایه)"}><input dir="ltr" type="number" min={0} className={inputCls} disabled={ro || !canPrice || editing.v.pricingMode === "AUTOMATIC"} value={editing.v.retailPrice} onChange={(e) => patchOne(editing.k, { retailPrice: e.target.value })} /></Label>
             <Label label="قیمت فروش ویژه" hint="باید کمتر از قیمت باشد؛ با تخفیف‌های دیگر، بهترین یکی اعمال می‌شود"><input dir="ltr" type="number" min={0} className={inputCls} disabled={ro || !canPrice} value={editing.v.salePrice} onChange={(e) => patchOne(editing.k, { salePrice: e.target.value })} /></Label>
-            <Label label="قیمت عمده (اختیاری)"><input dir="ltr" type="number" min={0} className={inputCls} disabled={ro || !canPrice} value={editing.v.wholesalePrice} onChange={(e) => patchOne(editing.k, { wholesalePrice: e.target.value })} /></Label>
+            <Label label="قیمت همکاری (خالی = ارث‌بری از قیمت همکاری محصول)"><input dir="ltr" type="number" min={0} className={inputCls} disabled={ro || !canPrice} value={editing.v.wholesalePrice} onChange={(e) => patchOne(editing.k, { wholesalePrice: e.target.value })} /></Label>
             <Label label="موجودی"><input dir="ltr" type="number" min={0} className={inputCls} disabled={ro || stockLocked(editing.v)} value={editing.v.stock} onChange={(e) => patchOne(editing.k, { stock: e.target.value })} /></Label>
             <label className="flex items-center gap-2 self-end text-sm"><input type="checkbox" className="size-4 accent-[var(--primary)]" disabled={ro} checked={editing.v.isActive} onChange={(e) => patchOne(editing.k, { isActive: e.target.checked })} />فعال (قابل خرید)</label>
           </div>
