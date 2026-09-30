@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, Banknote, Clock, PackageCheck, ShoppingBag, Store, Star, TrendingUp, UserPlus, Wallet, CalendarDays, ClipboardCheck } from "lucide-react";
+import { AlertTriangle, Banknote, Boxes, Clock, Package, PackageCheck, Percent, ShoppingBag, Store, Star, TrendingUp, UserPlus, Wallet, CalendarDays, ClipboardCheck } from "lucide-react";
 import { Card, PageHead } from "@/components/admin/kit";
 import { getCurrentUser } from "@/lib/server/auth/session";
 import { redirect } from "next/navigation";
@@ -37,6 +37,10 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
     { label: "درخواست همکاری در انتظار", value: fa(d.pendingWholesale), icon: Store, href: "/admin/wholesale" },
     { label: "نظرات در انتظار تأیید", value: fa(d.pendingReviews), icon: Star, href: "/admin/reviews" },
     { label: "مشتریان جدید (۳۰ روز)", value: fa(d.newCustomers), icon: UserPlus, href: "/admin/customers" },
+    { label: "تعداد محصولات", value: fa(d.catalog.productCount), icon: Package, href: "/admin/products" },
+    { label: "تعداد تنوع‌ها (Variant)", value: fa(d.catalog.variantCount), icon: Boxes, href: "/admin/products" },
+    { label: "تنوع‌های ناموجود", value: fa(d.catalog.outOfStock), icon: AlertTriangle, href: "/admin/inventory", tone: d.catalog.outOfStock ? "text-hot" : "" },
+    { label: "تخفیف‌های فعال", value: fa(d.catalog.activeDiscounts), icon: Percent, href: "/admin/discounts" },
   ];
   return (
     <>
@@ -69,6 +73,14 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <h2 className="mb-3 flex items-center justify-between text-sm font-black">آخرین پرداخت‌ها<Link href="/admin/payments" className="text-xs font-bold text-primary">بررسی</Link></h2>
           <ul className="space-y-2 text-sm">{d.recentPayments.map((p) => <li key={p.id} className="flex items-center justify-between gap-2"><span className="flex items-center gap-1"><Wallet className="size-3.5 text-muted" />#{p.order.number.toLocaleString("fa-IR", { useGrouping: false })}</span><span className="text-xs text-muted">{STATUS[p.status]}</span><b>{toman(p.amount)}</b></li>)}</ul>
           {d.recentPayments.length === 0 && <p className="py-6 text-center text-sm text-muted">پرداختی ثبت نشده.</p>}
+        </Card>
+        <Card>
+          <h2 className="mb-3 flex items-center justify-between text-sm font-black">تخفیف‌های در حال انقضا<Link href="/admin/discounts" className="text-xs font-bold text-primary">همه</Link></h2>
+          {d.catalog.expiring.length === 0 ? <p className="py-6 text-center text-sm text-muted">تخفیفی در ۷ روز آینده منقضی نمی‌شود.</p> : <ul className="space-y-2 text-sm">{d.catalog.expiring.map((x) => <li key={x.id} className="flex items-center justify-between gap-2"><span className="truncate">{x.name}</span><span className="shrink-0 text-xs text-muted">{new Date(x.endsAt!).toLocaleDateString("fa-IR", { day: "numeric", month: "short" })}</span></li>)}</ul>}
+        </Card>
+        <Card className="lg:col-span-2">
+          <h2 className="mb-3 flex items-center justify-between text-sm font-black">آخرین تغییرات قیمت{user.permissions.includes("pricing.read") && <Link href="/admin/pricing?tab=history" className="text-xs font-bold text-primary">تاریخچه</Link>}</h2>
+          {d.catalog.priceChanges.length === 0 ? <p className="py-6 text-center text-sm text-muted">تغییر قیمتی ثبت نشده.</p> : <ul className="divide-y divide-border text-sm">{d.catalog.priceChanges.map((c) => <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2"><span className="min-w-0 truncate">{c.product.name}{c.variant ? <span dir="ltr" className="ms-1 text-[11px] text-muted">{c.variant.sku}</span> : null}</span><span className="text-xs"><s className="text-muted">{fa(c.oldPrice)}</s> ‹ <b>{fa(c.newPrice)}</b></span></li>)}</ul>}
         </Card>
       </div>
     </>

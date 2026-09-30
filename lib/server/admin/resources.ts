@@ -90,6 +90,40 @@ export const RESOURCES: Record<string, Resource> = {
       if (await tx.couponUsage.count({ where: { couponId: id } })) throw conflict("این کوپن استفاده شده است؛ به‌جای حذف آن را غیرفعال کنید.");
     },
   },
+  colors: {
+    model: "color", perm: "product.write", label: "رنگ", auditName: "color", hasSort: true,
+    create: z.object({ name: req(40), hex: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, "کد رنگ مثل #FFFFFF وارد کنید.").nullable().optional().or(z.literal("").transform(() => null)), isActive: bool.optional(), sortOrder: int(0, 100000).optional() }),
+    orderBy: [{ sortOrder: "asc" }], search: ["name"], filters: ["isActive"], include: { _count: { select: { variants: true } } },
+    beforeDelete: async (tx, id) => {
+      if (await tx.productVariant.count({ where: { colorId: id } })) throw conflict("این رنگ در تنوع محصولات استفاده شده است؛ آن را غیرفعال کنید.");
+    },
+  },
+  discounts: {
+    model: "discount", perm: "discount.write", label: "تخفیف", auditName: "discount",
+    create: z.object({
+      name: req(80), type: z.enum(["PERCENT", "FIXED"]), value: int(1, 2_000_000_000),
+      scope: z.enum(["ALL", "PRODUCT", "CATEGORY", "VARIANT", "BRAND", "MODEL"]), targetId: z.string().trim().max(40).optional(),
+      startsAt: dateOpt, endsAt: dateOpt, minOrder: int(0).optional(), usageLimit: optInt(1), perUserLimit: optInt(1), isActive: bool.optional(),
+    }),
+    orderBy: [{ createdAt: "desc" }], search: ["name"], filters: ["isActive", "scope"],
+    guard: async (tx, d, ex) => {
+      const type = (d.type ?? ex?.type) as string, value = (d.value ?? ex?.value) as number;
+      if (type === "PERCENT" && value > 100) throw conflict("درصد تخفیف نمی‌تواند بیشتر از ۱۰۰ باشد.", "validation");
+      const scope = (d.scope ?? ex?.scope) as string; const targetId = ((d.targetId ?? (d.scope !== undefined ? "" : ex?.targetId)) ?? "") as string;
+      if (scope === "ALL") d.targetId = "";
+      else {
+        if (!targetId) throw conflict("برای این نوع تخفیف باید هدف (محصول، دسته، تنوع، برند یا مدل) انتخاب شود.", "validation");
+        const found = scope === "PRODUCT" ? await tx.product.count({ where: { id: targetId } }) : scope === "CATEGORY" ? await tx.category.count({ where: { id: targetId } }) : scope === "VARIANT" ? await tx.productVariant.count({ where: { id: targetId } }) : scope === "BRAND" ? await tx.brand.count({ where: { id: targetId } }) : await tx.phoneModel.count({ where: { id: targetId } });
+        if (!found) throw conflict("هدف انتخاب‌شده پیدا نشد.", "validation");
+        d.targetId = targetId;
+      }
+      const s = (d.startsAt === undefined ? ex?.startsAt : d.startsAt) as Date | null, e = (d.endsAt === undefined ? ex?.endsAt : d.endsAt) as Date | null;
+      if (s && e && e <= s) throw conflict("تاریخ پایان باید بعد از شروع باشد.", "validation");
+    },
+    beforeDelete: async (tx, id) => {
+      if (await tx.discountUsage.count({ where: { discountId: id } })) throw conflict("این تخفیف در سفارش‌ها استفاده شده است؛ به‌جای حذف آن را غیرفعال کنید.");
+    },
+  },
   shipping: {
     model: "shippingMethod", perm: "shipping.write", label: "روش ارسال", auditName: "shipping_method", hasSort: true,
     create: z.object({ key: keyish, name: req(80), description: opt(300), cost: int(0), freeThreshold: optInt(0), isActive: bool.optional(), sortOrder: int(0, 100000).optional() }),

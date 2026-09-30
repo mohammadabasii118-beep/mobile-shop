@@ -8,17 +8,17 @@ import { toFormData } from "@/lib/admin/product-map";
 import type { Opt } from "@/components/admin/resource-manager";
 import { cn } from "@/lib/utils";
 
-interface Variant { id?: string; sku: string; name: string; color: string; colorHex: string; retailPrice: string; wholesalePrice: string; isActive: boolean; stock: string; current?: number }
+interface Variant { id?: string; sku: string; name: string; phoneModelId: string; colorId: string; costPrice: string; pricingMode: "AUTOMATIC" | "MANUAL"; color: string; colorHex: string; retailPrice: string; wholesalePrice: string; isActive: boolean; stock: string; current?: number }
 export interface ProductData {
   id?: string; name: string; slug: string; sku: string; brandId: string; categoryId: string; shortDescription: string; description: string; badge: string; isActive: boolean;
-  retailPrice: string; retailDiscount: string; wholesalePrice: string; wholesaleDiscount: string; minWholesaleQty: string; seoTitle: string; seoDescription: string; canonical: string;
+  retailPrice: string; retailDiscount: string; costPrice: string; pricingMode: "AUTOMATIC" | "MANUAL"; wholesalePrice: string; wholesaleDiscount: string; minWholesaleQty: string; seoTitle: string; seoDescription: string; canonical: string;
   phoneModelIds: string[]; images: { url: string; alt: string }[]; variants: Variant[];
   history?: { id: string; type: string; oldPrice: number; newPrice: number; createdAt: string }[];
 }
 
 const num = (s: string) => (s.trim() === "" ? null : Number(s));
 
-export function ProductForm({ initial, categories, brands, phoneModels, canWrite, canDelete, canStock }: { initial: ProductData; categories: Opt[]; brands: Opt[]; phoneModels: (Opt & { group: string })[]; canWrite: boolean; canDelete: boolean; canStock: boolean }) {
+export function ProductForm({ initial, categories, brands, phoneModels, colors, canWrite, canDelete, canStock, canPrice, canCost }: { initial: ProductData; categories: Opt[]; brands: Opt[]; phoneModels: (Opt & { group: string })[]; colors: Opt[]; canWrite: boolean; canDelete: boolean; canStock: boolean; canPrice: boolean; canCost: boolean }) {
   const router = useRouter();
   const [p, setP] = useState(initial);
   const [busy, setBusy] = useState(false);
@@ -32,9 +32,9 @@ export function ProductForm({ initial, categories, brands, phoneModels, canWrite
     e.preventDefault(); setBusy(true); setErrs({});
     const body = {
       name: p.name, slug: p.slug, sku: p.sku, brandId: p.brandId || null, categoryId: p.categoryId, shortDescription: p.shortDescription, description: p.description, badge: p.badge, isActive: p.isActive,
-      retailPrice: Number(p.retailPrice), retailDiscount: Number(p.retailDiscount || 0), wholesalePrice: num(p.wholesalePrice), wholesaleDiscount: Number(p.wholesaleDiscount || 0), minWholesaleQty: Number(p.minWholesaleQty || 1),
+      ...(p.pricingMode === "AUTOMATIC" ? {} : { retailPrice: Number(p.retailPrice) }), costPrice: num(p.costPrice), pricingMode: p.pricingMode, retailDiscount: Number(p.retailDiscount || 0), wholesalePrice: num(p.wholesalePrice), wholesaleDiscount: Number(p.wholesaleDiscount || 0), minWholesaleQty: Number(p.minWholesaleQty || 1),
       seoTitle: p.seoTitle, seoDescription: p.seoDescription, canonical: p.canonical, phoneModelIds: p.phoneModelIds, images: p.images.map((i) => ({ url: i.url, alt: i.alt })),
-      variants: p.variants.map((v) => ({ ...(v.id ? { id: v.id } : {}), sku: v.sku, name: v.name, color: v.color, colorHex: v.colorHex, retailPrice: num(v.retailPrice), wholesalePrice: num(v.wholesalePrice), isActive: v.isActive, ...(v.id ? {} : { stock: Number(v.stock || 0) }) })),
+      variants: p.variants.map((v) => ({ ...(v.id ? { id: v.id } : {}), sku: v.sku, name: v.name, phoneModelId: v.phoneModelId || null, colorId: v.colorId || null, costPrice: num(v.costPrice), pricingMode: v.pricingMode, color: v.colorId ? null : v.color, colorHex: v.colorId ? null : v.colorHex, retailPrice: num(v.retailPrice), wholesalePrice: num(v.wholesalePrice), isActive: v.isActive, ...(v.id ? {} : { stock: Number(v.stock || 0) }) })),
     };
     const r = await act<Parameters<typeof toFormData>[0]>(isNew ? "POST" : "PATCH", isNew ? "/api/admin/products" : `/api/admin/products/${p.id}`, body, isNew ? "محصول ایجاد شد." : "محصول ذخیره شد.");
     setBusy(false);
@@ -62,7 +62,10 @@ export function ProductForm({ initial, categories, brands, phoneModels, canWrite
 
         <Card className="grid gap-3 sm:grid-cols-3">
           <h2 className="text-sm font-black sm:col-span-3">قیمت‌گذاری <span className="text-[11px] font-normal text-muted">(قیمت خرده و عمده کاملاً جدا هستند — تومان)</span></h2>
-          <Label label="قیمت خرده *" error={errs.retailPrice}><input dir="ltr" type="number" min={0} className={inputCls} value={p.retailPrice} onChange={(e) => set("retailPrice", e.target.value)} required /></Label>
+          <Label label="روش قیمت‌گذاری" hint={p.pricingMode === "AUTOMATIC" ? "قیمت از هزینه خرید + قانون سود محاسبه می‌شود" : "قیمت را خودتان وارد می‌کنید"}><select className={inputCls} disabled={!canPrice} value={p.pricingMode} onChange={(e) => set("pricingMode", e.target.value as "AUTOMATIC" | "MANUAL")}><option value="MANUAL">دستی (Manual)</option><option value="AUTOMATIC">خودکار (Automatic)</option></select></Label>
+          {canCost ? <Label label="هزینه خرید" hint="برای محصولی که چند تنوع دارد، هزینه را در هر تنوع هم می‌توان وارد کرد"><input dir="ltr" type="number" min={0} className={inputCls} disabled={!canPrice} value={p.costPrice} onChange={(e) => set("costPrice", e.target.value)} /></Label> : <span />}
+          <span />
+          <Label label="قیمت خرده *" error={errs.retailPrice}><input dir="ltr" type="number" min={0} className={inputCls} disabled={p.pricingMode === "AUTOMATIC"} value={p.retailPrice} onChange={(e) => set("retailPrice", e.target.value)} required={p.pricingMode !== "AUTOMATIC"} /></Label>
           <Label label="تخفیف خرده (مبلغ)" hint={p.retailPrice ? `قیمت نهایی: ${fmtToman(Number(p.retailPrice) - Number(p.retailDiscount || 0))}` : undefined}><input dir="ltr" type="number" min={0} className={inputCls} value={p.retailDiscount} onChange={(e) => set("retailDiscount", e.target.value)} /></Label>
           <span />
           <Label label="قیمت عمده" hint="خالی = این محصول عمده ندارد" error={errs.wholesalePrice}><input dir="ltr" type="number" min={0} className={inputCls} value={p.wholesalePrice} onChange={(e) => set("wholesalePrice", e.target.value)} /></Label>
@@ -89,15 +92,19 @@ export function ProductForm({ initial, categories, brands, phoneModels, canWrite
 
         <Card>
           <div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-black">تنوع‌ها و موجودی</h2>
-            <button type="button" className={cn(btnGhost, "h-8 px-3 text-xs")} onClick={() => set("variants", [...p.variants, { sku: "", name: "", color: "", colorHex: "", retailPrice: "", wholesalePrice: "", isActive: true, stock: "0" }])}><Plus className="size-4" />تنوع جدید</button></div>
+            <button type="button" className={cn(btnGhost, "h-8 px-3 text-xs")} onClick={() => set("variants", [...p.variants, { sku: "", name: "", phoneModelId: "", colorId: "", costPrice: "", pricingMode: "MANUAL", color: "", colorHex: "", retailPrice: "", wholesalePrice: "", isActive: true, stock: "0" }])}><Plus className="size-4" />تنوع جدید</button></div>
           <div className="space-y-3">
             {p.variants.map((v, i) => (
               <div key={v.id ?? i} className="grid gap-2 rounded-lg border border-border p-3 sm:grid-cols-6">
-                <Label label="نام تنوع *" className="sm:col-span-2"><input className={inputCls} value={v.name} onChange={(e) => setV(i, { name: e.target.value })} required /></Label>
+                <Label label="نام تنوع" hint="خالی = خودکار از مدل و رنگ" className="sm:col-span-2"><input className={inputCls} value={v.name} onChange={(e) => setV(i, { name: e.target.value })} /></Label>
                 <Label label="SKU *" className="sm:col-span-2" error={errs[`variants.${i}.sku`]}><input dir="ltr" className={inputCls} value={v.sku} onChange={(e) => setV(i, { sku: e.target.value })} required /></Label>
-                <Label label="رنگ"><input className={inputCls} value={v.color} onChange={(e) => setV(i, { color: e.target.value })} /></Label>
-                <Label label="کد رنگ"><input dir="ltr" className={inputCls} placeholder="#000000" value={v.colorHex} onChange={(e) => setV(i, { colorHex: e.target.value })} /></Label>
-                <Label label="قیمت خرده (اختیاری)" className="sm:col-span-2"><input dir="ltr" type="number" min={0} className={inputCls} value={v.retailPrice} onChange={(e) => setV(i, { retailPrice: e.target.value })} /></Label>
+                <Label label="مدل گوشی" className="sm:col-span-2"><select className={inputCls} value={v.phoneModelId} onChange={(e) => setV(i, { phoneModelId: e.target.value })}><option value="">— بدون مدل —</option>{[...new Set(phoneModels.map((m) => m.group))].map((g) => <optgroup key={g} label={g}>{phoneModels.filter((m) => m.group === g).map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}</optgroup>)}</select></Label>
+                <Label label="رنگ" className="sm:col-span-2"><select className={inputCls} value={v.colorId} onChange={(e) => setV(i, { colorId: e.target.value })}><option value="">— بدون رنگ —</option>{colors.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}</select></Label>
+                {!v.colorId && <Label label="رنگ (متن آزاد)" className="sm:col-span-1"><input className={inputCls} value={v.color} onChange={(e) => setV(i, { color: e.target.value })} /></Label>}
+                {!v.colorId && <Label label="کد رنگ" className="sm:col-span-1"><input dir="ltr" className={inputCls} placeholder="#000000" value={v.colorHex} onChange={(e) => setV(i, { colorHex: e.target.value })} /></Label>}
+                <Label label="روش قیمت" className="sm:col-span-2"><select className={inputCls} disabled={!canPrice} value={v.pricingMode} onChange={(e) => setV(i, { pricingMode: e.target.value as "AUTOMATIC" | "MANUAL" })}><option value="MANUAL">دستی</option><option value="AUTOMATIC">خودکار</option></select></Label>
+                {canCost && <Label label="هزینه خرید" className="sm:col-span-2"><input dir="ltr" type="number" min={0} className={inputCls} disabled={!canPrice} value={v.costPrice} onChange={(e) => setV(i, { costPrice: e.target.value })} /></Label>}
+                <Label label={v.pricingMode === "AUTOMATIC" ? "قیمت محاسبه‌شده" : "قیمت خرده (اختیاری)"} className="sm:col-span-2"><input dir="ltr" type="number" min={0} className={inputCls} disabled={v.pricingMode === "AUTOMATIC"} value={v.retailPrice} onChange={(e) => setV(i, { retailPrice: e.target.value })} /></Label>
                 <Label label="قیمت عمده (اختیاری)" className="sm:col-span-2"><input dir="ltr" type="number" min={0} className={inputCls} value={v.wholesalePrice} onChange={(e) => setV(i, { wholesalePrice: e.target.value })} /></Label>
                 {v.id ? (
                   <div className="flex items-end gap-2 sm:col-span-2 text-xs"><Pill tone={(v.current ?? 0) === 0 ? "bad" : "ok"}>موجودی: {fmtNum(v.current ?? 0)}</Pill>{canStock && <Link href={`/admin/inventory?q=${encodeURIComponent(v.sku)}`} className="font-bold text-primary">تنظیم موجودی</Link>}</div>

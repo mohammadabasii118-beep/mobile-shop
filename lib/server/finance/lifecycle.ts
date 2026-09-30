@@ -1,6 +1,7 @@
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { walletApply } from "@/lib/server/finance/wallet";
 import { reverseOrderPoints } from "@/lib/server/finance/loyalty";
+import { rollbackDiscounts } from "@/lib/server/price-engine/discounts";
 
 type Tx = Prisma.TransactionClient;
 
@@ -37,6 +38,7 @@ export async function releaseUnpaidOrder(tx: Tx, orderId: string, note: string, 
   const o = await tx.order.findUniqueOrThrow({ where: { id: orderId } });
   await restockOrder(tx, orderId, "cancel", note, byId);
   await rollbackCoupon(tx, orderId);
+  await rollbackDiscounts(tx, orderId);
   await reverseOrderPoints(tx, orderId, byId);
   if (o.walletUsed > 0 && o.userId) await walletApply(tx, { userId: o.userId, direction: "in", amount: o.walletUsed, type: "order_cancel_restore", reference: `order-restore:${orderId}`, description: `بازگشت اعتبار سفارش ${o.number}`, orderId, byId });
 }

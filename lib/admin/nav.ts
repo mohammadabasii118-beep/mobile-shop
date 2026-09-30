@@ -1,4 +1,4 @@
-import { Award, Undo2, BarChart3, BookOpen, Boxes, CreditCard, Crown, FileText, Home, Image as ImageIcon, LayoutGrid, ListTree, Megaphone, MessageSquare, Package, Percent, Receipt, ScrollText, Search, Settings, ShoppingCart, Smartphone, Star, Store, Tag, Truck, Users, Wallet, type LucideIcon } from "lucide-react";
+import { Award, BadgePercent, Calculator, Palette, Undo2, BarChart3, BookOpen, Boxes, CreditCard, Crown, FileText, Home, Image as ImageIcon, LayoutGrid, ListTree, Megaphone, MessageSquare, Package, Percent, Receipt, ScrollText, Search, Settings, ShoppingCart, Smartphone, Star, Store, Tag, Truck, Users, Wallet, type LucideIcon } from "lucide-react";
 
 export interface NavItem { href: string; label: string; icon: LucideIcon; perms: string[] }
 
@@ -11,7 +11,10 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/categories", label: "دسته‌بندی‌ها", icon: ListTree, perms: ["category.write"] },
   { href: "/admin/brands", label: "برندها", icon: Tag, perms: ["brand.write"] },
   { href: "/admin/phone-models", label: "مدل‌های گوشی", icon: Smartphone, perms: ["phone.write"] },
+  { href: "/admin/colors", label: "رنگ‌ها", icon: Palette, perms: ["product.write"] },
   { href: "/admin/inventory", label: "موجودی انبار", icon: Boxes, perms: ["inventory.write"] },
+  { href: "/admin/pricing", label: "قیمت‌گذاری", icon: Calculator, perms: ["pricing.read", "pricing.write"] },
+  { href: "/admin/discounts", label: "تخفیف‌ها", icon: BadgePercent, perms: ["discount.write"] },
   { href: "/admin/customers", label: "مشتریان", icon: Users, perms: ["customer.read"] },
   { href: "/admin/wholesale", label: "همکاران عمده", icon: Store, perms: ["wholesale.review"] },
   { href: "/admin/coupons", label: "کوپن‌ها", icon: Percent, perms: ["coupon.write"] },

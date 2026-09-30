@@ -2,9 +2,12 @@ import { db } from "@/lib/db";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { badRequest, conflict, notFound } from "@/lib/server/errors";
 import { evaluateCoupon } from "@/lib/server/coupons";
-import { unitPriceFor } from "@/lib/server/pricing";
+import { createHash } from "node:crypto";
+import { allocate } from "@/lib/server/price-engine/calc";
+import { priceLines } from "@/lib/server/price-engine/line";
+import { loadActiveDiscounts, reserveDiscounts, userDiscountUses } from "@/lib/server/price-engine/discounts";
 import { getProvider } from "@/lib/server/payments";
-import { userCartId } from "@/lib/server/cart";
+import { userCartId, variantOption } from "@/lib/server/cart";
 import { rateLimit } from "@/lib/server/rate-limit";
 import { getWalletBalance, walletApply } from "@/lib/server/finance/wallet";
 import { assertRedeem, earnForOrder, getLoyaltyRules, getPointsBalance, pointsApply, quoteRedeem, type RedeemQuote } from "@/lib/server/finance/loyalty";
@@ -15,7 +18,7 @@ import type { SessionUser } from "@/lib/server/auth/session";
 type Tx = Prisma.TransactionClient;
 
 const itemsInclude = {
-  items: { orderBy: { id: "asc" as const }, include: { variant: { include: { inventory: true, product: { include: { images: { orderBy: [{ isPrimary: "desc" as const }], take: 1 } } } } } } },
+  items: { orderBy: { id: "asc" as const }, include: { variant: { include: { inventory: true, colorRef: { select: { name: true } }, phoneModel: { select: { name: true, brandId: true, brand: { select: { name: true } } } }, product: { include: { category: { select: { parentId: true } }, images: { orderBy: [{ isPrimary: "desc" as const }], take: 1 } } } } } } },
 };
 
 export const shippingCost = (m: { cost: number; freeThreshold: number | null }, amountAfterDiscount: number) =>
@@ -27,17 +30,24 @@ async function priceCart(tx: Tx, user: SessionUser) {
   const cart = cartId ? await tx.cart.findUnique({ where: { id: cartId }, include: itemsInclude }) : null;
   if (!cart || cart.items.length === 0) throw badRequest("سبد خرید شما خالی است.", "cart_empty");
   const pmIds = cart.items.map((i) => i.phoneModelId).filter((x): x is string => !!x);
-  const pms = pmIds.length ? await tx.phoneModel.findMany({ where: { id: { in: pmIds } }, select: { id: true, name: true } }) : [];
-  const lines = cart.items.map((i) => {
+  const pms = pmIds.length ? await tx.phoneModel.findMany({ where: { id: { in: pmIds } }, select: { id: true, name: true, brand: { select: { name: true } } } }) : [];
+  for (const i of cart.items) {
+    if (!i.variant.product.isActive || !i.variant.isActive) throw conflict(`«${i.variant.product.name}» دیگر موجود نیست. آن را از سبد حذف کنید.`, "product_unavailable");
+  }
+  const discounts = await loadActiveDiscounts(tx);
+  const userUses = await userDiscountUses(tx, user.id, discounts.map((d) => d.id));
+  const prices = priceLines(cart.items.map((i) => ({ qty: i.quantity, product: i.variant.product, variant: i.variant })), user, discounts, userUses);
+  const lines = cart.items.map((i, k) => {
     const p = i.variant.product;
-    if (!p.isActive || !i.variant.isActive) throw conflict(`«${p.name}» دیگر موجود نیست. آن را از سبد حذف کنید.`, "product_unavailable");
-    const price = unitPriceFor(p, i.variant, i.quantity, user);
+    const price = prices[k]!;
     const pm = pms.find((m) => m.id === i.phoneModelId);
     return {
       cartItemId: i.id, variantId: i.variantId, productId: p.id, name: p.name, sku: i.variant.sku, image: p.images[0]?.url ?? null,
-      option: pm?.name ?? (i.variant.name !== "استاندارد" ? i.variant.name : null), quantity: i.quantity, stock: i.variant.inventory?.quantity ?? 0,
+      option: variantOption(i.variant, pm?.name), quantity: i.quantity, stock: i.variant.inventory?.quantity ?? 0,
       unitPrice: price.unitPrice, priceType: price.priceType, total: price.unitPrice * i.quantity,
-      retailUnit: Math.max(0, (i.variant.retailPrice ?? p.retailPrice) - p.retailDiscount),
+      retailUnit: price.priceType === "retail" ? price.unitPrice : Math.max(0, price.listPrice - p.retailDiscount),
+      brandName: i.variant.phoneModel?.brand.name ?? pm?.brand.name ?? null, modelName: i.variant.phoneModel?.name ?? pm?.name ?? null, colorName: i.variant.colorRef?.name ?? null,
+      originalPrice: price.originalPrice, discountAmount: price.discountAmount, discountId: price.discountId, discountLabel: price.discountLabel,
     };
   });
   const subtotal = lines.reduce((a, l) => a + l.total, 0);
@@ -46,6 +56,10 @@ async function priceCart(tx: Tx, user: SessionUser) {
   return { cart, lines, subtotal, retailSubtotal, wholesaleSubtotal };
 }
 
+/** Fingerprint of what the customer is being charged for. The browser echoes it back so a price change between quote and order is detected, never silently accepted. */
+const priceFingerprint = (lines: { variantId: string; quantity: number; unitPrice: number }[]) =>
+  createHash("sha256").update(JSON.stringify([...lines].sort((a, b) => a.variantId.localeCompare(b.variantId)).map((l) => [l.variantId, l.quantity, l.unitPrice]))).digest("hex").slice(0, 24);
+
 function checkWholesale(user: SessionUser, wholesaleSubtotal: number) {
   if (wholesaleSubtotal > 0 && user.wholesale && wholesaleSubtotal < user.wholesale.minOrder) {
     throw badRequest(`حداقل مبلغ سفارش عمده برای سطح ${user.wholesale.tierName} ${user.wholesale.minOrder.toLocaleString("fa-IR")} تومان است.`, "wholesale_min_order");
@@ -53,7 +67,9 @@ function checkWholesale(user: SessionUser, wholesaleSubtotal: number) {
 }
 
 export interface Quote {
-  lines: { name: string; option: string | null; quantity: number; unitPrice: number; total: number; priceType: string; inStock: boolean }[];
+  lines: { name: string; option: string | null; quantity: number; unitPrice: number; total: number; priceType: string; inStock: boolean; originalPrice: number; discountAmount: number; discountLabel: string | null }[];
+  /** Echo this in createOrder({ priceHash }) so a price change after the quote is rejected with `price_changed`. */
+  priceHash: string;
   subtotal: number;
   discount: number;
   couponCode: string | null;
@@ -92,7 +108,8 @@ export async function quoteCheckout(user: SessionUser, input: { shippingMethodId
   const chosen = methods.find((m) => m.id === input.shippingMethodId);
   const shipping = chosen ? shippingCost(chosen, after) : 0;
   return {
-    lines: priced.lines.map((l) => ({ name: l.name, option: l.option, quantity: l.quantity, unitPrice: l.unitPrice, total: l.total, priceType: l.priceType, inStock: l.stock >= l.quantity })),
+    lines: priced.lines.map((l) => ({ name: l.name, option: l.option, quantity: l.quantity, unitPrice: l.unitPrice, total: l.total, priceType: l.priceType, inStock: l.stock >= l.quantity, originalPrice: l.originalPrice, discountAmount: l.discountAmount, discountLabel: l.discountLabel })),
+    priceHash: priceFingerprint(priced.lines),
     subtotal: priced.subtotal, discount: discount + redeem.discount, couponCode: couponError ? null : code, couponError,
     shippingMethods: methods.map((m) => ({ id: m.id, key: m.key, name: m.name, description: m.description, cost: shippingCost(m, after), freeThreshold: m.freeThreshold })),
     shipping, total: after + shipping, issues, isWholesale: priced.wholesaleSubtotal > 0,
@@ -102,7 +119,7 @@ export async function quoteCheckout(user: SessionUser, input: { shippingMethodId
   };
 }
 
-export interface CreateOrderInput { addressId: string; shippingMethodId: string; couponCode?: string | null; paymentMethod: string; note?: string; useWallet?: boolean; redeemPoints?: number }
+export interface CreateOrderInput { addressId: string; shippingMethodId: string; couponCode?: string | null; paymentMethod: string; note?: string; useWallet?: boolean; redeemPoints?: number; priceHash?: string }
 
 /**
  * Creates the order atomically. Everything is recomputed from the database inside the transaction:
@@ -123,6 +140,8 @@ export async function createOrder(user: SessionUser, input: CreateOrderInput) {
 
     const priced = await priceCart(tx, user);
     checkWholesale(user, priced.wholesaleSubtotal);
+    // The customer confirmed a specific price. If anything that affects it changed since (price, rule, discount, quantity), stop and let them re-check.
+    if (input.priceHash && input.priceHash !== priceFingerprint(priced.lines)) throw conflict("قیمت یکی از کالاها تغییر کرده است. مبلغ به‌روز شد؛ لطفاً سبد و مبلغ نهایی را دوباره بررسی و سپس سفارش را ثبت کنید.", "price_changed");
 
     // Take stock atomically, in a stable order to avoid deadlocks between concurrent orders.
     const sorted = [...priced.lines].sort((a, b) => a.variantId.localeCompare(b.variantId));
@@ -148,6 +167,10 @@ export async function createOrder(user: SessionUser, input: CreateOrderInput) {
     const redeem = quoteRedeem(rules, acc?.points ?? 0, input.redeemPoints ?? 0, priced.retailSubtotal - couponDiscount);
     assertRedeem(redeem);
 
+    // The coupon applies to retail lines only; each line records its exact share (parts add up to the coupon discount).
+    const retailWeights = priced.lines.map((l) => (l.priceType === "retail" ? l.total : 0));
+    const couponShare = allocate(couponDiscount, retailWeights);
+
     const after = priced.subtotal - couponDiscount - redeem.discount;
     const shipping = shippingCost(method, after);
     const total = after + shipping;
@@ -169,7 +192,8 @@ export async function createOrder(user: SessionUser, input: CreateOrderInput) {
         paymentMethod: walletOnly ? "wallet" : provider!.key, note: input.note || null,
         walletUsed: walletApplied, loyaltyPointsUsed: redeem.applied, loyaltyDiscount: redeem.discount,
         status: walletOnly ? "PROCESSING" : "PENDING_PAYMENT", paymentStatus: walletOnly ? "PAID" : "PENDING",
-        items: { create: priced.lines.map((l) => ({ variantId: l.variantId, productId: l.productId, name: l.name, sku: l.sku, image: l.image, option: l.option, unitPrice: l.unitPrice, listPrice: l.retailUnit, priceType: l.priceType, quantity: l.quantity, total: l.total })) },
+        items: { create: priced.lines.map((l, k) => ({ variantId: l.variantId, productId: l.productId, name: l.name, sku: l.sku, image: l.image, option: l.option, unitPrice: l.unitPrice, listPrice: l.retailUnit, priceType: l.priceType, quantity: l.quantity, total: l.total,
+          brandName: l.brandName, modelName: l.modelName, colorName: l.colorName, originalPrice: l.originalPrice, discountAmount: l.discountAmount, discountLabel: l.discountLabel, couponDiscount: couponShare[k]!, finalTotal: l.total - couponShare[k]! })) },
         history: { create: [{ status: "PENDING_PAYMENT", description: "سفارش ثبت شد.", createdById: user.id }, ...(walletOnly ? [{ status: "PROCESSING" as const, description: "پرداخت کامل از کیف پول انجام شد. سفارش در حال پردازش است.", createdById: user.id }] : [])] },
         payments: { create: walletOnly ? { amount: total, method: "wallet", provider: "wallet", status: "PAID", paidAt: new Date(), submittedAt: new Date() } : { amount: payable, method: provider!.key, provider: provider!.key } },
       },
@@ -180,6 +204,7 @@ export async function createOrder(user: SessionUser, input: CreateOrderInput) {
       await tx.inventoryMovement.create({ data: { inventoryId: inv.id, delta: -l.quantity, balanceAfter: inv.quantity, reason: "order", orderId: order.id, createdById: user.id } });
     }
     if (couponId) await tx.couponUsage.create({ data: { couponId, userId: user.id, orderId: order.id } });
+    await reserveDiscounts(tx, user.id, order.id, priced.lines.filter((l) => l.priceType === "retail" && l.discountId).map((l) => l.discountId!));
     if (redeem.applied > 0) {
       await pointsApply(tx, { userId: user.id, points: -redeem.applied, type: "redeem", reference: `redeem:${order.id}`, description: `استفاده از امتیاز در سفارش ${order.number}`, orderId: order.id });
       await audit({ admin: user, ip: "customer" }, "loyalty.redeem", "order", order.id, undefined, { points: redeem.applied, discount: redeem.discount, orderNumber: order.number }, tx);

@@ -3,7 +3,9 @@ import { cookies } from "next/headers";
 import { db } from "@/lib/db";
 import { cookieSecure } from "@/lib/server/env";
 import { badRequest, conflict, notFound } from "@/lib/server/errors";
-import { unitPriceFor, type PriceType, type Viewer } from "@/lib/server/pricing";
+import type { PriceType } from "@/lib/server/pricing";
+import { priceLines } from "@/lib/server/price-engine/line";
+import { loadActiveDiscounts, userDiscountUses } from "@/lib/server/price-engine/discounts";
 import { evaluateCoupon } from "@/lib/server/coupons";
 import type { SessionUser } from "@/lib/server/auth/session";
 
@@ -16,8 +18,8 @@ const cartInclude = {
     include: {
       variant: {
         include: {
-          inventory: true,
-          product: { include: { images: { orderBy: [{ isPrimary: "desc" as const }, { sortOrder: "asc" as const }], take: 1 }, brand: { select: { name: true } } } },
+          inventory: true, colorRef: { select: { name: true } }, phoneModel: { select: { name: true, brandId: true } },
+          product: { include: { category: { select: { parentId: true } }, images: { orderBy: [{ isPrimary: "desc" as const }, { sortOrder: "asc" as const }], take: 1 }, brand: { select: { name: true } } } },
         },
       },
     },
@@ -42,6 +44,10 @@ export interface CartLine {
   stock: number;
   available: boolean;
   minWholesaleQty: number | null;
+  /** Price transparency (Phase 6): what one unit cost before discounts, and the discount taken. */
+  originalPrice: number;
+  discountAmount: number;
+  discountLabel: string | null;
 }
 
 export interface CartView {
@@ -100,6 +106,13 @@ async function findCart(user: SessionUser | null, create: boolean) {
   return (await db.cart.findUnique({ where: { guestKey: key } })) ?? (create ? await db.cart.create({ data: { guestKey: key } }) : null);
 }
 
+/** Human label of a cart/order line's option: "iPhone 12 · سفید یخی" for modelled variants, else the legacy phone-model / variant name. */
+export function variantOption(v: { name: string; phoneModel?: { name: string } | null; colorRef?: { name: string } | null }, legacyModelName?: string | null): string | null {
+  const parts = [v.phoneModel?.name ?? legacyModelName ?? null, v.colorRef?.name ?? null].filter((x): x is string => !!x);
+  if (parts.length) return parts.join(" · ");
+  return v.name !== "استاندارد" && v.name !== "پیش‌فرض" ? v.name : null;
+}
+
 export const emptyCart = (): CartView => ({ lines: [], count: 0, subtotal: 0, retailSubtotal: 0, wholesaleSubtotal: 0, couponCode: null, discount: 0, couponError: null, issues: [], isWholesale: false });
 
 /** Builds the priced cart view. Every number here is computed on the server from current DB prices. */
@@ -107,22 +120,25 @@ export async function getCartView(user: SessionUser | null): Promise<CartView> {
   const cart = await findCart(user, false);
   if (!cart) return emptyCart();
   const full = await db.cart.findUniqueOrThrow({ where: { id: cart.id }, include: cartInclude });
-  const viewer: Viewer = user;
+  const discounts = await loadActiveDiscounts();
+  const userUses = user ? await userDiscountUses(db, user.id, discounts.map((d) => d.id)) : undefined;
+  const priced = priceLines(full.items.map((i) => ({ qty: i.quantity, product: i.variant.product, variant: i.variant })), user, discounts, userUses);
   const pmIds = full.items.map((i) => i.phoneModelId).filter((x): x is string => !!x);
   const pms = pmIds.length ? await db.phoneModel.findMany({ where: { id: { in: pmIds } }, select: { id: true, name: true } }) : [];
   const issues: string[] = [];
-  const lines: CartLine[] = full.items.map((i) => {
+  const lines: CartLine[] = full.items.map((i, k) => {
     const p = i.variant.product;
     const stock = i.variant.inventory?.quantity ?? 0;
-    const price = unitPriceFor(p, i.variant, i.quantity, viewer);
+    const price = priced[k]!;
     const pm = pms.find((m) => m.id === i.phoneModelId);
-    const option = pm?.name ?? (i.variant.name !== "استاندارد" ? i.variant.name : null);
+    const option = variantOption(i.variant, pm?.name);
     const available = p.isActive && i.variant.isActive && stock >= i.quantity;
     if (!available) issues.push(`موجودی «${p.name}» کافی نیست (موجودی: ${stock}).`);
     return {
       id: i.id, slug: p.slug, productId: p.id, variantId: i.variantId, name: p.name, image: p.images[0]?.url ?? null, hue: p.visualHue ?? 210,
       option, phoneModelId: i.phoneModelId, unitPrice: price.unitPrice, listPrice: price.listPrice, priceType: price.priceType, quantity: i.quantity,
       lineTotal: price.unitPrice * i.quantity, stock, available, minWholesaleQty: user?.wholesale && p.wholesalePrice != null ? p.minWholesaleQty : null,
+      originalPrice: price.originalPrice, discountAmount: price.discountAmount, discountLabel: price.discountLabel,
     };
   });
   const subtotal = lines.reduce((a, l) => a + l.lineTotal, 0);
@@ -143,12 +159,16 @@ export async function addToCart(user: SessionUser | null, input: { productSlug: 
   const variant = input.variantId ? product.variants.find((v) => v.id === input.variantId) : product.variants[0];
   if (!variant) throw badRequest("گزینه انتخابی معتبر نیست.");
   let phoneModelId: string | null = null;
-  if (input.phoneModelId) {
+  if (variant.phoneModelId) {
+    // The variant already IS a specific phone model; the legacy per-product compatibility pick does not apply.
+    if (input.phoneModelId && input.phoneModelId !== variant.phoneModelId) throw badRequest("مدل گوشی با گزینهٔ انتخابی هم‌خوانی ندارد.");
+  } else if (input.phoneModelId) {
     if (!product.phoneModels.some((m) => m.phoneModelId === input.phoneModelId)) throw badRequest("این محصول با مدل گوشی انتخاب‌شده سازگار نیست.");
     phoneModelId = input.phoneModelId;
-  } else if (product.phoneModels.length > 0) {
+  } else if (product.phoneModels.length > 0 && !product.variants.some((v) => v.phoneModelId)) {
     throw badRequest("ابتدا مدل گوشی خود را انتخاب کنید.", "phone_model_required");
   }
+  if (!input.variantId && product.variants.some((v) => v.phoneModelId || v.colorId)) throw badRequest("ابتدا مدل و رنگ را انتخاب کنید.", "variant_required");
   const stock = variant.inventory?.quantity ?? 0;
   const cart = (await findCart(user, true))!;
   const existing = await db.cartItem.findFirst({ where: { cartId: cart.id, variantId: variant.id, phoneModelId } });

@@ -38,3 +38,13 @@ export interface SiteInfo {
   logo?: string;
   favicon?: string;
 }
+
+/** One selectable variant on the product page (phone brand → model → colour), priced and stocked independently. */
+export interface VariantOption {
+  id: string; sku: string; stock: number;
+  brandId: string | null; brandName: string | null;
+  modelId: string | null; modelName: string | null;
+  colorId: string | null; colorName: string | null; colorHex: string | null;
+  price: number; oldPrice?: number;
+  wholesale?: { unit: number; min: number } | null;
+}

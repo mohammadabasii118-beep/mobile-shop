@@ -2,7 +2,7 @@
 generator client {
   provider        = "prisma-client"
   previewFeatures = ["relationJoins"]
-  output   = "../lib/generated/prisma"
+  output          = "../lib/generated/prisma"
 }
 
 datasource db {
@@ -174,43 +174,47 @@ model PhoneModel {
   seoTitle       String?
   seoDescription String?
   products       ProductPhoneModel[]
+  variants       ProductVariant[]
 
   @@index([brandId, sortOrder])
 }
 
 model Product {
-  id                String   @id @default(cuid())
-  slug              String   @unique
-  sku               String   @unique
+  id                String      @id @default(cuid())
+  slug              String      @unique
+  sku               String      @unique
   name              String
   brandId           String?
-  brand             Brand?   @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  brand             Brand?      @relation(fields: [brandId], references: [id], onDelete: SetNull)
   categoryId        String
-  category          Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  category          Category    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   shortDescription  String?
   description       String?
   specifications    Json?
   badge             String?
-  isActive          Boolean  @default(true)
+  isActive          Boolean     @default(true)
   // Placeholder artwork for products without a photo (visual kind + hue)
   visualKind        String?
   visualHue         Int?
   // Retail and wholesale prices are independent (Toman)
   retailPrice       Int
-  retailDiscount    Int      @default(0) // fixed amount off retailPrice
+  retailDiscount    Int         @default(0) // fixed amount off retailPrice
+  // Pricing engine (Phase 6): AUTOMATIC → retailPrice is computed from costPrice + the most specific active PricingRule. MANUAL (default, all existing rows) → retailPrice is typed by the admin.
+  costPrice         Int?
+  pricingMode       PricingMode @default(MANUAL)
   wholesalePrice    Int?
-  wholesaleDiscount Int      @default(0)
-  minWholesaleQty   Int      @default(1)
-  ratingAvg         Float    @default(0)
-  ratingCount       Int      @default(0)
-  soldCount         Int      @default(0)
-  viewCount         Int      @default(0)
+  wholesaleDiscount Int         @default(0)
+  minWholesaleQty   Int         @default(1)
+  ratingAvg         Float       @default(0)
+  ratingCount       Int         @default(0)
+  soldCount         Int         @default(0)
+  viewCount         Int         @default(0)
   seoTitle          String?
   seoDescription    String?
   seoSlug           String?
   canonical         String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 
   variants     ProductVariant[]
   images       ProductImage[]
@@ -248,22 +252,33 @@ model ProductPhoneModel {
 }
 
 model ProductVariant {
-  id             String      @id @default(cuid())
+  id             String         @id @default(cuid())
   productId      String
-  product        Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  sku            String      @unique
+  product        Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku            String         @unique
   name           String // e.g. "مشکی"
   color          String?
   colorHex       String?
-  retailPrice    Int? // null → use product price
+  retailPrice    Int? // null → use product price. In AUTOMATIC mode this holds the computed selling price (before discounts).
   wholesalePrice Int?
-  isActive       Boolean     @default(true)
-  sortOrder      Int         @default(0)
+  isActive       Boolean        @default(true)
+  sortOrder      Int            @default(0)
+  // Variant axes (Phase 6): phone model (→ brand) and managed colour. Legacy variants leave both null.
+  phoneModelId   String?
+  phoneModel     PhoneModel?    @relation(fields: [phoneModelId], references: [id], onDelete: Restrict)
+  colorId        String?
+  colorRef       Color?         @relation(fields: [colorId], references: [id], onDelete: Restrict)
+  costPrice      Int?
+  pricingMode    PricingMode    @default(MANUAL)
   inventory      Inventory?
   cartItems      CartItem[]
   orderItems     OrderItem[]
+  priceHistory   PriceHistory[]
 
+  @@unique([productId, phoneModelId, colorId])
   @@index([productId])
+  @@index([phoneModelId])
+  @@index([colorId])
 }
 
 model ProductImage {
@@ -304,16 +319,26 @@ model InventoryMovement {
 }
 
 model PriceHistory {
-  id        String   @id @default(cuid())
+  id        String          @id @default(cuid())
   productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   type      String // retail | wholesale
   oldPrice  Int
   newPrice  Int
   adminId   String?
-  createdAt DateTime @default(now())
+  createdAt DateTime        @default(now())
+  // Phase 6 additions (all optional so old rows stay valid)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  oldCost   Int?
+  newCost   Int?
+  oldRule   String?
+  newRule   String?
+  reason    String?
+  source    String          @default("manual") // manual | rule | bulk
 
   @@index([productId, createdAt])
+  @@index([variantId, createdAt])
 }
 
 /**
@@ -457,21 +482,30 @@ model Order {
 }
 
 model OrderItem {
-  id        String          @id @default(cuid())
-  orderId   String
-  order     Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  variantId String?
-  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
-  productId String?
-  name      String // snapshot
-  sku       String
-  image     String?
-  option    String?
-  unitPrice Int
-  listPrice Int? // retail unit price at order time (to show wholesale savings)
-  priceType String          @default("retail") // retail | wholesale (price snapshot type)
-  quantity  Int
-  total     Int
+  id             String          @id @default(cuid())
+  orderId        String
+  order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variantId      String?
+  variant        ProductVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  productId      String?
+  name           String // snapshot
+  sku            String
+  image          String?
+  option         String?
+  unitPrice      Int
+  listPrice      Int? // retail unit price at order time (to show wholesale savings)
+  priceType      String          @default("retail") // retail | wholesale (price snapshot type)
+  quantity       Int
+  total          Int
+  // Financial snapshot taken at order time (Phase 6). Later price/discount/rule changes never touch these.
+  brandName      String? // phone brand
+  modelName      String? // phone model
+  colorName      String?
+  originalPrice  Int? // unit price before any discount
+  discountAmount Int             @default(0) // per-unit discount that was applied (promotion / legacy / wholesale)
+  discountLabel  String?
+  couponDiscount Int             @default(0) // this line's share of the order coupon discount
+  finalTotal     Int? // total - couponDiscount
 }
 
 model OrderStatusHistory {
@@ -958,13 +992,112 @@ model NotificationDelivery {
   @@index([status, channel])
 }
 
-/* Old public URLs after an admin changes a slug: answered with a permanent redirect (keeps SEO value and inbound links). */
+/**
+ * Old public URLs after an admin changes a slug: answered with a permanent redirect (keeps SEO value and inbound links).
+ */
 model SlugRedirect {
   id        String   @id @default(cuid())
-  kind      String   // product | category | brand | model | post
+  kind      String // product | category | brand | model | post
   oldSlug   String
   newSlug   String
   createdAt DateTime @default(now())
 
   @@unique([kind, oldSlug])
+}
+
+/**
+ * ───────────── Variants, pricing engine and discounts (Phase 6) ─────────────
+ */
+
+enum PricingMode {
+  AUTOMATIC
+  MANUAL
+}
+
+enum RuleScope {
+  GLOBAL
+  CATEGORY
+  PRODUCT
+  VARIANT
+}
+
+enum MarginType {
+  PERCENT // marginValue = basis points (3000 = 30 %)
+  FIXED // marginValue = Toman added to the cost
+}
+
+enum DiscountType {
+  PERCENT // value = whole percent (1–100)
+  FIXED // value = Toman per unit
+}
+
+enum DiscountScope {
+  ALL
+  PRODUCT
+  CATEGORY
+  VARIANT
+  BRAND // product brand OR the phone brand of the variant's model
+  MODEL
+}
+
+model Color {
+  id        String           @id @default(cuid())
+  name      String           @unique
+  hex       String? // #RRGGBB
+  isActive  Boolean          @default(true)
+  sortOrder Int              @default(0)
+  variants  ProductVariant[]
+}
+
+/**
+ * One margin rule per (scope, target). The most specific active rule wins: VARIANT > PRODUCT > CATEGORY (child before parents) > GLOBAL.
+ */
+model PricingRule {
+  id          String     @id @default(cuid())
+  scope       RuleScope
+  targetId    String     @default("") // "" for GLOBAL
+  marginType  MarginType @default(PERCENT)
+  marginValue Int
+  roundTo     Int        @default(0) // round the selling price UP to a multiple of this many Toman (0 = no rounding)
+  note        String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@unique([scope, targetId])
+}
+
+/**
+ * Automatic, scoped price reduction (per unit). Separate from Coupon (a code entered by the customer).
+ */
+model Discount {
+  id           String          @id @default(cuid())
+  name         String
+  type         DiscountType
+  value        Int
+  scope        DiscountScope
+  targetId     String          @default("") // "" for ALL
+  startsAt     DateTime?
+  endsAt       DateTime?
+  minOrder     Int             @default(0) // cart retail subtotal (before discounts) needed for it to apply
+  usageLimit   Int?
+  perUserLimit Int?
+  usedCount    Int             @default(0)
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  usages       DiscountUsage[]
+
+  @@index([isActive, startsAt, endsAt])
+}
+
+model DiscountUsage {
+  id         String   @id @default(cuid())
+  discountId String
+  discount   Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  userId     String?
+  orderId    String?
+  createdAt  DateTime @default(now())
+
+  @@index([discountId, userId])
+  @@index([orderId])
 }

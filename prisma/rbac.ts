@@ -9,7 +9,7 @@ export const PERMISSIONS: [string, string][] = [
   ["banner.write", "مدیریت بنر"], ["homepage.write", "مدیریت صفحه اصلی"], ["menu.write", "مدیریت منو"], ["blog.write", "مدیریت وبلاگ"],
   ["support.reply", "پاسخ به پشتیبانی"], ["wallet.adjust", "مدیریت کیف پول"], ["loyalty.adjust", "مدیریت امتیاز"], ["shipping.write", "مدیریت ارسال"],
   ["refund.manage", "ثبت درخواست بازگشت وجه"], ["refund.approve", "تأیید و تکمیل بازگشت وجه بانکی"], ["wallet.read", "مشاهده کیف پول"], ["loyalty.read", "مشاهده امتیاز وفاداری"], ["support.read", "مشاهده پشتیبانی"],
-  ["seo.write", "مدیریت سئو"], ["settings.write", "تنظیمات سایت"], ["audit.read", "مشاهده لاگ‌ها"], ["role.manage", "مدیریت نقش‌ها"],
+  ["seo.write", "مدیریت سئو"], ["pricing.read", "مشاهده قیمت‌گذاری و هزینه خرید"], ["pricing.write", "مدیریت قیمت‌گذاری، قوانین و تغییر گروهی قیمت"], ["discount.write", "مدیریت تخفیف‌ها"], ["settings.write", "تنظیمات سایت"], ["audit.read", "مشاهده لاگ‌ها"], ["role.manage", "مدیریت نقش‌ها"],
 ];
 export const ROLES: { key: string; name: string; staff: boolean; perms: string[] | "all" | "all-but-roles" }[] = [
   { key: "super_admin", name: "مدیر ارشد", staff: true, perms: "all" },

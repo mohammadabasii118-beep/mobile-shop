@@ -16,6 +16,8 @@ import { abs, breadcrumbLd, buildMeta, clip, paths, toRial } from "@/lib/seo";
 import { resolveSlugRedirect } from "@/lib/server/redirects";
 import { getCurrentUser } from "@/lib/server/auth/session";
 import { unitPriceFor } from "@/lib/server/pricing";
+import { loadActiveDiscounts } from "@/lib/server/price-engine/discounts";
+import { buildVariantOptions } from "@/lib/server/price-engine/storefront";
 import { formatToman, toFa } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -44,13 +46,14 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   const row = await getProductBySlug(decodeURIComponent(slug));
   if (!row) { const to = await resolveSlugRedirect("product", decodeURIComponent(slug)); if (to) permanentRedirect(paths.product(to)); notFound(); }
-  const [related, others, user, stats] = await Promise.all([getRelatedProducts(row.id, row.categoryId), getSidebarProducts(row.id), getCurrentUser(), db.review.aggregate({ where: { productId: row.id, status: "approved" }, _avg: { rating: true }, _count: true })]);
+  const [related, others, user, discounts, stats] = await Promise.all([getRelatedProducts(row.id, row.categoryId), getSidebarProducts(row.id), getCurrentUser(), loadActiveDiscounts(), db.review.aggregate({ where: { productId: row.id, status: "approved" }, _avg: { rating: true }, _count: true })]);
   const realCount = stats._count, realAvg = stats._avg.rating ?? 0;
-  const card = { ...toCard({ ...row, variants: row.variants }), brand: row.brand?.name ?? null };
+  const card = { ...toCard(row, discounts), brand: row.brand?.name ?? null };
+  const variantOptions = buildVariantOptions(row, user, discounts);
   const models = row.phoneModels.map((m) => m.phoneModel.name);
   const stock = row.variants.reduce((a, v) => a + (v.inventory?.quantity ?? 0), 0);
   const variant = row.variants[0];
-  const opt = row.phoneModels.length
+  const opt = variantOptions ? null : row.phoneModels.length
     ? { label: "مدل گوشی خود را انتخاب کنید", options: row.phoneModels.map((m) => ({ value: `m:${m.phoneModelId}`, label: m.phoneModel.name })) }
     : row.variants.length > 1
       ? { label: "گزینه مورد نظر را انتخاب کنید", options: row.variants.map((v) => ({ value: `v:${v.id}`, label: v.name })) }
@@ -94,11 +97,11 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                     <span dir="ltr" className="text-2xl font-black tracking-wide">{row.brand?.name ?? "CaseLine"}</span>
                     <span dir="ltr" className="text-[10px] font-bold tracking-[0.3em] text-accent">Caseline.ir</span>
                   </div>
-                  {row.retailDiscount > 0 && <div className="absolute end-3 top-3"><HotBadge /></div>}
+                  {card.oldPrice != null && <div className="absolute end-3 top-3"><HotBadge /></div>}
                 </div>
                 <div className="md:order-1">
-                  {row.retailDiscount > 0 && <p className="mb-2 text-xs text-muted">قیمت قبل: <s>{formatToman(row.retailPrice)}</s></p>}
-                  <BuyBox p={card} opt={opt} inStock={stock > 0} maxQty={Math.max(1, Math.min(99, stock))} wholesale={wholesale} />
+                  {card.oldPrice != null && !variantOptions && <p className="mb-2 text-xs text-muted">قیمت قبل: <s>{formatToman(card.oldPrice)}</s></p>}
+                  <BuyBox p={card} opt={opt} variants={variantOptions} inStock={stock > 0} maxQty={Math.max(1, Math.min(99, stock))} wholesale={wholesale} />
                 </div>
               </div>
               <p className="mt-5 text-sm text-muted">دسته‌بندی: <Link href={paths.category(row.category.slug)} className="font-bold text-foreground hover:text-primary">{row.category.name}</Link>

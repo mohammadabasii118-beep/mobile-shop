@@ -34,7 +34,18 @@ export async function dashboardData() {
   ]);
   const byDay = new Map(series.map((r) => [new Date(r.d).toDateString(), Number(r.s)]));
   const chart = Array.from({ length: 14 }, (_, i) => { const d = new Date(since14.getTime() + i * 86400_000); return { date: d.toISOString().slice(0, 10), value: byDay.get(d.toDateString()) ?? 0 }; });
+  const soon = new Date(now.getTime() + 7 * 86400_000);
+  const [productCount, variantCount, outOfStock, activeDiscounts, expiring, priceChanges] = await Promise.all([
+    db.product.count(),
+    db.productVariant.count(),
+    db.inventory.count({ where: { quantity: 0 } }),
+    db.discount.count({ where: { isActive: true, AND: [{ OR: [{ startsAt: null }, { startsAt: { lte: now } }] }, { OR: [{ endsAt: null }, { endsAt: { gte: now } }] }] } }),
+    db.discount.findMany({ where: { isActive: true, endsAt: { gte: now, lte: soon } }, orderBy: { endsAt: "asc" }, take: 5, select: { id: true, name: true, endsAt: true } }),
+    // Costs are deliberately not part of the dashboard: only prices.
+    db.priceHistory.findMany({ orderBy: { createdAt: "desc" }, take: 6, select: { id: true, oldPrice: true, newPrice: true, source: true, createdAt: true, product: { select: { name: true } }, variant: { select: { sku: true } } } }),
+  ]);
   return {
+    catalog: { productCount, variantCount, outOfStock, activeDiscounts, expiring, priceChanges },
     totalOrders, pendingOrders, reviewOrders, paidOrders, revenue: rev._sum.total ?? 0, revenueToday: revToday._sum.total ?? 0, revenueMonth: revMonth._sum.total ?? 0,
     lowStock: Number(lowStock[0]?.c ?? 0), pendingWholesale, pendingReviews, newCustomers, recentOrders, recentPayments, lowList, chart,
   };

@@ -1,24 +1,35 @@
 import "server-only";
 import { db } from "@/lib/db";
-import type { Prisma } from "@/lib/generated/prisma/client";
+import type { Discount, Prisma } from "@/lib/generated/prisma/client";
+import { lineCtx } from "@/lib/server/price-engine/line";
+import { loadActiveDiscounts, resolveUnitDiscount } from "@/lib/server/price-engine/discounts";
 import { cachedPublic } from "@/lib/server/public-cache";
 import type { CardProduct, MenuCategory, SiteInfo } from "@/lib/types";
 
 const cardInclude = {
-  category: { select: { slug: true, name: true, parent: { select: { slug: true } } } },
+  category: { select: { id: true, parentId: true, slug: true, name: true, parent: { select: { slug: true } } } },
   images: { orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }], take: 1 },
   phoneModels: { include: { phoneModel: { select: { name: true } } }, take: 1 },
-  variants: { include: { inventory: { select: { quantity: true } } } },
+  variants: { include: { inventory: { select: { quantity: true } }, phoneModel: { select: { brandId: true } } } },
 } satisfies Prisma.ProductInclude;
 
 type CardRow = Prisma.ProductGetPayload<{ include: typeof cardInclude }>;
 
-/** Retail card view model. Wholesale pricing is applied server-side in a later phase (never in the browser). */
-export function toCard(p: CardRow): CardProduct {
-  const price = p.retailPrice - p.retailDiscount;
+/**
+ * Retail card view model. The shown price is the cheapest active variant after the best single discount
+ * (legacy product discount or a matching promotion). Wholesale pricing is applied elsewhere, on the server, for the signed-in partner.
+ */
+export function toCard(p: Omit<CardRow, "variants"> & { variants: (Omit<CardRow["variants"][number], "phoneModel"> & { phoneModel?: { brandId: string } | null })[] }, discounts: Discount[] = []): CardProduct {
+  const active = p.variants.filter((v) => v.isActive);
+  const options = (active.length ? active : []).map((v) => {
+    const base = v.retailPrice ?? p.retailPrice;
+    const d = resolveUnitDiscount(discounts, lineCtx({ ...p, category: p.category }, v), base, p.retailDiscount);
+    return { price: Math.max(0, base - d.amount), base, off: d.amount };
+  });
+  const best = options.length ? options.reduce((a, b) => (b.price < a.price ? b : a)) : (() => { const d = resolveUnitDiscount(discounts, lineCtx({ ...p, category: p.category }, { id: "", retailPrice: null, wholesalePrice: null }), p.retailPrice, p.retailDiscount); return { price: Math.max(0, p.retailPrice - d.amount), base: p.retailPrice, off: d.amount }; })();
   return {
     id: p.id, slug: p.slug, name: p.name, brand: null, kind: p.visualKind ?? "case", hue: p.visualHue ?? 210,
-    price, oldPrice: p.retailDiscount > 0 ? p.retailPrice : undefined,
+    price: best.price, oldPrice: best.off > 0 ? best.base : undefined,
     rating: p.ratingAvg, reviews: p.ratingCount, badge: p.badge ?? undefined,
     compat: p.phoneModels[0]?.phoneModel.name, img: p.images[0]?.url,
     categorySlug: p.category.parent?.slug ?? p.category.slug, categoryLabel: p.category.name,
@@ -27,7 +38,8 @@ export function toCard(p: CardRow): CardProduct {
 }
 
 async function withBrand(rows: (CardRow & { brand: { name: string } | null })[]): Promise<CardProduct[]> {
-  return rows.map((r) => ({ ...toCard(r), brand: r.brand?.name ?? null }));
+  const discounts = await loadActiveDiscounts();
+  return rows.map((r) => ({ ...toCard(r, discounts), brand: r.brand?.name ?? null }));
 }
 
 const activeWhere = { isActive: true } satisfies Prisma.ProductWhereInput;
@@ -108,7 +120,7 @@ export async function getProductBySlug(slug: string) {
       brand: true, category: { include: { parent: true } },
       images: { orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }] },
       phoneModels: { include: { phoneModel: true } },
-      variants: { where: { isActive: true }, orderBy: { sortOrder: "asc" }, include: { inventory: true } },
+      variants: { where: { isActive: true }, orderBy: { sortOrder: "asc" }, include: { inventory: true, colorRef: true, phoneModel: { include: { brand: { select: { name: true } } } } } },
       reviews: { where: { status: "approved" }, orderBy: { createdAt: "desc" }, take: 10, include: { user: { select: { displayName: true, firstName: true } } } },
       questions: { where: { isPublished: true }, orderBy: { createdAt: "desc" }, take: 10 },
     },

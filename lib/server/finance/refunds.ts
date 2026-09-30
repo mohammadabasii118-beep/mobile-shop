@@ -6,6 +6,7 @@ import { audit, type AdminCtx } from "@/lib/server/admin/core";
 import { walletApply } from "@/lib/server/finance/wallet";
 import { reverseOrderPoints, reversePartialPoints } from "@/lib/server/finance/loyalty";
 import { restockOrder, rollbackCoupon } from "@/lib/server/finance/lifecycle";
+import { rollbackDiscounts } from "@/lib/server/price-engine/discounts";
 import { notify } from "@/lib/server/notify";
 import type { SessionUser } from "@/lib/server/auth/session";
 
@@ -90,6 +91,7 @@ async function afterCompleted(tx: Tx, refund: Refund, actorId: string) {
     await tx.order.update({ where: { id: o.id }, data: { status: "REFUNDED", paymentStatus: "REFUNDED" } });
     await tx.orderStatusHistory.create({ data: { orderId: o.id, status: "REFUNDED", description: "کل مبلغ پرداخت‌شده بازگردانده شد.", createdById: actorId } });
     await rollbackCoupon(tx, o.id);
+    await rollbackDiscounts(tx, o.id);
     await reverseOrderPoints(tx, o.id, actorId);
   } else {
     await reversePartialPoints(tx, o.id, refund.id, refund.amount, s.totalPaid, actorId);
