@@ -8,8 +8,9 @@ const t = (max: number) => z.string().trim().max(max).default("");
 const url = z.string().trim().max(300).refine((v) => v === "" || /^(https?:\/\/|\/(?!\/)|#)/.test(v), "آدرس نامعتبر است.").default("");
 const img = z.string().trim().max(300).refine((v) => v === "" || /^(https:\/\/|\/(?!\/))/.test(v), "آدرس تصویر نامعتبر است.").default("");
 
+// `site.name` has a default: a brand-new database has no stored site settings yet, and the settings page must still open.
 export const SETTING_SCHEMAS = {
-  site: z.object({ name: t(60).pipe(z.string().min(1, "نام سایت لازم است.")), tagline: t(120), logo: img, favicon: img, phone: t(40), email: z.string().trim().max(120).refine((v) => v === "" || /^\S+@\S+\.\S+$/.test(v), "ایمیل نامعتبر است.").default(""), address: t(300), hours: t(120), telegram: url, instagram: url, whatsapp: url, aparat: url, youtube: url, topBar: t(200), footerText: t(600) }),
+  site: z.object({ name: z.string().trim().max(60).default("CaseLine").pipe(z.string().min(1, "نام سایت لازم است.")), tagline: t(120), logo: img, favicon: img, phone: t(40), email: z.string().trim().max(120).refine((v) => v === "" || /^\S+@\S+\.\S+$/.test(v), "ایمیل نامعتبر است.").default(""), address: t(300), hours: t(120), telegram: url, instagram: url, whatsapp: url, aparat: url, youtube: url, topBar: t(200), footerText: t(600) }),
   payment: z.object({
     bankName: t(60), accountHolder: t(80),
     cardNumber: z.string().trim().max(30).refine((v) => v === "" || /^[\d\-\s۰-۹]{16,25}$/.test(v), "شماره کارت ۱۶ رقمی وارد کنید.").default(""),

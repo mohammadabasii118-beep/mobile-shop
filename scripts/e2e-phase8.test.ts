@@ -287,4 +287,18 @@ describe("Phase 9 — site identity (favicon / tagline) and blog rail", () => {
   it("home blog section is a swipeable rail on mobile (markup hook present)", async () => {
     assert.ok((await head()).includes("data-blog-rail"));
   });
+
+  it("a brand-new database (no stored settings at all) still opens the settings page and can save (regression: «نام سایت لازم است»)", async () => {
+    const rows = await db.siteSetting.findMany({ where: { key: { in: ["site", "payment", "shipping", "loyalty", "finance", "wholesalePolicy", "general"] } } });
+    await db.siteSetting.deleteMany({ where: { key: { in: rows.map((r) => r.key) } } });
+    try {
+      const g = await admin2.get("/api/admin/settings"); assert.equal(g.status, 200, JSON.stringify(g.json));
+      const site = g.json.data.site; assert.equal(site.name, "CaseLine");
+      ok(await admin2.put("/api/admin/settings/site", { ...site, tagline: "شعار" }));
+      assert.equal((await admin2.put("/api/admin/settings/site", { ...site, name: "" })).status, 422, "an explicitly empty name is still refused");
+    } finally {
+      await db.siteSetting.deleteMany({ where: { key: { in: rows.map((r) => r.key) } } });
+      for (const r of rows) await db.siteSetting.create({ data: { key: r.key, value: r.value as object } });
+    }
+  });
 });
