@@ -35,7 +35,7 @@ export default async function BrandPage({ params, searchParams }: Props) {
   const [list, models, cats] = await Promise.all([
     queryShop({ brandSlug: slug, sort: "popular", page, size: SIZE }),
     db.phoneModel.findMany({ where: { brandId: row.id, isActive: true, products: { some: { product: { isActive: true } } } }, orderBy: { sortOrder: "asc" }, select: { slug: true, name: true }, take: 30 }),
-    db.category.findMany({ where: { isActive: true, products: { some: { brandId: row.id, isActive: true } } }, orderBy: { sortOrder: "asc" }, select: { slug: true, name: true }, take: 12 }),
+    db.category.findMany({ where: { isActive: true, OR: [{ products: { some: { brandId: row.id, isActive: true } } }, { products: { some: { isActive: true, extraBrands: { some: { brandId: row.id } } } } }, { extraProducts: { some: { product: { isActive: true, OR: [{ brandId: row.id }, { extraBrands: { some: { brandId: row.id } } }] } } } }] }, orderBy: { sortOrder: "asc" }, select: { slug: true, name: true }, take: 12 }),
   ]);
   if (page > list.pages && page > 1) notFound();
   return (

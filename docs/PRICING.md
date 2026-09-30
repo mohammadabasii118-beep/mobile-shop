@@ -54,3 +54,8 @@ The migration `20261210000000_phase6_variants_pricing_discounts` is additive (ne
 ## Known limits
 - Home-page product rails are cached ≤ 60 s, so a promotion that starts or ends can lag there by up to a minute; product page, cart and checkout are always live.
 - Percent fields of the wholesale policy accept at most two decimals; the tier discount is not part of the policy check (it only lowers the partner price further).
+
+## Multiple categories and brands per product
+A product keeps one **primary** category (required) and brand (optional), and can have any number of **extra** categories/brands (`ProductCategory`, `ProductBrand`).
+The primary drives the breadcrumb, the card label and automatic margin rules. Extras make the product appear in those category/brand pages, the shop filters and counts,
+and let category (including the parent of an extra category) and product-brand discounts match — in TypeScript (`matchesLine`) and in SQL (`effective-sql.ts`) alike.

@@ -32,10 +32,11 @@ export async function queryShop(input: ShopQuery): Promise<{ items: CardProduct[
       where: input.sub ? { slug: input.sub, isActive: true } : { isActive: true, OR: [{ slug: input.cat }, { parent: { slug: input.cat } }] },
       select: { id: true },
     });
-    conds.push(Prisma.sql`p."categoryId" IN (${cats.length ? Prisma.join(cats.map((c) => c.id)) : Prisma.sql`NULL`})`);
+    const ids = cats.length ? Prisma.join(cats.map((c) => c.id)) : Prisma.sql`NULL`;
+    conds.push(Prisma.sql`(p."categoryId" IN (${ids}) OR EXISTS (SELECT 1 FROM "ProductCategory" xc WHERE xc."productId" = p."id" AND xc."categoryId" IN (${ids})))`);
   }
   if (input.model) conds.push(Prisma.sql`EXISTS (SELECT 1 FROM "ProductPhoneModel" x JOIN "PhoneModel" m ON m."id" = x."phoneModelId" WHERE x."productId" = p."id" AND m."name" = ${input.model})`);
-  if (input.brandSlug) conds.push(Prisma.sql`p."brandId" IN (SELECT b."id" FROM "Brand" b WHERE b."slug" = ${input.brandSlug} AND b."isActive" = true)`);
+  if (input.brandSlug) conds.push(Prisma.sql`(p."brandId" IN (SELECT b."id" FROM "Brand" b WHERE b."slug" = ${input.brandSlug} AND b."isActive" = true) OR EXISTS (SELECT 1 FROM "ProductBrand" xb JOIN "Brand" b ON b."id" = xb."brandId" WHERE xb."productId" = p."id" AND b."slug" = ${input.brandSlug} AND b."isActive" = true))`);
   if (input.modelSlug) conds.push(Prisma.sql`EXISTS (SELECT 1 FROM "ProductPhoneModel" x JOIN "PhoneModel" m ON m."id" = x."phoneModelId" WHERE x."productId" = p."id" AND m."slug" = ${input.modelSlug} AND m."isActive" = true)`);
   if (input.q) conds.push(Prisma.sql`p."name" ILIKE ${"%" + input.q.replace(/[%_\\]/g, "\\$&") + "%"}`);
   const where = Prisma.join(conds, " AND ");

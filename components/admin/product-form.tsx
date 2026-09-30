@@ -13,7 +13,7 @@ interface Variant { id?: string; sku: string; name: string; phoneModelId: string
 export interface ProductData {
   id?: string; name: string; slug: string; sku: string; brandId: string; categoryId: string; shortDescription: string; description: string; badge: string; isActive: boolean;
   retailPrice: string; retailDiscount: string; costPrice: string; pricingMode: "AUTOMATIC" | "MANUAL"; wholesalePrice: string; wholesaleDiscount: string; minWholesaleQty: string; seoTitle: string; seoDescription: string; canonical: string;
-  phoneModelIds: string[]; images: { url: string; alt: string }[]; variants: Variant[];
+  phoneModelIds: string[]; extraCategoryIds: string[]; extraBrandIds: string[]; images: { url: string; alt: string }[]; variants: Variant[];
   history?: { id: string; type: string; oldPrice: number; newPrice: number; createdAt: string }[];
 }
 
@@ -34,7 +34,7 @@ export function ProductForm({ initial, categories, brands, phoneModels, colors, 
     const body = {
       name: p.name, slug: p.slug, sku: p.sku, brandId: p.brandId || null, categoryId: p.categoryId, shortDescription: p.shortDescription, description: p.description, badge: p.badge, isActive: p.isActive,
       ...(p.pricingMode === "AUTOMATIC" ? {} : { retailPrice: Number(p.retailPrice) }), costPrice: num(p.costPrice), pricingMode: p.pricingMode, retailDiscount: Number(p.retailDiscount || 0), wholesalePrice: num(p.wholesalePrice), wholesaleDiscount: Number(p.wholesaleDiscount || 0), minWholesaleQty: Number(p.minWholesaleQty || 1),
-      seoTitle: p.seoTitle, seoDescription: p.seoDescription, canonical: p.canonical, phoneModelIds: p.phoneModelIds, ...(isNew ? { images: p.images.map((i) => ({ url: i.url, alt: i.alt })) } : {}),
+      seoTitle: p.seoTitle, seoDescription: p.seoDescription, canonical: p.canonical, phoneModelIds: p.phoneModelIds, extraCategoryIds: p.extraCategoryIds, extraBrandIds: p.extraBrandIds, ...(isNew ? { images: p.images.map((i) => ({ url: i.url, alt: i.alt })) } : {}),
       variants: p.variants.map((v) => ({ ...(v.id ? { id: v.id } : {}), sku: v.sku, name: v.name, phoneModelId: v.phoneModelId || null, colorId: v.colorId || null, costPrice: num(v.costPrice), pricingMode: v.pricingMode, color: v.colorId ? null : v.color, colorHex: v.colorId ? null : v.colorHex, retailPrice: num(v.retailPrice), wholesalePrice: num(v.wholesalePrice), isActive: v.isActive, ...(v.id ? {} : { stock: Number(v.stock || 0) }) })),
     };
     const r = await act<Parameters<typeof toFormData>[0]>(isNew ? "POST" : "PATCH", isNew ? "/api/admin/products" : `/api/admin/products/${p.id}`, body, isNew ? "محصول ایجاد شد." : "محصول ذخیره شد.");
@@ -56,6 +56,8 @@ export function ProductForm({ initial, categories, brands, phoneModels, colors, 
           <Label label="نشان (مثلاً «جدید»)"><input className={inputCls} value={p.badge} onChange={(e) => set("badge", e.target.value)} /></Label>
           <Label label="دسته‌بندی *" error={errs.categoryId}><select className={inputCls} value={p.categoryId} onChange={(e) => set("categoryId", e.target.value)} required>{categories.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></Label>
           <Label label="برند"><select className={inputCls} value={p.brandId} onChange={(e) => set("brandId", e.target.value)}><option value="">— بدون برند —</option>{brands.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}</select></Label>
+          <Label label="دسته‌بندی‌های دیگر (اختیاری، نامحدود)"><MultiPick value={p.extraCategoryIds} onChange={(v) => set("extraCategoryIds", v)} options={categories.filter((o) => o.value !== p.categoryId)} placeholder="جستجوی دسته‌بندی…" /></Label>
+          <Label label="برندهای دیگر (اختیاری، نامحدود)"><MultiPick value={p.extraBrandIds} onChange={(v) => set("extraBrandIds", v)} options={brands.filter((o) => o.value !== p.brandId)} placeholder="جستجوی برند…" /></Label>
           <Label label="توضیح کوتاه" className="sm:col-span-2"><input className={inputCls} value={p.shortDescription} onChange={(e) => set("shortDescription", e.target.value)} /></Label>
           <Label label="توضیحات" className="sm:col-span-2"><textarea className={cn(inputCls, "h-28 py-2")} value={p.description} onChange={(e) => set("description", e.target.value)} /></Label>
           <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" className="size-4 accent-[var(--primary)]" checked={p.isActive} onChange={(e) => set("isActive", e.target.checked)} />محصول فعال (نمایش در سایت)</label>
@@ -155,5 +157,23 @@ export function ProductForm({ initial, categories, brands, phoneModels, colors, 
         </div>
       </div>
     </form>
+  );
+}
+
+/** Searchable multi-select with chips: any number of options can be ticked (used for extra categories/brands). */
+function MultiPick({ value, onChange, options, placeholder }: { value: string[]; onChange: (v: string[]) => void; options: { value: string; label: string }[]; placeholder: string }) {
+  const [q, setQ] = useState("");
+  const chosen = options.filter((o) => value.includes(o.value));
+  const shown = options.filter((o) => !q.trim() || o.label.includes(q.trim()));
+  const toggle = (id: string) => onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
+  return (
+    <div className="space-y-2">
+      {chosen.length > 0 && <div className="flex flex-wrap gap-1.5">{chosen.map((o) => <button type="button" key={o.value} onClick={() => toggle(o.value)} aria-label={`حذف ${o.label}`} className="rounded-full bg-primary/12 px-2.5 py-1 text-xs font-bold text-primary">{o.label} ✕</button>)}</div>}
+      <input className={inputCls} value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder} />
+      <div className="max-h-40 space-y-0.5 overflow-y-auto rounded-md border border-border p-1.5">
+        {shown.length === 0 && <p className="p-1 text-xs text-muted">موردی پیدا نشد.</p>}
+        {shown.map((o) => <label key={o.value} className="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-surface-2"><input type="checkbox" className="accent-[var(--primary)]" checked={value.includes(o.value)} onChange={() => toggle(o.value)} />{o.label}</label>)}
+      </div>
+    </div>
   );
 }

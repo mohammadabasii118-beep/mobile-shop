@@ -8,6 +8,8 @@ import { cachedPublic } from "@/lib/server/public-cache";
 import type { CardProduct, MenuCategory, SiteInfo } from "@/lib/types";
 
 const cardInclude = {
+  extraCategories: { select: { categoryId: true, category: { select: { parentId: true } } } },
+  extraBrands: { select: { brandId: true } },
   category: { select: { id: true, parentId: true, slug: true, name: true, parent: { select: { slug: true } } } },
   images: { where: { type: "IMAGE" }, orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }], take: 1 },
   phoneModels: { include: { phoneModel: { select: { name: true } } }, take: 1 },
@@ -55,7 +57,7 @@ export async function getProducts(where: Prisma.ProductWhereInput = {}, opts: { 
 // Home-page rails: identical for everyone, so cached briefly (admin edits invalidate immediately; stock badges may lag ≤60 s,
 // while checkout always re-validates stock on the server).
 export const getProductsByCategory = cachedPublic("rail-category", async (slug: string, take: number) =>
-  getProducts({ OR: [{ category: { slug } }, { category: { parent: { slug } } }] }, { take, orderBy: [{ soldCount: "desc" }, { createdAt: "asc" }] }), 60);
+  getProducts({ OR: [{ category: { slug } }, { category: { parent: { slug } } }, { extraCategories: { some: { category: { OR: [{ slug }, { parent: { slug } }] } } } }] }, { take, orderBy: [{ soldCount: "desc" }, { createdAt: "asc" }] }), 60);
 
 /** Hand-picked products (admin homepage section), kept in the order the admin chose. */
 export const getProductsByIds = cachedPublic("rail-ids", async (ids: string[]) => {
@@ -74,8 +76,8 @@ export const getCategoryTree = cachedPublic("category-tree", async (): Promise<(
   return Promise.all(tops.map(async (t) => {
     const ids = [t.id, ...t.children.map((c) => c.id)];
     const [productCount, sample] = await Promise.all([
-      db.product.count({ where: { isActive: true, categoryId: { in: ids } } }),
-      db.product.findMany({ where: { isActive: true, categoryId: { in: ids } }, select: { visualKind: true }, take: 3, orderBy: { soldCount: "desc" } }),
+      db.product.count({ where: { isActive: true, OR: [{ categoryId: { in: ids } }, { extraCategories: { some: { categoryId: { in: ids } } } }] } }),
+      db.product.findMany({ where: { isActive: true, OR: [{ categoryId: { in: ids } }, { extraCategories: { some: { categoryId: { in: ids } } } }] }, select: { visualKind: true }, take: 3, orderBy: { soldCount: "desc" } }),
     ]);
     return { id: t.id, slug: t.slug, label: t.name, subs: t.children.map((c) => ({ slug: c.slug, label: c.name })), productCount, sampleKinds: sample.map((x) => x.visualKind ?? "case") };
   }));
@@ -119,6 +121,8 @@ export async function getProductBySlug(slug: string) {
     where: { slug, isActive: true },
     include: {
       brand: true, category: { include: { parent: true } },
+      extraCategories: { include: { category: { select: { id: true, name: true, slug: true, parentId: true } } }, orderBy: { createdAt: "asc" } },
+      extraBrands: { include: { brand: { select: { id: true, name: true, slug: true } } }, orderBy: { createdAt: "asc" } },
       images: { orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }, { id: "asc" }] },
       phoneModels: { include: { phoneModel: true } },
       variants: { where: { isActive: true }, orderBy: { sortOrder: "asc" }, include: { inventory: true, colorRef: true, phoneModel: { include: { brand: { select: { name: true } } } } } },
@@ -128,7 +132,7 @@ export async function getProductBySlug(slug: string) {
 }
 
 export async function getRelatedProducts(productId: string, categoryId: string, take = 3) {
-  return getProducts({ categoryId, id: { not: productId } }, { take, orderBy: { soldCount: "desc" } });
+  return getProducts({ OR: [{ categoryId }, { extraCategories: { some: { categoryId } } }], id: { not: productId } }, { take, orderBy: { soldCount: "desc" } });
 }
 export async function getSidebarProducts(exceptId: string, take = 7) {
   return getProducts({ id: { not: exceptId } }, { take, orderBy: { soldCount: "desc" } });

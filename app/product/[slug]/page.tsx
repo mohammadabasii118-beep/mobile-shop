@@ -100,8 +100,8 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                   <BuyBox p={card} opt={opt} variants={variantOptions} inStock={stock > 0} maxQty={Math.max(1, Math.min(99, stock))} wholesale={wholesale} />
                 </div>
               </div>
-              <p className="mt-5 text-sm text-muted">دسته‌بندی: <Link href={paths.category(row.category.slug)} className="font-bold text-foreground hover:text-primary">{row.category.name}</Link>
-                {row.brand && <> · برند: <Link href={paths.brand(row.brand.slug)} className="font-bold text-foreground hover:text-primary">{row.brand.name}</Link></>}
+              <p className="mt-5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted">دسته‌بندی: {[row.category, ...row.extraCategories.map((e) => e.category)].map((c, i) => <span key={c.id}>{i > 0 && "، "}<Link href={paths.category(c.slug)} className="font-bold text-foreground hover:text-primary">{c.name}</Link></span>)}
+                {(row.brand || row.extraBrands.length > 0) && <> · برند: {[...(row.brand ? [row.brand] : []), ...row.extraBrands.map((e) => e.brand)].map((b, i) => <span key={b.id}>{i > 0 && "، "}<Link href={paths.brand(b.slug)} className="font-bold text-foreground hover:text-primary">{b.name}</Link></span>)}</>}
               </p>
               {row.phoneModels.length > 0 && <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-muted">سازگار با: {row.phoneModels.slice(0, 8).map((m) => <Link key={m.phoneModelId} href={paths.model(m.phoneModel.slug)} className="rounded-full bg-surface-2 px-2.5 py-1 font-medium text-foreground hover:text-primary">{m.phoneModel.name}</Link>)}</p>}
             </section>

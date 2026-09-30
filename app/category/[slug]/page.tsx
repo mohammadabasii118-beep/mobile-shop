@@ -35,9 +35,10 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   const page = Math.max(1, Number((await searchParams).page) || 1);
   const c = await load(slug);
   if (!c) { const to = await resolveSlugRedirect("category", slug); if (to) permanentRedirect(paths.category(to)); notFound(); }
+  const catMatch = { OR: [{ slug: c.slug }, { parent: { slug: c.slug } }] };
   const [list, brands] = await Promise.all([
     queryShop({ cat: c.slug, sort: "popular", page, size: SIZE }),
-    db.brand.findMany({ where: { isActive: true, products: { some: { isActive: true, category: { OR: [{ slug: c.slug }, { parent: { slug: c.slug } }] } } } }, orderBy: { sortOrder: "asc" }, select: { slug: true, name: true }, take: 12 }),
+    db.brand.findMany({ where: { isActive: true, OR: [{ products: { some: { isActive: true, category: catMatch } } }, { products: { some: { isActive: true, extraCategories: { some: { category: catMatch } } } } }, { extraProducts: { some: { product: { isActive: true, OR: [{ category: catMatch }, { extraCategories: { some: { category: catMatch } } }] } } } }] }, orderBy: { sortOrder: "asc" }, select: { slug: true, name: true }, take: 12 }),
   ]);
   if (page > list.pages && page > 1) notFound();
   const crumbs = [{ name: "خانه", path: "/" }, { name: "فروشگاه", path: "/shop" }, ...(c.parent ? [{ name: c.parent.name, path: paths.category(c.parent.slug) }] : []), { name: c.name, path: paths.category(c.slug) }];

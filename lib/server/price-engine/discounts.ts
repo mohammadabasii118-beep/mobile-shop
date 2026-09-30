@@ -9,7 +9,8 @@ type Db = Prisma.TransactionClient | typeof db;
 export interface LineCtx {
   productId: string; variantId: string | null;
   categoryIds: string[]; // the product's category and its ancestors
-  productBrandId: string | null; phoneBrandId: string | null; phoneModelId: string | null;
+  productBrandId: string | null; extraBrandIds?: string[]; // the product's primary brand and any additional ones
+  phoneBrandId: string | null; phoneModelId: string | null;
 }
 
 /** Currently usable promotions: enabled, inside their time window, and not out of global capacity. */
@@ -21,6 +22,8 @@ export async function loadActiveDiscounts(client: Db = db, now = new Date()): Pr
   return rows.filter((d) => d.usageLimit == null || d.usedCount < d.usageLimit);
 }
 
+const brandIdsOf = (c: LineCtx) => [c.productBrandId ?? "", ...(c.extraBrandIds ?? [])].filter(Boolean);
+
 export function matchesLine(d: Pick<Discount, "scope" | "targetId">, c: LineCtx): boolean {
   switch (d.scope) {
     case "ALL": return true;
@@ -28,9 +31,9 @@ export function matchesLine(d: Pick<Discount, "scope" | "targetId">, c: LineCtx)
     case "VARIANT": return !!c.variantId && d.targetId === c.variantId;
     case "CATEGORY": return c.categoryIds.includes(d.targetId);
     case "MODEL": return !!c.phoneModelId && d.targetId === c.phoneModelId;
-    case "PRODUCT_BRAND": return !!c.productBrandId && d.targetId === c.productBrandId; // the maker of the product (Spigen)
+    case "PRODUCT_BRAND": return brandIdsOf(c).includes(d.targetId); // the maker of the product (Spigen)
     case "PHONE_BRAND": return !!c.phoneBrandId && d.targetId === c.phoneBrandId; // the brand of the variant's phone model (Apple)
-    case "BRAND": return d.targetId === c.productBrandId || (!!c.phoneBrandId && d.targetId === c.phoneBrandId); // legacy rows only
+    case "BRAND": return brandIdsOf(c).includes(d.targetId) || (!!c.phoneBrandId && d.targetId === c.phoneBrandId); // legacy rows only
   }
 }
 

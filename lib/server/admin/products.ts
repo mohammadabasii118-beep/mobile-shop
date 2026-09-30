@@ -36,6 +36,9 @@ const base = z.object({
   wholesalePrice: optMoney, wholesaleDiscount: money.optional(), minWholesaleQty: z.coerce.number().int().min(1).max(10000).optional(),
   seoTitle: txt(120), seoDescription: txt(300), canonical: txt(300),
   phoneModelIds: z.array(z.string().max(40)).max(200).optional(),
+  // Additional categories/brands beyond the primary ones (no practical limit; the primary drives breadcrumbs and margin rules).
+  extraCategoryIds: z.array(z.string().max(40)).max(2000).optional(),
+  extraBrandIds: z.array(z.string().max(40)).max(2000).optional(),
   images: z.array(z.object({ url: imgUrl, alt: txt(160) })).max(12).optional(),
   variants: z.array(variantSchema).max(60).optional(),
 });
@@ -56,6 +59,7 @@ function checkPrices(d: { retailPrice?: number; retailDiscount?: number; wholesa
 
 const detailInclude = {
   brand: { select: { id: true, name: true } }, category: { select: { id: true, name: true } },
+  extraCategories: { select: { categoryId: true } }, extraBrands: { select: { brandId: true } },
   images: { orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }] }, phoneModels: { select: { phoneModelId: true } },
   variants: { orderBy: { sortOrder: "asc" }, include: { inventory: { select: { quantity: true, lowStockThreshold: true } }, phoneModel: { select: { id: true, name: true, brandId: true } }, colorRef: { select: { id: true, name: true, hex: true } } } },
 } satisfies Prisma.ProductInclude;
@@ -92,8 +96,10 @@ export async function listProducts(req: NextRequest) {
   const { take, skip, q, page, sp } = pageParams(req, 25);
   const where: Prisma.ProductWhereInput = {};
   if (q) where.OR = [{ name: { contains: q, mode: "insensitive" } }, { sku: { contains: q, mode: "insensitive" } }, { slug: { contains: q, mode: "insensitive" } }];
-  if (sp.get("categoryId")) where.categoryId = sp.get("categoryId")!;
-  if (sp.get("brandId")) where.brandId = sp.get("brandId")!;
+  const and: Prisma.ProductWhereInput[] = [];
+  if (sp.get("categoryId")) { const c = sp.get("categoryId")!; and.push({ OR: [{ categoryId: c }, { extraCategories: { some: { categoryId: c } } }] }); }
+  if (sp.get("brandId")) { const b = sp.get("brandId")!; and.push({ OR: [{ brandId: b }, { extraBrands: { some: { brandId: b } } }] }); }
+  if (and.length) where.AND = and;
   if (sp.get("isActive")) where.isActive = sp.get("isActive") === "true";
   if (sp.get("low") === "1") where.variants = { some: { inventory: { is: { quantity: { lte: 5 } } } } };
   const [rows, total] = await Promise.all([
@@ -108,7 +114,7 @@ export async function getProduct(id: string, caps: Caps = { cost: false }) {
   const p = await db.product.findUnique({ where: { id }, include: detailInclude });
   if (!p) throw notFound("محصول پیدا نشد.");
   const history = await db.priceHistory.findMany({ where: { productId: id }, orderBy: { createdAt: "desc" }, take: 30 });
-  return redactCost({ ...p, phoneModelIds: p.phoneModels.map((m) => m.phoneModelId), priceHistory: history }, caps);
+  return redactCost({ ...p, phoneModelIds: p.phoneModels.map((m) => m.phoneModelId), extraCategoryIds: p.extraCategories.map((c) => c.categoryId), extraBrandIds: p.extraBrands.map((b) => b.brandId), priceHistory: history }, caps);
 }
 
 async function syncImages(tx: Prisma.TransactionClient, productId: string, images: { url: string; alt?: string | null }[]) {
@@ -126,10 +132,29 @@ async function assertUniqueAxes(tx: Prisma.TransactionClient, productId: string,
   if (dup) throw conflict("این ترکیب مدل گوشی و رنگ قبلاً برای این محصول تعریف شده است.", "variant_duplicate");
 }
 
+/**
+ * Replaces the product's additional categories/brands (when given) and always drops any that equal the current primary,
+ * so a category/brand is never linked twice. Ids must exist.
+ */
+async function syncExtras(tx: Prisma.TransactionClient, productId: string, categoryId: string, brandId: string | null, cats?: string[], brands?: string[]) {
+  if (cats) {
+    const ids = [...new Set(cats)].filter((c) => c !== categoryId);
+    if (ids.length && (await tx.category.count({ where: { id: { in: ids } } })) !== ids.length) throw badRequest("یکی از دسته‌بندی‌های انتخاب‌شده وجود ندارد.", "validation");
+    await tx.productCategory.deleteMany({ where: { productId } });
+    if (ids.length) await tx.productCategory.createMany({ data: ids.map((cid) => ({ productId, categoryId: cid })) });
+  } else await tx.productCategory.deleteMany({ where: { productId, categoryId } });
+  if (brands) {
+    const ids = [...new Set(brands)].filter((b) => b !== brandId);
+    if (ids.length && (await tx.brand.count({ where: { id: { in: ids } } })) !== ids.length) throw badRequest("یکی از برندهای انتخاب‌شده وجود ندارد.", "validation");
+    await tx.productBrand.deleteMany({ where: { productId } });
+    if (ids.length) await tx.productBrand.createMany({ data: ids.map((bid) => ({ productId, brandId: bid })) });
+  } else if (brandId) await tx.productBrand.deleteMany({ where: { productId, brandId } });
+}
+
 export async function createProduct(body: unknown, a: AdminCtx) {
   const d = stripPricingInput(productCreateSchema.parse(body), canPrice(a));
   if (d.pricingMode !== "AUTOMATIC") checkPrices(d);
-  const { phoneModelIds = [], images = [], variants, retailPrice, ...fields } = d;
+  const { phoneModelIds = [], extraCategoryIds, extraBrandIds, images = [], variants, retailPrice, ...fields } = d;
   const id = await db.$transaction(async (tx) => {
     const p = await tx.product.create({ data: { ...fields, retailPrice: retailPrice ?? 0, visualKind: "case", visualHue: 210 } });
     const seen = new Set<string>();
@@ -142,6 +167,7 @@ export async function createProduct(body: unknown, a: AdminCtx) {
       await audit(a, "variant.create", "variant", row.id, undefined, { sku: row.sku, name: row.name, phoneModelId: row.phoneModelId, colorId: row.colorId, pricingMode: row.pricingMode }, tx);
     }
     if (phoneModelIds.length) await tx.productPhoneModel.createMany({ data: phoneModelIds.map((phoneModelId) => ({ productId: p.id, phoneModelId })) });
+    await syncExtras(tx, p.id, p.categoryId, p.brandId, extraCategoryIds, extraBrandIds);
     await syncImages(tx, p.id, images);
     await audit(a, "product.create", "product", p.id, undefined, { name: p.name, sku: p.sku, retailPrice: p.retailPrice, wholesalePrice: p.wholesalePrice, pricingMode: p.pricingMode }, tx);
     const policy = await getWholesalePolicy(tx);
@@ -157,7 +183,7 @@ export async function createProduct(body: unknown, a: AdminCtx) {
 
 export async function updateProduct(id: string, body: unknown, a: AdminCtx) {
   const d = stripPricingInput(productUpdateSchema.parse(body), canPrice(a));
-  const { phoneModelIds, images, variants, ...fields } = d;
+  const { phoneModelIds, extraCategoryIds, extraBrandIds, images, variants, ...fields } = d;
   await db.$transaction(async (tx) => {
     const cur = await tx.product.findUnique({ where: { id } });
     if (!cur) throw notFound("محصول پیدا نشد.");
@@ -182,6 +208,7 @@ export async function updateProduct(id: string, body: unknown, a: AdminCtx) {
       await tx.productPhoneModel.deleteMany({ where: { productId: id } });
       if (phoneModelIds.length) await tx.productPhoneModel.createMany({ data: phoneModelIds.map((phoneModelId) => ({ productId: id, phoneModelId })) });
     }
+    await syncExtras(tx, id, fields.categoryId ?? cur.categoryId, fields.brandId === undefined ? cur.brandId : fields.brandId, extraCategoryIds, extraBrandIds);
     if (images) await syncImages(tx, id, images);
     if (variants) {
       const existing = await tx.productVariant.findMany({ where: { productId: id } });
@@ -218,7 +245,7 @@ export async function updateProduct(id: string, body: unknown, a: AdminCtx) {
     const touchesPricing = "costPrice" in fields || "pricingMode" in fields || (variants ?? []).some((v) => v.costPrice !== undefined || v.pricingMode !== undefined);
     if (touchesPricing || nextMode === "AUTOMATIC" || variants) await recomputePrices(tx, { productIds: [id] }, { apply: true, adminId: a.admin.id, source: "manual", reason: "ویرایش محصول", oldCosts, wholesale: { policy, onConflict: "throw" } });
     await assertWholesaleConsistent(tx, id, statesBefore, policy);
-    const change = { ...df.next, ...(phoneModelIds ? { phoneModelIds } : {}), ...(images ? { images: images.length } : {}), ...(variants ? { variants: variants.length } : {}) };
+    const change = { ...df.next, ...(phoneModelIds ? { phoneModelIds } : {}), ...(extraCategoryIds ? { extraCategoryIds } : {}), ...(extraBrandIds ? { extraBrandIds } : {}), ...(images ? { images: images.length } : {}), ...(variants ? { variants: variants.length } : {}) };
     if (Object.keys(change).length) await audit(a, "product.update", "product", id, { ...df.old, ...(priceLog.length ? { priceHistory: priceLog } : {}) }, change, tx);
   });
   return getProduct(id, capsOf(a));

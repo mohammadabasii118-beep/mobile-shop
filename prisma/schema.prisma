@@ -143,6 +143,7 @@ model Category {
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
   products       Product[]
+  extraProducts  ProductCategory[]
 
   @@index([parentId, sortOrder])
 }
@@ -158,6 +159,7 @@ model Brand {
   seoTitle       String?
   seoDescription String?
   products       Product[]
+  extraProducts  ProductBrand[]
   phoneModels    PhoneModel[]
 }
 
@@ -219,6 +221,9 @@ model Product {
   variants     ProductVariant[]
   images       ProductImage[]
   phoneModels  ProductPhoneModel[]
+  /// Additional categories / brands besides the primary `categoryId` / `brandId` (unlimited). The primary ones still drive breadcrumbs and margin rules.
+  extraCategories ProductCategory[]
+  extraBrands     ProductBrand[]
   reviews      Review[]
   questions    ProductQuestion[]
   wishlist     WishlistItem[]
@@ -305,6 +310,28 @@ model ProductImage {
 enum MediaType {
   IMAGE
   VIDEO
+}
+
+model ProductCategory {
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@id([productId, categoryId])
+  @@index([categoryId])
+}
+
+model ProductBrand {
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  brandId   String
+  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([productId, brandId])
+  @@index([brandId])
 }
 
 model Inventory {

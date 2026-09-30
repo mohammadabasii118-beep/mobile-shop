@@ -5,13 +5,13 @@ import { DEFAULT_WHOLESALE_POLICY, type WholesalePolicy } from "@/lib/server/pri
 
 export interface PriceInput {
   qty: number;
-  product: { id: string; categoryId: string; category?: { parentId: string | null } | null; brandId: string | null; retailPrice: number; retailDiscount: number; wholesalePrice: number | null; wholesaleDiscount: number; minWholesaleQty: number };
+  product: { id: string; categoryId: string; category?: { parentId: string | null } | null; extraCategories?: { categoryId: string; category: { parentId: string | null } }[]; extraBrands?: { brandId: string }[]; brandId: string | null; retailPrice: number; retailDiscount: number; wholesalePrice: number | null; wholesaleDiscount: number; minWholesaleQty: number };
   variant: { id: string; retailPrice: number | null; wholesalePrice: number | null; phoneModelId?: string | null; phoneModel?: { brandId: string } | null };
 }
 
 export const lineCtx = (i: PriceInput["product"], v: PriceInput["variant"]): LineCtx => ({
-  productId: i.id, variantId: v.id, categoryIds: [i.categoryId, i.category?.parentId ?? ""].filter(Boolean),
-  productBrandId: i.brandId, phoneBrandId: v.phoneModel?.brandId ?? null, phoneModelId: v.phoneModelId ?? null,
+  productId: i.id, variantId: v.id, categoryIds: [i.categoryId, i.category?.parentId ?? "", ...(i.extraCategories ?? []).flatMap((e) => [e.categoryId, e.category.parentId ?? ""])].filter(Boolean),
+  productBrandId: i.brandId, extraBrandIds: (i.extraBrands ?? []).map((b) => b.brandId), phoneBrandId: v.phoneModel?.brandId ?? null, phoneModelId: v.phoneModelId ?? null,
 });
 
 /**

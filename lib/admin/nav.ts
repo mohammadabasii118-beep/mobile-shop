@@ -14,6 +14,7 @@ export const ADMIN_NAV: NavItem[] = [
   { href: "/admin/colors", label: "رنگ‌ها", icon: Palette, perms: ["product.write"] },
   { href: "/admin/inventory", label: "موجودی انبار", icon: Boxes, perms: ["inventory.write"] },
   { href: "/admin/pricing", label: "قیمت‌گذاری", icon: Calculator, perms: ["pricing.read", "pricing.write"] },
+  { href: "/admin/variants-demo", label: "دموی سیستم Variant", icon: Palette, perms: ["product.write"] },
   { href: "/admin/discounts", label: "تخفیف‌ها", icon: BadgePercent, perms: ["discount.write"] },
   { href: "/admin/customers", label: "مشتریان", icon: Users, perms: ["customer.read"] },
   { href: "/admin/wholesale", label: "همکاران عمده", icon: Store, perms: ["wholesale.review"] },

@@ -40,11 +40,13 @@ export const EFFECTIVE_PRICE_JOIN = Prisma.sql`
             d."scope" = 'ALL'
             OR (d."scope" = 'PRODUCT' AND d."targetId" = p."id")
             OR (d."scope" = 'VARIANT' AND b."vid" IS NOT NULL AND d."targetId" = b."vid")
-            OR (d."scope" = 'CATEGORY' AND (d."targetId" = p."categoryId" OR d."targetId" = pc."parentId"))
+            OR (d."scope" = 'CATEGORY' AND (d."targetId" = p."categoryId" OR d."targetId" = pc."parentId"
+              OR EXISTS (SELECT 1 FROM "ProductCategory" xc LEFT JOIN "Category" xcc ON xcc."id" = xc."categoryId"
+                         WHERE xc."productId" = p."id" AND (d."targetId" = xc."categoryId" OR d."targetId" = xcc."parentId"))))
             OR (d."scope" = 'MODEL' AND b."pm" IS NOT NULL AND d."targetId" = b."pm")
-            OR (d."scope" = 'PRODUCT_BRAND' AND p."brandId" IS NOT NULL AND d."targetId" = p."brandId")
+            OR (d."scope" = 'PRODUCT_BRAND' AND (d."targetId" = p."brandId" OR EXISTS (SELECT 1 FROM "ProductBrand" xb WHERE xb."productId" = p."id" AND xb."brandId" = d."targetId")))
             OR (d."scope" = 'PHONE_BRAND' AND b."pm" IS NOT NULL AND d."targetId" = (SELECT m."brandId" FROM "PhoneModel" m WHERE m."id" = b."pm"))
-            OR (d."scope" = 'BRAND' AND (d."targetId" = p."brandId" OR (b."pm" IS NOT NULL AND d."targetId" = (SELECT m."brandId" FROM "PhoneModel" m WHERE m."id" = b."pm"))))
+            OR (d."scope" = 'BRAND' AND (d."targetId" = p."brandId" OR EXISTS (SELECT 1 FROM "ProductBrand" xb WHERE xb."productId" = p."id" AND xb."brandId" = d."targetId") OR (b."pm" IS NOT NULL AND d."targetId" = (SELECT m."brandId" FROM "PhoneModel" m WHERE m."id" = b."pm"))))
           )
       ) c
     ) x ON true
