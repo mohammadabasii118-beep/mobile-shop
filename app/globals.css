@@ -271,3 +271,10 @@ body {
 .cl-slide-from-right { animation: cl-slide-right .28s cubic-bezier(.22,.8,.3,1); }
 .cl-fade-in { animation: cl-fade .2s ease-out; }
 @media (prefers-reduced-motion: reduce) { .cl-slide-from-right, .cl-fade-in { animation: none; } }
+
+/* Bottom-bar night item: no stuck iOS tap highlight; when dark mode is ON it is a highlighted tile (white disc + moon), tap again to turn it off. */
+.night-tab { -webkit-tap-highlight-color: transparent; outline: none; transition: background-color .2s, color .2s; border-radius: 24px; }
+.night-tab:focus-visible { box-shadow: 0 0 0 2px var(--primary); }
+.night-tab svg { box-sizing: content-box; padding: 7px; margin: -7px; border-radius: 9999px; transition: background-color .2s, color .2s; }
+.night-tab[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); font-weight: 700; }
+.night-tab[aria-pressed="true"] svg { background: #fff; color: var(--primary); }

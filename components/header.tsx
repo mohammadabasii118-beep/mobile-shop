@@ -121,7 +121,7 @@ export function BottomNav() {
       <nav aria-label="منوی اصلی" className="glass fixed inset-x-3 bottom-3 z-40 mx-auto flex max-w-md rounded-full px-2 shadow-lg md:hidden">
         <Link href="/support" className={item}><Headphones className="size-5" />پشتیبانی</Link>
         <Link href="/blog" className={item}><PenLine className="size-5" />بلاگ</Link>
-        <NightButton className={item} />
+        <NightButton tab className={item} />
         <Link href="/shop" className={item}><Store className="size-5" />فروشگاه</Link>
         <Link href="/account/orders" className={item}><User className="size-5" />داشبورد</Link>
       </nav>

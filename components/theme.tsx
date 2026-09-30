@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -53,16 +53,31 @@ export function ThemeToggle() {
 }
 
 /** One-tap night mode button used in the mobile bottom bar. */
-export function NightButton({ className, iconOnly }: { className?: string; iconOnly?: boolean }) {
+/** Live "is dark mode on" (follows the <html class="dark"> flag, so every night button stays in sync with the real theme). */
+function subscribeDark(cb: () => void) {
+  const mo = new MutationObserver(cb);
+  mo.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  return () => mo.disconnect();
+}
+const getDark = () => document.documentElement.classList.contains("dark");
+export const useIsDark = () => useSyncExternalStore(subscribeDark, getDark, () => false);
+
+/**
+ * Night-mode toggle. `aria-pressed` mirrors the real theme (on → highlighted, tap again → off).
+ * `tab`: bottom-bar item (highlighted tile when on). `withSwitch`: shows a small on/off switch (menu row).
+ */
+export function NightButton({ className, iconOnly, tab, withSwitch }: { className?: string; iconOnly?: boolean; tab?: boolean; withSwitch?: boolean }) {
+  const dark = useIsDark();
   const toggle = () => {
     const next: Mode = document.documentElement.classList.contains("dark") ? "light" : "dark";
     try { localStorage.setItem(THEME_KEY, next); } catch {}
     apply(next);
   };
   return (
-    <button data-night aria-label="حالت شب" onClick={toggle} className={className}>
-      <Moon className="size-5 dark:hidden" /><Sun className="hidden size-5 dark:block" />
-      {!iconOnly && <span>حالت شب</span>}
+    <button type="button" data-night aria-label="حالت شب" aria-pressed={dark} onClick={toggle} className={cn(tab && "night-tab", className)}>
+      {tab ? <Moon className="size-5" /> : <><Moon className="size-5 dark:hidden" /><Sun className="hidden size-5 dark:block" /></>}
+      {!iconOnly && <span className={withSwitch ? "flex-1 text-start" : undefined}>حالت شب</span>}
+      {withSwitch && <span aria-hidden className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors", dark ? "bg-primary" : "bg-border")}><span className={cn("absolute top-0.5 size-5 rounded-full bg-white shadow transition-all", dark ? "start-[22px]" : "start-0.5")} /></span>}
     </button>
   );
 }

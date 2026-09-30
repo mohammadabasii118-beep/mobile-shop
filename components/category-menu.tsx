@@ -97,7 +97,7 @@ export function MobileMenu({ menu, links = [], loggedIn, logo, name, className }
             <ul className="space-y-1">
               <li><Link href={loggedIn ? "/account/orders" : "/account"} onClick={close} className={row}><span className={chip}><User className="size-5" /></span><span className="flex-1 text-start">{loggedIn ? "حساب کاربری" : "ورود / ثبت‌نام"}</span></Link></li>
               {extra.map((l) => { const I = extraIcon(l.link); return <li key={l.link + l.label}><Link href={l.link} onClick={close} className={row}><span className={chip}><I className="size-5" /></span><span className="flex-1 text-start">{l.label}</span></Link></li>; })}
-              <li><NightButton className={cn(row, "w-full cursor-pointer")} /></li>
+              <li><NightButton withSwitch className={cn(row, "w-full cursor-pointer")} /></li>
             </ul>
           </aside>
         </div>, document.body)}

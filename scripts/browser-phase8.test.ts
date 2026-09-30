@@ -103,4 +103,19 @@ describe("Phase 8 — browser flows", () => {
     await p2.getByText("لینک بازیابی نامعتبر است").waitFor();
     await ctx.close();
   });
+
+  it("mobile bottom bar: the night item is a real toggle (tap → on/highlighted, tap again → off) and stays in sync with the menu switch", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: "fa-IR", colorScheme: "light" });
+    const p = await ctx.newPage(); await p.goto(`${BASE}/`, { waitUntil: "networkidle" });
+    const tab = p.locator("nav.md\\:hidden [data-night]"); const dark = () => p.evaluate(() => document.documentElement.classList.contains("dark"));
+    assert.equal(await tab.getAttribute("aria-pressed"), "false"); assert.equal(await dark(), false);
+    await tab.tap(); await p.waitForTimeout(300);
+    assert.equal(await tab.getAttribute("aria-pressed"), "true"); assert.equal(await dark(), true);
+    assert.ok((await tab.evaluate((el: HTMLElement) => getComputedStyle(el).backgroundColor)) !== "rgba(0, 0, 0, 0)", "highlighted tile when on");
+    await p.getByLabel("منو", { exact: true }).first().tap();
+    assert.equal(await p.locator("[data-mobile-menu] [data-night]").getAttribute("aria-pressed"), "true");
+    await p.locator("[data-mobile-menu] [data-night]").tap(); await p.waitForTimeout(300);
+    assert.equal(await dark(), false);
+    await ctx.close();
+  });
 });
