@@ -11,7 +11,7 @@ export default function NotFound() {
   return (
     <>
       <Header />
-      <main id="main" className="py-16">
+      <main id="main" tabIndex={-1} className="py-16">
         <Container className="text-center">
           <p className="text-6xl font-black text-primary">۴۰۴</p>
           <h1 className="mt-4 text-xl font-black">صفحه‌ای که دنبالش بودید پیدا نشد</h1>

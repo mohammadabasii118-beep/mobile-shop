@@ -53,7 +53,7 @@ export default async function Home() {
   return (
     <>
       <Header />
-      <main id="main">{blocks}</main>
+      <main id="main" tabIndex={-1}>{blocks}</main>
       <Footer />
       <BottomNav />
     </>

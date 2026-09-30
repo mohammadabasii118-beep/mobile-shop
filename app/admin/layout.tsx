@@ -15,7 +15,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!user) redirect("/account?next=/admin");
   if (!user.isStaff) {
     return (
-      <main id="main" className="grid min-h-screen place-items-center p-6 text-center">
+      <main id="main" tabIndex={-1} className="grid min-h-screen place-items-center p-6 text-center">
         <div><h1 className="text-2xl font-black">دسترسی ندارید</h1><p className="mt-2 text-sm text-muted">حساب شما اجازه ورود به پنل مدیریت را ندارد.</p><Link href="/" className="mt-4 inline-block text-primary">بازگشت به سایت</Link></div>
       </main>
     );

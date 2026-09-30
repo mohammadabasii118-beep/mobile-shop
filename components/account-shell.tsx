@@ -26,8 +26,9 @@ export async function AccountShell({ active, children }: { active: string; child
   return (
     <>
       <Header />
-      <main id="main" className="py-6">
+      <main id="main" tabIndex={-1} className="py-6">
         <Container className="max-w-[790px]">
+          <h1 className="sr-only">حساب کاربری</h1>
           <div className="rounded-[28px] border border-border bg-surface/90 p-3 shadow-md sm:p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <nav aria-label="پنل کاربری" className="no-scrollbar flex gap-1 overflow-x-auto rounded-2xl bg-surface-2 p-1">

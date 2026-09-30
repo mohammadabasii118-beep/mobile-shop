@@ -180,3 +180,11 @@ lib/server/admin/finance.ts      admin wallet / loyalty views and idempotent adj
 
 ### Tests
 `npm run test:e2e` runs all three suites sequentially: **113 integration tests** (27 auth/checkout, 48 admin, 38 business systems).
+
+## Phase 5 — SEO, security, performance, production readiness
+- **SEO:** `lib/seo.ts` (metadata, canonical, OG/Twitter, JSON-LD), `app/sitemap.ts`, `app/robots.ts`, category/brand/model landing pages, `SlugRedirect` (308 on slug change). See `docs/SEO.md`.
+- **Performance:** `lib/queries.ts` cached readers (`cachedPublic`, tag `public`, invalidated by every admin write in `adminRoute`), relation-join strategy, server-driven shop (`lib/shop-list.ts`, 12 per page instead of 380 in the DOM), `next/image` for uploads, preloaded self-hosted font, DB pool config. Measured before/after in the Phase 5 report.
+- **Security:** `proxy.ts` (CSP nonce), `next.config.ts` (headers, noindex/no-store for private paths), per-session write limiter + body cap in `lib/server/http.ts`, four-eyes bank refunds, production config validation in `lib/server/env.ts`. See `docs/SECURITY.md`.
+- **Finance:** proportional loyalty reversal on partial refunds (`reversePartialPoints`), setting `finance.fourEyes`.
+- **Production tooling:** `prisma/rbac.ts` (single RBAC source), `scripts/bootstrap-production.ts`, `scripts/preflight.ts`, `scripts/backup.sh` / `restore.sh`, `/api/health`, JSON logger `lib/server/log.ts`. See `docs/PRODUCTION.md`, `docs/EXTERNAL_SERVICES.md`.
+- **Tests:** `scripts/e2e-phase5.test.ts` (35 tests). Run against a production build: `ALLOW_INSECURE_HTTP=1 TRUST_PROXY=1 AUTH_SECRET=<same as tests> npm start -- -p 3300`.

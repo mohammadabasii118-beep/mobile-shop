@@ -39,7 +39,7 @@ export default async function OrderPage({ params }: { params: Promise<{ number: 
       <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-lg font-black">سفارش <span className="text-primary">#{order.number.toLocaleString("fa-IR", { useGrouping: false })}</span></h1>
+            <h2 className="text-lg font-black">سفارش <span className="text-primary">#{order.number.toLocaleString("fa-IR", { useGrouping: false })}</span></h2>
             <p className="mt-1 text-xs text-muted">ثبت‌شده در {faDateTime(order.createdAt)}</p>
           </div>
           <span className="rounded-full bg-primary/12 px-3 py-1.5 text-xs font-bold text-primary">{ORDER_STATUS_LABEL[order.status]}</span>

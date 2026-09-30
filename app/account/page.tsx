@@ -12,7 +12,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const target = safeNext(next);
   if (await getCurrentUser()) redirect(target);
   return (
-    <main id="main" className="login-bg grid min-h-screen place-items-center px-4 py-10">
+    <main id="main" tabIndex={-1} className="login-bg grid min-h-screen place-items-center px-4 py-10">
       <LoginForm next={target} />
     </main>
   );

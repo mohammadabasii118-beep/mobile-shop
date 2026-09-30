@@ -40,11 +40,11 @@ export default function SupportPage() {
   return (
     <>
       <Header />
-      <main id="main" className="py-6">
+      <main id="main" tabIndex={-1} className="py-6">
         <Container>
           <section className="rounded-[28px] border border-border bg-surface p-5 shadow-md sm:p-10">
             <div className="grid items-center gap-8 md:grid-cols-[1.5fr_1fr]">
-              <div>
+              <div className="min-w-0">
                 <h1 className="text-2xl font-black sm:text-3xl">تماس با <span className="text-primary">کیس‌لاین</span></h1>
                 <p className="mt-5 text-[13px] leading-8 text-muted sm:text-sm">پشتیبانی فروشگاه کیس‌لاین همه‌روزه آماده پاسخ‌گویی به شماست تا مشکلات و درخواست‌های شما را در سریع‌ترین زمان ممکن بررسی و برطرف کند. همکاران ما در ساعات کاری با دقت و احترام پاسخ‌گوی شما خواهند بود. ساعت کاری پشتیبانی از ساعت ۸ صبح تا ۱۰ شب می‌باشد. همچنین سریع‌ترین راه برای ارتباط، ارسال پیام به پشتیبانی تلگرام می‌باشد.</p>
                 <CopyChip label="آیدی پشتیبانی تلگرام:" value="@caseline_support" className="mt-5" />

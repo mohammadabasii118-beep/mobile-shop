@@ -21,7 +21,7 @@ export default async function TicketPage({ params }: { params: Promise<{ number:
     <AccountShell active="tickets">
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div><h1 className="text-base font-black">{t.subject}</h1><p className="mt-1 text-[11px] text-muted">تیکت #{orderNo(t.number)} · {faDateTime(t.createdAt)}{t.orderNumber ? <> · سفارش <Link href={`/account/orders/${t.orderNumber}`} className="font-bold text-primary">#{orderNo(t.orderNumber)}</Link></> : null}</p></div>
+          <div><h2 className="text-base font-black">{t.subject}</h2><p className="mt-1 text-[11px] text-muted">تیکت #{orderNo(t.number)} · {faDateTime(t.createdAt)}{t.orderNumber ? <> · سفارش <Link href={`/account/orders/${t.orderNumber}`} className="font-bold text-primary">#{orderNo(t.orderNumber)}</Link></> : null}</p></div>
           <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${TICKET_STATUS[t.status]?.[1]}`}>{TICKET_STATUS[t.status]?.[0]}</span>
         </div>
         <ol className="space-y-3">

@@ -42,7 +42,7 @@ export default async function ModelPage({ params, searchParams }: Props) {
   return (
     <>
       <Header />
-      <main id="main" className="py-6">
+      <main id="main" tabIndex={-1} className="py-6">
         <Container>
           <JsonLd data={breadcrumbLd([{ name: "خانه", path: "/" }, ...(row.brand.isActive ? [{ name: row.brand.name, path: paths.brand(row.brand.slug) }] : []), { name: row.name, path: paths.model(row.slug) }])} />
           <Crumbs items={[{ name: "خانه", href: "/" }, ...(row.brand.isActive ? [{ name: row.brand.name, href: paths.brand(row.brand.slug) }] : []), { name: row.name }]} />

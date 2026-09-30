@@ -74,7 +74,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   return (
     <>
       <Header />
-      <main id="main" className="pt-6">
+      <main id="main" tabIndex={-1} className="pt-6">
         <Container className="grid items-start gap-4 lg:grid-cols-[1fr_230px]">
           <div className="min-w-0 space-y-4">
             <nav aria-label="مسیر" className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted">

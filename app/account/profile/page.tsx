@@ -9,7 +9,7 @@ export default async function ProfilePage({ searchParams }: { searchParams: Prom
   const { next } = await searchParams;
   const user = await requirePageUser("/account/profile");
   return (
-    <main id="main" className="grid min-h-screen place-items-center bg-background px-4 py-10">
+    <main id="main" tabIndex={-1} className="grid min-h-screen place-items-center bg-background px-4 py-10">
       <ProfileForm next={safeNext(next)} firstName={user.firstName ?? ""} lastName={user.lastName ?? ""} />
     </main>
   );

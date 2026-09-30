@@ -9,7 +9,7 @@ export function CopyChip({ label, value, className }: { label: string; value: st
     try { await navigator.clipboard.writeText(value); setDone(true); setTimeout(() => setDone(false), 1500); } catch {}
   };
   return (
-    <div className={cn("inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/8 p-1.5 pe-4 text-sm font-medium text-primary", className)}>
+    <div className={cn("inline-flex max-w-full flex-wrap items-center gap-2 rounded-full border border-primary/25 bg-primary/8 p-1.5 pe-4 text-sm font-medium text-primary", className)}>
       <Send className="ms-2 size-4" />
       <span className="whitespace-nowrap">{label}</span>
       <b dir="ltr">{value}</b>

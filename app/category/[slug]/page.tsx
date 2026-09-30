@@ -49,7 +49,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   return (
     <>
       <Header />
-      <main id="main" className="py-6">
+      <main id="main" tabIndex={-1} className="py-6">
         <Container>
           <JsonLd data={ld} />
           <Crumbs items={[{ name: "خانه", href: "/" }, { name: "فروشگاه", href: "/shop" }, ...(c.parent ? [{ name: c.parent.name, href: paths.category(c.parent.slug) }] : []), { name: c.name }]} />

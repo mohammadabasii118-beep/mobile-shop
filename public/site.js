@@ -53,7 +53,7 @@
     }).join("");
     foot.innerHTML = '<div class="cl-total"><span>جمع:</span><b>' + toman(cart.subtotal) + '</b></div><a class="cl-btn" href="/checkout">تسویه حساب</a><button class="cl-btn cl-btn-ghost" data-close>ادامه خرید</button>';
   }
-  function openCart() { ensureDrawer(); renderDrawer(); drawer.hidden = false; document.documentElement.classList.add("cl-lock"); loadCart(); }
+  function openCart() { ensureDrawer(); renderDrawer(); drawer.hidden = false; document.documentElement.classList.add("cl-lock"); loadCart(); var x = $(".cl-x", drawer); if (x) x.focus(); }
   function closeAll() { if (drawer) drawer.hidden = true; if (search) search.hidden = true; document.documentElement.classList.remove("cl-lock"); }
 
   function add() {
@@ -154,7 +154,18 @@
     if ((el = t.closest("[data-qty-set]"))) { return cartCall(api("PATCH", "/api/cart/items/" + el.dataset.qtySet, { quantity: +el.dataset.q })); }
     if ((el = t.closest("[data-rm]"))) { return cartCall(api("DELETE", "/api/cart/items/" + el.dataset.rm)); }
   });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeAll(); });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") return closeAll();
+    if (e.key !== "Tab") return;
+    var dlg = [drawer, search].filter(function (d) { return d && !d.hidden; })[0]; // keep keyboard focus inside the open dialog
+    if (!dlg) return;
+    var f = [].slice.call(dlg.querySelectorAll("a[href],button,input,select,textarea,[tabindex]:not([tabindex='-1'])")).filter(function (n) { return !n.disabled && n.offsetParent !== null; });
+    if (!f.length) return;
+    var first = f[0], last = f[f.length - 1];
+    if (!dlg.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+    else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
   document.addEventListener("submit", function (e) {
     var f = e.target;
     if (f.matches && f.matches("[data-search-form]")) { e.preventDefault(); openSearch($("input", f).value); }

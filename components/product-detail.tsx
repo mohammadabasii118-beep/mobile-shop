@@ -40,7 +40,7 @@ export function BuyBox({ p, opt, inStock, maxQty, wholesale }: { p: CardProduct;
       </ul>
       {opt && (
         <label className="relative block">
-          <select id="model-select" data-model-select value={choice} onChange={(e) => setChoice(e.target.value)} dir="ltr"
+          <select id="model-select" aria-label="انتخاب مدل گوشی" data-model-select value={choice} onChange={(e) => setChoice(e.target.value)} dir="ltr"
             className="h-12 w-full cursor-pointer appearance-none rounded-md border border-primary/30 bg-surface ps-10 pe-4 text-start text-sm text-foreground outline-none focus:border-primary">
             <option value="">{opt.label}</option>
             {opt.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}

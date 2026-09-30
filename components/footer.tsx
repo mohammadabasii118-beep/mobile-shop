@@ -21,7 +21,7 @@ export async function Footer() {
             <p className="mt-4 leading-8 text-muted">{info.footerText}</p>
           </div>
           <div>
-            <h4 className="mb-3 font-extrabold">خدمات ما</h4>
+            <p className="mb-3 font-extrabold">خدمات ما</p>
             <ul className="space-y-2 text-muted">
               {links.map((l) => (
                 <li key={l.id}><Link href={l.link ?? "/"} className="inline-block transition-all duration-150 hover:-translate-x-0.5 hover:text-primary">{l.label}</Link></li>
@@ -29,7 +29,7 @@ export async function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="mb-3 font-extrabold">اطلاعات تماس</h4>
+            <p className="mb-3 font-extrabold">اطلاعات تماس</p>
             <ul className="space-y-3">
               {rows.map(({ i: I, t, href }) => {
                 const inner = (<><span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/12 text-primary transition-colors group-hover:bg-primary/20"><I className="size-4" /></span><span dir="auto">{t}</span></>);
@@ -38,7 +38,7 @@ export async function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="mb-3 font-extrabold">نماد اعتماد</h4>
+            <p className="mb-3 font-extrabold">نماد اعتماد</p>
             <div className="grid h-24 w-28 place-items-center rounded-lg border border-dashed border-border bg-surface p-2 text-center text-[11px] text-muted">محل نماد اعتماد الکترونیکی</div>
           </div>
         </div>

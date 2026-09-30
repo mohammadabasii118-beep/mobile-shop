@@ -59,7 +59,7 @@ export default async function WholesalePage({ searchParams }: { searchParams: Pr
   return (
     <AccountShell active="wholesale">
       <div className="space-y-4">
-        <div><h1 className="text-base font-black">همکاری عمده</h1><p className="mt-1 text-xs leading-6 text-muted">فروشندگان می‌توانند با ثبت درخواست و ارسال مدارک، پس از تأیید از قیمت‌های عمده و سطوح همکاری استفاده کنند. قیمت‌ها همیشه سمت سرور و بر اساس سطح تأییدشده شما محاسبه می‌شود.</p></div>
+        <div><h2 className="text-base font-black">همکاری عمده</h2><p className="mt-1 text-xs leading-6 text-muted">فروشندگان می‌توانند با ثبت درخواست و ارسال مدارک، پس از تأیید از قیمت‌های عمده و سطوح همکاری استفاده کنند. قیمت‌ها همیشه سمت سرور و بر اساس سطح تأییدشده شما محاسبه می‌شود.</p></div>
         {app && st && (
           <section className="rounded-2xl border border-border p-4 text-[13px]">
             <div className="flex items-center justify-between"><b>{app.storeName}</b><span className={`rounded-full px-3 py-1 text-[11px] font-bold ${st[1]}`}>{st[0]}</span></div>

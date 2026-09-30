@@ -39,7 +39,7 @@ export default async function BlogPage() {
   return (
     <>
       <Header />
-      <main id="main" className="py-6">
+      <main id="main" tabIndex={-1} className="py-6">
         <Container>
           <div data-blog>
             <BannerSlot placement="blog_top" />

@@ -30,14 +30,14 @@
   --secondary: #0f2a44;
   --secondary-fg: #ffffff;
   --accent: #58c0e8;
-  --hot: #f5460a;
+  --hot: #d93d06;
   --background: #ffffff;
   --surface: #ffffff;
   --surface-2: #f2f8fd;
   --foreground: #0f2233;
-  --muted: #6b8296;
+  --muted: #5a7085;
   --border: #e6eef5;
-  --success: #12a150;
+  --success: #0f7d3d;
   --warning: #d98a06;
   --error: #dc2f3c;
   --glass: rgb(249 251 252 / 0.96);
@@ -112,7 +112,7 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
-@layer base { :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; } }
+@layer base { main:focus { outline: none; } :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; } }
 .glass { background: var(--glass); backdrop-filter: blur(16px) saturate(1.4); -webkit-backdrop-filter: blur(16px) saturate(1.4); border: 1px solid var(--border); }
 .no-scrollbar { scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }

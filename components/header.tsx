@@ -75,7 +75,7 @@ export function FloatingHeader({ menu, links, loggedIn, info }: HeaderProps) {
     return () => window.removeEventListener("scroll", on);
   }, []);
   return (
-    <div data-float-header data-show={show} aria-hidden={!show}
+    <div data-float-header data-show={show} aria-hidden={!show} inert={!show}
       className="pointer-events-none fixed inset-x-0 top-3 z-50 -translate-y-24 opacity-0 transition-all duration-300 data-[show=true]:pointer-events-auto data-[show=true]:translate-y-0 data-[show=true]:opacity-100">
       <Container>
         <div className="glass flex h-14 items-center gap-2 rounded-full px-3 shadow-md sm:px-5">

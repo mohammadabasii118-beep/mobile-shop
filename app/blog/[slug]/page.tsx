@@ -51,7 +51,7 @@ export default async function BlogPostPage({ params }: Props) {
   return (
     <>
       <Header />
-      <main id="main" className="py-6">
+      <main id="main" tabIndex={-1} className="py-6">
         <Container className="max-w-[760px]">
           <JsonLd data={ld} />
           <article className="rounded-[28px] border border-border bg-surface p-5 shadow-md sm:p-8">

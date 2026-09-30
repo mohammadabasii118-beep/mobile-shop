@@ -41,7 +41,7 @@ export default async function BrandPage({ params, searchParams }: Props) {
   return (
     <>
       <Header />
-      <main id="main" className="py-6">
+      <main id="main" tabIndex={-1} className="py-6">
         <Container>
           <JsonLd data={[breadcrumbLd([{ name: "خانه", path: "/" }, { name: "برندها", path: "/shop" }, { name: row.name, path: paths.brand(row.slug) }]), { "@context": "https://schema.org", "@type": "Brand", name: row.name, url: abs(paths.brand(row.slug)), ...(row.logo ? { logo: abs(row.logo) } : {}), ...(row.description ? { description: row.description } : {}) }]} />
           <Crumbs items={[{ name: "خانه", href: "/" }, { name: "فروشگاه", href: "/shop" }, { name: row.name }]} />

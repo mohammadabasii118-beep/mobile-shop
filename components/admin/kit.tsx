@@ -84,7 +84,7 @@ export function Table({ head, children }: { head: string[]; children: ReactNode 
   return (
     <div className="overflow-x-auto rounded-xl border border-border bg-surface shadow-sm">
       <table className="w-full min-w-[640px] text-sm">
-        <thead><tr className="border-b border-border bg-surface-2 text-xs text-muted">{head.map((h, i) => <th key={i} className="whitespace-nowrap px-3 py-2.5 text-start font-bold">{h}</th>)}</tr></thead>
+        <thead><tr className="border-b border-border bg-surface-2 text-xs text-muted">{head.map((h, i) => <th key={i} className="whitespace-nowrap px-3 py-2.5 text-start font-bold">{h || <span className="sr-only">عملیات</span>}</th>)}</tr></thead>
         <tbody className="divide-y divide-border">{children}</tbody>
       </table>
     </div>

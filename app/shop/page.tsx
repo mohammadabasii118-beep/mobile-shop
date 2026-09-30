@@ -45,11 +45,12 @@ export default async function ShopPage({ searchParams }: { searchParams: SP }) {
   return (
     <>
       <Header />
-      <main id="main" className="py-6">
+      <main id="main" tabIndex={-1} className="py-6">
         <Container>
+          <h1 className="sr-only">فروشگاه لوازم جانبی موبایل</h1>
           <BannerSlot placement="shop_top" />
           <JsonLd data={[breadcrumbLd([{ name: "خانه", path: "/" }, { name: "فروشگاه", path: "/shop" }]), !cat && !sub && !model && !q && page === 1 ? listLd : null]} />
-          <div data-shop data-cat={cat ?? ""} data-sub={sub ?? ""} data-model={model ?? ""} data-sort={sort} data-q={q ?? ""} data-page={list.page} data-total={total} data-size={SHOP_PAGE_SIZE} className="grid items-start gap-4 lg:grid-cols-[230px_1fr]">
+          <div data-shop data-cat={cat ?? ""} data-sub={sub ?? ""} data-model={model ?? ""} data-sort={sort} data-q={q ?? ""} data-page={list.page} data-total={total} data-size={SHOP_PAGE_SIZE} className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 lg:grid-cols-[230px_minmax(0,1fr)]">
             <aside className="space-y-4 lg:sticky lg:top-20">
               <div className="rounded-xl border border-border bg-surface p-3 shadow-sm">
                 <h2 className="mb-2 hidden px-1 text-sm font-black lg:block">دسته‌بندی محصولات</h2>

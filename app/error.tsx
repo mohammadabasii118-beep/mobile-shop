@@ -6,7 +6,7 @@ import Link from "next/link";
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => { console.error("[page-error]", error.digest ?? "", error.message); }, [error]);
   return (
-    <main id="main" className="grid min-h-[60vh] place-items-center px-4 py-16 text-center">
+    <main id="main" tabIndex={-1} className="grid min-h-[60vh] place-items-center px-4 py-16 text-center">
       <div role="alert">
         <h1 className="text-xl font-black">مشکلی پیش آمد</h1>
         <p className="mt-2 text-sm text-muted">خطایی در نمایش این صفحه رخ داد. لطفاً دوباره تلاش کنید.{error.digest ? ` (کد پیگیری: ${error.digest})` : ""}</p>

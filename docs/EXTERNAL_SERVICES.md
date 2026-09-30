@@ -1,0 +1,17 @@
+# External services — NOT connected (architecture ready, contracts documented)
+
+Nothing below is called from the code today. Every integration is behind an interface, is off by default, and needs credentials that must live only in `.env` (never in Git).
+
+| Service | Where it plugs in | What you must obtain | Env vars (proposed) | Contract to implement |
+|---|---|---|---|---|
+| **Online payment gateway** (Zarinpal, IDPay, SnappPay, TorobPay, BalePay …) | `lib/server/payments/` — implement `PaymentProvider` (`types.ts`) and register in `index.ts` | Merchant contract, merchant id / API key, callback (return) URL whitelisted for your domain | `PAYMENT_GATEWAY`, `PAYMENT_MERCHANT_ID`, `PAYMENT_API_KEY` | `instructions()` → redirect URL; add a `GET/POST /api/payments/callback` route that **verifies server-side** with the gateway, then marks the `Payment` PAID through the same code path that staff approval uses (`approvePayment`), idempotently by gateway reference. Never trust the browser redirect. Refunds to the card stay manual (bank refund flow) until the gateway's refund API is added as another `refund.method`. |
+| **Online wallet top-up** | New `provider` value on `Payment` + `walletApply(... type: "topup")` | Same gateway as above | same | Create a top-up intent → gateway → verified callback → `walletApply` with `reference = "topup:<gatewayRef>"` (the ledger is already idempotent per reference). |
+| **SMS (OTP + notifications)** | `lib/server/auth/sms.ts` `SmsProvider` (+ `notify/channels.ts` sms channel uses it) | Provider account (Kavenegar, Melipayamak, Ghasedak, sms.ir …), API key, approved sender line / OTP template | `SMS_PROVIDER=<name>`, `SMS_API_KEY`, `SMS_SENDER` (extend the zod enum in `lib/server/env.ts`) | `send(to, message)`; OTP templates usually need a pre-approved pattern id. **Required before launch:** with `console` OTP codes only appear in server logs. |
+| **E-mail** | `notify/channels.ts` `email` channel | SMTP account or transactional service (SES, Mailgun …), verified sender domain (SPF/DKIM) | `EMAIL_SMTP_URL`, `NOTIFY_CHANNELS` includes `email` | implement `send`; `configured()` already gates on the URL. |
+| **Telegram** | `notify/channels.ts` `telegram` channel | Bot token from @BotFather; each user's chat id (needs a "connect Telegram" step: user starts the bot with a one-time code) | `TELEGRAM_BOT_TOKEN` | implement `send`; store chat id on the user (new column). |
+| **Delivery queue worker** | `npm run notify:flush` | A cron/systemd timer | — | run every minute: `* * * * * cd /srv/caseline && npm run notify:flush`. |
+| **Object storage** (optional, for scale) | `lib/server/storage/` driver | S3-compatible bucket + keys | `STORAGE_DRIVER=s3` (+ keys) | implement the storage driver interface; keep receipts/tickets/wholesale documents private (signed, short-lived URLs or proxy through the app). |
+| **Error monitoring** (optional) | `lib/server/log.ts` / `app/error.tsx` | Sentry (or similar) DSN | `SENTRY_DSN` | forward `log("error", …)` events. |
+| **Analytics / Search Console** | layout `<head>` | Property ids / verification tokens | — | Add scripts through the CSP nonce (`proxy.ts` allows only `'self'` + nonce; extend `script-src`/`connect-src` for the vendor host explicitly). |
+
+Security rules for any integration: secrets only in `.env`; verify webhooks by signature or by calling the provider back; make every callback idempotent; log request ids, never card data or full tokens; add the provider host to the CSP only when needed.
