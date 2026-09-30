@@ -175,3 +175,88 @@ describe("Phase 8 — partner registration", () => {
     const c = new Client(); ok(await reg(c)); const red = await c.get("/partner/register"); assert.equal(red.status, 307); assert.match(red.headers.get("location")!, /\/account\/wholesale/);
   });
 });
+
+/* ───────── password reset by e-mail (real SMTP path against a tiny in-process SMTP server) ───────── */
+import { createHash } from "node:crypto";
+import { inbox, linkOf, startSmtp, stopSmtp, textOf, waitMail } from "./fake-smtp";
+
+const forgot = (c: Client, body: unknown) => c.post("/api/auth/forgot", body);
+const sha = (t: string) => createHash("sha256").update(t).digest("hex");
+
+describe("Phase 8b — password reset by e-mail", () => {
+  before(async () => { await db.rateLimit.deleteMany({}); await startSmtp(); });
+  after(async () => { await stopSmtp(); });
+
+  it("Forgot → mail with a one-time link → Reset → old sessions die → Login with the new password (old one fails)", async () => {
+    const email = mail(); const dev1 = new Client(), dev2 = new Client(); ok(await reg(dev1, { email })); ok(await dev2.post("/api/auth/login", { identifier: email, password: PASS }));
+    assert.equal((await dev2.get("/api/me")).status, 200);
+    const r = await forgot(new Client(), { email }); assert.equal(r.status, 200); assert.deepEqual(r.json.data, { sent: true });
+    const m = await waitMail(email); assert.ok(m, "mail delivered over SMTP"); const token = linkOf(m!); assert.ok(token, "reset link present");
+    assert.ok(textOf(m!).includes(`${process.env.APP_URL ?? "http://localhost:3000"}/account?reset=`) || /https?:\/\/[^/\s]+\/account\?reset=/.test(textOf(m!)), "absolute link on the configured site URL");
+    assert.ok(/no-reply@/.test(m!.body) && !/evil\.example/.test(m!.body));
+    const row = await db.passwordResetToken.findUniqueOrThrow({ where: { tokenHash: sha(token!) } });
+    assert.equal(row.usedAt, null); assert.ok(row.expiresAt.getTime() - Date.now() > 50 * 60_000 && row.expiresAt.getTime() - Date.now() <= 60 * 60_000);
+    assert.equal(await db.passwordResetToken.count({ where: { tokenHash: token! } }), 0, "the raw token is never stored");
+    assert.match((await new Client().get(`/account?reset=${token}`)).text, /رمز عبور جدید/);
+    const NEW = "Brand9New77";
+    assert.equal((await new Client().post("/api/auth/reset", { token, password: "weak" })).status, 422);
+    ok(await new Client().post("/api/auth/reset", { token, password: NEW }));
+    assert.equal((await dev1.get("/api/me")).status, 401); assert.equal((await dev2.get("/api/me")).status, 401);
+    assert.equal((await new Client().post("/api/auth/login", { identifier: email, password: PASS })).status, 400);
+    const c = new Client(); ok(await c.post("/api/auth/login", { identifier: email, password: NEW })); assert.equal((await c.get("/api/me")).status, 200);
+    assert.notEqual((await db.user.findUniqueOrThrow({ where: { email } })).passwordChangedAt, null);
+  });
+
+  it("the link is single-use, and only the newest link works", async () => {
+    const email = mail(); ok(await reg(new Client(), { email }));
+    ok(await forgot(new Client(), { email })); const t1 = linkOf((await waitMail(email, 1))!)!;
+    ok(await forgot(new Client(), { email })); const t2 = linkOf((await waitMail(email, 2))!)!;
+    assert.notEqual(t1, t2);
+    assert.equal((await new Client().post("/api/auth/reset", { token: t1, password: "Another11pass" })).status, 400);
+    ok(await new Client().post("/api/auth/reset", { token: t2, password: "Another11pass" }));
+    const again = await new Client().post("/api/auth/reset", { token: t2, password: "Third22passw" }); assert.equal(again.status, 400); assert.equal(again.json.error.code, "reset_token_invalid");
+    assert.equal((await new Client().post("/api/auth/login", { identifier: email, password: "Third22passw" })).status, 400);
+  });
+
+  it("expired and forged tokens are refused; concurrent use of one token succeeds once", async () => {
+    const email = mail(); ok(await reg(new Client(), { email })); ok(await forgot(new Client(), { email }));
+    const token = linkOf((await waitMail(email))!)!;
+    assert.equal((await new Client().post("/api/auth/reset", { token: "x".repeat(43), password: "Another11pass" })).status, 400);
+    assert.equal((await new Client().post("/api/auth/reset", { token: "short", password: "Another11pass" })).status, 422);
+    await db.passwordResetToken.update({ where: { tokenHash: sha(token) }, data: { expiresAt: new Date(Date.now() - 1000) } });
+    assert.equal((await new Client().post("/api/auth/reset", { token, password: "Another11pass" })).status, 400);
+    const e2 = mail(); ok(await reg(new Client(), { email: e2 })); ok(await forgot(new Client(), { email: e2 })); const t2 = linkOf((await waitMail(e2))!)!;
+    const rs = await Promise.all([1, 2, 3].map((i) => new Client().post("/api/auth/reset", { token: t2, password: `Race${i}pass99` })));
+    assert.equal(rs.filter((r) => r.status === 200).length, 1);
+  });
+
+  it("no enumeration: unknown and known addresses get the same answer, no token is created for unknown ones, and nothing is mailed to them", async () => {
+    const known = mail(); ok(await reg(new Client(), { email: known })); const ghost = mail();
+    const a = await forgot(new Client(), { email: known }), b = await forgot(new Client(), { email: ghost });
+    assert.equal(a.status, b.status); assert.deepEqual(a.json, b.json);
+    assert.ok(await waitMail(known)); await new Promise((r) => setTimeout(r, 400));
+    assert.equal(inbox.filter((x) => x.to.toLowerCase() === ghost.toLowerCase()).length, 0);
+    assert.equal(await db.passwordResetToken.count({ where: { user: { email: ghost } } }), 0);
+    assert.equal((await forgot(new Client(), { email: "not-an-email" })).status, 422);
+    assert.equal((await forgot(new Client(), { email: known, extra: 1 })).status, 422);
+  });
+
+  it("rate limited per address and per IP (same 429 for known and unknown addresses)", async () => {
+    const known = mail(), ghost = mail(); ok(await reg(new Client(), { email: known }));
+    const codes = async (e: string) => { const out: number[] = []; for (let i = 0; i < 4; i++) out.push((await forgot(new Client(), { email: e })).status); return out; };
+    assert.deepEqual(await codes(known), [200, 200, 200, 429]); assert.deepEqual(await codes(ghost), [200, 200, 200, 429]);
+    const c = new Client(); let last = 0; for (let i = 0; i < 11; i++) last = (await forgot(c, { email: mail() })).status; assert.equal(last, 429);
+  });
+
+  it("phone-code recovery still works for phone accounts, and the UI offers the e-mail link from the existing login card", async () => {
+    const u = await seedUser(); assert.equal((await forgot(new Client(), { phone: u.phone })).status, 200);
+    assert.equal((await forgot(new Client(), { phone: newPhone() })).status, 200);
+    assert.ok((await new Client().get("/account")).text.includes("فراموشی رمز عبور"));
+  });
+
+  it("inactive accounts get no link and no token", async () => {
+    const email = mail(); ok(await reg(new Client(), { email })); await db.user.update({ where: { email }, data: { isActive: false } });
+    const before = inbox.length; ok(await forgot(new Client(), { email })); await new Promise((r) => setTimeout(r, 500));
+    assert.equal(inbox.length, before); assert.equal(await db.passwordResetToken.count({ where: { user: { email } } }), 0);
+  });
+});

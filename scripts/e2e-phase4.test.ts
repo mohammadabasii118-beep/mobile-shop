@@ -465,6 +465,7 @@ describe("Phase 4 — business systems", () => {
       await notify(db, cu.userId, "wallet_change", { title: "بدون کانال" });
       assert.equal(await db.notificationDelivery.count(), before); // default: in-app only
       process.env.NOTIFY_CHANNELS = "sms,email,telegram";
+      const smtp = process.env.EMAIL_SMTP_URL; delete process.env.EMAIL_SMTP_URL; // this test is about UNconfigured channels
       try {
         const n = await notify(db, cu.userId, "wallet_change", { title: "با کانال", body: "تست" });
         const rows = await db.notificationDelivery.findMany({ where: { notificationId: n.id } });
@@ -472,7 +473,7 @@ describe("Phase 4 — business systems", () => {
         await processDeliveries(500);
         const after = Object.fromEntries((await db.notificationDelivery.findMany({ where: { notificationId: n.id } })).map((r) => [r.channel, r.status]));
         assert.equal(after.sms, "sent"); assert.equal(after.email, "skipped"); assert.equal(after.telegram, "skipped");
-      } finally { delete process.env.NOTIFY_CHANNELS; }
+      } finally { delete process.env.NOTIFY_CHANNELS; if (smtp) process.env.EMAIL_SMTP_URL = smtp; }
     });
   });
 

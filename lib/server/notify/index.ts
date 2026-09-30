@@ -30,6 +30,7 @@ export async function processDeliveries(limit = 50) {
     const ch = getChannel(d.channel);
     if (!ch || !ch.configured()) { await db.notificationDelivery.update({ where: { id: d.id }, data: { status: "skipped", error: "channel_not_configured", attempts: { increment: 1 } } }); skipped++; continue; }
     if (d.channel === "sms" && !d.notification.user.phone) { await db.notificationDelivery.update({ where: { id: d.id }, data: { status: "skipped", error: "no_phone", attempts: { increment: 1 } } }); skipped++; continue; }
+    if (d.channel === "email" && !d.notification.user.email) { await db.notificationDelivery.update({ where: { id: d.id }, data: { status: "skipped", error: "no_email", attempts: { increment: 1 } } }); skipped++; continue; }
     try {
       await ch.send(d.notification.user, { title: d.notification.title, body: d.notification.body, link: d.notification.link });
       await db.notificationDelivery.update({ where: { id: d.id }, data: { status: "sent", sentAt: new Date(), attempts: { increment: 1 } } }); sent++;

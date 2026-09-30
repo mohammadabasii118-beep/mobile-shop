@@ -1,12 +1,10 @@
-import { BadgeCheck, Star } from "lucide-react";
+import { BadgeCheck } from "lucide-react";
 import { cn, formatDateFa, toFa } from "@/lib/utils";
 
-export function Stars({ value, className, size = "size-3.5" }: { value: number; className?: string; size?: string }) {
-  return (
-    <span className={cn("inline-flex items-center gap-0.5", className)} role="img" aria-label={`امتیاز ${toFa(value)} از ۵`}>
-      {[1, 2, 3, 4, 5].map((n) => <Star key={n} className={cn(size, n <= Math.round(value) ? "fill-warning text-warning" : "text-border")} aria-hidden />)}
-    </span>
-  );
+export function Stars({ value, className, size }: { value: number; className?: string; size?: string }) {
+  // `size` is kept for callers; the star size is 14px (a CSS variable can override it via className).
+  void size;
+  return <span className={cn("cl-stars", className)} style={{ "--n": Math.max(0, Math.min(5, Math.round(value))) } as React.CSSProperties} role="img" aria-label={`امتیاز ${toFa(value)} از ۵`} />;
 }
 
 export function VerifiedBadge() {

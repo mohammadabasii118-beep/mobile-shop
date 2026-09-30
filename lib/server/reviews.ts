@@ -69,18 +69,21 @@ export async function getProductReviewsPage(productId: string, page = 1, size = 
   return { hasMore: rows.length > size, items: rows.slice(0, size).map((r) => ({ id: r.id, name: reviewerName(r.user), rating: r.rating, title: r.title, body: r.body, verified: r.verifiedPurchase, createdAt: r.createdAt.toISOString(), reply: r.adminReply })) };
 }
 
-export interface HomeReview extends PublicReview { product: { name: string; slug: string; img: string | null } }
+/** Homepage card: only what is shown, with the text cut on the server (the full review lives on the product page). */
+export interface HomeReview { id: string; name: string; rating: number; body: string; verified: boolean; product: { name: string; slug: string; img: string | null } }
+export const HOME_REVIEW_CHARS = 160;
+const excerpt = (t: string) => { const s = t.replace(/\s+/g, " ").trim(); return s.length > HOME_REVIEW_CHARS ? s.slice(0, HOME_REVIEW_CHARS).replace(/\s\S*$/, "") + "…" : s; };
 
-/** Homepage strip: one bounded query (LIMIT `limit`), only approved reviews of active products. */
+/** Homepage strip: one bounded query (LIMIT ≤ 6), only approved reviews of active products. */
 export async function queryHomeReviews(limit = 6): Promise<HomeReview[]> {
   const rows = await db.review.findMany({
     relationLoadStrategy: "join",
     where: { status: "approved", product: { isActive: true } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: Math.min(6, Math.max(1, limit)),
     select: {
-      id: true, rating: true, title: true, body: true, verifiedPurchase: true, createdAt: true, adminReply: true,
+      id: true, rating: true, body: true, verifiedPurchase: true,
       user: { select: { displayName: true, firstName: true } },
       product: { select: { name: true, slug: true, images: { where: { type: "IMAGE" }, orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }], take: 1, select: { url: true } } } },
     },
   });
-  return rows.map((r) => ({ id: r.id, name: reviewerName(r.user), rating: r.rating, title: r.title, body: r.body, verified: r.verifiedPurchase, createdAt: r.createdAt.toISOString(), reply: r.adminReply, product: { name: r.product.name, slug: r.product.slug, img: r.product.images[0]?.url ?? null } }));
+  return rows.map((r) => ({ id: r.id, name: reviewerName(r.user), rating: r.rating, body: excerpt(r.body), verified: r.verifiedPurchase, product: { name: r.product.name, slug: r.product.slug, img: r.product.images[0]?.url ?? null } }));
 }

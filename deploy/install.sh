@@ -67,6 +67,9 @@ STORAGE_DRIVER="local"
 SMS_PROVIDER="console"
 NOTIFY_CHANNELS=""
 DB_POOL_MAX="10"
+# Password-reset e-mails (fill in, then: systemctl restart caseline). Empty = no e-mail is sent.
+EMAIL_SMTP_URL=""
+EMAIL_FROM=""
 ENV
   chown "$APP_USER:$APP_USER" "$ENV_FILE"; chmod 600 "$ENV_FILE"
 fi

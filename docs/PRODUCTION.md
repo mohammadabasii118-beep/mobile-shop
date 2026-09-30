@@ -14,7 +14,10 @@ UPLOAD_DIR="/srv/caseline-data/storage"  # private, writable, backed up, NOT und
 SMS_PROVIDER="console"                   # replace before launch — see EXTERNAL_SERVICES.md
 DB_POOL_MAX=10                           # keep (pool × app processes) < PostgreSQL max_connections
 NOTIFY_CHANNELS=""
+EMAIL_SMTP_URL="smtps://USER:PASS@smtp.example.com:465"   # password-reset e-mails; without it no e-mail is sent
+EMAIL_FROM="CaseLine <no-reply@shop.example.com>"
 ```
+`SMS_PROVIDER` currently accepts only `console` (codes are printed to the server log, nobody receives an SMS). Until a real gateway is coded, phone-code login and phone-based password recovery do not reach users; e-mail + password (with e-mail recovery) is the working path.
 The app **refuses to start in production** with a placeholder `AUTH_SECRET` or an `http://` `APP_URL` (`ALLOW_INSECURE_HTTP=1` exists only for local staging checks).
 
 ## 3. First deployment
@@ -36,7 +39,7 @@ systemd unit (`ExecStart=/usr/bin/npm run start -- -p 3000`, `EnvironmentFile=/s
 nginx essentials:
 ```
 server { listen 443 ssl http2; server_name shop.example.com;
-  client_max_body_size 30m;
+  client_max_body_size 30m;   # product videos are up to 25 MB (media route allows 28 MB); keep ≥ 30m
   location / { proxy_pass http://127.0.0.1:3000; proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $remote_addr; proxy_set_header X-Forwarded-Proto $scheme; } }
 server { listen 80; server_name shop.example.com; return 301 https://$host$request_uri; }

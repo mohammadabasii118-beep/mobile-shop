@@ -7,9 +7,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
 import { BASE, Client, db, loginWithPassword, uid } from "./test-utils";
+import { linkOf, startSmtp, stopSmtp, waitMail } from "./fake-smtp";
 
 const PW = process.env.PLAYWRIGHT_MODULE ?? "/opt/node22/lib/node_modules/playwright/index.mjs";
 const SHOTS = process.env.SHOTS;
+const ok = (r: { status: number; json: any }) => { assert.equal(r.status, 200, JSON.stringify(r.json)); return r.json?.data; };
 let browser: any, admin: Client;
 const shot = async (page: any, name: string) => { if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await page.screenshot({ path: path.join(SHOTS, name + ".png"), fullPage: true }); } };
 
@@ -19,8 +21,9 @@ describe("Phase 8 — browser flows", () => {
     browser = await chromium.launch({ executablePath: process.env.CHROMIUM ?? "/opt/pw-browsers/chromium", args: ["--no-sandbox"] });
     await db.rateLimit.deleteMany({});
     admin = await loginWithPassword("09120000001", "Admin@12345");
+    await startSmtp();
   });
-  after(async () => { await browser?.close(); await db.$disconnect(); });
+  after(async () => { await browser?.close(); await stopSmtp(); await db.$disconnect(); });
 
   it("customer registers from the login card with name + e-mail + password (no code step), lands signed in; duplicate e-mail is explained", async () => {
     const ctx = await browser.newContext({ locale: "fa-IR", viewport: { width: 420, height: 800 } }); const page = await ctx.newPage();
@@ -75,5 +78,29 @@ describe("Phase 8 — browser flows", () => {
     assert.ok(u2.roles.some((r) => r.role.key === "wholesale_partner"));
     await page.goto(`${BASE}/account/wholesale`, { waitUntil: "networkidle" }); await page.getByText("همکار عمده").first().waitFor(); await shot(page, "07-partner-approved");
     await ctx.close(); await actx.close();
+  });
+
+  it("forgot password from the login card → e-mail link → new password form (same card) → login with the new password", async () => {
+    const email = `f-${uid()}@example.com`; const OLD = "Secret123x", NEW = "Fresh4567yz";
+    ok(await new Client().post("/api/auth/register", { fullName: "رضا قاسمی", email, password: OLD }));
+    const ctx = await browser.newContext({ locale: "fa-IR", viewport: { width: 420, height: 800 } }); const page = await ctx.newPage();
+    await page.goto(`${BASE}/account`, { waitUntil: "networkidle" });
+    await page.getByLabel("ایمیل یا شماره موبایل").fill(email);
+    await page.getByRole("button", { name: "فراموشی رمز عبور" }).click();
+    await page.getByText("اگر این ایمیل ثبت شده باشد").waitFor(); await shot(page, "08-forgot-sent");
+    const m = await waitMail(email); assert.ok(m); const token = linkOf(m!); assert.ok(token);
+    await page.goto(`${BASE}/account?reset=${token}`, { waitUntil: "networkidle" }); await shot(page, "09-reset-form");
+    await page.getByLabel("رمز عبور جدید").fill(NEW); await page.getByLabel("تکرار رمز عبور").fill(NEW);
+    const done = page.waitForResponse((r: any) => r.url().endsWith("/api/auth/reset")); await page.getByRole("button", { name: "تغییر رمز عبور" }).click();
+    assert.equal((await done).status(), 200);
+    await page.getByText("رمز عبور تغییر کرد").waitFor(); assert.equal(new URL(page.url()).search, "");
+    await page.getByLabel("ایمیل یا شماره موبایل").fill(email); await page.getByLabel("رمز عبور", { exact: true }).fill(NEW);
+    const li = page.waitForResponse((r: any) => r.url().endsWith("/api/auth/login")); await page.getByRole("button", { name: "ورود", exact: true }).click();
+    assert.equal((await li).status(), 200);
+    // the used link is dead
+    const p2 = await ctx.newPage(); await p2.goto(`${BASE}/account?reset=${token}`, { waitUntil: "networkidle" });
+    await p2.getByLabel("رمز عبور جدید").fill("Other1234abc"); await p2.getByLabel("تکرار رمز عبور").fill("Other1234abc"); await p2.getByRole("button", { name: "تغییر رمز عبور" }).click();
+    await p2.getByText("لینک بازیابی نامعتبر است").waitFor();
+    await ctx.close();
   });
 });

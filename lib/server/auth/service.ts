@@ -7,6 +7,10 @@ import { dummyVerify, hashPassword, verifyPassword } from "@/lib/server/auth/pas
 import { createSession, currentTokenHash, destroyAllSessions } from "@/lib/server/auth/session";
 import { signTicket, verifyTicket } from "@/lib/server/auth/tickets";
 import { mergeGuestCart } from "@/lib/server/cart";
+import { createHash, randomBytes } from "node:crypto";
+import { env } from "@/lib/server/env";
+import { log } from "@/lib/server/log";
+import { mailConfigured, trySendMail } from "@/lib/server/mail";
 
 const BAD_CREDENTIALS = () => badRequest("ایمیل/شماره موبایل یا رمز عبور نادرست است.", "bad_credentials");
 
@@ -109,4 +113,51 @@ export async function changePassword(userId: string, oldPassword: string | undef
   }
   await db.user.update({ where: { id: userId }, data: { passwordHash: await hashPassword(newPassword), passwordChangedAt: new Date() } });
   await destroyAllSessions(userId, await currentTokenHash()); // keep only this device signed in
+}
+
+/* ───────── password reset by e-mail ───────── */
+
+const RESET_TTL_MIN = 60;
+const sha256hex = (v: string) => createHash("sha256").update(v).digest("hex");
+
+/**
+ * Sends a one-time reset link to a registered e-mail. The answer never depends on whether the address exists (no enumeration):
+ * rate limits are checked first for every address, the real work runs after the response is decided, and failures are only logged.
+ */
+export async function requestEmailReset(email: string, ip: string) {
+  await rateLimit(`pwreset:ip:${ip}`, 10, 3600);
+  await rateLimit(`pwreset:email:${email}`, 3, 3600);
+  void sendResetEmail(email).catch((e) => log("error", "password_reset_email_failed", { error: String((e as Error).message).slice(0, 200) }));
+  return { sent: true };
+}
+
+async function sendResetEmail(email: string) {
+  if (!mailConfigured()) { log("warn", "password_reset_email_skipped", { reason: "EMAIL_SMTP_URL not configured" }); return; }
+  const user = await db.user.findUnique({ where: { email }, select: { id: true, isActive: true, passwordHash: true } });
+  if (!user?.isActive) return;
+  const token = randomBytes(32).toString("base64url"); // 256 bits; only its SHA-256 is stored
+  await db.$transaction([
+    db.passwordResetToken.updateMany({ where: { userId: user.id, usedAt: null }, data: { usedAt: new Date() } }), // only the newest link works
+    db.passwordResetToken.create({ data: { userId: user.id, tokenHash: sha256hex(token), expiresAt: new Date(Date.now() + RESET_TTL_MIN * 60_000) } }),
+  ]);
+  const link = `${env().APP_URL.replace(/\/$/, "")}/account?reset=${token}`;
+  await trySendMail({
+    to: email, subject: "بازیابی رمز عبور کیس‌لاین",
+    text: `برای انتخاب رمز عبور جدید روی لینک زیر بزنید (اعتبار: ${RESET_TTL_MIN} دقیقه، فقط یک بار):\n${link}\n\nاگر شما این درخواست را نداده‌اید، این ایمیل را نادیده بگیرید؛ رمز شما تغییری نمی‌کند.`,
+  });
+}
+
+/** Consumes a reset link (single use, expiring), sets the new password and signs every device out. */
+export async function resetPasswordWithToken(token: string, password: string, ip: string) {
+  await rateLimit(`pwreset:use:ip:${ip}`, 30, 900);
+  const INVALID = () => badRequest("لینک بازیابی نامعتبر است یا منقضی شده. دوباره درخواست دهید.", "reset_token_invalid");
+  const row = await db.passwordResetToken.findUnique({ where: { tokenHash: sha256hex(token) }, include: { user: { select: { id: true, isActive: true } } } });
+  if (!row || row.usedAt || row.expiresAt < new Date() || !row.user.isActive) throw INVALID();
+  const passwordHash = await hashPassword(password);
+  const claimed = await db.passwordResetToken.updateMany({ where: { id: row.id, usedAt: null, expiresAt: { gt: new Date() } }, data: { usedAt: new Date() } }); // atomic: only one caller wins
+  if (!claimed.count) throw INVALID();
+  await db.user.update({ where: { id: row.userId }, data: { passwordHash, passwordChangedAt: new Date() } });
+  await db.passwordResetToken.updateMany({ where: { userId: row.userId, usedAt: null }, data: { usedAt: new Date() } });
+  await destroyAllSessions(row.userId);
+  return { ok: true };
 }

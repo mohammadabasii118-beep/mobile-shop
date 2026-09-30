@@ -43,6 +43,7 @@ export const passwordLoginSchema = z.object({ identifier: z.string().trim().min(
     if (!ph.success) { ctx.addIssue({ code: "custom", message: "ایمیل یا شماره موبایل نامعتبر است." }); return z.NEVER; }
     return { email: null as string | null, phone: ph.data, password: v.password };
   });
+export const resetTokenSchema = z.object({ token: z.string().min(20).max(100), password: passwordSchema }).strict();
 export const resetSchema = z.object({ ticket: z.string().min(10), password: passwordSchema });
 export const profileSchema = z.object({
   firstName: name, lastName: name,

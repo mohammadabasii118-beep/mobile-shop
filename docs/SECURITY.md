@@ -20,7 +20,7 @@
 | # | Finding | Severity | Fix |
 |---|---|---|---|
 | 1 | No global write throttle: an authenticated client could hammer any endpoint that lacked a specific limiter | Medium | per-session write limiter in `route()` (429) |
-| 2 | Request bodies were buffered without a size limit before validation | Medium | 12 MB cap on declared length (413) |
+| 2 | Request bodies were buffered without a size limit before validation | Medium | 12 MB cap on declared length (413); 28 MB only on the product-media upload route (videos ≤ 25 MB); nginx `client_max_body_size 30m` |
 | 3 | Bank refunds could be requested and approved by the same person | Medium (fraud) | four-eyes rule, setting `finance.fourEyes` (default on), audited |
 | 4 | Partial refunds left loyalty points untouched (points farming through partial refunds) | Low–Medium | proportional reversal; final refund reverses only the remainder |
 | 5 | `public/site.js` thumbnail builder interpolated image URLs/ids into `innerHTML`/CSS with `encodeURI` only | Low | `(`, `)`, `'`, `"` encoded, ids escaped, hue coerced to number |
@@ -39,3 +39,6 @@ Verified with no change needed: IDOR on orders / receipts / tickets, admin API 4
 
 ## Phase 8 — registration without SMS
 Public sign-up is full name + e-mail + password (`POST /api/auth/register`) and partner sign-up adds business fields (`POST /api/wholesale/register`); neither sends or needs a code. Bodies are `.strict()` (no roles/status/phone), passwords use the existing bcrypt(12) hashing, e-mail is unique (409 `email_taken`), registration is rate limited per IP and e-mail, and the standard CSRF/origin check applies. Phone-code sign-in only works for existing accounts and never creates one. Wholesale access is granted only by an admin approval. Known gap: password reset is still by phone code, so e-mail-only accounts need support until an e-mail gateway exists.
+
+## Password reset by e-mail
+`POST /api/auth/forgot {email}` always answers `{sent:true}` (no enumeration; per-IP 10/h and per-address 3/h, checked before the address is looked up). For a registered active account a 256-bit random token is stored **only as SHA-256**, valid 60 minutes, single use, and only the newest link works; the link is built from `APP_URL`. `POST /api/auth/reset {token,password}` claims the token atomically, sets the password (same bcrypt/policy) and signs every device out. Mail goes through `EMAIL_SMTP_URL`; without it nothing is sent and a warning is logged.

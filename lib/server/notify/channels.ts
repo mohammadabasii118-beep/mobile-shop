@@ -1,4 +1,5 @@
 import { getSmsProvider } from "@/lib/server/auth/sms";
+import { mailConfigured, sendMail } from "@/lib/server/mail";
 
 export interface Recipient { phone: string | null; email: string | null }
 export interface OutgoingMessage { title: string; body: string | null; link: string | null }
@@ -20,8 +21,8 @@ const sms: ChannelProvider = {
 };
 const email: ChannelProvider = {
   key: "email",
-  configured: () => !!process.env.EMAIL_SMTP_URL,
-  send: async () => { throw new Error("E-mail gateway not implemented yet"); },
+  configured: () => mailConfigured(), // EMAIL_SMTP_URL (same SMTP as password-reset mails)
+  send: async (to, m) => { if (!to.email) throw new Error("no_email"); await sendMail({ to: to.email, subject: m.title, text: `${m.body ?? ""}${m.link ? `\n${m.link}` : ""}`.trim() || m.title }); },
 };
 const telegram: ChannelProvider = {
   key: "telegram",

@@ -258,3 +258,9 @@ body {
 .cl-note { border-radius: 12px; padding: 10px 12px; font-size: 12px; background: color-mix(in srgb, var(--hot) 12%, var(--surface)); color: var(--hot); }
 .cl-ws { color: var(--success) !important; font-weight: 700; }
 .cl-bad { color: var(--hot) !important; font-weight: 700; }
+
+/* Review stars drawn with one masked element (five inline SVGs per rating made the homepage HTML ~4 KB heavier per card). */
+.cl-stars { --sz: 14px; display: inline-block; width: calc(var(--sz) * 5); height: var(--sz); vertical-align: middle;
+  background: linear-gradient(to right, var(--warning) calc(var(--n) * 20%), var(--border) 0);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.3l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.2l-5.9 3.1 1.2-6.5L2.5 9.2l6.6-.9z'/%3E%3C/svg%3E") 0 0 / var(--sz) var(--sz) repeat-x; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2.3l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.2l-5.9 3.1 1.2-6.5L2.5 9.2l6.6-.9z'/%3E%3C/svg%3E") 0 0 / var(--sz) var(--sz) repeat-x; }
+[dir="rtl"] .cl-stars { transform: scaleX(-1); }

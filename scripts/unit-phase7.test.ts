@@ -65,10 +65,12 @@ describe("Phase 7 — query counts (no N+1) and homepage strip", () => {
   it("homepage strip is ordered newest-first, contains only approved reviews of active products, and nothing else leaks", async () => {
     const R = await import("../lib/server/reviews");
     await db.review.create({ data: { productId, userId, rating: 1, body: "pending-should-not-show", status: "pending", createdAt: new Date() } });
+    await db.review.create({ data: { productId, userId, rating: 5, body: ("کلمه‌ی طولانی " + "x".repeat(20) + " ").repeat(80), status: "approved", createdAt: new Date(Date.now() + 5000) } });
     const rows = await R.queryHomeReviews(6);
     assert.ok(rows.every((r) => r.body !== "pending-should-not-show"));
-    for (let i = 1; i < rows.length; i++) assert.ok(rows[i - 1]!.createdAt >= rows[i]!.createdAt);
-    assert.deepEqual(Object.keys(rows[0]!).sort(), ["body", "createdAt", "id", "name", "product", "rating", "reply", "title", "verified"]);
+    assert.ok(rows.every((r) => r.body.length <= 161), "texts are cut on the server");
+    assert.ok(rows[0]!.body.endsWith("…") && rows[0]!.body.length > 100, "long review is shortened with an ellipsis");
+        assert.deepEqual(Object.keys(rows[0]!).sort(), ["body", "id", "name", "product", "rating", "verified"]);
     await db.product.update({ where: { id: productId }, data: { isActive: false } });
     assert.ok(!(await R.queryHomeReviews(6)).some((r) => r.body.startsWith("r")) || (await R.queryHomeReviews(6)).every((r) => r.product.slug !== "u7"));
     await db.product.update({ where: { id: productId }, data: { isActive: true } });
@@ -77,7 +79,7 @@ describe("Phase 7 — query counts (no N+1) and homepage strip", () => {
   it("HomeReviews renders nothing when empty and escapes text when present", async () => {
     const { HomeReviews } = await import("../components/home-reviews");
     assert.equal(renderToStaticMarkup(createElement(HomeReviews, { reviews: [] })), "");
-    const html = renderToStaticMarkup(createElement(HomeReviews, { reviews: [{ id: "1", name: "<b>x</b>", rating: 5, title: null, body: "<script>1</script>", verified: true, createdAt: new Date().toISOString(), reply: null, product: { name: "P", slug: "p", img: null } }] }));
+    const html = renderToStaticMarkup(createElement(HomeReviews, { reviews: [{ id: "1", name: "<b>x</b>", rating: 5, body: "<script>1</script>", verified: true, product: { name: "P", slug: "p", img: null } }] }));
     assert.ok(html.includes("&lt;script&gt;") && !html.includes("<script>") && html.includes("✓ خرید تأییدشده"));
   });
 });

@@ -9,9 +9,9 @@ const field = "h-12 w-full rounded-xl border border-primary/40 bg-surface px-4 t
 type Step = "phone" | "otp" | "newpass";
 type Purpose = "login" | "reset";
 
-export function LoginForm({ next }: { next: string }) {
+export function LoginForm({ next, resetToken }: { next: string; resetToken?: string }) {
   const [mode, setMode] = useState<"otp" | "password" | "register">("password");
-  const [step, setStep] = useState<Step>("phone");
+  const [step, setStep] = useState<Step>(resetToken ? "newpass" : "phone");
   const [purpose, setPurpose] = useState<Purpose>("login");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -64,7 +64,8 @@ export function LoginForm({ next }: { next: string }) {
       return void run(api<{ ticket: string }>("POST", "/api/auth/forgot/verify", { phone, code }), (d) => { setTicket(d.ticket); setStep("newpass"); });
     }
     if (pass2 !== password) return setErr("تکرار رمز عبور یکسان نیست.");
-    return void run(api("POST", "/api/auth/reset", { ticket, password }), () => {
+    return void run(api("POST", "/api/auth/reset", resetToken && !ticket ? { token: resetToken, password } : { ticket, password }), () => {
+      if (resetToken) window.history.replaceState(null, "", "/account");
       setStep("phone"); setMode("password"); setPassword(""); setPass2(""); setInfo("رمز عبور تغییر کرد. با رمز جدید وارد شوید.");
     });
   }
@@ -117,7 +118,7 @@ export function LoginForm({ next }: { next: string }) {
                 <>
                   <label htmlFor="login-pass" className="mt-4 block text-start text-xs font-bold">رمز عبور</label>
                   <input id="login-pass" name="password" type="password" dir="ltr" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className={`${field} mt-2`} />
-                  <div className="mt-2 text-start"><button type="button" onClick={() => phone && !phone.includes("@") ? sendOtp("reset") : setErr(phone.includes("@") ? "بازیابی رمز عبور برای حساب‌های ایمیلی از طریق پشتیبانی انجام می‌شود." : "ابتدا شماره موبایل را وارد کنید.")} className="cursor-pointer text-[11px] text-primary hover:underline">فراموشی رمز عبور</button></div>
+                  <div className="mt-2 text-start"><button type="button" onClick={() => !phone ? setErr("ابتدا ایمیل یا شماره موبایل را وارد کنید.") : phone.includes("@") ? void run(api("POST", "/api/auth/forgot", { email: phone }), () => setInfo("اگر این ایمیل ثبت شده باشد، لینک بازیابی رمز عبور برایتان ارسال می‌شود.")) : sendOtp("reset")} className="cursor-pointer text-[11px] text-primary hover:underline">فراموشی رمز عبور</button></div>
                 </>
               )}
               <div className="mt-3 text-[11px]"><button type="button" onClick={() => { setMode(mode === "otp" ? "password" : "otp"); setErr(""); setInfo(""); }} className="cursor-pointer text-primary hover:underline">{mode === "otp" ? "ورود با رمز عبور" : "ورود با کد پیامکی"}</button></div>
