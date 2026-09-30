@@ -36,7 +36,7 @@ systemd unit (`ExecStart=/usr/bin/npm run start -- -p 3000`, `EnvironmentFile=/s
 nginx essentials:
 ```
 server { listen 443 ssl http2; server_name shop.example.com;
-  client_max_body_size 12m;
+  client_max_body_size 30m;
   location / { proxy_pass http://127.0.0.1:3000; proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $remote_addr; proxy_set_header X-Forwarded-Proto $scheme; } }
 server { listen 80; server_name shop.example.com; return 301 https://$host$request_uri; }

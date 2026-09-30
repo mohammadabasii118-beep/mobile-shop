@@ -191,3 +191,9 @@ lib/server/admin/finance.ts      admin wallet / loyalty views and idempotent adj
 
 ## Phase 6 — variants, pricing engine, discounts
 See `docs/PRICING.md`. Code: `lib/server/price-engine/*` (calc, rules, discounts, line, storefront), `lib/server/admin/pricing.ts`, admin pages `/admin/pricing`, `/admin/discounts`, `/admin/colors`. Tests: `scripts/unit-pricing.test.ts` (9, pure) and `scripts/e2e-phase6.test.ts` (32).
+
+## Phase 7 — product media & reviews
+- **Media** lives in `ProductImage` (`type` IMAGE|VIDEO, mime/size/width/height, caption). Exactly one primary IMAGE per product is enforced by a partial unique index; all mutations (`lib/server/admin/media.ts`) run under a `SELECT … FOR UPDATE` on the product row. Images are decoded and re-encoded with `sharp` (EXIF stripped, ≤2000 px); videos (MP4/WebM ≤25 MB, max 3) are validated by signature and stored as-is under `uploads/public/videos/`. `/media/videos/*` supports HTTP Range. Nginx `client_max_body_size` is 30m for this reason.
+- **Reviews** extend `Review` (title, verifiedPurchase, orderItemId, rejectionReason, moderatedAt). Status stays lowercase text (`pending|approved|rejected`) guarded by CHECK constraints. `verifiedPurchase`/`orderItemId` are set only by `createReview` from User→Order(DELIVERED)→OrderItem; client bodies are `.strict()`. A rejected/pending review is edited in place via `PATCH /api/reviews/:id` (no duplicates).
+- Public reads: `getReviewSummary` (1 groupBy), `getProductReviewsPage` (1 joined query), `queryHomeReviews` (1 joined query, LIMIT ≤6, cached ≤60 s, invalidated by admin writes).
+- Tests: `scripts/e2e-phase7.test.ts`, `scripts/unit-phase7.test.ts` (query counts), `npm run test:browser` (Playwright).

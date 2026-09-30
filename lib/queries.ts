@@ -3,12 +3,13 @@ import { db } from "@/lib/db";
 import type { Discount, Prisma } from "@/lib/generated/prisma/client";
 import { lineCtx } from "@/lib/server/price-engine/line";
 import { loadActiveDiscounts, resolveUnitDiscount } from "@/lib/server/price-engine/discounts";
+import { queryHomeReviews } from "@/lib/server/reviews";
 import { cachedPublic } from "@/lib/server/public-cache";
 import type { CardProduct, MenuCategory, SiteInfo } from "@/lib/types";
 
 const cardInclude = {
   category: { select: { id: true, parentId: true, slug: true, name: true, parent: { select: { slug: true } } } },
-  images: { orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }], take: 1 },
+  images: { where: { type: "IMAGE" }, orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }], take: 1 },
   phoneModels: { include: { phoneModel: { select: { name: true } } }, take: 1 },
   variants: { include: { inventory: { select: { quantity: true } }, phoneModel: { select: { brandId: true } } } },
 } satisfies Prisma.ProductInclude;
@@ -118,10 +119,9 @@ export async function getProductBySlug(slug: string) {
     where: { slug, isActive: true },
     include: {
       brand: true, category: { include: { parent: true } },
-      images: { orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }] },
+      images: { orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }, { id: "asc" }] },
       phoneModels: { include: { phoneModel: true } },
       variants: { where: { isActive: true }, orderBy: { sortOrder: "asc" }, include: { inventory: true, colorRef: true, phoneModel: { include: { brand: { select: { name: true } } } } } },
-      reviews: { where: { status: "approved" }, orderBy: { createdAt: "desc" }, take: 10, include: { user: { select: { displayName: true, firstName: true } } } },
       questions: { where: { isPublished: true }, orderBy: { createdAt: "desc" }, take: 10 },
     },
   });
@@ -144,3 +144,6 @@ export async function getCatalogIndex() {
   const cards = await withBrand(rows);
   return cards;
 }
+
+/** Homepage reviews strip: a single bounded query, cached ≤60 s and dropped whenever an admin edit invalidates the public cache. */
+export const getHomeReviews = cachedPublic("home-reviews", async () => queryHomeReviews(6), 60);

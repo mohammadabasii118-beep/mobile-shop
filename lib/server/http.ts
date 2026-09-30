@@ -12,10 +12,10 @@ const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 export const MAX_BODY_BYTES = 12 * 1024 * 1024;
 
 /** Body-size cap and a per-session write limiter that backs up the specific limiters on money/upload/auth endpoints. */
-async function guardWrite(req: NextRequest) {
+async function guardWrite(req: NextRequest, maxBody = MAX_BODY_BYTES) {
   if (!WRITE_METHODS.has(req.method)) return;
   const len = Number(req.headers.get("content-length") ?? 0);
-  if (len > MAX_BODY_BYTES) throw new AppError(413, "payload_too_large", "حجم درخواست بیش از حد مجاز است.");
+  if (len > maxBody) throw new AppError(413, "payload_too_large", "حجم درخواست بیش از حد مجاز است.");
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   if (token) await rateLimit(`w:${createHash("sha256").update(token).digest("hex").slice(0, 24)}`, 240, 60);
 }
@@ -50,11 +50,11 @@ export async function parseJson<T>(req: Request, schema: ZodType<T>): Promise<T>
 type Handler<C> = (req: NextRequest, ctx: C) => Promise<Response | unknown>;
 
 /** Wraps a route handler: CSRF check, uniform JSON errors, no stack traces to the client. */
-export function route<C = { params: Promise<Record<string, string>> }>(handler: Handler<C>) {
+export function route<C = { params: Promise<Record<string, string>> }>(handler: Handler<C>, opts: { maxBody?: number } = {}) {
   return async (req: NextRequest, ctx: C): Promise<Response> => {
     try {
       assertSameOrigin(req);
-      await guardWrite(req);
+      await guardWrite(req, opts.maxBody);
       const res = await handler(req, ctx);
       return res instanceof Response ? res : ok(res ?? null);
     } catch (e) {

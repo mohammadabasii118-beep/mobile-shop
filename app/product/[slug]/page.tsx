@@ -9,9 +9,11 @@ import { Footer } from "@/components/footer";
 import { Container } from "@/components/ui";
 import { ProductCard } from "@/components/product-card";
 import { BuyBox, HotBadge, StickyBar, Thumb } from "@/components/product-detail";
+import { ProductGallery } from "@/components/product-gallery";
+import { ProductReviews } from "@/components/product-reviews";
+import { getProductReviewsPage, getReviewSummary } from "@/lib/server/reviews";
 import { getProductBySlug, getRelatedProducts, getSidebarProducts, toCard } from "@/lib/queries";
 import { JsonLd } from "@/components/json-ld";
-import { db } from "@/lib/db";
 import { abs, breadcrumbLd, buildMeta, clip, paths, toRial } from "@/lib/seo";
 import { resolveSlugRedirect } from "@/lib/server/redirects";
 import { getCurrentUser } from "@/lib/server/auth/session";
@@ -39,7 +41,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return buildMeta({
     title: p.seoTitle || `خرید ${p.name}${models[0] ? ` ${models[0]}` : ""} | ${p.category.name} | CaseLine`,
     description: p.seoDescription || p.shortDescription || p.description || `خرید ${p.name} اورجینال با ضمانت اصالت و ارسال سریع از CaseLine.`,
-    path: paths.product(p.slug), canonical: p.canonical, image: p.images[0]?.url,
+    path: paths.product(p.slug), canonical: p.canonical, image: p.images.find((i) => i.type === "IMAGE")?.url,
   });
 }
 
@@ -47,9 +49,9 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   const row = await getProductBySlug(decodeURIComponent(slug));
   if (!row) { const to = await resolveSlugRedirect("product", decodeURIComponent(slug)); if (to) permanentRedirect(paths.product(to)); notFound(); }
-  const [related, others, user, discounts, policy, stats] = await Promise.all([getRelatedProducts(row.id, row.categoryId), getSidebarProducts(row.id), getCurrentUser(), loadActiveDiscounts(), getWholesalePolicy(), db.review.aggregate({ where: { productId: row.id, status: "approved" }, _avg: { rating: true }, _count: true })]);
-  const realCount = stats._count, realAvg = stats._avg.rating ?? 0;
-  const card = { ...toCard(row, discounts), brand: row.brand?.name ?? null };
+  const [related, others, user, discounts, policy, summary, firstPage] = await Promise.all([getRelatedProducts(row.id, row.categoryId), getSidebarProducts(row.id), getCurrentUser(), loadActiveDiscounts(), getWholesalePolicy(), getReviewSummary(row.id), getProductReviewsPage(row.id, 1)]);
+  const realCount = summary.count, realAvg = summary.avg;
+  const card = { ...toCard({ ...row, images: row.images.filter((i) => i.type === "IMAGE").slice(0, 1) }, discounts), brand: row.brand?.name ?? null };
   const variantOptions = buildVariantOptions(row, user, discounts, policy);
   const models = row.phoneModels.map((m) => m.phoneModel.name);
   const stock = row.variants.reduce((a, v) => a + (v.inventory?.quantity ?? 0), 0);
@@ -66,14 +68,14 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
   const specs = (row.specifications ?? {}) as Record<string, string>;
   const cats = [row.category.parent, row.category].filter(Boolean);
   const crumbs = [{ name: "خانه", path: "/" }, { name: "فروشگاه", path: "/shop" }, ...cats.map((c) => ({ name: c!.name, path: paths.category(c!.slug) })), { name: row.name, path: paths.product(row.slug) }];
-  const images = row.images.map((i) => abs(i.url)!).filter(Boolean);
+  const images = row.images.filter((i) => i.type === "IMAGE").map((i) => abs(i.url)!).filter(Boolean);
   // Structured data uses only stored facts. AggregateRating/Review appear only when there are real approved reviews.
   const productLd = {
     "@context": "https://schema.org", "@type": "Product", name: row.name, sku: row.sku, url: abs(paths.product(row.slug)),
     ...(images.length ? { image: images } : {}), description: clip(row.description || row.shortDescription, 300),
     ...(row.brand ? { brand: { "@type": "Brand", name: row.brand.name } } : {}), category: row.category.name,
     offers: { "@type": "Offer", url: abs(paths.product(row.slug)), priceCurrency: "IRR", price: toRial(card.price), itemCondition: "https://schema.org/NewCondition", availability: stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock" },
-    ...(realCount > 0 ? { aggregateRating: { "@type": "AggregateRating", ratingValue: Math.round(realAvg * 10) / 10, reviewCount: realCount, bestRating: 5, worstRating: 1 }, review: row.reviews.map((r) => ({ "@type": "Review", author: { "@type": "Person", name: r.user.displayName ?? r.user.firstName ?? "کاربر" }, datePublished: r.createdAt.toISOString().slice(0, 10), reviewBody: r.body, reviewRating: { "@type": "Rating", ratingValue: r.rating, bestRating: 5, worstRating: 1 } })) } : {}),
+    ...(realCount > 0 ? { aggregateRating: { "@type": "AggregateRating", ratingValue: Math.round(realAvg * 10) / 10, reviewCount: realCount, bestRating: 5, worstRating: 1 }, review: firstPage.items.map((r) => ({ "@type": "Review", author: { "@type": "Person", name: r.name }, datePublished: r.createdAt.slice(0, 10), ...(r.title ? { name: r.title } : {}), reviewBody: r.body, reviewRating: { "@type": "Rating", ratingValue: r.rating, bestRating: 5, worstRating: 1 } })) } : {}),
   };
   return (
     <>
@@ -92,14 +94,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               <h1 className="text-lg font-black leading-9 sm:text-xl">{title}</h1>
               <p className="mt-1 text-xs text-muted">(دیدگاه کاربر {toFa(realCount)}) · <span className="inline-flex items-center gap-1"><Star className="size-3 fill-warning text-warning" />{toFa(Math.round(realAvg * 10) / 10)}</span> · SKU: <span dir="ltr">{row.sku}</span></p>
               <div className="mt-5 grid gap-6 md:grid-cols-2">
-                <div className="relative mx-auto aspect-square w-full max-w-sm md:order-2">
-                  <Thumb p={card} priority className="size-full rounded-[32px]" />
-                  <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-1 rounded-b-[32px] bg-black/80 py-4 text-white">
-                    <span dir="ltr" className="text-2xl font-black tracking-wide">{row.brand?.name ?? "CaseLine"}</span>
-                    <span dir="ltr" className="text-[10px] font-bold tracking-[0.3em] text-accent">Caseline.ir</span>
-                  </div>
-                  {card.oldPrice != null && <div className="absolute end-3 top-3"><HotBadge /></div>}
-                </div>
+                <ProductGallery items={row.images.map((m) => ({ id: m.id, type: m.type, url: m.url, alt: m.alt, caption: m.caption, width: m.width, height: m.height }))} fallback={card} brandName={row.brand?.name ?? "CaseLine"} hot={<HotBadge />} hotBadge={card.oldPrice != null} />
                 <div className="md:order-1">
                   {card.oldPrice != null && !variantOptions && <p className="mb-2 text-xs text-muted">قیمت قبل: <s>{formatToman(card.oldPrice)}</s></p>}
                   <BuyBox p={card} opt={opt} variants={variantOptions} inStock={stock > 0} maxQty={Math.max(1, Math.min(99, stock))} wholesale={wholesale} />
@@ -138,9 +133,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
                 <div className="panel panel-faq space-y-4">
                   {row.questions.length ? row.questions.map((q) => <div key={q.id}><h3 className="font-black">{q.question}</h3><p className="text-muted">{q.answer}</p></div>) : <p className="text-muted">هنوز سوالی برای این محصول ثبت نشده است.</p>}
                 </div>
-                <div className="panel panel-rev space-y-4">
-                  {row.reviews.length ? row.reviews.map((r) => <div key={r.id} className="rounded-md bg-surface-2 p-4"><div className="flex items-center justify-between"><b>{r.user.displayName ?? r.user.firstName ?? "کاربر"}</b><span className="text-warning">{"★".repeat(r.rating)}</span></div><p className="mt-1 text-muted">{r.body}</p>{r.adminReply && <p className="mt-2 rounded-md bg-primary/10 p-2 text-xs"><b className="text-primary">پاسخ فروشگاه: </b>{r.adminReply}</p>}</div>) : <p className="text-muted">هنوز نظری ثبت نشده است.</p>}
-                </div>
+                <div className="panel panel-rev space-y-4"><ProductReviews slug={row.slug} summary={summary} initial={firstPage.items} hasMore={firstPage.hasMore} /></div>
               </div>
             </div>
 

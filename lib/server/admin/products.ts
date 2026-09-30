@@ -97,7 +97,7 @@ export async function listProducts(req: NextRequest) {
   if (sp.get("isActive")) where.isActive = sp.get("isActive") === "true";
   if (sp.get("low") === "1") where.variants = { some: { inventory: { is: { quantity: { lte: 5 } } } } };
   const [rows, total] = await Promise.all([
-    db.product.findMany({ where, orderBy: { updatedAt: "desc" }, take, skip, include: { category: { select: { name: true } }, brand: { select: { name: true } }, images: { take: 1, orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }] }, variants: { select: { inventory: { select: { quantity: true } } } } } }),
+    db.product.findMany({ where, orderBy: { updatedAt: "desc" }, take, skip, include: { category: { select: { name: true } }, brand: { select: { name: true } }, images: { where: { type: "IMAGE" }, take: 1, orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }] }, variants: { select: { inventory: { select: { quantity: true } } } } } }),
     db.product.count({ where }),
   ]);
   const items = rows.map(({ variants, ...p }) => ({ ...p, stock: variants.reduce((s, v) => s + (v.inventory?.quantity ?? 0), 0), variantCount: variants.length }));
@@ -112,8 +112,8 @@ export async function getProduct(id: string, caps: Caps = { cost: false }) {
 }
 
 async function syncImages(tx: Prisma.TransactionClient, productId: string, images: { url: string; alt?: string | null }[]) {
-  await tx.productImage.deleteMany({ where: { productId } });
-  if (images.length) await tx.productImage.createMany({ data: images.map((im, i) => ({ productId, url: im.url, alt: im.alt ?? null, isPrimary: i === 0, sortOrder: i })) });
+  await tx.productImage.deleteMany({ where: { productId, type: "IMAGE" } }); // videos are managed only through the media API
+  if (images.length) await tx.productImage.createMany({ data: images.map((im, i) => ({ productId, url: im.url, alt: im.alt ?? null, type: "IMAGE" as const, isPrimary: i === 0, sortOrder: i })) });
 }
 
 const capsOf = (a: AdminCtx): Caps => ({ cost: a.admin.permissions.includes("pricing.read") || a.admin.permissions.includes("pricing.write") });

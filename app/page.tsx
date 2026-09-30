@@ -5,8 +5,9 @@ import { Header } from "@/components/site-header";
 import { BannerSlot } from "@/components/banner-slot";
 import { Footer } from "@/components/footer";
 import { Hero } from "@/components/hero";
+import { HomeReviews } from "@/components/home-reviews";
 import { BlogSection, BrandMarquee, CategoryTiles, ProductRail, TelegramBanner } from "@/components/home-sections";
-import { getBanner, getBlogPosts, getBrandNames, getCategoryTree, getHomeSections, getNewestProducts, getProductsByCategory, getProductsByIds } from "@/lib/queries";
+import { getBanner, getBlogPosts, getBrandNames, getCategoryTree, getHomeReviews, getHomeSections, getNewestProducts, getProductsByCategory, getProductsByIds } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
 const faDate = (d: Date | null) => (d ? d.toLocaleDateString("fa-IR", { day: "numeric", month: "long", year: "numeric" }) : "");
 
 export default async function Home() {
-  const [sections, tree] = await Promise.all([getHomeSections(), getCategoryTree()]);
+  const [sections, tree, homeReviews] = await Promise.all([getHomeSections(), getCategoryTree(), getHomeReviews()]);
   const blocks = await Promise.all(
     sections.map(async (s) => {
       const cfg = (s.config ?? {}) as { categorySlug?: string; productIds?: string[]; limit?: number; placement?: string };
@@ -53,7 +54,7 @@ export default async function Home() {
   return (
     <>
       <Header />
-      <main id="main" tabIndex={-1}>{blocks}</main>
+      <main id="main" tabIndex={-1}>{blocks}<HomeReviews reviews={homeReviews} /></main>
       <Footer />
       <BottomNav />
     </>

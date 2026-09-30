@@ -1,6 +1,8 @@
+import { createReadStream } from "node:fs";
+import { Readable } from "node:stream";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { StorageDriver, StoredObject } from "@/lib/server/storage/types";
+import type { StorageDriver, StoredObject, StoredRange } from "@/lib/server/storage/types";
 
 const KEY_RE = /^[a-z0-9][a-z0-9/_.-]{0,200}$/i;
 
@@ -26,6 +28,13 @@ export class LocalStorageDriver implements StorageDriver {
     const full = this.resolve(key);
     const [buf, st] = await Promise.all([readFile(full), stat(full)]);
     return { size: st.size, stream: new Blob([new Uint8Array(buf)]).stream() };
+  }
+  async getRange(key: string, start: number, end?: number): Promise<StoredRange> {
+    const full = this.resolve(key);
+    const size = (await stat(full)).size;
+    const last = Math.min(end ?? size - 1, size - 1);
+    if (!Number.isFinite(start) || start < 0 || start > last) throw new Error("Range not satisfiable");
+    return { size, start, end: last, stream: Readable.toWeb(createReadStream(full, { start, end: last })) as unknown as ReadableStream<Uint8Array> };
   }
   async delete(key: string) {
     await rm(this.resolve(key), { force: true });

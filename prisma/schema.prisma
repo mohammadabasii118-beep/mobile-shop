@@ -289,8 +289,22 @@ model ProductImage {
   alt       String?
   isPrimary Boolean @default(false)
   sortOrder Int     @default(0)
+  type      MediaType @default(IMAGE)
+  caption   String?
+  mimeType  String?
+  fileSize  Int?
+  width     Int?
+  height    Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 
   @@index([productId, sortOrder])
+  @@index([productId, type])
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
 }
 
 model Inventory {
@@ -707,15 +721,26 @@ model Review {
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   orderId    String?
   order      Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderItemId String?
   rating     Int
+  title      String?
   body       String
   status     String    @default("pending") // pending | approved | rejected
+  verifiedPurchase Boolean @default(false)
+  rejectionReason  String?
+  moderatedAt      DateTime?
   adminReply String?
   repliedAt  DateTime?
   createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
 
   @@unique([userId, productId, orderId])
   @@index([productId, status])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([productId, status, createdAt])
 }
 
 model ProductQuestion {

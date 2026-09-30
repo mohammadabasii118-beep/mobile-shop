@@ -110,7 +110,7 @@ cat > /etc/nginx/sites-available/caseline <<NGINX
 server {
   listen 80;
   server_name $DOMAIN;
-  client_max_body_size 12m;
+  client_max_body_size 30m;
   location / {
     proxy_pass http://127.0.0.1:$APP_PORT;
     proxy_http_version 1.1;

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, MessagesSquare, ShoppingBag, Star, Store, User, Wallet } from "lucide-react";
+import { Bell, MessageSquareText, MessagesSquare, ShoppingBag, Star, Store, User, Wallet } from "lucide-react";
 import { LogoutButton } from "@/components/account/logout-button";
 import { BottomNav } from "@/components/header";
 import { Header } from "@/components/site-header";
@@ -13,6 +13,7 @@ const tabs = [
   { key: "orders", href: "/account/orders", label: "سفارش ها", Icon: ShoppingBag },
   { key: "wallet", href: "/account/wallet", label: "کیف پول", Icon: Wallet },
   { key: "points", href: "/account/points", label: "امتیاز باشگاه", Icon: Star },
+  { key: "reviews", href: "/account/reviews", label: "نظرات من", Icon: MessageSquareText },
   { key: "notifications", href: "/account/notifications", label: "اعلان‌ها", Icon: Bell },
   { key: "tickets", href: "/account/tickets", label: "تیکت‌های پشتیبانی", Icon: MessagesSquare },
   { key: "wholesale", href: "/account/wholesale", label: "همکاری عمده", Icon: Store },

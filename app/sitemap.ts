@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
   const [products, categories, brands, models, posts, seo] = await Promise.all([
-    db.product.findMany({ where: { isActive: true }, select: { slug: true, updatedAt: true, images: { take: 1, orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }], select: { url: true } } } }),
+    db.product.findMany({ where: { isActive: true }, select: { slug: true, updatedAt: true, images: { where: { type: "IMAGE" }, take: 1, orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }], select: { url: true } } } }),
     db.category.findMany({ where: { isActive: true }, select: { slug: true, updatedAt: true, _count: { select: { products: { where: { isActive: true } } } }, children: { where: { isActive: true }, select: { _count: { select: { products: { where: { isActive: true } } } } } } } }),
     db.brand.findMany({ where: { isActive: true, products: { some: { isActive: true } } }, select: { slug: true } }),
     db.phoneModel.findMany({ where: { isActive: true, products: { some: { product: { isActive: true } } } }, select: { slug: true } }),

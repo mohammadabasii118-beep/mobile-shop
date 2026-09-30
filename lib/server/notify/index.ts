@@ -7,7 +7,7 @@ type Tx = Prisma.TransactionClient | typeof db;
 export type NotifyEvent =
   | "order_created" | "payment_approved" | "payment_rejected" | "order_status" | "order_tracking" | "order_cancelled"
   | "support_reply" | "wholesale_approved" | "wholesale_rejected" | "wholesale_changes"
-  | "wallet_change" | "refund_requested" | "refund_completed" | "loyalty_change" | "review_reply";
+  | "wallet_change" | "refund_requested" | "refund_completed" | "loyalty_change" | "review_reply" | "review_moderated";
 
 export interface NotifyInput { title: string; body?: string | null; link?: string | null; data?: Prisma.InputJsonValue }
 

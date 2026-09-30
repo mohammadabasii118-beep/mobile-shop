@@ -20,7 +20,7 @@ const cartInclude = {
       variant: {
         include: {
           inventory: true, colorRef: { select: { name: true } }, phoneModel: { select: { name: true, brandId: true } },
-          product: { include: { category: { select: { parentId: true } }, images: { orderBy: [{ isPrimary: "desc" as const }, { sortOrder: "asc" as const }], take: 1 }, brand: { select: { name: true } } } },
+          product: { include: { category: { select: { parentId: true } }, images: { where: { type: "IMAGE" as const }, orderBy: [{ isPrimary: "desc" as const }, { sortOrder: "asc" as const }], take: 1 }, brand: { select: { name: true } } } },
         },
       },
     },

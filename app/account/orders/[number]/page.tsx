@@ -5,7 +5,8 @@ import { Check } from "lucide-react";
 import { AccountShell } from "@/components/account-shell";
 import { CopyField, ReceiptForm } from "@/components/account/receipt-form";
 import { db } from "@/lib/db";
-import { OrderExtras, RefundBox, ReviewForm } from "@/components/account/order-extras";
+import { ItemReview } from "@/components/account/item-review";
+import { OrderExtras, RefundBox } from "@/components/account/order-extras";
 import { requirePageUser } from "@/lib/server/auth/guard";
 import { getUserOrder, ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL, TIMELINE } from "@/lib/server/orders";
 import { getProvider } from "@/lib/server/payments";
@@ -26,7 +27,7 @@ export default async function OrderPage({ params }: { params: Promise<{ number: 
   const payment = order.payments[0];
   const provider = getProvider(order.paymentMethod);
   const instructions = provider && payment ? await provider.instructions(order, payment.amount) : null;
-  const reviewed = order.status === "DELIVERED" ? new Set((await db.review.findMany({ where: { userId: user.id, orderId: order.id }, select: { productId: true } })).map((r) => r.productId)) : new Set<string>();
+  const reviews = order.status === "DELIVERED" ? new Map((await db.review.findMany({ where: { userId: user.id, orderId: order.id }, select: { id: true, productId: true, status: true, rating: true, title: true, body: true, rejectionReason: true } })).map((r) => [r.productId, r])) : new Map<string, { id: string; status: string; rating: number; title: string | null; body: string; rejectionReason: string | null }>();
   const canPay = order.status === "PENDING_PAYMENT" && payment && ["PENDING", "REJECTED"].includes(payment.status);
   const ended = order.status === "CANCELLED" || order.status === "REFUNDED";
   // The timeline highlights the current step; PAID is displayed as the "payment approved" step.
@@ -104,13 +105,14 @@ export default async function OrderPage({ params }: { params: Promise<{ number: 
           <h2 className="mb-2 text-sm font-black">اقلام سفارش</h2>
           <ul className="divide-y divide-border/60">
             {order.items.map((it) => (
-              <li key={it.id} className="flex items-center gap-3 py-3 text-[13px]">
+              <li key={it.id} className="flex flex-wrap items-center gap-3 py-3 text-[13px]">
                 <span className="size-14 shrink-0 overflow-hidden rounded-xl bg-surface-2">{it.image && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={it.image} alt="" className="size-full object-cover" />
                   )}</span>
                 <span className="min-w-0 flex-1"><span className="line-clamp-2 font-bold">{it.name}</span>{it.option && <span className="block text-[11px] text-muted">{it.option}</span>}<span className="block text-[11px] text-muted">{formatToman(it.unitPrice)} × {toFa(it.quantity)}{it.priceType === "wholesale" ? " · قیمت همکار" : ""}</span></span>
                 <b className="whitespace-nowrap">{formatToman(it.total)}</b>
+                {order.status === "DELIVERED" && it.productId && <ItemReview orderNumber={order.number} productId={it.productId} review={reviews.get(it.productId) ?? null} />}
               </li>
             ))}
           </ul>
@@ -126,7 +128,6 @@ export default async function OrderPage({ params }: { params: Promise<{ number: 
         </section>
 
         {order.refunds.length > 0 && <RefundBox refunds={order.refunds.map((r) => ({ id: r.id, method: r.method, amount: r.amount, status: r.status, reason: r.reason, bankReference: r.bankReference }))} />}
-        {order.status === "DELIVERED" && <ReviewForm orderNumber={order.number} items={order.items.filter((i) => i.productId && !reviewed.has(i.productId)).map((i) => ({ productId: i.productId!, name: i.name }))} />}
 
         <section aria-label="آدرس تحویل" className="rounded-2xl border border-border p-4 text-[13px] leading-7">
           <h2 className="mb-1 text-sm font-black">آدرس تحویل</h2>

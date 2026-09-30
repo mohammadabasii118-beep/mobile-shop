@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { notFound } from "@/lib/server/errors";
+import { notify } from "@/lib/server/notify";
 import { audit, pageParams, type AdminCtx } from "@/lib/server/admin/core";
 
 /* ───────── dashboard ───────── */
@@ -47,30 +48,44 @@ export async function dashboardData() {
   return {
     catalog: { productCount, variantCount, outOfStock, activeDiscounts, expiring, priceChanges },
     totalOrders, pendingOrders, reviewOrders, paidOrders, revenue: rev._sum.total ?? 0, revenueToday: revToday._sum.total ?? 0, revenueMonth: revMonth._sum.total ?? 0,
-    lowStock: Number(lowStock[0]?.c ?? 0), pendingWholesale, pendingReviews, newCustomers, recentOrders, recentPayments, lowList, chart,
+    lowStock: Number(lowStock[0]?.c ?? 0), pendingWholesale, pendingReviews, reviews: await reviewStats(), newCustomers, recentOrders, recentPayments, lowList, chart,
   };
 }
 
 /* ───────── reviews moderation ───────── */
+export async function reviewStats() {
+  const [rows, avg] = await Promise.all([db.review.groupBy({ by: ["status"], _count: { _all: true } }), db.review.aggregate({ where: { status: "approved" }, _avg: { rating: true } })]);
+  const n = (st: string) => rows.find((r) => r.status === st)?._count._all ?? 0;
+  return { pending: n("pending"), approved: n("approved"), rejected: n("rejected"), avgRating: Math.round((avg._avg.rating ?? 0) * 10) / 10 };
+}
 export async function listReviews(req: NextRequest) {
   const { take, skip, q, page, sp } = pageParams(req, 25);
   const where: Prisma.ReviewWhereInput = {};
   const st = sp.get("status") ?? "pending";
   if (["pending", "approved", "rejected"].includes(st)) where.status = st;
-  if (q) where.OR = [{ body: { contains: q, mode: "insensitive" } }, { product: { name: { contains: q, mode: "insensitive" } } }];
+  const rating = Number(sp.get("rating"));
+  if (Number.isInteger(rating) && rating >= 1 && rating <= 5) where.rating = rating;
+  if (q) where.OR = [{ body: { contains: q, mode: "insensitive" } }, { title: { contains: q, mode: "insensitive" } }, { product: { name: { contains: q, mode: "insensitive" } } }, { user: { OR: [{ displayName: { contains: q, mode: "insensitive" } }, { phone: { contains: q } }] } }];
   if (sp.get("productId")) where.productId = sp.get("productId")!;
-  const [items, total] = await Promise.all([
-    db.review.findMany({ where, orderBy: { createdAt: "desc" }, take, skip, include: { product: { select: { name: true, slug: true } }, user: { select: { displayName: true, phone: true } } } }),
+  const [items, total, stats] = await Promise.all([
+    db.review.findMany({ relationLoadStrategy: "join", where, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take, skip, include: { product: { select: { id: true, name: true, slug: true } }, user: { select: { id: true, displayName: true, phone: true } }, order: { select: { number: true, status: true } } } }),
     db.review.count({ where }),
+    reviewStats(),
   ]);
-  return { items, total, page, pages: Math.max(1, Math.ceil(total / take)) };
+  return { items, total, page, pages: Math.max(1, Math.ceil(total / take)), stats };
 }
 export async function moderateReview(id: string, body: unknown, a: AdminCtx) {
-  const { status } = z.object({ status: z.enum(["approved", "rejected", "pending"]) }).parse(body);
+  const { status, reason } = z.object({ status: z.enum(["approved", "rejected", "pending"]), reason: z.string().trim().max(300).optional() }).parse(body);
   return db.$transaction(async (tx) => {
     const r = await tx.review.findUnique({ where: { id } });
     if (!r) throw notFound("نظر پیدا نشد.");
-    await tx.review.update({ where: { id }, data: { status } });
+    await tx.review.update({ where: { id }, data: { status, moderatedAt: status === "pending" ? null : new Date(), rejectionReason: status === "rejected" ? reason || null : null } });
+    if (status !== r.status && status !== "pending") {
+      const prod = await tx.product.findUnique({ where: { id: r.productId }, select: { name: true, slug: true } });
+      await notify(tx, r.userId, "review_moderated", status === "approved"
+        ? { title: "نظر شما منتشر شد", body: prod?.name, link: `/product/${prod?.slug}` }
+        : { title: "نظر شما رد شد", body: reason || "می‌توانید آن را ویرایش و دوباره ارسال کنید.", link: "/account/reviews" });
+    }
     const agg = await tx.review.aggregate({ where: { productId: r.productId, status: "approved" }, _avg: { rating: true }, _count: true });
     await tx.product.update({ where: { id: r.productId }, data: { ratingAvg: Math.round((agg._avg.rating ?? 0) * 10) / 10, ratingCount: agg._count } });
     await audit(a, "review.moderate", "review", id, { status: r.status }, { status }, tx);

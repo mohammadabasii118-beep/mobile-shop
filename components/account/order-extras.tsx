@@ -58,28 +58,3 @@ export function RefundBox({ refunds }: { refunds: { id: string; method: string; 
     </section>
   );
 }
-
-export function ReviewForm({ orderNumber, items }: { orderNumber: number; items: { productId: string; name: string }[] }) {
-  const router = useRouter();
-  const [pid, setPid] = useState(items[0]?.productId ?? ""); const [rating, setRating] = useState(5); const [body, setBody] = useState(""); const [busy, setBusy] = useState(false); const [msg, setMsg] = useState<{ ok: boolean; t: string } | null>(null);
-  if (items.length === 0) return null;
-  async function submit(e: React.FormEvent) {
-    e.preventDefault(); setBusy(true); setMsg(null);
-    const r = await api("POST", "/api/reviews", { orderNumber, productId: pid, rating, body });
-    setBusy(false);
-    if (!r.ok) return setMsg({ ok: false, t: r.error.message });
-    setMsg({ ok: true, t: "نظر شما ثبت شد و پس از بررسی نمایش داده می‌شود." }); setBody(""); router.refresh();
-  }
-  return (
-    <section aria-label="ثبت نظر" className="rounded-2xl border border-border p-4">
-      <h2 className="mb-3 text-sm font-black">نظر شما درباره کالاهای این سفارش</h2>
-      <form onSubmit={submit} className="space-y-3 text-sm">
-        <select value={pid} onChange={(e) => setPid(e.target.value)} className="h-11 w-full rounded-xl border border-border bg-surface px-3">{items.map((i) => <option key={i.productId} value={i.productId}>{i.name}</option>)}</select>
-        <div className="flex gap-1" role="radiogroup" aria-label="امتیاز">{[1, 2, 3, 4, 5].map((n) => <button type="button" key={n} role="radio" aria-checked={rating === n} onClick={() => setRating(n)} className={`cursor-pointer text-2xl ${n <= rating ? "text-warning" : "text-border"}`}>★</button>)}</div>
-        <textarea required minLength={5} rows={3} value={body} onChange={(e) => setBody(e.target.value)} placeholder="تجربه خود را بنویسید…" className="w-full rounded-xl border border-border bg-surface px-4 py-3 leading-7" />
-        {msg && <p role="status" className={`text-xs ${msg.ok ? "text-success" : "text-hot"}`}>{msg.t}</p>}
-        <button disabled={busy} className="h-11 cursor-pointer rounded-xl bg-primary px-6 text-xs font-bold text-primary-fg disabled:opacity-60">ثبت نظر</button>
-      </form>
-    </section>
-  );
-}

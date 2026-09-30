@@ -29,6 +29,7 @@ const WRITE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 export function adminRoute<P extends Record<string, string> = Record<string, string>>(
   perm: string | string[] | ((req: NextRequest, params: P) => string | string[]),
   handler: (req: NextRequest, params: P, a: AdminCtx) => Promise<unknown>,
+  opts: { maxBody?: number } = {},
 ) {
   return route<{ params: Promise<P> }>(async (req, ctx) => {
     const params = (await ctx.params) ?? ({} as P);
@@ -37,7 +38,7 @@ export function adminRoute<P extends Record<string, string> = Record<string, str
     const result = await handler(req, params, { admin, ip: clientIp(req) });
     if (WRITE.has(req.method)) invalidatePublic(); // admin edits are visible on the storefront immediately
     return result;
-  });
+  }, opts);
 }
 
 /** Append-only audit record. Pass the transaction client so the log commits atomically with the change. */

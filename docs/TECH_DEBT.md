@@ -19,3 +19,8 @@
 | 15 | The site has no favicon unless one is set in admin settings, so browsers log a 404 for `/favicon.ico`. | Phase 5/6 | design phase | Add a favicon asset (design decision). |
 | 16 | ~~Automatic retail price could fall below the wholesale price.~~ **RESOLVED in Phase 6b** by the configurable wholesale policy (checked on save and compute; conflicting automatic prices are not applied). Wholesale prices themselves are still typed, not derived from rules. | Phase 6 | when wholesale margin rules are wanted | Add a wholesale margin to `PricingRule`. |
 | 17 | Legacy discount scope `BRAND` (first Phase 6 cut) is kept only so existing rows keep working; it cannot be created any more. | Phase 6b | remove once no row uses it | `SELECT count(*) FROM "Discount" WHERE scope='BRAND'` then a data migration + enum cleanup. |
+
+## Phase 7 notes
+- Videos are stored as uploaded (no transcoding/poster generation); the poster is the product's primary image. A malformed-but-signature-valid video is possible; it is only ever served as `video/*` with `nosniff` and a locked-down CSP.
+- Media files are read fully into memory during upload (≤25 MB) and served from local disk; move to object storage + CDN when traffic grows.
+- Reviewer display name is `displayName` or first name (no masking of full names).

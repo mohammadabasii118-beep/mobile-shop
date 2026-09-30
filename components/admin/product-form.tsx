@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { Card, ImageInput, Label, Pill, act, btnDanger, btnGhost, btnPrimary, confirmAsk, fmtDate, fmtNum, fmtToman, inputCls } from "@/components/admin/kit";
+import { MediaManager } from "@/components/admin/media-manager";
 import { toFormData } from "@/lib/admin/product-map";
 import type { Opt } from "@/components/admin/resource-manager";
 import { cn } from "@/lib/utils";
@@ -33,7 +34,7 @@ export function ProductForm({ initial, categories, brands, phoneModels, colors, 
     const body = {
       name: p.name, slug: p.slug, sku: p.sku, brandId: p.brandId || null, categoryId: p.categoryId, shortDescription: p.shortDescription, description: p.description, badge: p.badge, isActive: p.isActive,
       ...(p.pricingMode === "AUTOMATIC" ? {} : { retailPrice: Number(p.retailPrice) }), costPrice: num(p.costPrice), pricingMode: p.pricingMode, retailDiscount: Number(p.retailDiscount || 0), wholesalePrice: num(p.wholesalePrice), wholesaleDiscount: Number(p.wholesaleDiscount || 0), minWholesaleQty: Number(p.minWholesaleQty || 1),
-      seoTitle: p.seoTitle, seoDescription: p.seoDescription, canonical: p.canonical, phoneModelIds: p.phoneModelIds, images: p.images.map((i) => ({ url: i.url, alt: i.alt })),
+      seoTitle: p.seoTitle, seoDescription: p.seoDescription, canonical: p.canonical, phoneModelIds: p.phoneModelIds, ...(isNew ? { images: p.images.map((i) => ({ url: i.url, alt: i.alt })) } : {}),
       variants: p.variants.map((v) => ({ ...(v.id ? { id: v.id } : {}), sku: v.sku, name: v.name, phoneModelId: v.phoneModelId || null, colorId: v.colorId || null, costPrice: num(v.costPrice), pricingMode: v.pricingMode, color: v.colorId ? null : v.color, colorHex: v.colorId ? null : v.colorHex, retailPrice: num(v.retailPrice), wholesalePrice: num(v.wholesalePrice), isActive: v.isActive, ...(v.id ? {} : { stock: Number(v.stock || 0) }) })),
     };
     const r = await act<Parameters<typeof toFormData>[0]>(isNew ? "POST" : "PATCH", isNew ? "/api/admin/products" : `/api/admin/products/${p.id}`, body, isNew ? "محصول ایجاد شد." : "محصول ذخیره شد.");
@@ -75,7 +76,8 @@ export function ProductForm({ initial, categories, brands, phoneModels, colors, 
         </Card>
 
         <Card>
-          <h2 className="mb-3 text-sm font-black">تصاویر <span className="text-[11px] font-normal text-muted">(اولی تصویر اصلی است)</span></h2>
+          <h2 className="mb-3 text-sm font-black">تصاویر و ویدیو <span className="text-[11px] font-normal text-muted">(اولی تصویر اصلی است)</span></h2>
+          {!isNew ? <MediaManager productId={p.id!} productName={p.name} /> : <>
           <div className="grid gap-3 sm:grid-cols-2">
             {p.images.map((im, i) => (
               <div key={i} className="flex items-center gap-2 rounded-lg border border-border p-2">
@@ -88,6 +90,7 @@ export function ProductForm({ initial, categories, brands, phoneModels, colors, 
             ))}
           </div>
           <div className="mt-3 flex items-center gap-3"><span className="text-xs text-muted">افزودن تصویر:</span><ImageInput value={null} onChange={(u) => u && set("images", [...p.images, { url: u, alt: p.name }])} /></div>
+          <p className="mt-2 text-[11px] text-muted">پس از ذخیره محصول می‌توانید تصاویر بیشتر، تغییر ترتیب، تصویر اصلی و ویدیو را مدیریت کنید.</p></>}
         </Card>
 
         <Card>
