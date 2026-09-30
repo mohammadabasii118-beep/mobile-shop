@@ -40,7 +40,8 @@ export async function getSeoSetting(scope: string): Promise<SeoSetting> {
   // Titles/descriptions are per page (falling back to global would give every page the same title); only the
   // home page inherits the global text, and the social image is shared.
   const inherit = scope === "home";
-  return { title: row?.title ?? (inherit ? global?.title : null) ?? null, description: row?.description ?? (inherit ? global?.description : null) ?? null, ogImage: row?.ogImage ?? global?.ogImage ?? null, robots: row?.robots ?? null };
+  // The home TITLE is never inherited from the global row: it follows the site name + tagline (هویت سایت) unless /admin/seo sets one for the home page.
+  return { title: row?.title ?? null, description: row?.description ?? (inherit ? global?.description : null) ?? null, ogImage: row?.ogImage ?? global?.ogImage ?? null, robots: row?.robots ?? null };
 }
 
 export interface MetaInput {

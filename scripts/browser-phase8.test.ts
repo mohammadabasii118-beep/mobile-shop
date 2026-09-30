@@ -144,4 +144,20 @@ describe("Phase 8 — browser flows", () => {
       await ctx2.close();
     } finally { await admin.del(`/api/admin/r/menus/${made.id}`); }
   });
+
+  it("admin settings shows a «هویت سایت» block (name, شعار, logo, favicon) and the home blog section is a swipeable rail on mobile", async () => {
+    const actx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: "fa-IR" });
+    await actx.addCookies([...admin.jar].map(([name, value]) => ({ name, value, url: BASE })));
+    const ap = await actx.newPage(); await ap.goto(`${BASE}/admin/settings`, { waitUntil: "networkidle" });
+    await ap.getByText("هویت سایت", { exact: true }).first().waitFor();
+    for (const l of ["نام سایت", "شعار سایت", "لوگو (هدر و فوتر)", "آیکون مرورگر (فاویکون)"]) await ap.getByText(l).first().waitFor();
+    await shot(ap, "10-admin-identity"); await actx.close();
+    const m = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: "fa-IR" }); const mp = await m.newPage();
+    await mp.goto(`${BASE}/`, { waitUntil: "networkidle" });
+    const rail = mp.locator("[data-blog-rail]"); await rail.scrollIntoViewIfNeeded();
+    const info = await rail.evaluate((el: HTMLElement) => ({ scrollable: el.scrollWidth > el.clientWidth, cards: el.children.length, noPageOverflow: document.documentElement.scrollWidth <= window.innerWidth + 1, rowY: [...el.children].map((c) => Math.round(c.getBoundingClientRect().top)) }));
+    assert.ok(info.cards >= 2 && info.scrollable && info.noPageOverflow, JSON.stringify(info));
+    assert.equal(new Set(info.rowY).size, 1, "all cards on one row (a rail, not stacked)");
+    await shot(mp, "11-blog-rail-mobile"); await m.close();
+  });
 });

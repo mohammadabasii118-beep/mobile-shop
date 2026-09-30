@@ -84,9 +84,10 @@ export function BlogSection({ title, posts }: { title: string; posts: { slug: st
     <section id="blog" className="py-4">
       <Container>
         <SectionHeader title={title} href="/blog" />
-        <div className="grid gap-3 md:grid-cols-3">
+        {/* Mobile: one swipeable rail; from md: three columns. */}
+        <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0" data-blog-rail>
           {posts.map((b) => (
-            <Link key={b.slug} href={`/blog/${b.slug}`} className="flex min-h-36 flex-col gap-3 rounded-xl border border-border bg-surface-2 p-4 transition-shadow hover:shadow-md">
+            <Link key={b.slug} href={`/blog/${b.slug}`} className="flex min-h-36 w-[78%] shrink-0 snap-start flex-col gap-3 rounded-xl md:w-auto md:shrink-0 border border-border bg-surface-2 p-4 transition-shadow hover:shadow-md">
               <div className="flex items-center justify-between text-[11px] text-muted"><span className="rounded-md bg-primary/10 px-2 py-1 font-medium text-primary">{b.category}</span><span>{b.date}</span></div>
               <h3 className="line-clamp-2 text-sm font-black leading-7">{b.title}</h3>
               <span className="mt-auto text-[11px] font-bold text-primary">ادامه مطلب ‹</span>

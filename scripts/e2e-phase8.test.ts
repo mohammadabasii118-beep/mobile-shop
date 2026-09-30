@@ -260,3 +260,31 @@ describe("Phase 8b — password reset by e-mail", () => {
     assert.equal(inbox.length, before); assert.equal(await db.passwordResetToken.count({ where: { user: { email } } }), 0);
   });
 });
+
+describe("Phase 9 — site identity (favicon / tagline) and blog rail", () => {
+  let admin2: Client; let original: Record<string, unknown> = {};
+  before(async () => { admin2 = await loginWithPassword("09120000001", "Admin@12345"); original = ok(await admin2.get("/api/admin/settings")).site ?? {}; });
+  after(async () => { ok(await admin2.put("/api/admin/settings/site", original)); });
+  const head = async () => (await new Client().get("/")).text;
+
+  it("default: a built-in icon is advertised and /favicon.ico answers (no blank globe, no 404)", async () => {
+    ok(await admin2.put("/api/admin/settings/site", { ...original, favicon: "" }));
+    const h = await head();
+    assert.match(h, /<link[^>]+rel="icon"[^>]+href="\/favicon\.svg"/); assert.match(h, /apple-touch-icon\.png/);
+    const ico = await fetch(`${process.env.BASE_URL ?? "http://localhost:3300"}/favicon.ico`); assert.equal(ico.status, 200); assert.match(ico.headers.get("content-type") ?? "", /icon/);
+    const png = await fetch(`${process.env.BASE_URL ?? "http://localhost:3300"}/apple-touch-icon.png`); assert.equal(png.status, 200);
+  });
+
+  it("admin sets favicon + tagline (هویت سایت): tab icon, /favicon.ico redirect and page title follow immediately", async () => {
+    const tag = "شعار-تست-" + uid();
+    ok(await admin2.put("/api/admin/settings/site", { ...original, favicon: "/media/images/custom-icon.png", tagline: tag }));
+    const h = await head();
+    assert.ok(h.includes('href="/media/images/custom-icon.png"')); assert.ok(h.includes(tag), "tagline is in the page title");
+    const r = await fetch(`${process.env.BASE_URL ?? "http://localhost:3300"}/favicon.ico`, { redirect: "manual" }); assert.equal(r.status, 302); assert.match(r.headers.get("location") ?? "", /\/media\/images\/custom-icon\.png$/);
+    assert.equal((await admin2.get("/admin/settings")).status, 200);
+  });
+
+  it("home blog section is a swipeable rail on mobile (markup hook present)", async () => {
+    assert.ok((await head()).includes("data-blog-rail"));
+  });
+});

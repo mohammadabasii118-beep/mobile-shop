@@ -58,7 +58,9 @@ describe("Phase 6 — variants, pricing engine, discounts", () => {
     for (const [k, n] of [["white", "سفید یخی"], ["black", "مشکی"]]) colors[k!] = ok(await admin.post("/api/admin/r/colors", { name: `${n} ${tag}`, hex: k === "white" ? "#F2F7FA" : "#111111" })).id;
   });
   // Promotions from one test must never leak into the next (brands/models/categories are shared across the file).
-  afterEach(async () => { if (madeDiscounts.length) await db.discount.updateMany({ where: { id: { in: madeDiscounts.splice(0) } }, data: { isActive: false } }); });
+  const madeCats: string[] = []; // test categories are switched off afterwards so they never pile up in the storefront menu
+  afterEach(async () => { if (madeCats.length) await db.category.updateMany({ where: { id: { in: madeCats.splice(0) } }, data: { isActive: false } });
+    if (madeDiscounts.length) await db.discount.updateMany({ where: { id: { in: madeDiscounts.splice(0) } }, data: { isActive: false } }); });
   after(async () => {
     // Keep the dev database's storefront small: test categories/brands/models/colours are retired (deactivated), not deleted.
     await db.category.updateMany({ where: { id: { in: [catId, catId2] } }, data: { isActive: false } });
@@ -306,7 +308,7 @@ describe("Phase 6 — variants, pricing engine, discounts", () => {
     });
     it("margin change for a whole category (25 % → 30 %) and a manual-price bump (+10 %) with skipped items reported", async () => {
       const tag = uid();
-      const cat = ok(await admin.post("/api/admin/r/categories", { name: "دستهٔ گروهی " + tag, slug: "bulk6-" + tag })).id;
+      const cat = ok(await admin.post("/api/admin/r/categories", { name: "دستهٔ گروهی " + tag, slug: "bulk6-" + tag })).id; madeCats.push(cat);
       const A = await mkProduct({ mode: "AUTOMATIC", category: cat, variants: [{ key: "a", cost: 100_000 }] });
       const M = await mkProduct({ mode: "MANUAL", category: cat, retailPrice: 200_000, variants: [{ key: "a" }] });
       ok(await rule("CATEGORY", cat, 25)); assert.equal((await variantRow(A.vid("a"))).retailPrice, 125_000);

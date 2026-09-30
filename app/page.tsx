@@ -7,13 +7,13 @@ import { Footer } from "@/components/footer";
 import { Hero } from "@/components/hero";
 import { HomeReviews } from "@/components/home-reviews";
 import { BlogSection, BrandMarquee, CategoryTiles, ProductRail, TelegramBanner } from "@/components/home-sections";
-import { getBanner, getBlogPosts, getBrandNames, getCategoryTree, getHomeReviews, getHomeSections, getNewestProducts, getProductsByCategory, getProductsByIds } from "@/lib/queries";
+import { getBanner, getBlogPosts, getBrandNames, getCategoryTree, getHomeReviews, getHomeSections, getNewestProducts, getProductsByCategory, getProductsByIds, getSiteInfo } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const seo = await getSeoSetting("home");
-  return buildMeta({ title: seo.title || "CaseLine | فروشگاه لوازم جانبی موبایل", description: seo.description || "قاب، گلس، شارژر، کابل و هندزفری با تضمین سازگاری با مدل گوشی شما", path: "/", image: seo.ogImage, robots: seo.robots });
+  const [seo, info] = await Promise.all([getSeoSetting("home"), getSiteInfo().catch(() => null)]);
+  return buildMeta({ title: seo.title || `${info?.name || "CaseLine"} | ${info?.tagline || "فروشگاه لوازم جانبی موبایل"}`, description: seo.description || "قاب، گلس، شارژر، کابل و هندزفری با تضمین سازگاری با مدل گوشی شما", path: "/", image: seo.ogImage, robots: seo.robots });
 }
 const faDate = (d: Date | null) => (d ? d.toLocaleDateString("fa-IR", { day: "numeric", month: "long", year: "numeric" }) : "");
 

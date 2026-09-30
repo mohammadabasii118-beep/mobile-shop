@@ -1,13 +1,13 @@
 "use client";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { Card, ErrorBox, ImageInput, Label, Spinner, act, btnPrimary, inputCls, useApi } from "@/components/admin/kit";
 import { cn } from "@/lib/utils";
 
-type F = { key: string; label: string; type?: "text" | "textarea" | "number" | "image" | "bool" | "select"; ltr?: boolean; hint?: string; options?: [string, string][] };
+type F = { key: string; label: string; group?: string; type?: "text" | "textarea" | "number" | "image" | "bool" | "select"; ltr?: boolean; hint?: string; options?: [string, string][] };
 const SECTIONS: { key: string; title: string; desc?: string; fields: F[] }[] = [
-  { key: "site", title: "اطلاعات سایت", fields: [
-    { key: "name", label: "نام سایت" }, { key: "tagline", label: "شعار" }, { key: "logo", label: "لوگو", type: "image" }, { key: "favicon", label: "فاویکون", type: "image" },
-    { key: "phone", label: "تلفن", ltr: true }, { key: "email", label: "ایمیل", ltr: true }, { key: "address", label: "آدرس" }, { key: "hours", label: "ساعت کاری" },
+  { key: "site", title: "هویت سایت و اطلاعات تماس", desc: "نام، شعار، لوگو و آیکون مرورگر (فاویکون) در هدر، فوتر، تب مرورگر و گوگل نمایش داده می‌شود.", fields: [
+    { key: "name", label: "نام سایت", group: "هویت سایت" }, { key: "tagline", label: "شعار سایت", hint: "در عنوان تب مرورگر و نتایج گوگل کنار نام سایت می‌آید؛ هر وقت خواستید عوض کنید." }, { key: "logo", label: "لوگو (هدر و فوتر)", type: "image", hint: "تصویر افقی با پس‌زمینه شفاف (PNG یا WebP)." }, { key: "favicon", label: "آیکون مرورگر (فاویکون)", type: "image", hint: "تصویر مربعی حداقل ۱۹۲×۱۹۲ (PNG). خالی = آیکون پیش‌فرض CaseLine." },
+    { key: "phone", label: "تلفن", ltr: true, group: "اطلاعات تماس، شبکه‌های اجتماعی و فوتر" }, { key: "email", label: "ایمیل", ltr: true }, { key: "address", label: "آدرس" }, { key: "hours", label: "ساعت کاری" },
     { key: "telegram", label: "تلگرام (لینک)", ltr: true }, { key: "instagram", label: "اینستاگرام (لینک)", ltr: true }, { key: "whatsapp", label: "واتساپ (لینک)", ltr: true }, { key: "aparat", label: "آپارات (لینک)", ltr: true }, { key: "youtube", label: "یوتیوب (لینک)", ltr: true },
     { key: "topBar", label: "متن نوار بالای سایت" }, { key: "footerText", label: "متن فوتر", type: "textarea" },
   ] },
@@ -44,13 +44,16 @@ function Section({ s, initial }: { s: (typeof SECTIONS)[number]; initial: Record
         <h2 className="text-base font-black">{s.title}</h2>{s.desc && <p className="mb-3 mt-1 text-xs text-muted">{s.desc}</p>}
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {s.fields.map((f) => (
-            <Label key={f.key} label={f.label} error={errs[f.key]} className={cn((f.type === "textarea" || f.type === "image") && "sm:col-span-2")}>
+            <Fragment key={f.key}>
+            {f.group && <h3 className="mt-2 border-b border-border pb-1 text-sm font-black text-primary sm:col-span-2">{f.group}</h3>}
+            <Label label={f.label} hint={f.hint} error={errs[f.key]} className={cn((f.type === "textarea" || f.type === "image") && "sm:col-span-2")}>
               {f.type === "textarea" ? <textarea className={cn(inputCls, "h-24 py-2")} value={String(v[f.key] ?? "")} onChange={(e) => set(f.key, e.target.value)} />
                 : f.type === "image" ? <ImageInput value={(v[f.key] as string) || null} onChange={(u) => set(f.key, u ?? "")} label={f.label} />
                 : f.type === "select" ? <select className={inputCls} value={String(v[f.key] ?? "")} onChange={(e) => set(f.key, e.target.value)}>{f.options?.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
                 : f.type === "bool" ? <span className="flex h-10 items-center gap-2"><input type="checkbox" className="size-4 accent-[var(--primary)]" checked={!!v[f.key]} onChange={(e) => set(f.key, e.target.checked)} />فعال</span>
                 : <input className={inputCls} dir={f.ltr ? "ltr" : undefined} type={f.type === "number" ? "number" : "text"} value={String(v[f.key] ?? "")} onChange={(e) => set(f.key, f.type === "number" ? Number(e.target.value) : e.target.value)} />}
             </Label>
+            </Fragment>
           ))}
         </div>
         <div className="mt-4 flex justify-end"><button className={btnPrimary} disabled={busy || !dirty}>{busy ? "…" : "ذخیره"}</button></div>

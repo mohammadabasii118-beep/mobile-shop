@@ -9,6 +9,7 @@ import { Client, db, loginWithPassword, registerAndLogin, uid } from "./test-uti
 let admin: Client, manager: Client, partner: Client, catId = "", catSlug = "";
 const ok = (r: { status: number; json: any }, status = 200) => { assert.equal(r.status, status, JSON.stringify(r.json)); return r.json?.data; };
 const DAY = 86_400_000, iso = (ms: number) => new Date(Date.now() + ms).toISOString();
+let tag = ""; // unique suffix of this run's brands (used to look them up exactly)
 const B: Record<string, string> = {}, M: Record<string, string> = {}, C: Record<string, string> = {};
 const DEFAULT_POLICY = { minDiscountPercent: 0, maxDiscountPercent: 0, capAtRetail: true };
 const setPolicy = (p: Partial<typeof DEFAULT_POLICY>) => admin.put("/api/admin/settings/wholesalePolicy", { ...DEFAULT_POLICY, ...p });
@@ -40,7 +41,7 @@ describe("Phase 6b — wholesale policy, effective-price sort, brand discounts",
     await db.rateLimit.deleteMany({});
     admin = await loginWithPassword("09120000001", "Admin@12345"); manager = await loginWithPassword("09120000006", "Manager@12345"); partner = await loginWithPassword("09120000003", "Partner@12345");
     ok(await setPolicy({}));
-    const tag = uid();
+    tag = uid();
     catSlug = "cat6b-" + tag; catId = ok(await admin.post("/api/admin/r/categories", { name: "دستهٔ ۶ب " + tag, slug: catSlug })).id; cats.push(catId);
     for (const [k, n] of [["Spigen", "Spigen"], ["Baseus", "Baseus"], ["Apple", "Apple"], ["Samsung", "Samsung"]]) B[k!] = ok(await admin.post("/api/admin/r/brands", { name: `${n} ${tag}`, slug: `${k!.toLowerCase()}-${tag}` })).id;
     M.i12 = ok(await admin.post("/api/admin/r/phone-models", { name: "iPhone 12 " + tag, slug: "i12b-" + tag, brandId: B.Apple })).id;
@@ -81,10 +82,10 @@ describe("Phase 6b — wholesale policy, effective-price sort, brand discounts",
       assert.equal((await cartUnit(c, apple.slug, apple.vid("sam"))).unitPrice, 100_000, "an Apple-made product on a Samsung phone is not an Apple phone");
     });
     it("the two admin pickers are separate and labelled; the ambiguous legacy scope cannot be created any more but old rows keep working", async () => {
-      const a = ok(await admin.get(`/api/admin/pricing/targets?scope=PRODUCT_BRAND&q=Spigen`)) as { id: string; label: string }[];
+      const a = ok(await admin.get(`/api/admin/pricing/targets?scope=PRODUCT_BRAND&q=${encodeURIComponent("Spigen " + tag)}`)) as { id: string; label: string }[];
       assert.ok(a.some((x) => x.id === B.Spigen && x.label.includes("سازندهٔ")));
       assert.ok(!a.some((x) => x.id === B.Samsung), "a brand with no products is not a product-brand target");
-      const p = ok(await admin.get(`/api/admin/pricing/targets?scope=PHONE_BRAND&q=Apple`)) as { id: string; label: string }[];
+      const p = ok(await admin.get(`/api/admin/pricing/targets?scope=PHONE_BRAND&q=${encodeURIComponent("Apple " + tag)}`)) as { id: string; label: string }[];
       assert.ok(p.some((x) => x.id === B.Apple && x.label.includes("برند گوشی")));
       assert.ok(!p.some((x) => x.id === B.Spigen), "a brand with no phone models is not a phone-brand target");
       assert.equal((await admin.post("/api/admin/r/discounts", { name: "x", type: "PERCENT", value: 5, scope: "BRAND", targetId: B.Apple })).status, 422);

@@ -20,7 +20,8 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(siteUrl()),
     title, description,
     applicationName: name,
-    ...(info?.favicon ? { icons: { icon: info.favicon } } : {}),
+    // Icon set in admin (هویت سایت); otherwise the built-in CaseLine icon, so browser tabs never show a blank globe.
+    icons: info?.favicon ? { icon: info.favicon, shortcut: info.favicon, apple: info.favicon } : { icon: [{ url: "/favicon.svg", type: "image/svg+xml" }, { url: "/favicon.ico", sizes: "any" }], shortcut: "/favicon.ico", apple: "/apple-touch-icon.png" },
     openGraph: { type: "website", siteName: name, locale: "fa_IR", title, description },
     twitter: { card: "summary", title, description },
     formatDetection: { telephone: false },
