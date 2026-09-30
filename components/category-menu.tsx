@@ -55,6 +55,7 @@ export function CategoryMenu({ menu }: { menu: MenuCategory[] }) {
 /** Mobile menu: hamburger opens a glass side sheet — categories, then account / shop / blog / support and the night-mode switch. */
 export function MobileMenu({ menu, links = [], loggedIn, logo, name, className }: { menu: MenuCategory[]; links?: { label: string; link: string }[]; loggedIn?: boolean; logo?: string; name?: string; className?: string }) {
   const [open, setOpen] = useState(false);
+  const [openCat, setOpenCat] = useState<string | null>(null);
   useEffect(() => {
     if (!open) return;
     const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
@@ -89,8 +90,23 @@ export function MobileMenu({ menu, links = [], loggedIn, logo, name, className }
               <>
                 <div className="mt-6 px-3 text-sm text-muted">دسته‌بندی‌ها</div>
                 <ul className="mt-2 space-y-1" data-mobile-cats>
-                  {menu.map((c) => { const I = iconFor(c.slug); return (
-                    <li key={c.slug}><Link href={`/shop#${c.slug}`} onClick={close} className={row}><span className={chip}><I className="size-5" /></span><span className="flex-1 text-start">{c.label}</span></Link></li>
+                  {menu.map((c) => { const I = iconFor(c.slug); const isOpen = openCat === c.slug; return (
+                    <li key={c.slug}>
+                      {c.subs.length ? (
+                        <button type="button" aria-expanded={isOpen} onClick={() => setOpenCat(isOpen ? null : c.slug)} className={cn(row, "w-full cursor-pointer")}>
+                          <span className={chip}><I className="size-5" /></span><span className="flex-1 text-start">{c.label}</span>
+                          <ChevronDown className={cn("size-4 shrink-0 text-muted transition-transform", isOpen && "rotate-180")} aria-hidden />
+                        </button>
+                      ) : (
+                        <Link href={`/shop#${c.slug}`} onClick={close} className={row}><span className={chip}><I className="size-5" /></span><span className="flex-1 text-start">{c.label}</span></Link>
+                      )}
+                      {c.subs.length > 0 && isOpen && (
+                        <div className="flex flex-wrap gap-1.5 px-3 pb-2 pe-16 pt-1" data-subcats>
+                          <Link href={`/shop#${c.slug}`} onClick={close} className="rounded-full bg-primary/12 px-3 py-1.5 text-[12px] font-bold text-primary">همه {c.label}</Link>
+                          {c.subs.map((sb) => <Link key={sb.slug} href={`/shop#${sb.slug}`} onClick={close} className="rounded-full bg-surface-2 px-3 py-1.5 text-[12px] font-medium hover:bg-primary/10 hover:text-primary">{sb.label}</Link>)}
+                        </div>
+                      )}
+                    </li>
                   ); })}
                 </ul>
               </>
