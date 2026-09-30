@@ -59,6 +59,8 @@ export const createOrderSchema = z.object({
   useWallet: z.boolean().default(false),
   redeemPoints: z.coerce.number().int().min(0).max(100_000_000).default(0),
   note: z.string().trim().max(300).optional(),
+  /** Fingerprint from the quote the customer confirmed (detects a price change in between). Optional for API clients. */
+  priceHash: z.string().max(64).optional(),
 });
 export const referenceSchema = z.string().transform(toLatinDigits).transform((v) => v.trim()).refine((v) => /^[A-Za-z0-9\-_/.]{4,40}$/.test(v), "شماره پیگیری را درست وارد کنید (۴ تا ۴۰ حرف یا عدد).");
 export const rejectSchema = z.object({ reason: z.string().trim().min(3, "دلیل رد را بنویسید.").max(300) });

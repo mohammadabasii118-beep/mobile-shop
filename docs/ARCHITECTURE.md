@@ -188,3 +188,6 @@ lib/server/admin/finance.ts      admin wallet / loyalty views and idempotent adj
 - **Finance:** proportional loyalty reversal on partial refunds (`reversePartialPoints`), setting `finance.fourEyes`.
 - **Production tooling:** `prisma/rbac.ts` (single RBAC source), `scripts/bootstrap-production.ts`, `scripts/preflight.ts`, `scripts/backup.sh` / `restore.sh`, `/api/health`, JSON logger `lib/server/log.ts`. See `docs/PRODUCTION.md`, `docs/EXTERNAL_SERVICES.md`.
 - **Tests:** `scripts/e2e-phase5.test.ts` (35 tests). Run against a production build: `ALLOW_INSECURE_HTTP=1 TRUST_PROXY=1 AUTH_SECRET=<same as tests> npm start -- -p 3300`.
+
+## Phase 6 — variants, pricing engine, discounts
+See `docs/PRICING.md`. Code: `lib/server/price-engine/*` (calc, rules, discounts, line, storefront), `lib/server/admin/pricing.ts`, admin pages `/admin/pricing`, `/admin/discounts`, `/admin/colors`. Tests: `scripts/unit-pricing.test.ts` (9, pure) and `scripts/e2e-phase6.test.ts` (32).

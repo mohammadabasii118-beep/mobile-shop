@@ -6,7 +6,7 @@ import { badRequest, conflict, notFound } from "@/lib/server/errors";
 import { audit, diff, pageParams, type AdminCtx } from "@/lib/server/admin/core";
 import { recordSlugChange } from "@/lib/server/redirects";
 import { slug } from "@/lib/server/admin/resources";
-import { recomputePrices } from "@/lib/server/price-engine/rules";
+import { recomputePrices, type OldCosts } from "@/lib/server/price-engine/rules";
 
 const txt = (max: number) => z.string().trim().max(max).transform((v) => (v === "" ? null : v)).nullable().optional();
 const money = z.coerce.number().int("عدد صحیح وارد کنید.").min(0).max(2_000_000_000);
@@ -83,8 +83,7 @@ async function resolveAxes(tx: Prisma.TransactionClient, v: { name?: string; pho
   if (v.phoneModelId && !model) throw badRequest("مدل گوشی انتخاب‌شده پیدا نشد.", "validation");
   if (v.colorId && !color) throw badRequest("رنگ انتخاب‌شده پیدا نشد.", "validation");
   const generated = [model?.name, color?.name].filter(Boolean).join(" · ");
-  const name = (v.name && v.name.trim()) || generated || "";
-  if (!name) throw badRequest("نام تنوع لازم است.", "validation");
+  const name = (v.name && v.name.trim()) || generated || "پیش‌فرض";
   return { name, ...(color ? { color: color.name, colorHex: color.hex } : {}) };
 }
 
@@ -159,6 +158,8 @@ export async function updateProduct(id: string, body: unknown, a: AdminCtx) {
   await db.$transaction(async (tx) => {
     const cur = await tx.product.findUnique({ where: { id } });
     if (!cur) throw notFound("محصول پیدا نشد.");
+    // Costs as they were before this edit, so price history can show old → new cost.
+    const oldCosts: OldCosts = { product: cur.costPrice, variants: new Map((await tx.productVariant.findMany({ where: { productId: id }, select: { id: true, costPrice: true } })).map((v) => [v.id, v.costPrice])) };
     const nextMode = fields.pricingMode ?? cur.pricingMode;
     if (nextMode !== "AUTOMATIC") checkPrices(fields, cur);
     // In AUTOMATIC mode the selling price belongs to the engine; a typed value is ignored.
@@ -210,7 +211,7 @@ export async function updateProduct(id: string, body: unknown, a: AdminCtx) {
       }
     }
     const touchesPricing = "costPrice" in fields || "pricingMode" in fields || (variants ?? []).some((v) => v.costPrice !== undefined || v.pricingMode !== undefined);
-    if (touchesPricing || nextMode === "AUTOMATIC" || variants) await recomputePrices(tx, { productIds: [id] }, { apply: true, adminId: a.admin.id, source: "manual", reason: "ویرایش محصول" });
+    if (touchesPricing || nextMode === "AUTOMATIC" || variants) await recomputePrices(tx, { productIds: [id] }, { apply: true, adminId: a.admin.id, source: "manual", reason: "ویرایش محصول", oldCosts });
     const change = { ...df.next, ...(phoneModelIds ? { phoneModelIds } : {}), ...(images ? { images: images.length } : {}), ...(variants ? { variants: variants.length } : {}) };
     if (Object.keys(change).length) await audit(a, "product.update", "product", id, { ...df.old, ...(priceLog.length ? { priceHistory: priceLog } : {}) }, change, tx);
   });

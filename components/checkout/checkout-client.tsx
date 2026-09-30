@@ -7,7 +7,8 @@ import { formatToman, toFa } from "@/lib/utils";
 
 interface Address { id: string; title: string | null; receiver: string; phone: string; province: string; city: string; postalCode: string | null; address: string; isDefault: boolean }
 interface Quote {
-  lines: { name: string; option: string | null; quantity: number; unitPrice: number; total: number; priceType: string; inStock: boolean }[];
+  lines: { name: string; option: string | null; quantity: number; unitPrice: number; total: number; priceType: string; inStock: boolean; originalPrice?: number; discountAmount?: number; discountLabel?: string | null }[];
+  priceHash?: string;
   subtotal: number; discount: number; couponCode: string | null; couponError: string | null;
   shippingMethods: { id: string; name: string; description: string | null; cost: number; freeThreshold: number | null }[];
   shipping: number; total: number; issues: string[]; isWholesale: boolean;
@@ -81,7 +82,7 @@ export function CheckoutClient({ initialAddresses, providers, initialCoupon }: {
     if (!addressId) return setErr("آدرس تحویل را انتخاب کنید.");
     if (!shippingId) return setErr("روش ارسال را انتخاب کنید.");
     setBusy(true);
-    const r = await api<{ number: number }>("POST", "/api/checkout/orders", { addressId, shippingMethodId: shippingId, paymentMethod: payment, useWallet, redeemPoints: redeem, note: note || undefined, couponCode: quote?.couponCode ?? undefined });
+    const r = await api<{ number: number }>("POST", "/api/checkout/orders", { addressId, shippingMethodId: shippingId, paymentMethod: payment, useWallet, redeemPoints: redeem, note: note || undefined, couponCode: quote?.couponCode ?? undefined, priceHash: quote?.priceHash });
     if (r.ok) { window.dispatchEvent(new Event("cl:cart-changed")); // Full navigation so the header cart badge and server data are fresh.
  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
  window.location.href = `/account/orders/${r.data.number}`; return; }
@@ -153,7 +154,7 @@ export function CheckoutClient({ initialAddresses, providers, initialCoupon }: {
           <h2 className="mb-2 text-base font-black">سفارش شما</h2>
           <ul className="divide-y divide-border/60 text-xs">
             {(quote?.lines ?? []).map((l, i) => (
-              <li key={i} className="flex items-start justify-between gap-2 py-2.5"><span className="min-w-0"><b className="line-clamp-2">{l.name}</b>{l.option && <span className="block text-muted">{l.option}</span>}<span className="text-muted">{formatToman(l.unitPrice)} × {toFa(l.quantity)}{l.priceType === "wholesale" ? " · قیمت همکار" : ""}</span>{!l.inStock && <span className="block font-bold text-hot">موجودی کافی نیست</span>}</span><b className="whitespace-nowrap">{formatToman(l.total)}</b></li>
+              <li key={i} className="flex items-start justify-between gap-2 py-2.5"><span className="min-w-0"><b className="line-clamp-2">{l.name}</b>{l.option && <span className="block text-muted">{l.option}</span>}<span className="text-muted">{formatToman(l.unitPrice)} × {toFa(l.quantity)}{l.priceType === "wholesale" ? " · قیمت همکار" : ""}{l.priceType !== "wholesale" && l.discountAmount ? ` · ${l.discountLabel ?? "تخفیف"}` : ""}</span>{!l.inStock && <span className="block font-bold text-hot">موجودی کافی نیست</span>}</span><b className="whitespace-nowrap">{formatToman(l.total)}</b></li>
             ))}
           </ul>
           <div className="mt-3 space-y-1.5 text-xs font-medium">
