@@ -17,6 +17,8 @@ export const SETTING_SCHEMAS = {
   }),
   shipping: z.object({ freeThreshold: z.coerce.number().int().min(0).max(2_000_000_000).default(0) }),
   loyalty: loyaltySchema,
+  // fourEyes: the staff member who requested a bank refund may not be the one who approves it (default on).
+  finance: z.object({ fourEyes: z.boolean().default(true) }),
   general: z.object({ currency: t(20), lowStockNotify: z.boolean().default(true) }),
 } as const;
 export type SettingKey = keyof typeof SETTING_SCHEMAS;

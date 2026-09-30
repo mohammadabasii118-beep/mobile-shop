@@ -20,8 +20,19 @@ export function env(): Env {
     const parsed = schema.safeParse(process.env);
     if (!parsed.success) throw new Error("Invalid environment: " + parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
     cached = parsed.data;
+    const problems = productionProblems(cached);
+    if (problems.length && process.env.NEXT_PHASE !== "phase-production-build") throw new Error("Unsafe production configuration: " + problems.join("; "));
   }
   return cached;
+}
+
+/** Settings that must never reach a real deployment. Also used by scripts/preflight.ts. Empty outside production. */
+export function productionProblems(e: Env, nodeEnv = process.env.NODE_ENV): string[] {
+  if (nodeEnv !== "production") return [];
+  const out: string[] = [];
+  if (/^(change|replace|secret|dev|test|example|x+$)/i.test(e.AUTH_SECRET) || new Set(e.AUTH_SECRET).size < 10) out.push("AUTH_SECRET looks like a placeholder — generate one with `openssl rand -base64 48`");
+  if (!e.APP_URL.startsWith("https://") && process.env.ALLOW_INSECURE_HTTP !== "1") out.push("APP_URL must be https:// (set ALLOW_INSECURE_HTTP=1 only for a private staging check)");
+  return out;
 }
 
 export const isProd = () => process.env.NODE_ENV === "production";

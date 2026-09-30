@@ -14,5 +14,6 @@ export async function rateLimit(key: string, limit: number, windowSec: number) {
       "resetAt" = CASE WHEN "RateLimit"."resetAt" < now() THEN now() + make_interval(secs => ${windowSec}::double precision) ELSE "RateLimit"."resetAt" END
     RETURNING "count", "resetAt"`;
   const row = rows[0]!;
+  if (Math.random() < 0.01) void db.$executeRaw`DELETE FROM "RateLimit" WHERE "resetAt" < now() - interval '1 hour'`.catch(() => {}); // opportunistic cleanup
   if (row.count > limit) throw tooMany(Math.max(1, Math.ceil((row.resetAt.getTime() - Date.now()) / 1000)));
 }

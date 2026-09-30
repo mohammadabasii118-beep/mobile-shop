@@ -13,7 +13,7 @@ const securityHeaders = [
   ...(https ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }] : []),
 ];
 const noIndex = { key: "X-Robots-Tag", value: "noindex, nofollow" };
-const noStore = { key: "Cache-Control", value: "no-store" };
+const noStore = { key: "Cache-Control", value: "private, no-store" };
 // Unversioned static scripts: short browser cache, long stale-while-revalidate, so repeat visits are instant.
 const staticJs = { key: "Cache-Control", value: "public, max-age=3600, stale-while-revalidate=86400" };
 

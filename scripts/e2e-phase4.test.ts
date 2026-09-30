@@ -59,8 +59,10 @@ describe("Phase 4 — business systems", () => {
     const cat = await db.category.findFirstOrThrow({ where: { parentId: { not: null } } }); catId = cat.id;
     freeShip = ok(await admin.post("/api/admin/r/shipping", { key: "free-" + uid(), name: "تحویل حضوری تست", cost: 0 })).id;
     await setRules();
+    // These Phase 4 tests use ONE admin as requester and approver; Phase 5 four-eyes enforcement is covered in e2e-phase5.
+    await db.siteSetting.upsert({ where: { key: "finance" }, update: { value: { fourEyes: false } }, create: { key: "finance", value: { fourEyes: false } } });
   });
-  after(async () => { await setRules(); await db.$disconnect(); });
+  after(async () => { await db.siteSetting.deleteMany({ where: { key: "finance" } }); await setRules(); await db.$disconnect(); });
 
   describe("Wallet", () => {
     it("admin credit records amount, direction, before/after, reference, actor; audit + notification; customer sees it", async () => {

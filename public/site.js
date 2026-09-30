@@ -7,7 +7,8 @@
   var fa = function (n) { return Number(n).toLocaleString("fa-IR"); };
   var toman = function (n) { return fa(n) + " تومان"; };
   var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
-  var thumb = function (h, img) { return '<span class="cl-thumb" style="background:' + (img ? "url(" + encodeURI(img) + ") center/cover" : "linear-gradient(160deg,hsl(" + h + " 80% 56%),hsl(" + ((h + 40) % 360) + " 70% 30%))") + '"></span>'; };
+  var safeUrl = function (u) { return encodeURI(String(u)).replace(/[()'"]/g, function (c) { return "%" + c.charCodeAt(0).toString(16); }); };
+  var thumb = function (h, img) { h = Number(h) || 0; return '<span class="cl-thumb" style="background:' + (img ? "url(" + safeUrl(img) + ") center/cover" : "linear-gradient(160deg,hsl(" + h + " 80% 56%),hsl(" + ((h + 40) % 360) + " 70% 30%))") + '"></span>'; };
   function J(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
   function W(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   function today() { return new Date().toLocaleDateString("fa-IR", { year: "numeric", month: "2-digit", day: "2-digit" }); }
@@ -48,7 +49,7 @@
     }
     body.innerHTML = msg + cart.lines.map(function (l) {
       return '<div class="cl-line">' + thumb(l.hue, l.image) + '<div class="cl-info"><a href="/product/' + encodeURIComponent(l.slug) + '">' + esc(l.name) + '</a>' + (l.option ? '<small>' + esc(l.option) + '</small>' : "") + (l.priceType === "wholesale" ? '<small class="cl-ws">قیمت همکار</small>' : "") + (l.available ? "" : '<small class="cl-bad">موجودی کافی نیست</small>') +
-        '<div class="cl-row"><span class="cl-qty"><button data-qty-set="' + l.id + '" data-q="' + (l.quantity + 1) + '" aria-label="افزایش">+</button><i>' + fa(l.quantity) + '</i><button data-qty-set="' + l.id + '" data-q="' + (l.quantity - 1) + '" aria-label="کاهش">−</button></span><b>' + toman(l.lineTotal) + '</b></div></div><button class="cl-rm" data-rm="' + l.id + '" aria-label="حذف">✕</button></div>';
+        '<div class="cl-row"><span class="cl-qty"><button data-qty-set="' + esc(l.id) + '" data-q="' + (l.quantity + 1) + '" aria-label="افزایش">+</button><i>' + fa(l.quantity) + '</i><button data-qty-set="' + esc(l.id) + '" data-q="' + (l.quantity - 1) + '" aria-label="کاهش">−</button></span><b>' + toman(l.lineTotal) + '</b></div></div><button class="cl-rm" data-rm="' + esc(l.id) + '" aria-label="حذف">✕</button></div>';
     }).join("");
     foot.innerHTML = '<div class="cl-total"><span>جمع:</span><b>' + toman(cart.subtotal) + '</b></div><a class="cl-btn" href="/checkout">تسویه حساب</a><button class="cl-btn cl-btn-ghost" data-close>ادامه خرید</button>';
   }

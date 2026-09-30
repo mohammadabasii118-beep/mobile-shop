@@ -60,7 +60,12 @@ export async function reverseOrderPoints(tx: Tx, orderId: string, byId?: string)
   const o = await tx.order.findUnique({ where: { id: orderId } });
   if (!o?.userId) return;
   const earned = await tx.loyaltyTransaction.findUnique({ where: { reference: `earn:${orderId}` } });
-  if (earned && earned.points > 0) await pointsApply(tx, { userId: o.userId, points: -earned.points, type: "reverse", reference: `earn-reverse:${orderId}`, description: `بازگشت امتیاز سفارش ${o.number} (لغو/مرجوعی)`, orderId, byId, floorAtZero: true });
+  if (earned && earned.points > 0) {
+    // Partial refunds already took back their share; only the remainder is reversed now.
+    const partial = await tx.loyaltyTransaction.findMany({ where: { orderId, reference: { startsWith: "earn-partial:" } }, select: { points: true } });
+    const remaining = earned.points + partial.reduce((a, t) => a + t.points, 0); // partial rows are negative
+    if (remaining > 0) await pointsApply(tx, { userId: o.userId, points: -remaining, type: "reverse", reference: `earn-reverse:${orderId}`, description: `بازگشت امتیاز سفارش ${o.number} (لغو/مرجوعی)`, orderId, byId, floorAtZero: true });
+  }
   if (o.loyaltyPointsUsed > 0) await pointsApply(tx, { userId: o.userId, points: o.loyaltyPointsUsed, type: "restore", reference: `redeem-restore:${orderId}`, description: `بازگشت امتیاز مصرف‌شده سفارش ${o.number}`, orderId, byId });
 }
 
@@ -80,3 +85,18 @@ export function quoteRedeem(rules: LoyaltyRules, balance: number, requested: num
   return { ...base, applied, discount: applied * rules.pointValue };
 }
 export const assertRedeem = (q: RedeemQuote) => { if (q.error) throw badRequest(q.error, "loyalty_invalid"); };
+
+/**
+ * Partial refund: take back the share of the earned points that matches the refunded share of the money paid.
+ * Points already spent on the order and the coupon are NOT touched by a partial refund (documented limitation);
+ * both are restored only when the order is fully refunded or cancelled.
+ */
+export async function reversePartialPoints(tx: Tx, orderId: string, refundId: string, refundAmount: number, totalPaid: number, byId?: string) {
+  const o = await tx.order.findUnique({ where: { id: orderId } });
+  if (!o?.userId || totalPaid <= 0) return;
+  const earned = await tx.loyaltyTransaction.findUnique({ where: { reference: `earn:${orderId}` } });
+  if (!earned || earned.points <= 0) return;
+  const share = Math.floor((earned.points * Math.min(refundAmount, totalPaid)) / totalPaid);
+  if (share <= 0) return;
+  await pointsApply(tx, { userId: o.userId, points: -share, type: "reverse", reference: `earn-partial:${refundId}`, description: `کسر امتیاز متناسب با بازگشت وجه جزئی سفارش ${o.number}`, orderId, byId, floorAtZero: true });
+}

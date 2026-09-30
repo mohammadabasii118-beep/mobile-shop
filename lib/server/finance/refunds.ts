@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
 import type { Prisma, Refund } from "@/lib/generated/prisma/client";
-import { badRequest, conflict, forbidden, notFound } from "@/lib/server/errors";
+import { AppError, badRequest, conflict, forbidden, notFound } from "@/lib/server/errors";
 import { audit, type AdminCtx } from "@/lib/server/admin/core";
 import { walletApply } from "@/lib/server/finance/wallet";
-import { reverseOrderPoints } from "@/lib/server/finance/loyalty";
+import { reverseOrderPoints, reversePartialPoints } from "@/lib/server/finance/loyalty";
 import { restockOrder, rollbackCoupon } from "@/lib/server/finance/lifecycle";
 import { notify } from "@/lib/server/notify";
 import type { SessionUser } from "@/lib/server/auth/session";
@@ -30,6 +30,12 @@ export async function refundSummary(tx: Tx, orderId: string) {
   const reservedBank = live.filter((r) => r.method === "bank").reduce((a, r) => a + r.amount, 0);
   const completed = o.refunds.filter((r) => r.status === "COMPLETED").reduce((a, r) => a + r.amount, 0);
   return { order: o, cardPaid, walletPaid, totalPaid, reserved, completed, refundable: totalPaid - reserved, bankRefundable: Math.min(totalPaid - reserved, cardPaid - reservedBank) };
+}
+
+/** Separation of duties for bank refunds. On unless an owner explicitly turns it off in settings ("finance"). */
+async function fourEyesEnabled(tx: Tx) {
+  const row = await tx.siteSetting.findUnique({ where: { key: "finance" } });
+  return (row?.value as { fourEyes?: boolean } | null)?.fourEyes !== false;
 }
 
 export const requestSchema = z.object({
@@ -86,6 +92,7 @@ async function afterCompleted(tx: Tx, refund: Refund, actorId: string) {
     await rollbackCoupon(tx, o.id);
     await reverseOrderPoints(tx, o.id, actorId);
   } else {
+    await reversePartialPoints(tx, o.id, refund.id, refund.amount, s.totalPaid, actorId);
     await tx.orderStatusHistory.create({ data: { orderId: o.id, status: o.status, description: `بازگشت وجه جزئی: ${refund.amount.toLocaleString("fa-IR")} تومان`, createdById: actorId } });
   }
   if (o.userId) await notify(tx, o.userId, "refund_completed", { title: "بازگشت وجه انجام شد", body: `${refund.amount.toLocaleString("fa-IR")} تومان ${refund.method === "wallet" ? "به کیف پول شما واریز شد." : `به حساب شما واریز شد. شماره پیگیری: ${refund.bankReference}`}`, link: `/account/orders/${o.number}`, data: { refundId: refund.id } });
@@ -127,6 +134,7 @@ export async function completeBankRefund(refundId: string, body: unknown, a: Adm
     const r = await tx.refund.findUnique({ where: { id: refundId } });
     if (!r) throw notFound("درخواست پیدا نشد.");
     if (r.method !== "bank") throw conflict("این بازگشت وجه بانکی نیست.", "not_bank");
+    if (r.requestedById && r.requestedById === a.admin.id && (await fourEyesEnabled(tx))) throw new AppError(403, "four_eyes", "درخواست‌دهنده نمی‌تواند همان بازگشت وجه را تأیید کند؛ مدیر دیگری باید تأیید کند.");
     const claimed = await tx.refund.updateMany({ where: { id: refundId, status: "PENDING_BANK" }, data: { status: "COMPLETED", bankReference: d.bankReference, completedById: a.admin.id, completedAt: new Date() } });
     if (claimed.count !== 1) throw conflict("این بازگشت وجه قابل تکمیل نیست (قبلاً انجام یا لغو شده).", "already_handled");
     const done = await tx.refund.findUniqueOrThrow({ where: { id: refundId } });

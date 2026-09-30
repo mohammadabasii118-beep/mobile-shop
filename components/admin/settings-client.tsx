@@ -25,6 +25,7 @@ const SECTIONS: { key: string; title: string; desc?: string; fields: F[] }[] = [
     { key: "minRedeemPoints", label: "حداقل امتیاز برای استفاده", type: "number", ltr: true },
     { key: "maxRedeemPercent", label: "حداکثر درصدی از مبلغ کالا که با امتیاز قابل پرداخت است", type: "number", ltr: true },
   ] },
+  { key: "finance", title: "کنترل مالی", desc: "جداسازی وظایف: کسی که بازگشت وجه بانکی را ثبت کرده نمی‌تواند همان را تأیید کند. خاموش کردن فقط برای فروشگاه‌های تک‌نفره توصیه می‌شود.", fields: [{ key: "fourEyes", label: "تأیید بازگشت وجه بانکی توسط شخصی غیر از درخواست‌دهنده", type: "bool" }] },
   { key: "general", title: "تنظیمات عمومی", fields: [{ key: "currency", label: "واحد پول" }, { key: "lowStockNotify", label: "هشدار کم‌موجودی", type: "bool" }] },
 ];
 
