@@ -72,8 +72,8 @@ export function MobileMenu({ menu, links = [], loggedIn, logo, name, className }
       <button type="button" aria-label="منو" aria-expanded={open} onClick={() => setOpen(true)} className="grid size-10 cursor-pointer place-items-center rounded-full bg-surface text-foreground/80 shadow-sm ring-1 ring-transparent transition-all duration-200 hover:bg-primary/10 hover:text-primary hover:shadow-md hover:ring-primary/35"><Menu className="size-5" /></button>
       {open && createPortal( // portal: the floating header is transformed, which would otherwise trap a fixed overlay
         <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label="منوی سایت" data-mobile-menu>
-          <button type="button" aria-label="بستن منو" className="absolute inset-0 cursor-default bg-black/35 backdrop-blur-[2px]" onClick={close} />
-          <aside className="glass absolute inset-y-3 start-3 flex w-[min(340px,86vw)] flex-col overflow-y-auto rounded-[28px] p-4 shadow-2xl">
+          <button type="button" aria-label="بستن منو" className="cl-fade-in absolute inset-0 cursor-default bg-black/35 backdrop-blur-[2px]" onClick={close} />
+          <aside className="glass cl-slide-from-right absolute inset-y-3 right-3 flex w-[80vw] max-w-[360px] flex-col overflow-y-auto rounded-[28px] p-4 shadow-2xl">
             <div className="flex items-center justify-between gap-3">
               {logo ? (
                 // eslint-disable-next-line @next/next/no-img-element
