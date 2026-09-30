@@ -44,8 +44,14 @@ export async function plantOtp(phone: string, purpose: "login" | "reset", code =
   await db.otpCode.create({ data: { phone, purpose, codeHash: __hashOtpForTests(phone, purpose, code), expiresAt: new Date(Date.now() + 120_000) } });
   return code;
 }
+/** Creates a plain customer with a phone number directly (public sign-up is e-mail + password; phone-code login only serves existing accounts). */
+export async function seedUser(phone = newPhone()) {
+  const role = await db.role.findUniqueOrThrow({ where: { key: "customer" } });
+  return db.user.create({ data: { phone, phoneVerifiedAt: new Date(), roles: { create: { roleId: role.id } } } });
+}
 export async function registerAndLogin(c = new Client()) {
   const phone = newPhone();
+  await seedUser(phone);
   const r = await c.post("/api/auth/otp/verify", { phone, code: await plantOtp(phone, "login") });
   assert.equal(r.status, 200, JSON.stringify(r.json));
   return { c, phone, userId: (await db.user.findUniqueOrThrow({ where: { phone } })).id };

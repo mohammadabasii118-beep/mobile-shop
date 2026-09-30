@@ -1,6 +1,6 @@
 import { getSmsProvider } from "@/lib/server/auth/sms";
 
-export interface Recipient { phone: string; email: string | null }
+export interface Recipient { phone: string | null; email: string | null }
 export interface OutgoingMessage { title: string; body: string | null; link: string | null }
 
 /**
@@ -16,7 +16,7 @@ export interface ChannelProvider {
 const sms: ChannelProvider = {
   key: "sms",
   configured: () => true, // uses the SmsProvider abstraction (console in development)
-  send: (to, m) => getSmsProvider().send(to.phone, `${m.title}${m.body ? ` — ${m.body}` : ""}`),
+  send: async (to, m) => { if (!to.phone) throw new Error("no_phone"); await getSmsProvider().send(to.phone, `${m.title}${m.body ? ` — ${m.body}` : ""}`); },
 };
 const email: ChannelProvider = {
   key: "email",

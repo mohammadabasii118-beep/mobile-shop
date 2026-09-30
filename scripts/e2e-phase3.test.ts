@@ -582,7 +582,7 @@ async function loginForOrder(number: number) {
   const o = await db.order.findUniqueOrThrow({ where: { number }, include: { user: true } });
   const { plantOtp } = await import("./test-utils");
   const c = new Client();
-  const code = await plantOtp(o.user!.phone, "login");
+  const code = await plantOtp(o.user!.phone!, "login");
   const r = await c.post("/api/auth/otp/verify", { phone: o.user!.phone, code });
   assert.equal(r.status, 200);
   return c;

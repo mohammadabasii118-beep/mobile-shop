@@ -38,7 +38,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { label: "تیکت در انتظار پاسخ", count: tk, href: "/admin/support?status=open" },
   ].filter((n) => n.count > 0);
   return (
-    <AdminShell user={{ name: user.displayName ?? user.phone, phone: user.phone, roles: user.roles.map((r) => ROLE_NAMES[r] ?? r) }} perms={user.permissions} notices={notices}>
+    <AdminShell user={{ name: user.displayName ?? user.phone ?? user.email ?? "", phone: user.phone ?? user.email ?? "", roles: user.roles.map((r) => ROLE_NAMES[r] ?? r) }} perms={user.permissions} notices={notices}>
       {children}
     </AdminShell>
   );

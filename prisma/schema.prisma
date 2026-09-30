@@ -15,7 +15,7 @@ datasource db {
 
 model User {
   id                String    @id @default(cuid())
-  phone             String    @unique
+  phone             String?   @unique // optional: accounts created with e-mail + password have no phone
   email             String?   @unique
   passwordHash      String?
   firstName         String?
@@ -679,11 +679,13 @@ model WholesaleApplication {
   userId       String?
   user         User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
   name         String
+  email        String?
   phone        String
   storeName    String
   businessType String // instagram_shop | online_shop | physical_store | other
   instagram    String?
   website      String?
+  province     String?
   city         String
   address      String
   description  String?

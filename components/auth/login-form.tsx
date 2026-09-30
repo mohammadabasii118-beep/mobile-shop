@@ -10,12 +10,15 @@ type Step = "phone" | "otp" | "newpass";
 type Purpose = "login" | "reset";
 
 export function LoginForm({ next }: { next: string }) {
-  const [mode, setMode] = useState<"otp" | "password">("otp");
+  const [mode, setMode] = useState<"otp" | "password" | "register">("password");
   const [step, setStep] = useState<Step>("phone");
   const [purpose, setPurpose] = useState<Purpose>("login");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [pass2, setPass2] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [dupEmail, setDupEmail] = useState(false);
   const [digits, setDigits] = useState(["", "", "", ""]);
   const [ticket, setTicket] = useState("");
   const [busy, setBusy] = useState(false);
@@ -34,10 +37,10 @@ export function LoginForm({ next }: { next: string }) {
   const destination = (needsProfile: boolean) => (needsProfile ? `/account/profile?next=${encodeURIComponent(safeNext(next))}` : safeNext(next));
 
   async function run<T>(p: Promise<{ ok: true; data: T } | { ok: false; error: { message: string } }>, then: (d: T) => void) {
-    setErr(""); setInfo(""); setBusy(true);
+    setErr(""); setInfo(""); setDupEmail(false); setBusy(true);
     const [r] = await Promise.all([p, new Promise((res) => setTimeout(res, 700))]); // short delay so the loading animation is visible
     setBusy(false);
-    if (r.ok) then(r.data); else setErr(r.error.message);
+    if (r.ok) then(r.data); else { setErr(r.error.message); setDupEmail((r.error as { code?: string }).code === "email_taken"); }
   }
 
   const sendOtp = (p: Purpose) =>
@@ -50,8 +53,9 @@ export function LoginForm({ next }: { next: string }) {
     e.preventDefault();
     if (busy) return;
     if (step === "phone") {
+      if (mode === "register") return void run(api<{ needsProfile: boolean }>("POST", "/api/auth/register", { fullName, email, password }), (d) => go(destination(d.needsProfile)));
       if (mode === "otp") return void sendOtp("login");
-      return void run(api<{ needsProfile: boolean }>("POST", "/api/auth/login", { phone, password }), (d) => go(destination(d.needsProfile)));
+      return void run(api<{ needsProfile: boolean }>("POST", "/api/auth/login", { identifier: phone, password }), (d) => go(destination(d.needsProfile)));
     }
     if (step === "otp") {
       const code = digits.join("");
@@ -79,7 +83,7 @@ export function LoginForm({ next }: { next: string }) {
   }
 
   const title = step === "newpass" ? "رمز عبور جدید" : "به پنل کاربری خوش آمدید.";
-  const btn = step === "phone" ? (mode === "otp" ? "ارسال کد" : "ورود") : step === "otp" ? "تایید" : "تغییر رمز عبور";
+  const btn = step === "phone" ? (mode === "register" ? "ثبت‌نام" : mode === "otp" ? "ارسال کد" : "ورود") : step === "otp" ? "تایید" : "تغییر رمز عبور";
 
   return (
     <div data-login-card data-loading={busy} className="login-card relative w-full max-w-[330px] rounded-[28px] border border-white/60 bg-surface/70 p-6 shadow-lg backdrop-blur-xl dark:border-border">
@@ -90,19 +94,34 @@ export function LoginForm({ next }: { next: string }) {
         <form onSubmit={submit} className="mt-3 text-center" noValidate>
           <h1 className="text-base font-black">{title}</h1>
 
-          {step === "phone" && (
+          {step === "phone" && mode === "register" && (
             <div>
-              <p className="mt-3 text-[11.5px] leading-6 text-muted">{mode === "otp" ? "شماره موبایل خود را وارد کنید تا کد تایید برایتان ارسال شود. اگر حساب ندارید، همین‌جا ساخته می‌شود." : "شماره موبایل و رمز عبور خود را وارد کنید."}</p>
-              <label htmlFor="login-phone" className="mt-5 block text-start text-xs font-bold">شماره موبایل</label>
-              <input id="login-phone" name="phone" type="tel" dir="ltr" inputMode="numeric" autoComplete="tel" placeholder="09xxxxxxxxx" value={phone} onChange={(e) => setPhone(e.target.value)} className={`${field} mt-2 tracking-widest`} />
+              <p className="mt-3 text-[11.5px] leading-6 text-muted">برای ساخت حساب، نام، ایمیل و رمز عبور خود را وارد کنید.</p>
+              <label htmlFor="reg-name" className="mt-5 block text-start text-xs font-bold">نام و نام خانوادگی</label>
+              <input id="reg-name" name="fullName" type="text" autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} className={`${field} mt-2`} />
+              <label htmlFor="reg-email" className="mt-4 block text-start text-xs font-bold">ایمیل</label>
+              <input id="reg-email" name="email" type="email" dir="ltr" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} className={`${field} mt-2`} />
+              <label htmlFor="reg-pass" className="mt-4 block text-start text-xs font-bold">رمز عبور</label>
+              <input id="reg-pass" name="password" type="password" dir="ltr" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} className={`${field} mt-2`} />
+              <div className="mt-3 text-[11px]"><button type="button" onClick={() => { setMode("password"); setErr(""); setDupEmail(false); }} className="cursor-pointer text-primary hover:underline">قبلاً ثبت‌نام کرده‌اید؟ ورود</button></div>
+              <div className="mt-2 text-[11px]"><Link href="/partner/register" className="text-primary hover:underline">ثبت‌نام / درخواست همکاری</Link></div>
+            </div>
+          )}
+
+          {step === "phone" && mode !== "register" && (
+            <div>
+              <p className="mt-3 text-[11.5px] leading-6 text-muted">{mode === "otp" ? "شماره موبایل ثبت‌شده در حساب خود را وارد کنید تا کد تایید برایتان ارسال شود." : "ایمیل یا شماره موبایل و رمز عبور خود را وارد کنید."}</p>
+              <label htmlFor="login-phone" className="mt-5 block text-start text-xs font-bold">{mode === "otp" ? "شماره موبایل" : "ایمیل یا شماره موبایل"}</label>
+              <input id="login-phone" name="phone" type={mode === "otp" ? "tel" : "text"} dir="ltr" inputMode={mode === "otp" ? "numeric" : "email"} autoComplete={mode === "otp" ? "tel" : "username"} placeholder={mode === "otp" ? "09xxxxxxxxx" : ""} value={phone} onChange={(e) => setPhone(e.target.value)} className={`${field} mt-2 ${mode === "otp" ? "tracking-widest" : ""}`} />
               {mode === "password" && (
                 <>
                   <label htmlFor="login-pass" className="mt-4 block text-start text-xs font-bold">رمز عبور</label>
                   <input id="login-pass" name="password" type="password" dir="ltr" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className={`${field} mt-2`} />
-                  <div className="mt-2 text-start"><button type="button" onClick={() => phone ? sendOtp("reset") : setErr("ابتدا شماره موبایل را وارد کنید.")} className="cursor-pointer text-[11px] text-primary hover:underline">فراموشی رمز عبور</button></div>
+                  <div className="mt-2 text-start"><button type="button" onClick={() => phone && !phone.includes("@") ? sendOtp("reset") : setErr(phone.includes("@") ? "بازیابی رمز عبور برای حساب‌های ایمیلی از طریق پشتیبانی انجام می‌شود." : "ابتدا شماره موبایل را وارد کنید.")} className="cursor-pointer text-[11px] text-primary hover:underline">فراموشی رمز عبور</button></div>
                 </>
               )}
               <div className="mt-3 text-[11px]"><button type="button" onClick={() => { setMode(mode === "otp" ? "password" : "otp"); setErr(""); setInfo(""); }} className="cursor-pointer text-primary hover:underline">{mode === "otp" ? "ورود با رمز عبور" : "ورود با کد پیامکی"}</button></div>
+              <div className="mt-2 text-[11px]"><button type="button" onClick={() => { setMode("register"); setErr(""); setInfo(""); setPassword(""); }} className="cursor-pointer text-primary hover:underline">حساب ندارید؟ ثبت‌نام</button></div>
             </div>
           )}
 
@@ -135,7 +154,7 @@ export function LoginForm({ next }: { next: string }) {
             </div>
           )}
 
-          <p role="alert" className="mt-2 min-h-4 text-xs text-hot">{err}</p>
+          <p role="alert" className="mt-2 min-h-4 text-xs text-hot">{err}{dupEmail && <> <button type="button" onClick={() => { setMode("password"); setPhone(email); setErr(""); setDupEmail(false); }} className="cursor-pointer font-bold text-primary hover:underline">ورود به حساب</button></>}</p>
           {info && <p className="text-xs text-success">{info}</p>}
           <button type="submit" disabled={busy} className="mt-2 flex h-12 w-full cursor-pointer items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-fg shadow-md transition-colors hover:bg-primary-hover disabled:opacity-60">{btn}</button>
           <p className="mt-6 text-[10.5px] leading-5 text-muted">با ورود یا ثبت‌نام در سایت، شما قوانین و مقررات استفاده از سایت کیس‌لاین را قبول می‌کنید.</p>

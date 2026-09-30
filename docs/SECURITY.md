@@ -36,3 +36,6 @@ Verified with no change needed: IDOR on orders / receipts / tickets, admin API 4
 - Receipt download returns 403 (not 404) to a non-owner: ids are unguessable cuids.
 - `npm audit`: 4 advisories only in the Prisma CLI's transitive deps (see TECH_DEBT #10).
 - Rate limiting per IP needs `TRUST_PROXY=1` behind nginx/Caddy that **overwrites** `X-Forwarded-For`.
+
+## Phase 8 — registration without SMS
+Public sign-up is full name + e-mail + password (`POST /api/auth/register`) and partner sign-up adds business fields (`POST /api/wholesale/register`); neither sends or needs a code. Bodies are `.strict()` (no roles/status/phone), passwords use the existing bcrypt(12) hashing, e-mail is unique (409 `email_taken`), registration is rate limited per IP and e-mail, and the standard CSRF/origin check applies. Phone-code sign-in only works for existing accounts and never creates one. Wholesale access is granted only by an admin approval. Known gap: password reset is still by phone code, so e-mail-only accounts need support until an e-mail gateway exists.

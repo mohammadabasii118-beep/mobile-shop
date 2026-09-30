@@ -10,7 +10,7 @@ const RENEW_WHEN_LEFT_DAYS = 15;
 
 export interface SessionUser {
   id: string;
-  phone: string;
+  phone: string | null;
   email: string | null;
   firstName: string | null;
   lastName: string | null;

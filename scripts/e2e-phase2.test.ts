@@ -49,8 +49,13 @@ async function plantOtp(phone: string, purpose: "login" | "reset", code = "4321"
   await db.otpCode.create({ data: { phone, purpose, codeHash: __hashOtpForTests(phone, purpose, code), expiresAt: new Date(Date.now() + (opts.expired ? -1000 : 120_000)) } });
   return code;
 }
+async function seedUser(phone: string) {
+  const role = await db.role.findUniqueOrThrow({ where: { key: "customer" } });
+  return db.user.create({ data: { phone, phoneVerifiedAt: new Date(), roles: { create: { roleId: role.id } } } });
+}
 async function registerAndLogin(c = new Client()) {
   const phone = newPhone();
+  await seedUser(phone);
   const code = await plantOtp(phone, "login");
   const r = await c.post("/api/auth/otp/verify", { phone, code });
   assert.equal(r.status, 200, JSON.stringify(r.json));
@@ -96,9 +101,9 @@ describe("Phase 2", () => {
       const r = await c.post("/api/auth/otp/request", { phone: newPhone() }, { origin: "https://evil.example" });
       assert.equal(r.status, 403);
     });
-    it("registers on first OTP login and issues an HttpOnly session cookie", async () => {
+    it("OTP login signs an EXISTING account in and issues an HttpOnly session cookie (it never creates accounts)", async () => {
       const { c, res } = await registerAndLogin();
-      assert.equal(res.registered, true);
+      assert.equal(res.registered, false);
       assert.equal(res.needsProfile, true);
       assert.ok(c.jar.has("cl_session"));
       const me = await c.get("/api/me");
@@ -107,14 +112,14 @@ describe("Phase 2", () => {
     });
     it("cookie flags are safe", async () => {
       const c = new Client();
-      const phone = newPhone(); const code = await plantOtp(phone, "login");
+      const phone = newPhone(); await seedUser(phone); const code = await plantOtp(phone, "login");
       const res = await fetch(BASE + "/api/auth/otp/verify", { method: "POST", headers: { "content-type": "application/json", "x-forwarded-for": nextIp() }, body: JSON.stringify({ phone, code }) });
       const sc = res.headers.getSetCookie().find((x) => x.startsWith("cl_session="))!;
       assert.match(sc, /HttpOnly/i); assert.match(sc, /SameSite=lax/i); assert.match(sc, /Path=\//i);
       void c;
     });
     it("OTP is single-use", async () => {
-      const phone = newPhone(); const code = await plantOtp(phone, "login");
+      const phone = newPhone(); await seedUser(phone); const code = await plantOtp(phone, "login");
       const a = await new Client().post("/api/auth/otp/verify", { phone, code });
       assert.equal(a.status, 200);
       const b = await new Client().post("/api/auth/otp/verify", { phone, code });
@@ -122,24 +127,24 @@ describe("Phase 2", () => {
       assert.equal(b.json.error.code, "otp_invalid");
     });
     it("expired OTP is rejected", async () => {
-      const phone = newPhone(); const code = await plantOtp(phone, "login", "1111", { expired: true });
+      const phone = newPhone(); await seedUser(phone); const code = await plantOtp(phone, "login", "1111", { expired: true });
       assert.equal((await new Client().post("/api/auth/otp/verify", { phone, code })).status, 400);
     });
     it("locks a code after 5 wrong attempts, even if the right code is then sent", async () => {
-      const phone = newPhone(); const code = await plantOtp(phone, "login", "5555");
+      const phone = newPhone(); await seedUser(phone); const code = await plantOtp(phone, "login", "5555");
       const c = new Client();
       for (let i = 0; i < 5; i++) assert.equal((await c.post("/api/auth/otp/verify", { phone, code: "0000" })).status, 400);
       assert.equal((await c.post("/api/auth/otp/verify", { phone, code })).status, 400);
     });
     it("OTP request has a resend cooldown", async () => {
-      const phone = newPhone(); const c = new Client();
+      const phone = newPhone(); await seedUser(phone); const c = new Client();
       assert.equal((await c.post("/api/auth/otp/request", { phone })).status, 200);
       const again = await c.post("/api/auth/otp/request", { phone });
       assert.equal(again.status, 429);
       assert.ok(again.headers.get("retry-after"));
     });
     it("OTP is not stored in plaintext", async () => {
-      const phone = newPhone(); await new Client().post("/api/auth/otp/request", { phone });
+      const phone = newPhone(); await seedUser(phone); await new Client().post("/api/auth/otp/request", { phone });
       const row = await db.otpCode.findFirstOrThrow({ where: { phone } });
       assert.match(row.codeHash, /^[a-f0-9]{64}$/);
     });
@@ -174,7 +179,7 @@ describe("Phase 2", () => {
       assert.equal(r.status, 200);
     });
     it("brute-force protection on password login", async () => {
-      const phone = newPhone(); const c = new Client();
+      const phone = newPhone(); await seedUser(phone); const c = new Client();
       let last = 0;
       for (let i = 0; i < 10; i++) last = (await c.post("/api/auth/login", { phone, password: "wrong-pass1" })).status;
       assert.equal(last, 429);
@@ -203,7 +208,7 @@ describe("Phase 2", () => {
       assert.equal(upd.json.data.count, 4);
 
       // login → guest cart merges into the user's cart
-      const phone = newPhone(); const code = await plantOtp(phone, "login");
+      const phone = newPhone(); await seedUser(phone); const code = await plantOtp(phone, "login");
       assert.equal((await c.post("/api/auth/otp/verify", { phone, code })).status, 200);
       const merged = await c.get("/api/cart");
       assert.equal(merged.json.data.count, 4);

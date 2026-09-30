@@ -5,7 +5,7 @@ import { Card, ErrorBox, Label, ORDER_LABEL, Pill, Spinner, StatusPill, act, btn
 import { cn } from "@/lib/utils";
 
 interface C {
-  id: string; phone: string; email: string | null; firstName: string | null; lastName: string | null; displayName: string | null; isActive: boolean; phoneVerifiedAt: string | null; lastLoginAt: string | null; createdAt: string;
+  id: string; phone: string | null; email: string | null; firstName: string | null; lastName: string | null; displayName: string | null; isActive: boolean; phoneVerifiedAt: string | null; lastLoginAt: string | null; createdAt: string;
   roles: { id: string; key: string; name: string; isStaff: boolean }[]; addresses: { id: string; title: string | null; receiver: string; phone: string; province: string; city: string; address: string; postalCode: string | null }[];
   wallet: { balance: number } | null; loyalty: { points: number } | null; wholesaleProfile: { storeName: string; tier: { id: string; key: string; name: string } } | null;
   orders: { number: number; status: string; total: number; type: string; createdAt: string }[]; spent: number; paidOrders: number;
@@ -34,7 +34,7 @@ export function CustomerDetail({ id, canWrite, canRoles, canWholesale, selfId }:
             <Label label="نام خانوادگی"><input className={inputCls} disabled={!canWrite} value={f.lastName} onChange={(e) => setForm({ ...f, lastName: e.target.value })} /></Label>
             <Label label="نام نمایشی"><input className={inputCls} disabled={!canWrite} value={f.displayName} onChange={(e) => setForm({ ...f, displayName: e.target.value })} /></Label>
             <Label label="ایمیل"><input dir="ltr" className={inputCls} disabled={!canWrite} value={f.email} onChange={(e) => setForm({ ...f, email: e.target.value })} /></Label>
-            <Label label="موبایل (غیرقابل ویرایش)"><input dir="ltr" className={inputCls} disabled value={c.phone} readOnly /></Label>
+            <Label label="موبایل (غیرقابل ویرایش)"><input dir="ltr" className={inputCls} disabled value={c.phone ?? ""} readOnly /></Label>
             <div className="text-xs leading-6 text-muted">عضویت: {fmtDate(c.createdAt)}<br />آخرین ورود: {fmtDate(c.lastLoginAt)}<br />تأیید موبایل: {c.phoneVerifiedAt ? "بله" : "خیر"}</div>
           </div>
           {canWrite && <div className="mt-3 flex flex-wrap gap-2"><button className={btnPrimary} disabled={!form} onClick={save}>ذخیره</button>{c.id !== selfId && <button className={c.isActive ? btnDanger : btnGhost} onClick={toggle}>{c.isActive ? "غیرفعال‌سازی حساب" : "فعال‌سازی حساب"}</button>}</div>}

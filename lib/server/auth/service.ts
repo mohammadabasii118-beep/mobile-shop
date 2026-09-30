@@ -1,13 +1,14 @@
 import { db } from "@/lib/db";
 import { badRequest, conflict } from "@/lib/server/errors";
 import { rateLimit } from "@/lib/server/rate-limit";
+import { splitFullName } from "@/lib/server/validation";
 import { issueOtp, verifyOtp, type OtpPurpose } from "@/lib/server/auth/otp";
 import { dummyVerify, hashPassword, verifyPassword } from "@/lib/server/auth/password";
 import { createSession, currentTokenHash, destroyAllSessions } from "@/lib/server/auth/session";
 import { signTicket, verifyTicket } from "@/lib/server/auth/tickets";
 import { mergeGuestCart } from "@/lib/server/cart";
 
-const BAD_CREDENTIALS = () => badRequest("شماره موبایل یا رمز عبور نادرست است.", "bad_credentials");
+const BAD_CREDENTIALS = () => badRequest("ایمیل/شماره موبایل یا رمز عبور نادرست است.", "bad_credentials");
 
 async function finishLogin(userId: string) {
   await createSession(userId);
@@ -16,34 +17,54 @@ async function finishLogin(userId: string) {
   return { needsProfile: !u.firstName || !u.lastName, hasPassword: !!u.passwordHash };
 }
 
-export const requestOtp = (phone: string, purpose: OtpPurpose, ip: string) => issueOtp(phone, purpose, ip);
-
-/** OTP login. A first successful verification registers the account with the "customer" role. */
-export async function loginWithOtp(phone: string, code: string, ip: string) {
-  await verifyOtp(phone, "login", code, ip);
-  let user = await db.user.findUnique({ where: { phone } });
-  if (user && !user.isActive) throw badRequest("این حساب غیرفعال است.", "account_disabled");
-  let registered = false;
-  if (!user) {
-    const role = await db.role.findUniqueOrThrow({ where: { key: "customer" } });
-    user = await db.user.create({ data: { phone, phoneVerifiedAt: new Date(), roles: { create: { roleId: role.id } } } });
-    registered = true;
-  } else if (!user.phoneVerifiedAt) {
-    await db.user.update({ where: { id: user.id }, data: { phoneVerifiedAt: new Date() } });
-  }
-  return { registered, ...(await finishLogin(user.id)) };
+/**
+ * Phone-code sign-in is only for EXISTING accounts. It never creates one (registration is e-mail + password, no SMS), and a code is
+ * only sent to a registered, active number; the answer is identical either way so it cannot be used to discover numbers.
+ */
+export async function requestOtp(phone: string, purpose: OtpPurpose, ip: string) {
+  const user = await db.user.findUnique({ where: { phone }, select: { isActive: true } });
+  if (!user?.isActive) { await rateLimit(`otp:req:ip:${ip}`, 15, 3600); return { expiresIn: 120, resendIn: 60 }; }
+  return issueOtp(phone, purpose, ip);
 }
 
-export async function loginWithPassword(phone: string, password: string, ip: string) {
-  await rateLimit(`login:ip:${ip}`, 40, 900);
-  await rateLimit(`login:phone:${phone}`, 8, 900);
+export async function loginWithOtp(phone: string, code: string, ip: string) {
+  await verifyOtp(phone, "login", code, ip);
   const user = await db.user.findUnique({ where: { phone } });
+  if (!user) throw badRequest("کد تایید نادرست یا منقضی شده است.", "otp_invalid");
+  if (!user.isActive) throw badRequest("این حساب غیرفعال است.", "account_disabled");
+  if (!user.phoneVerifiedAt) await db.user.update({ where: { id: user.id }, data: { phoneVerifiedAt: new Date() } });
+  return { registered: false, ...(await finishLogin(user.id)) };
+}
+
+export async function loginWithPassword(id: { email: string | null; phone: string | null }, password: string, ip: string) {
+  const key = id.email ? `e:${id.email}` : `p:${id.phone}`;
+  await rateLimit(`login:ip:${ip}`, 40, 900);
+  await rateLimit(`login:id:${key}`, 8, 900);
+  const user = id.email ? await db.user.findUnique({ where: { email: id.email } }) : await db.user.findUnique({ where: { phone: id.phone! } });
   if (!user || !user.passwordHash || !user.isActive) {
     await dummyVerify(password);
     throw BAD_CREDENTIALS();
   }
   if (!(await verifyPassword(password, user.passwordHash))) throw BAD_CREDENTIALS();
   return { registered: false, ...(await finishLogin(user.id)) };
+}
+
+/** Public registration: full name + e-mail + password. No phone, no SMS/OTP. Creates a plain customer and signs them in. */
+export async function registerWithEmail(d: { fullName: string; email: string; password: string }, ip: string) {
+  await rateLimit(`register:ip:${ip}`, 10, 3600);
+  await rateLimit(`register:email:${d.email}`, 5, 3600);
+  const existing = await db.user.findUnique({ where: { email: d.email }, select: { id: true } });
+  if (existing) throw conflict("این ایمیل قبلاً ثبت شده است. لطفاً وارد حساب خود شوید.", "email_taken");
+  const role = await db.role.findUniqueOrThrow({ where: { key: "customer" } });
+  const { firstName, lastName } = splitFullName(d.fullName);
+  let user;
+  try {
+    user = await db.user.create({ data: { email: d.email, passwordHash: await hashPassword(d.password), firstName, lastName, displayName: d.fullName, roles: { create: { roleId: role.id } } } });
+  } catch (e) {
+    if ((e as { code?: string }).code === "P2002") throw conflict("این ایمیل قبلاً ثبت شده است. لطفاً وارد حساب خود شوید.", "email_taken"); // concurrent duplicate
+    throw e;
+  }
+  return { registered: true, ...(await finishLogin(user.id)) };
 }
 
 /** Always answers the same way, so it cannot be used to discover registered numbers. */

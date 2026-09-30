@@ -23,8 +23,8 @@ export async function seedDemoOrders(db: PrismaClient) {
     const unit = prod.retailPrice - prod.retailDiscount, subtotal = unit * p.qty, shipping = subtotal >= 2_000_000 ? 0 : ship.cost, total = subtotal + shipping;
     const order = await db.order.create({
       data: {
-        userId: u.id, status: p.status, paymentStatus: p.status === "PAYMENT_REVIEW" ? "REVIEW" : "PENDING", customerName: u.displayName ?? u.phone, customerPhone: u.phone,
-        shippingAddress: { receiver: u.displayName ?? "گیرنده", phone: u.phone, province: "تهران", city: "تهران", postalCode: "1234567890", address: "خیابان ولیعصر، نبش کوچه نمونه، پلاک ۱۲" },
+        userId: u.id, status: p.status, paymentStatus: p.status === "PAYMENT_REVIEW" ? "REVIEW" : "PENDING", customerName: u.displayName ?? u.phone ?? "مشتری", customerPhone: u.phone ?? "",
+        shippingAddress: { receiver: u.displayName ?? "گیرنده", phone: u.phone ?? "", province: "تهران", city: "تهران", postalCode: "1234567890", address: "خیابان ولیعصر، نبش کوچه نمونه، پلاک ۱۲" },
         shippingMethodId: ship.id, subtotal, shippingCost: shipping, total,
         items: { create: [{ variantId: v.id, productId: prod.id, name: prod.name, sku: v.sku, image: prod.images[0]?.url ?? null, unitPrice: unit, priceType: "retail", quantity: p.qty, total: subtotal }] },
         history: { create: [{ status: "PENDING_PAYMENT", description: "سفارش ثبت شد." }, ...(p.status === "PAYMENT_REVIEW" ? [{ status: "PAYMENT_REVIEW" as const, description: "رسید پرداخت ارسال شد و در انتظار بررسی است." }] : [])] },

@@ -5,9 +5,9 @@ import { Paperclip } from "lucide-react";
 import { api } from "@/lib/client/api";
 
 const field = "w-full rounded-xl border border-border bg-surface px-4 text-sm outline-none focus:border-primary";
-const TYPES: [string, string][] = [["instagram_shop", "پیج اینستاگرام"], ["online_shop", "فروشگاه آنلاین"], ["physical_store", "مغازه حضوری"], ["other", "سایر"]];
+const TYPES: [string, string][] = [["instagram_shop", "پیج اینستاگرام"], ["online_shop", "فروشگاه آنلاین"], ["physical_store", "فروشگاه فیزیکی"], ["other", "سایر"]];
 interface Doc { id: string; originalName: string }
-interface Initial { name: string; storeName: string; businessType: string; instagram: string; website: string; city: string; address: string; description: string }
+interface Initial { name: string; phone: string; province: string; storeName: string; businessType: string; instagram: string; website: string; city: string; address: string; description: string }
 
 export function WholesaleForm({ initial, applicationId, docs, editing }: { initial: Initial; applicationId: string | null; docs: Doc[]; editing: boolean }) {
   const router = useRouter();
@@ -18,7 +18,8 @@ export function WholesaleForm({ initial, applicationId, docs, editing }: { initi
 
   async function submit(e: React.FormEvent) {
     e.preventDefault(); setBusy(true); setErr("");
-    const r = await api<{ id: string }>("POST", "/api/wholesale/apply", { ...v, instagram: v.instagram || undefined, website: v.website || undefined, description: v.description || undefined });
+    const { name, ...rest } = v;
+    const r = await api<{ id: string }>("POST", "/api/wholesale/apply", { ...rest, fullName: name, phone: v.phone || undefined, province: v.province || undefined, address: v.address || undefined, instagram: v.instagram || undefined, website: v.website || undefined, description: v.description || undefined });
     if (!r.ok) { setBusy(false); return setErr(r.error.message); }
     for (const f of pending) {
       const fd = new FormData(); fd.set("applicationId", r.data.id); fd.set("file", f);
@@ -36,9 +37,9 @@ export function WholesaleForm({ initial, applicationId, docs, editing }: { initi
       <div className="grid gap-3 sm:grid-cols-2">
         {F("name", "نام و نام خانوادگی", { required: true })}{F("storeName", "نام فروشگاه / برند", { required: true })}
         <label className="block space-y-1.5 text-xs font-medium"><span>نوع کسب‌وکار</span><select value={v.businessType} onChange={(e) => set("businessType", e.target.value)} className={`${field} h-11`}>{TYPES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
-        {F("city", "شهر", { required: true })}{F("instagram", "اینستاگرام (اختیاری)", { dir: "ltr" })}{F("website", "وب‌سایت (اختیاری)", { dir: "ltr" })}
+        {F("phone", "شماره موبایل (برای تماس)", { dir: "ltr", inputMode: "numeric" })}{F("province", "استان", { required: true })}{F("city", "شهر", { required: true })}{F("instagram", "اینستاگرام (اختیاری)", { dir: "ltr" })}{F("website", "وب‌سایت (اختیاری)", { dir: "ltr" })}
       </div>
-      <label className="block space-y-1.5 text-xs font-medium"><span>آدرس</span><input required value={v.address} onChange={(e) => set("address", e.target.value)} className={`${field} h-11`} /></label>
+      <label className="block space-y-1.5 text-xs font-medium"><span>آدرس فروشگاه (برای فروشگاه فیزیکی)</span><input required={v.businessType === "physical_store"} value={v.address} onChange={(e) => set("address", e.target.value)} className={`${field} h-11`} /></label>
       <label className="block space-y-1.5 text-xs font-medium"><span>توضیحات (حجم فروش، نوع محصولات…)</span><textarea rows={3} value={v.description} onChange={(e) => set("description", e.target.value)} className={`${field} py-3 leading-7`} /></label>
       <div className="space-y-2 text-xs">
         <div className="font-bold">مدارک (جواز کسب، کارت ملی، تصویر مغازه یا پیج) — خصوصی و فقط برای بررسی‌کنندگان</div>

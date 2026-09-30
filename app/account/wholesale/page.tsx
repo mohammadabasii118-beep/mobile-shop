@@ -55,7 +55,7 @@ export default async function WholesalePage({ searchParams }: { searchParams: Pr
 
   const st = app ? STATUS[app.status] : null;
   const canEdit = !app || app.status === "CHANGES_REQUESTED" || app.status === "REJECTED";
-  const initial = { name: app?.name ?? "", storeName: app?.storeName ?? "", businessType: app?.businessType ?? "online_shop", instagram: app?.instagram ?? "", website: app?.website ?? "", city: app?.city ?? "", address: app?.address ?? "", description: app?.description ?? "" };
+  const initial = { name: app?.name ?? user.displayName ?? "", phone: app?.phone ?? user.phone ?? "", province: app?.province ?? "", storeName: app?.storeName ?? "", businessType: app?.businessType ?? "online_shop", instagram: app?.instagram ?? "", website: app?.website ?? "", city: app?.city ?? "", address: app?.address ?? "", description: app?.description ?? "" };
   return (
     <AccountShell active="wholesale">
       <div className="space-y-4">

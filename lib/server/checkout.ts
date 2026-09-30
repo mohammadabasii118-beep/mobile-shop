@@ -187,7 +187,7 @@ export async function createOrder(user: SessionUser, input: CreateOrderInput) {
       data: {
         userId: user.id,
         type: priced.wholesaleSubtotal > 0 ? "WHOLESALE" : "RETAIL",
-        customerName: address.receiver, customerPhone: user.phone, customerEmail: user.email,
+        customerName: address.receiver, customerPhone: user.phone ?? address.phone, customerEmail: user.email,
         shippingAddress: { title: address.title, receiver: address.receiver, phone: address.phone, province: address.province, city: address.city, postalCode: address.postalCode, address: address.address },
         shippingMethodId: method.id, subtotal: priced.subtotal, discountTotal: couponDiscount + redeem.discount, shippingCost: shipping, total, couponCode,
         paymentMethod: walletOnly ? "wallet" : provider!.key, note: input.note || null,

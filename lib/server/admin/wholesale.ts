@@ -13,7 +13,7 @@ export async function listApplications(req: NextRequest) {
   const where: Prisma.WholesaleApplicationWhereInput = {};
   const st = sp.get("status");
   if (st && (STATUSES as readonly string[]).includes(st)) where.status = st as WholesaleStatus;
-  if (q) where.OR = [{ name: { contains: q, mode: "insensitive" } }, { phone: { contains: q } }, { storeName: { contains: q, mode: "insensitive" } }];
+  if (q) where.OR = [{ name: { contains: q, mode: "insensitive" } }, { phone: { contains: q } }, { email: { contains: q, mode: "insensitive" } }, { storeName: { contains: q, mode: "insensitive" } }];
   const [items, total, counts] = await Promise.all([
     db.wholesaleApplication.findMany({ where, orderBy: { createdAt: "desc" }, take, skip, include: { files: { select: { id: true, originalName: true, mime: true, size: true } } } }),
     db.wholesaleApplication.count({ where }),
@@ -23,7 +23,7 @@ export async function listApplications(req: NextRequest) {
 }
 
 export async function getApplication(id: string) {
-  const app = await db.wholesaleApplication.findUnique({ where: { id }, include: { user: { select: { id: true, phone: true, displayName: true, wholesaleProfile: { select: { tierId: true } } } }, files: { select: { id: true, originalName: true, mime: true, size: true } } } });
+  const app = await db.wholesaleApplication.findUnique({ where: { id }, include: { user: { select: { id: true, phone: true, email: true, displayName: true, wholesaleProfile: { select: { tierId: true } } } }, files: { select: { id: true, originalName: true, mime: true, size: true } } } });
   if (!app) throw notFound("درخواست پیدا نشد.");
   const { documents, ...rest } = app;
   void documents;
@@ -33,7 +33,7 @@ export async function getApplication(id: string) {
 const approveSchema = z.object({ tierId: z.string().min(1).max(40), note: z.string().trim().max(400).optional() });
 const noteSchema = z.object({ note: z.string().trim().min(3, "توضیح لازم است.").max(400) });
 
-async function decide(id: string, next: WholesaleStatus, note: string | undefined, a: AdminCtx, extra?: (tx: Prisma.TransactionClient, app: { id: string; userId: string | null; phone: string; storeName: string }) => Promise<void>) {
+async function decide(id: string, next: WholesaleStatus, note: string | undefined, a: AdminCtx, extra?: (tx: Prisma.TransactionClient, app: { id: string; userId: string | null; phone: string; email: string | null; storeName: string }) => Promise<void>) {
   return db.$transaction(async (tx) => {
     const app = await tx.wholesaleApplication.findUnique({ where: { id } });
     if (!app) throw notFound("درخواست پیدا نشد.");
@@ -51,8 +51,8 @@ export async function approveApplication(id: string, body: unknown, a: AdminCtx)
   return decide(id, "APPROVED", note, a, async (tx, app) => {
     const tier = await tx.wholesaleTier.findUnique({ where: { id: tierId } });
     if (!tier || !tier.isActive) throw badRequest("سطح همکار نامعتبر یا غیرفعال است.");
-    const user = app.userId ? await tx.user.findUnique({ where: { id: app.userId } }) : await tx.user.findUnique({ where: { phone: app.phone } });
-    if (!user) throw conflict("کاربری با این شماره ثبت‌نام نکرده است. از متقاضی بخواهید ابتدا وارد سایت شود.", "no_user");
+    const user = app.userId ? await tx.user.findUnique({ where: { id: app.userId } }) : (await tx.user.findUnique({ where: { phone: app.phone } })) ?? (app.email ? await tx.user.findUnique({ where: { email: app.email } }) : null);
+    if (!user) throw conflict("کاربری برای این درخواست پیدا نشد. از متقاضی بخواهید ابتدا ثبت‌نام کند.", "no_user");
     const role = await tx.role.findUniqueOrThrow({ where: { key: "wholesale_partner" } });
     await tx.wholesaleProfile.upsert({ where: { userId: user.id }, update: { tierId, storeName: app.storeName }, create: { userId: user.id, tierId, storeName: app.storeName } });
     await tx.userRole.upsert({ where: { userId_roleId: { userId: user.id, roleId: role.id } }, update: {}, create: { userId: user.id, roleId: role.id } });

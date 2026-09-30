@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 interface R {
   id: string; rating: number; title: string | null; body: string; status: string; verifiedPurchase: boolean; rejectionReason: string | null; adminReply: string | null; createdAt: string;
-  product: { id: string; name: string; slug: string }; user: { id: string; displayName: string | null; phone: string }; order: { number: number; status: string } | null;
+  product: { id: string; name: string; slug: string }; user: { id: string; displayName: string | null; phone: string | null }; order: { number: number; status: string } | null;
 }
 interface Stats { pending: number; approved: number; rejected: number; avgRating: number }
 const TABS = [["pending", "در انتظار"], ["approved", "تأیید شده"], ["rejected", "رد شده"]] as const;
@@ -54,7 +54,7 @@ export function ReviewsClient({ initialStatus = "pending", initialProductId = ""
               {replying === r.id && <div className="flex gap-2"><input className={inputCls} maxLength={800} value={text} onChange={(e) => setText(e.target.value)} placeholder="پاسخ عمومی به این نظر (خالی = حذف پاسخ)" autoFocus /><button className={btnPrimary} onClick={() => sendReply(r.id)}>ذخیره</button><button className={btnGhost} onClick={() => setReplying(null)}>انصراف</button></div>}
               {rejecting === r.id && <div className="flex gap-2"><input className={inputCls} maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="دلیل رد (اختیاری؛ برای کاربر نمایش داده می‌شود)" autoFocus /><button className={btnDanger} onClick={() => { void set(r.id, "rejected", reason); setRejecting(null); setReason(""); }}>رد نظر</button><button className={btnGhost} onClick={() => setRejecting(null)}>انصراف</button></div>}
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
-                <span>{r.user.displayName ?? "—"} · <Link href={`/admin/customers/${r.user.id}`} className="text-primary" dir="ltr">{r.user.phone}</Link>{r.order && <> · سفارش <Link href={`/admin/orders/${r.order.number}`} className="text-primary">{r.order.number.toLocaleString("fa-IR")}</Link></>} · {fmtDate(r.createdAt)}</span>
+                <span>{r.user.displayName ?? "—"} · <Link href={`/admin/customers/${r.user.id}`} className="text-primary" dir="ltr">{r.user.phone ?? "—"}</Link>{r.order && <> · سفارش <Link href={`/admin/orders/${r.order.number}`} className="text-primary">{r.order.number.toLocaleString("fa-IR")}</Link></>} · {fmtDate(r.createdAt)}</span>
                 <span className="flex gap-2">
                   {r.status !== "approved" && <button className={cn(btnPrimary, "h-8 px-3 text-xs")} onClick={() => set(r.id, "approved")}>تأیید</button>}
                   {r.status !== "rejected" && <button className={cn(btnGhost, "h-8 px-3 text-xs")} onClick={() => { setRejecting(r.id); setReason(""); }}>رد</button>}

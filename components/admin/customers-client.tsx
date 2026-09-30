@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Empty, ErrorBox, Pager, Pill, Spinner, Table, Td, fmtDate, fmtNum, inputCls, useApi } from "@/components/admin/kit";
 import { cn } from "@/lib/utils";
 
-interface Row { id: string; phone: string; displayName: string | null; firstName: string | null; lastName: string | null; isActive: boolean; createdAt: string; roles: { key: string; name: string }[]; _count: { orders: number } }
+interface Row { id: string; phone: string | null; email: string | null; displayName: string | null; firstName: string | null; lastName: string | null; isActive: boolean; createdAt: string; roles: { key: string; name: string }[]; _count: { orders: number } }
 
 export function CustomersClient() {
   const [q, setQ] = useState(""); const [page, setPage] = useState(1); const [role, setRole] = useState(""); const [act, setAct] = useState("");
@@ -20,7 +20,7 @@ export function CustomersClient() {
       {error ? <ErrorBox message={error} /> : loading && !data ? <Spinner /> : !data?.items.length ? <Empty /> : (
         <>
           <Table head={["کاربر", "موبایل", "نقش‌ها", "سفارش‌ها", "عضویت", "وضعیت"]}>
-            {data.items.map((u) => <tr key={u.id} className="hover:bg-surface-2/60"><Td><Link href={`/admin/customers/${u.id}`} className="font-bold hover:text-primary">{u.displayName ?? ([u.firstName, u.lastName].filter(Boolean).join(" ") || "—")}</Link></Td><Td><span dir="ltr">{u.phone}</span></Td><Td><span className="flex flex-wrap gap-1">{u.roles.map((r) => <Pill key={r.key} tone={r.key === "wholesale_partner" ? "warn" : "mute"}>{r.name}</Pill>)}</span></Td><Td>{fmtNum(u._count.orders)}</Td><Td className="text-xs">{fmtDate(u.createdAt)}</Td><Td><Pill tone={u.isActive ? "ok" : "bad"}>{u.isActive ? "فعال" : "غیرفعال"}</Pill></Td></tr>)}
+            {data.items.map((u) => <tr key={u.id} className="hover:bg-surface-2/60"><Td><Link href={`/admin/customers/${u.id}`} className="font-bold hover:text-primary">{u.displayName ?? ([u.firstName, u.lastName].filter(Boolean).join(" ") || "—")}</Link></Td><Td><span dir="ltr">{u.phone ?? u.email ?? "—"}</span></Td><Td><span className="flex flex-wrap gap-1">{u.roles.map((r) => <Pill key={r.key} tone={r.key === "wholesale_partner" ? "warn" : "mute"}>{r.name}</Pill>)}</span></Td><Td>{fmtNum(u._count.orders)}</Td><Td className="text-xs">{fmtDate(u.createdAt)}</Td><Td><Pill tone={u.isActive ? "ok" : "bad"}>{u.isActive ? "فعال" : "غیرفعال"}</Pill></Td></tr>)}
           </Table>
           <Pager page={data.page} pages={data.pages} total={data.total} onPage={setPage} />
         </>

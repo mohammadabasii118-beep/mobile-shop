@@ -21,7 +21,28 @@ const name = z.string().trim().min(2, "حداقل ۲ کاراکتر وارد ک�
 
 export const otpRequestSchema = z.object({ phone: phoneSchema, purpose: z.enum(["login", "reset"]).default("login") });
 export const otpVerifySchema = z.object({ phone: phoneSchema, code: otpSchema, purpose: z.enum(["login", "reset"]).default("login") });
-export const passwordLoginSchema = z.object({ phone: phoneSchema, password: z.string().min(1, "رمز عبور را وارد کنید.").max(72) });
+export const emailSchema = z.string().trim().toLowerCase().min(1, "ایمیل را وارد کنید.").max(120, "ایمیل بیش از حد طولانی است.").email("ایمیل نامعتبر است.");
+/** Full name in one field; at least two words (first + last name). */
+export const fullNameSchema = z.string().trim().min(3, "نام و نام خانوادگی را وارد کنید.").max(80, "متن بیش از حد طولانی است.").refine((v) => v.split(/\s+/).filter(Boolean).length >= 2, "نام و نام خانوادگی را کامل وارد کنید.");
+export function splitFullName(full: string) {
+  const [first, ...rest] = full.trim().split(/\s+/);
+  return { firstName: first!, lastName: rest.join(" ") };
+}
+/** Registration: exactly these three fields. `.strict()` refuses anything else (no mass assignment of roles/status/phone). */
+export const registerSchema = z.object({ fullName: fullNameSchema, email: emailSchema, password: passwordSchema }).strict();
+/** Sign in with a phone number (existing accounts) or an e-mail address; `phone` is kept as an alias of `identifier`. */
+export const passwordLoginSchema = z.object({ identifier: z.string().trim().min(1, "ایمیل یا شماره موبایل را وارد کنید.").max(120).optional(), phone: z.string().trim().max(120).optional(), password: z.string().min(1, "رمز عبور را وارد کنید.").max(72) })
+  .transform((v, ctx) => {
+    const raw = (v.identifier ?? v.phone ?? "").trim();
+    if (raw.includes("@")) {
+      const e = emailSchema.safeParse(raw);
+      if (!e.success) { ctx.addIssue({ code: "custom", message: "ایمیل نامعتبر است." }); return z.NEVER; }
+      return { email: e.data, phone: null as string | null, password: v.password };
+    }
+    const ph = phoneSchema.safeParse(raw);
+    if (!ph.success) { ctx.addIssue({ code: "custom", message: "ایمیل یا شماره موبایل نامعتبر است." }); return z.NEVER; }
+    return { email: null as string | null, phone: ph.data, password: v.password };
+  });
 export const resetSchema = z.object({ ticket: z.string().min(10), password: passwordSchema });
 export const profileSchema = z.object({
   firstName: name, lastName: name,

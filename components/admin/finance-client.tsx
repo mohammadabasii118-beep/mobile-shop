@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { Card, Empty, ErrorBox, Label, Modal, Pager, Pill, Spinner, Table, Td, act, btnGhost, btnPrimary, fmtDate, fmtNum, fmtToman, inputCls, useApi } from "@/components/admin/kit";
 import { cn } from "@/lib/utils";
 
-interface U { id: string; phone: string; displayName: string | null; firstName: string | null; lastName: string | null }
+interface U { id: string; phone: string | null; displayName: string | null; firstName: string | null; lastName: string | null }
 const nm = (u: U) => u.displayName ?? ([u.firstName, u.lastName].filter(Boolean).join(" ") || u.phone);
 const WT: Record<string, string> = { admin_credit: "افزایش توسط ادمین", admin_debit: "کاهش توسط ادمین", order_payment: "پرداخت سفارش", order_cancel_restore: "بازگشت اعتبار لغو سفارش", refund_credit: "بازگشت وجه", credit: "افزایش", debit: "کاهش", refund: "بازگشت وجه", admin_adjustment: "اصلاح" };
 const LT: Record<string, string> = { earn: "کسب", redeem: "مصرف", restore: "بازگشت مصرف", reverse: "کسر لغو/مرجوعی", admin_adjustment: "اصلاح ادمین", expire: "انقضا" };
