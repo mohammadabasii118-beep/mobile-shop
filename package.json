@@ -18,7 +18,9 @@
     "test": "vitest run",
     "demo": "tsx demo/server.ts",
     "demo:script": "tsx demo/transcript.ts",
-    "seed": "tsx src/scripts/seed.ts"
+    "seed": "tsx src/scripts/seed.ts",
+    "xui:check": "tsx src/scripts/xuiCheck.ts",
+    "preflight": "tsx src/scripts/preflight.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

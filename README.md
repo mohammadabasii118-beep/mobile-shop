@@ -50,6 +50,13 @@ Adapter از API پنل زیر استفاده می‌کند: `POST /login`، `GE
 
 ⚠️ **راستی‌آزمایی روی پنل شما الزامی است** (بخش Known limitations): در `/admin → ⚙️ تنظیمات → 🔌 تست اتصال X-UI` و سپس یک خرید آزمایشی روی یک inbound تست.
 
+## چک‌لیست راه‌اندازی واقعی
+```bash
+npm run preflight                     # ENV، دیتابیس/مایگریشن، Telegram getMe، ورود به X-UI
+npm run xui:check -- --inbound <id>   # تست زنده روی پنل واقعی (Client موقت tgtest_* که همیشه حذف می‌شود)
+```
+`xui:check` این مراحل را جدا PASS/FAIL می‌دهد: authentication، list/lookup inbound، create client، verify، traffic (واحد بایت)، expiry (epoch ms)، ساخت لینک، renew، suspend/resume، idempotency، cleanup. اگر هر مرحله FAIL شد، خطای خود پنل چاپ می‌شود؛ تا قبل از PASS کامل فروش را شروع نکنید.
+
 ## اجرا (Docker)
 ```bash
 cp .env.example .env      # BOT_TOKEN, ADMIN_TELEGRAM_ID, POSTGRES_PASSWORD, XUI_*, CARD_*, BANK_WEBHOOK_SECRET

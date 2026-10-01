@@ -22,7 +22,11 @@ export class FakeXui {
   /** drop the response of the next addClient AFTER applying it (simulates network timeout) */
   dropNextAddClientResponse = false;
   failNext = 0;
+  /** after a successful addClient, answer the next N requests with 503 (panel dies mid-provisioning) */
+  failAfterAddClient = 0;
+  private failCountdown = 0;
   logins = 0;
+  addClientCalls = 0;
 
   constructor() {
     this.inbounds.set(1, {
@@ -77,6 +81,7 @@ export class FakeXui {
         return fail('wrong username or password');
       }
       if (!this.authed(req)) { res.writeHead(404); return res.end('404 page not found'); }
+      if (this.failCountdown > 0) { this.failCountdown--; res.writeHead(503); return res.end('down'); }
       if (this.failNext > 0) { this.failNext--; res.writeHead(503); return res.end('down'); }
 
       const p = u.pathname;
@@ -93,6 +98,8 @@ export class FakeXui {
           for (const ib of this.inbounds.values()) if ((ib.settings.clients as any[]).some((x) => x.email === c.email)) return fail('Duplicate email: ' + c.email);
           i.settings.clients.push({ ...c });
         }
+        this.addClientCalls++;
+        this.failCountdown = this.failAfterAddClient; this.failAfterAddClient = 0;
         if (this.dropNextAddClientResponse) { this.dropNextAddClientResponse = false; return req.socket.destroy(); }
         return send(null);
       }
