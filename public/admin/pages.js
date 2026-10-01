@@ -118,12 +118,14 @@ export function products(ctx, root) {
   async function reload() {
     clear(card); card.append(h('div', { class: 'table-wrap' }, h('table', { class: 'table' }, skeletonRows(9, 4))));
     try {
-      const { items } = await api('/products');
+      const [{ items }, cats] = await Promise.all([api('/products'), loadCategories()]);
+      const catById = new Map(cats.map((c) => [c.id, c]));
       clear(card);
       if (!items.length) return void card.append(emptyState('هنوز محصولی تعریف نشده', 'اولین پلن را بسازید تا کاربران بتوانند خرید کنند.', 'box', newBtn && button('ساخت محصول', { kind: 'primary', ico: 'plus', onClick: () => productForm(null, reload) })));
       card.append(table([
         { label: 'نام', render: (p) => h('div', null, h('div', { class: 'cell-main', text: p.name }), h('div', { class: 'cell-sub', text: p.description || '' })) },
         { label: 'قیمت', cls: 'num', render: (p) => money(p.price) }, { label: 'حجم', cls: 'num', render: (p) => `${num(p.trafficGB)} GB` }, { label: 'مدت', cls: 'num', render: (p) => `${num(p.durationDays)} روز` },
+        { label: 'دسته', render: (p) => (p.categoryId && catById.get(p.categoryId) ? h('span', { class: 'badge plain', text: catById.get(p.categoryId).path }) : h('span', { class: 'muted', text: 'صفحه‌ی اول' })) },
         { label: 'Protocol', render: (p) => h('span', { class: 'badge plain brand', text: p.protocol }) }, { label: 'Inbound', cls: 'num', render: (p) => ltr('#' + p.xuiInboundId, 'mono') },
         { label: 'ترتیب', cls: 'num', render: (p) => num(p.sortOrder) },
         { label: 'وضعیت', render: (p) => h('span', { class: `badge ${p.isActive ? 'ok' : ''}`, text: p.isActive ? 'فعال' : 'غیرفعال' }) },
@@ -140,21 +142,29 @@ function bulkProductsForm(done) {
   const text = h('textarea', { class: 'textarea ltr', dir: 'auto', style: 'min-height:200px;font-family:var(--mono);font-size:13px', placeholder: 'اقتصادی ۵۰ گیگ | 30 | 50 | 250000\nویژه ۱۰۰ گیگ | 60 | 100 | 450000\nویژه ۲۰۰ گیگ | 90 | 200 | 800000 | 25 | VLESS | توضیح', 'aria-label': 'لیست محصولات' });
   const inbound = h('input', { class: 'input', type: 'number', inputmode: 'numeric', placeholder: 'مثلاً ۲۳', 'aria-label': 'Inbound پیش‌فرض' });
   const proto = h('select', { class: 'select', 'aria-label': 'پروتکل پیش‌فرض' }, ['VLESS', 'VMESS', 'TROJAN', 'SHADOWSOCKS'].map((x) => h('option', { value: x }, x)));
+  const cat = h('input', { class: 'input', placeholder: 'مثلاً: ماهانه ▸ حجمی (اگر نبود ساخته می‌شود)', 'aria-label': 'دسته‌بندی' });
   const err = h('pre', { class: 'form-error', hidden: true, style: 'white-space:pre-wrap;margin:0;font-family:inherit' });
   const ok = button('ثبت همه', { kind: 'primary', onClick: async () => {
     err.hidden = true;
     try {
-      const r = await api('/products/bulk', { method: 'POST', body: { text: text.value, inbound: inbound.value ? Number(inbound.value) : null, protocol: proto.value } });
+      const r = await api('/products/bulk', { method: 'POST', body: { text: text.value, inbound: inbound.value ? Number(inbound.value) : null, protocol: proto.value, category: cat.value.trim() || null } });
       toast(`${num(r.created)} محصول ثبت شد`); m.close(); done();
     } catch (e) { err.hidden = false; err.textContent = errMsg(e); }
   } });
   const m = modal({ title: 'افزودن گروهی محصولات', body: h('div', { class: 'stack' },
     h('div', { class: 'callout' }, icon('info'), h('div', null, 'هر محصول یک خط: ', h('b', { class: 'ltr', text: 'نام | روز | حجم GB | قیمت | [inbound] | [پروتکل] | [توضیح]' }), '. اگر inbound یکی است، پایین فقط یک‌بار تعیینش کنید. اگر یک خط خطا داشته باشد هیچ‌کدام ثبت نمی‌شود.')),
-    h('div', { class: 'form-grid' }, h('div', { class: 'field' }, h('label', { text: 'Inbound پیش‌فرض' }), inbound), h('div', { class: 'field' }, h('label', { text: 'پروتکل پیش‌فرض' }), proto)),
+    h('div', { class: 'form-grid' }, h('div', { class: 'field' }, h('label', { text: 'Inbound پیش‌فرض' }), inbound), h('div', { class: 'field' }, h('label', { text: 'پروتکل پیش‌فرض' }), proto), h('div', { class: 'field full' }, h('label', { text: 'دسته‌بندی پیش‌فرض (اختیاری)' }), cat)),
     h('div', { class: 'field' }, h('label', { text: 'لیست محصولات' }), text), err), footer: [ok, button('انصراف', { onClick: () => m.close() })] });
 }
+async function loadCategories() {
+  try { return (await api('/categories')).items; } catch { return []; }
+}
+const catLabel = (c) => `${'· '.repeat(c.depth)}${c.icon || '📁'} ${c.name}`;
+
 function productForm(p, done) {
   const f = (label, name, type = 'text', val = '', hint) => h('div', { class: 'field' }, h('label', { for: `pf-${name}`, text: label }), h('input', { class: 'input', id: `pf-${name}`, name, type, value: val, inputmode: type === 'number' ? 'numeric' : false }), hint ? h('div', { class: 'hint', text: hint }) : null);
+  const catSel = h('select', { class: 'select', id: 'pf-category', 'aria-label': 'دسته‌بندی' }, h('option', { value: '' }, '🏠 بدون دسته (صفحه‌ی اول)'));
+  loadCategories().then((cs) => cs.forEach((c) => catSel.append(h('option', { value: c.id, selected: p?.categoryId === c.id }, catLabel(c)))));
   const proto = h('select', { class: 'select', id: 'pf-protocol' }, ['VLESS', 'VMESS', 'TROJAN', 'SHADOWSOCKS'].map((x) => h('option', { value: x, selected: p?.protocol === x }, x)));
   const active = h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(p ? p.isActive : true), 'aria-label': 'فعال' });
   active.addEventListener('click', () => active.setAttribute('aria-checked', String(active.getAttribute('aria-checked') !== 'true')));
@@ -162,11 +172,11 @@ function productForm(p, done) {
     h('div', { class: 'full' }, f('نام محصول', 'name', 'text', p?.name || '')), h('div', { class: 'full' }, f('توضیح (اختیاری)', 'description', 'text', p?.description || '')),
     f('قیمت (تومان)', 'price', 'number', p?.price ?? '', 'عدد صحیح'), f('حجم (GB)', 'trafficGB', 'number', p?.trafficGB ?? ''), f('مدت (روز)', 'durationDays', 'number', p?.durationDays ?? ''),
     f('Inbound ID در X-UI', 'xuiInboundId', 'number', p?.xuiInboundId ?? '', 'شناسه inbound در پنل'), h('div', { class: 'field' }, h('label', { for: 'pf-protocol', text: 'Protocol' }), proto), f('ترتیب نمایش', 'sortOrder', 'number', p?.sortOrder ?? 0),
-    h('div', { class: 'field' }, h('label', { text: 'وضعیت' }), h('div', { class: 'row' }, active, h('span', { class: 'muted', text: 'قابل خرید' }))), h('div', { class: 'full form-error', hidden: true, id: 'pf-err' }));
+    h('div', { class: 'field' }, h('label', { text: 'دسته‌بندی در منوی خرید' }), catSel), h('div', { class: 'field' }, h('label', { text: 'وضعیت' }), h('div', { class: 'row' }, active, h('span', { class: 'muted', text: 'قابل خرید' }))), h('div', { class: 'full form-error', hidden: true, id: 'pf-err' }));
   const save = button(p ? 'ذخیره تغییرات' : 'ایجاد محصول', { kind: 'primary', onClick: async () => {
     const v = (n) => form.querySelector(`[name=${n}]`).value.trim();
     const err = form.querySelector('#pf-err');
-    const body = { name: v('name'), description: v('description') || null, price: Number(v('price')), trafficGB: Number(v('trafficGB')), durationDays: Number(v('durationDays')), xuiInboundId: Number(v('xuiInboundId')), sortOrder: Number(v('sortOrder') || 0), protocol: proto.value, isActive: active.getAttribute('aria-checked') === 'true' };
+    const body = { name: v('name'), description: v('description') || null, price: Number(v('price')), trafficGB: Number(v('trafficGB')), durationDays: Number(v('durationDays')), xuiInboundId: Number(v('xuiInboundId')), sortOrder: Number(v('sortOrder') || 0), protocol: proto.value, isActive: active.getAttribute('aria-checked') === 'true', categoryId: catSel.value || null };
     const bad = !body.name ? 'نام محصول را وارد کنید' : ['price', 'trafficGB', 'durationDays', 'xuiInboundId'].find((k) => !Number.isInteger(body[k]) || body[k] < (k === 'price' ? 0 : 1)) ? 'قیمت، حجم، مدت و Inbound باید عدد صحیح معتبر باشند' : '';
     if (bad) { err.hidden = false; err.textContent = bad; return; }
     try { await api(p ? `/products/${p.id}` : '/products', { method: p ? 'PATCH' : 'POST', body }); toast(p ? 'تغییرات ذخیره شد' : 'محصول ساخته شد'); m.close(); done(); }
@@ -487,4 +497,48 @@ export function audit(ctx, root) {
       { label: 'IP', render: (a) => (a.ip ? ltr(a.ip, 'mono') : '—') },
     ],
   });
+}
+
+/* ================================= Categories ================================= */
+export function categories(ctx, root) {
+  const nb = button('دسته‌ی جدید', { kind: 'primary', ico: 'plus', onClick: () => categoryForm(null, null, [], reload) });
+  root.append(pageHead('دسته‌بندی منوی خرید', 'ساختار منوی «خرید VPN» در ربات: دسته، زیرمجموعه و محصولات', nb));
+  root.append(h('div', { class: 'callout' }, icon('info'), h('div', { text: 'مشتری ابتدا دسته‌ها را می‌بیند و با انتخاب هر دسته، زیرمجموعه‌ها و پلن‌های آن باز می‌شود (تا ۳ سطح). دسته‌ای که محصول فعال نداشته باشد یا غیرفعال باشد برای مشتری نمایش داده نمی‌شود.' })));
+  const card = h('div', { class: 'card' }); root.append(card);
+  async function reload() {
+    clear(card); card.append(h('div', { class: 'table-wrap' }, h('table', { class: 'table' }, skeletonRows(5, 4))));
+    try {
+      const { items } = await api('/categories'); clear(card);
+      if (!items.length) return void card.append(emptyState('هنوز دسته‌ای نساخته‌اید', 'مثلاً «ماهانه» و «حجمی» بسازید و محصولات را داخلشان قرار دهید. تا وقتی دسته‌ای نباشد، همه‌ی پلن‌ها در صفحه‌ی اول نمایش داده می‌شوند.', 'folder', button('ساخت اولین دسته', { kind: 'primary', ico: 'plus', onClick: () => categoryForm(null, null, [], reload) })));
+      const sib = (c) => items.filter((x) => x.parentId === c.parentId);
+      card.append(table([
+        { label: 'دسته', cls: 'wrap', render: (c) => h('div', { style: `padding-inline-start:${c.depth * 30}px` }, h('div', { class: 'cell-main', text: `${c.depth ? '↳ ' : ''}${c.icon || '📁'} ${c.name}` }), c.description ? h('div', { class: 'cell-sub', text: c.description }) : null) },
+        { label: 'محصولات', cls: 'num', render: (c) => h('span', { title: 'مستقیم در این دسته (فعال در کل شاخه)' }, `${num(c.productCount)} (${num(c.activeProductCount)} فعال در شاخه)`) },
+        { label: 'وضعیت', render: (c) => h('span', { class: `badge ${c.isActive ? 'ok' : ''}`, text: c.isActive ? 'فعال' : 'غیرفعال' }) },
+        { label: '', render: (c) => h('div', { class: 'actions' },
+          button('', { size: 'sm', kind: 'ghost', ico: 'up', title: 'بالا', disabled: sib(c)[0].id === c.id, onClick: async () => { try { await api(`/categories/${c.id}/move`, { method: 'POST', body: { dir: 'up' } }); reload(); } catch (e) { toast(errMsg(e), 'err'); } } }),
+          button('', { size: 'sm', kind: 'ghost', ico: 'down', title: 'پایین', disabled: sib(c).at(-1).id === c.id, onClick: async () => { try { await api(`/categories/${c.id}/move`, { method: 'POST', body: { dir: 'down' } }); reload(); } catch (e) { toast(errMsg(e), 'err'); } } }),
+          c.depth < 2 ? button('', { size: 'sm', kind: 'ghost', ico: 'plus', title: 'زیرمجموعه', onClick: () => categoryForm(null, c.id, items, reload) }) : null,
+          button('', { size: 'sm', kind: 'ghost', ico: 'edit', title: 'ویرایش / انتقال', onClick: () => categoryForm(c, c.parentId, items, reload) }),
+          button('', { size: 'sm', kind: 'ghost', ico: c.isActive ? 'pause' : 'play', title: c.isActive ? 'غیرفعال‌سازی' : 'فعال‌سازی', onClick: async () => { try { await api(`/categories/${c.id}`, { method: 'PATCH', body: { isActive: !c.isActive } }); reload(); } catch (e) { toast(errMsg(e), 'err'); } } }),
+          button('', { size: 'sm', kind: 'ghost', ico: 'trash', title: 'حذف', onClick: async () => { if (!(await confirmDialog({ title: 'حذف دسته', message: `«${c.name}» حذف شود؟ محصولات داخلش به دسته‌ی بالاتر (یا صفحه‌ی اول) منتقل می‌شوند. اگر زیرمجموعه داشته باشد حذف نمی‌شود.`, confirmLabel: 'حذف', kind: 'danger' }))) return; try { const r = await api(`/categories/${c.id}`, { method: 'DELETE' }); toast(r.movedProducts ? `دسته حذف شد؛ ${num(r.movedProducts)} محصول منتقل شد` : 'دسته حذف شد'); reload(); } catch (e) { toast(errMsg(e), 'err'); } } })) },
+      ], items));
+    } catch (e) { clear(card); card.append(errorState(errMsg(e), reload)); }
+  }
+  reload();
+}
+function categoryForm(cat, parentId, all, done) {
+  const name = h('input', { class: 'input', value: cat?.name || '', maxlength: '40', 'aria-label': 'نام دسته' });
+  const iconIn = h('input', { class: 'input', value: cat?.icon || '', maxlength: '8', placeholder: '📁', 'aria-label': 'آیکون' });
+  const desc = h('input', { class: 'input', value: cat?.description || '', maxlength: '300', placeholder: 'اختیاری؛ زیر عنوان به مشتری نمایش داده می‌شود', 'aria-label': 'توضیح' });
+  const banned = new Set(); // can't move into itself or its descendants
+  if (cat) { banned.add(cat.id); let grew = true; while (grew) { grew = false; for (const c of all) if (c.parentId && banned.has(c.parentId) && !banned.has(c.id)) { banned.add(c.id); grew = true; } } }
+  const parent = h('select', { class: 'select', 'aria-label': 'دسته‌ی والد' }, h('option', { value: '' }, '🏠 سطح اول'), all.filter((c) => !banned.has(c.id) && c.depth < 2).map((c) => h('option', { value: c.id, selected: parentId === c.id }, catLabel(c))));
+  const err = h('div', { class: 'form-error', hidden: true });
+  const ok = button(cat ? 'ذخیره' : 'ایجاد', { kind: 'primary', onClick: async () => {
+    const body = { name: name.value.trim(), icon: iconIn.value.trim() || null, description: desc.value.trim() || null, parentId: parent.value || null };
+    if (!body.name) { err.hidden = false; err.textContent = 'نام دسته را وارد کنید'; return; }
+    try { await api(cat ? `/categories/${cat.id}` : '/categories', { method: cat ? 'PATCH' : 'POST', body }); toast(cat ? 'ذخیره شد' : 'دسته ساخته شد'); m.close(); done(); } catch (e) { err.hidden = false; err.textContent = errMsg(e); }
+  } });
+  const m = modal({ title: cat ? 'ویرایش دسته' : 'دسته‌ی جدید', body: h('div', { class: 'form-grid' }, h('div', { class: 'field' }, h('label', { text: 'نام' }), name), h('div', { class: 'field' }, h('label', { text: 'آیکون (ایموجی)' }), iconIn), h('div', { class: 'field full' }, h('label', { text: 'توضیح' }), desc), h('div', { class: 'field full' }, h('label', { text: 'قرار گرفتن در' }), parent), h('div', { class: 'full' }, err)), footer: [ok, button('انصراف', { onClick: () => m.close() })] });
 }

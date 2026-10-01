@@ -15,6 +15,7 @@ import { adminReply, closeTicket } from '../modules/support/service';
 import { SETTING_DEFAULTS, SettingKey, allSettings, setSetting } from '../modules/settings/service';
 import { flushPending } from '../modules/notifications/service';
 import { getVpnProvider } from '../providers/vpn';
+import { categoryTree, createCategory, deleteCategory, moveCategory, updateCategory } from '../modules/categories/service';
 import * as Q from './queries';
 
 export interface ApiCtx {
@@ -76,6 +77,7 @@ const productBody = z.object({
   name: z.string().trim().min(1).max(80), description: z.string().trim().max(500).optional().nullable(),
   durationDays: z.number().int(), trafficGB: z.number().int(), price: z.number().int(), xuiInboundId: z.number().int(),
   protocol: z.nativeEnum(Protocol), isActive: z.boolean().optional(), sortOrder: z.number().int().optional(),
+  categoryId: z.string().nullable().optional(),
 });
 
 const confirmFor = (externalId: string) => `DELETE ${externalId.slice(-6)}`;
@@ -92,13 +94,25 @@ export const routes: Route[] = [
   {
     method: 'POST', re: /^\/products\/bulk$/, perm: 'products.manage',
     run: async (c) => {
-      const b = z.object({ text: z.string().min(1).max(20_000), inbound: z.number().int().min(1).optional().nullable(), protocol: z.nativeEnum(Protocol).optional().nullable() }).parse(c.body);
-      const created = await createProductsBulk(actor(c), b.text, { inbound: b.inbound ?? undefined, protocol: b.protocol ?? undefined });
+      const b = z.object({ text: z.string().min(1).max(20_000), inbound: z.number().int().min(1).optional().nullable(), protocol: z.nativeEnum(Protocol).optional().nullable(), category: z.string().max(120).optional().nullable() }).parse(c.body);
+      const created = await createProductsBulk(actor(c), b.text, { inbound: b.inbound ?? undefined, protocol: b.protocol ?? undefined, category: b.category?.trim() || undefined });
       return { created: created.length, items: created };
     },
   },
   { method: 'PATCH', re: /^\/products\/([\w-]+)$/, perm: 'products.manage', run: async (c) => updateProduct(actor(c), c.params[0], productBody.partial().parse(c.body) as any) },
   { method: 'DELETE', re: /^\/products\/([\w-]+)$/, perm: 'products.manage', run: async (c) => { await deleteProduct(actor(c), c.params[0]); return { ok: true }; } },
+
+  { method: 'GET', re: /^\/categories$/, perm: 'products.manage', run: async () => ({ items: await categoryTree() }) },
+  {
+    method: 'POST', re: /^\/categories$/, perm: 'products.manage',
+    run: async (c) => createCategory(actor(c), z.object({ name: z.string(), icon: z.string().max(8).nullable().optional(), description: z.string().max(300).nullable().optional(), parentId: z.string().nullable().optional() }).parse(c.body)),
+  },
+  {
+    method: 'PATCH', re: /^\/categories\/([\w-]+)$/, perm: 'products.manage',
+    run: async (c) => updateCategory(actor(c), c.params[0], z.object({ name: z.string().optional(), icon: z.string().max(8).nullable().optional(), description: z.string().max(300).nullable().optional(), isActive: z.boolean().optional(), parentId: z.string().nullable().optional() }).parse(c.body)),
+  },
+  { method: 'POST', re: /^\/categories\/([\w-]+)\/move$/, perm: 'products.manage', run: async (c) => ({ moved: await moveCategory(actor(c), c.params[0], z.object({ dir: z.enum(['up', 'down']) }).parse(c.body).dir) }) },
+  { method: 'DELETE', re: /^\/categories\/([\w-]+)$/, perm: 'products.manage', run: async (c) => deleteCategory(actor(c), c.params[0]) },
 
   { method: 'GET', re: /^\/orders$/, perm: 'users.view', run: (c) => Q.listOrders(str(c, 'q'), str(c, 'status'), page(c)) },
 

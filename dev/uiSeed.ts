@@ -32,6 +32,11 @@ async function main() {
   const p1 = await createProduct('seed', { name: 'اقتصادی ۵۰ گیگ', description: 'مناسب استفاده روزمره', durationDays: 30, trafficGB: 50, price: 250000, xuiInboundId: 1, protocol: 'VLESS', sortOrder: 1 });
   const p2 = await createProduct('seed', { name: 'ویژه ۱۰۰ گیگ', durationDays: 60, trafficGB: 100, price: 450000, xuiInboundId: 1, protocol: 'VLESS', sortOrder: 2 });
   await createProduct('seed', { name: 'قدیمی (غیرفعال)', durationDays: 30, trafficGB: 20, price: 120000, xuiInboundId: 1, protocol: 'VLESS', isActive: false, sortOrder: 3 });
+  const { createCategory, setProductCategory } = await import('../src/modules/categories/service');
+  const cm = await createCategory('seed', { name: 'ماهانه', icon: '🗓', description: 'پلن‌های یک‌ماهه' });
+  const cv = await createCategory('seed', { name: 'حجمی', icon: '📦', parentId: cm.id });
+  await createCategory('seed', { name: 'سالانه', icon: '⭐' });
+  await setProductCategory('seed', p1.id, cm.id); await setProductCategory('seed', p2.id, cv.id);
   await createCoupon('seed', { code: 'WELCOME20', type: 'PERCENT', value: 20, maxUses: 100 });
   await createCoupon('seed', { code: 'FIX50K', type: 'FIXED', value: 50000, expiresAt: new Date(Date.now() + 20 * 86_400_000) });
   const img = await QRCode.toBuffer('receipt-demo-image', { width: 420 });

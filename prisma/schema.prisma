@@ -151,13 +151,35 @@ model Product {
   protocol       Protocol @default(VLESS)
   isActive       Boolean  @default(true)
   sortOrder      Int      @default(0)
+  categoryId     String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   orders   Order[]
   services VpnService[]
 
   @@index([isActive, sortOrder])
+  @@index([categoryId])
+}
+
+/// Buy-menu tree (e.g. ماهانه ▸ حجمی). Products hang off a category; no category = shown at the root.
+model Category {
+  id          String     @id @default(cuid())
+  name        String
+  icon        String?
+  description String?
+  parentId    String?
+  sortOrder   Int        @default(0)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children Category[] @relation("CategoryTree")
+  products Product[]
+
+  @@index([parentId, sortOrder])
 }
 
 model Order {

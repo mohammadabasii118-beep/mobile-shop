@@ -2,6 +2,7 @@ import { Composer, InputFile } from 'grammy';
 import QRCode from 'qrcode';
 import { AppError } from '../utils/errors';
 import { listActiveProducts, getProduct } from '../modules/products/service';
+import { menuLevel } from '../modules/categories/service';
 import { cancelOrder, createOrder, getOrderForUser, listUserOrders, setOrderServiceName } from '../modules/orders/service';
 import { isPaymentMethodEnabled, startPayment, submitReceipt } from '../modules/payments/service';
 import { accountSummary } from '../modules/users/service';
@@ -65,24 +66,34 @@ export function userHandlers(fetchFile: FileFetcher) {
 
   /* ----------------------------- buy flow ----------------------------- */
 
-  async function buyMenu(ctx: Ctx) {
-    const ps = await listActiveProducts();
-    if (!ps.length) return show(ctx, `${header('🛒', 'خرید VPN')}\n😕 در حال حاضر پلنی برای فروش موجود نیست.\nلطفاً بعداً سر بزنید.`, [nav()], H);
-    const cards = ps.map((p, n) => [
+  /** One level of the buy menu: sub-category buttons first, then this level's plans as cards. */
+  async function buyMenu(ctx: Ctx, categoryId: string | null = null) {
+    const lvl = await menuLevel(categoryId);
+    const title = lvl.crumbs.length ? lvl.crumbs.map((c) => `${c.icon ?? '📁'} ${c.name}`).join(' ▸ ') : 'خرید VPN';
+    const parentBack = lvl.here ? (lvl.here.parentId ? `bc:${lvl.here.parentId}` : 'menu:buy') : undefined;
+    if (!lvl.children.length && !lvl.products.length) {
+      return show(ctx, `${header('🛒', title)}\n😕 ${lvl.here ? 'این بخش فعلاً پلنی ندارد.' : 'در حال حاضر پلنی برای فروش موجود نیست.\nلطفاً بعداً سر بزنید.'}`, [parentBack ? back(parentBack) : nav()], H);
+    }
+    const cards = lvl.products.map((p, n) => [
       `${fa(n + 1)}️⃣ ${b(p.name)}  ✅ موجود`,
       `   ⏱ ${fa(p.durationDays)} روز  ·  📊 ${fa(p.trafficGB)} GB`,
       `   💰 ${b(money(p.price, p.currency))}`,
       p.description ? `   ${i(p.description)}` : '',
     ].filter(Boolean).join('\n'));
-    await show(ctx, `${header('🛒', 'خرید VPN', 'یکی از پلن‌ها را انتخاب کنید')}\n\n${cards.join('\n\n')}`, [
-      ...ps.map((p, n): Button[] => [{ text: `🛒 ${fa(n + 1)}) ${p.name} · ${money(p.price, p.currency)}`, data: `buy:${p.id}` }]),
-      nav(),
-    ], H);
+    const sub = lvl.children.length && lvl.products.length ? 'یک دسته یا یکی از پلن‌ها را انتخاب کنید' : lvl.children.length ? 'یک دسته را انتخاب کنید' : 'یکی از پلن‌ها را انتخاب کنید';
+    const rows: Button[][] = [];
+    for (let k = 0; k < lvl.children.length; k += 2) {
+      rows.push(lvl.children.slice(k, k + 2).map((c) => ({ text: `${c.icon ?? '📁'} ${c.name}`, data: `bc:${c.id}` })));
+    }
+    rows.push(...lvl.products.map((p, n): Button[] => [{ text: `🛒 ${fa(n + 1)}) ${p.name} · ${money(p.price, p.currency)}`, data: `buy:${p.id}` }]));
+    rows.push(parentBack ? back(parentBack) : nav());
+    const desc = lvl.here?.description ? `\n${i(lvl.here.description)}` : '';
+    await show(ctx, `${header('🛒', title, sub)}${desc}${cards.length ? `\n\n${cards.join('\n\n')}` : ''}`, rows, H);
   }
 
   async function orderSummary(ctx: Ctx, productId: string) {
     const p = await getProduct(productId);
-    if (!p.isActive) return show(ctx, fail('این پلن در دسترس نیست', 'لطفاً پلن دیگری انتخاب کنید.'), [back('menu:buy')], H);
+    if (!p.isActive) return show(ctx, fail('این پلن در دسترس نیست', 'لطفاً پلن دیگری انتخاب کنید.'), [back(p.categoryId ? `bc:${p.categoryId}` : 'menu:buy')], H);
     let discount = 0;
     let couponNote = '';
     if (ctx.session.coupon) {
@@ -108,7 +119,7 @@ export function userHandlers(fetchFile: FileFetcher) {
       '',
       methods.length ? `${b('روش پرداخت را انتخاب کنید')} 👇` : fail('در حال حاضر روش پرداختی فعال نیست', 'لطفاً بعداً تلاش کنید یا با پشتیبانی در ارتباط باشید.'),
     ].join('\n');
-    await show(ctx, text, [...methods, [{ text: '🎁 ثبت کد تخفیف', data: `uc:${p.id}` }], back('menu:buy')], H);
+    await show(ctx, text, [...methods, [{ text: '🎁 ثبت کد تخفیف', data: `uc:${p.id}` }], back(p.categoryId ? `bc:${p.categoryId}` : 'menu:buy')], H);
   }
 
   async function showPaymentInstructions(ctx: Ctx, orderId: string) {
@@ -217,6 +228,7 @@ export function userHandlers(fetchFile: FileFetcher) {
             return show(ctx, `${header('🎁', 'کد تخفیف')}\nکد تخفیف خود را ارسال کنید.\n${i('کد روی سفارش بعدی شما اعمال می‌شود.')}`, [nav()], H);
         }
       }
+      if (ns === 'bc') return await buyMenu(ctx, a);
       if (ns === 'buy') return await orderSummary(ctx, a);
       if (ns === 'uc') { // coupon entry from the order summary, returns to it afterwards
         ctx.session.step = 'coupon'; ctx.session.data = { returnTo: a };

@@ -12,6 +12,7 @@ import { adminRetry } from '../modules/vpn/provisioning';
 import { adminReply, closeTicket, listOpenTickets } from '../modules/support/service';
 import { SETTING_DEFAULTS, SettingKey, allSettings, getSetting, setSetting } from '../modules/settings/service';
 import { audit } from '../modules/admin/audit';
+import { categoryTree, createCategory, deleteCategory, getCategory, moveCategory, setProductCategory, splitIconName, updateCategory } from '../modules/categories/service';
 import { getVpnProvider } from '../providers/vpn';
 import { serviceSummary } from '../modules/vpn/messages';
 import { Button } from '../modules/notifications/service';
@@ -39,6 +40,7 @@ export function adminHandlers() {
     await add('payments.view', { text: '💳 پرداخت‌ها', data: 'adm:pays' });
     await add('vpn.view', { text: '🛰 سرویس‌های VPN', data: 'vl:0' });
     await add('products.manage', { text: '📦 محصولات', data: 'adm:products' });
+    await add('products.manage', { text: '🗂 دسته‌بندی منوی خرید', data: 'ct:l:root' });
     await add('products.manage', { text: '🎁 کدهای تخفیف', data: 'adm:coupons' });
     await add('users.view', { text: '👥 کاربران / سفارش‌ها', data: 'adm:orders' });
     await add('support.reply', { text: '🎫 پشتیبانی', data: 'adm:tickets' });
@@ -165,7 +167,7 @@ export function adminHandlers() {
   c.on('callback_query:data', async (ctx, next) => {
     const d = ctx.callbackQuery.data;
     const [ns, a, b] = d.split(':');
-    const adminNs = ['adm', 'pl', 'ap', 'av', 'vl', 'pr', 'cp', 'st', 'at', 'ao'];
+    const adminNs = ['adm', 'pl', 'ap', 'av', 'vl', 'pr', 'cp', 'st', 'at', 'ao', 'ct'];
     if (!adminNs.includes(ns)) return next();
     try {
       // every admin callback re-checks authorization server-side (callback data is untrusted)
@@ -257,13 +259,27 @@ export function adminHandlers() {
       if (ns === 'pr') {
         await need(ctx, 'products.manage');
         if (a === 'new') { ctx.session.step = 'a_product'; return show(ctx, 'فرمت: نام|روز|حجم GB|قیمت|inboundId|پروتکل(VLESS/VMESS/TROJAN)\nمثال:\n50GB یک‌ماهه|30|50|250000|1|VLESS', [back('adm:products')]); }
+        if (a === 'c') {
+          await getProduct(b);
+          const tree = await categoryTree();
+          return show(ctx, tree.length ? '🗂 این محصول در کدام دسته نمایش داده شود؟' : '🗂 هنوز دسته‌ای نساخته‌اید. ابتدا از «🗂 دسته‌بندی منوی خرید» دسته بسازید.', [
+            [{ text: '🏠 بدون دسته (صفحه‌ی اول)', data: `pr:cs:${b}:none` }],
+            ...tree.slice(0, 40).map((t): Button[] => [{ text: `${'· '.repeat(t.depth)}${t.icon ?? '📁'} ${t.name}`, data: `pr:cs:${b}:${t.id}` }]),
+            back(`pr:v:${b}`),
+          ]);
+        }
+        if (a === 'cs') {
+          const cid = d.split(':')[3];
+          await setProductCategory(actor(ctx), b, cid === 'none' ? null : cid);
+          return show(ctx, '✅ دسته‌ی محصول تغییر کرد.', [[{ text: '📦 مشاهده محصول', data: `pr:v:${b}` }], back('adm:products')]);
+        }
         if (a === 'bulk') {
           ctx.session.step = 'a_bulk';
           return show(ctx, [
             '📥 افزودن گروهی محصولات', '',
             'همه‌ی محصولات را در «یک پیام» بفرستید؛ هر محصول یک خط:',
             'نام | روز | حجم GB | قیمت تومان | [inbound] | [پروتکل] | [توضیح]', '',
-            'اگر inbound یکی است، یک‌بار بالای لیست بنویسید:', 'inbound=23', '',
+            'اگر inbound یکی است، یک‌بار بالای لیست بنویسید:', 'inbound=23', 'برای قرار دادن در دسته (اگر نبود ساخته می‌شود):', 'category=ماهانه ▸ حجمی', '',
             'مثال:', 'inbound=23', 'اقتصادی ۵۰ گیگ | 30 | 50 | 250000', 'ویژه ۱۰۰ گیگ | 60 | 100 | 450,000', 'ویژه ۲۰۰ گیگ | 90 | 200 | 800000 | 25 | VLESS | مناسب خانواده', '',
             '• ارقام فارسی و جداکننده هزارگان مجازند.', '• اگر حتی یک خط خطا داشته باشد هیچ‌کدام ثبت نمی‌شود.', '• محصول کاملاً تکراری رد می‌شود (برای جلوگیری از ارسال دوباره).',
           ].join('\n'), [back('adm:products')]);
@@ -272,7 +288,7 @@ export function adminHandlers() {
           const p = await getProduct(b);
           return show(ctx, `📦 ${p.name}\n${p.description ? p.description + '\n' : ''}⏱ ${p.durationDays} روز · 📊 ${p.trafficGB} GB\n💰 قیمت: ${formatMoney(p.price)}\n🔌 inbound: ${p.xuiInboundId} · ${p.protocol}\n🔢 ترتیب: ${p.sortOrder}\nوضعیت: ${p.isActive ? '🟢 فعال' : '⚪ غیرفعال'}`, [
             [{ text: '✏️ ویرایش', data: `pr:e:${p.id}` }, { text: '🗑 حذف', data: `pr:d:${p.id}` }],
-            [{ text: p.isActive ? '⏸ غیرفعال‌سازی' : '▶️ فعال‌سازی', data: `pr:tg:${p.id}` }],
+            [{ text: '🗂 دسته‌بندی', data: `pr:c:${p.id}` }, { text: p.isActive ? '⏸ غیرفعال‌سازی' : '▶️ فعال‌سازی', data: `pr:tg:${p.id}` }],
             back('adm:products'),
           ]);
         }
@@ -313,6 +329,71 @@ export function adminHandlers() {
         }
         if (a === 'tg') { const p = await getProduct(b); await updateProduct(actor(ctx), b, { isActive: !p.isActive }); return ctx.reply(p.isActive ? '⏸ غیرفعال شد.' : '▶️ فعال شد.'); }
         if (a === 'pc') { ctx.session.step = 'a_price'; ctx.session.data = { id: b }; return show(ctx, 'قیمت جدید (عدد):', [back(`pr:v:${b}`)]); }
+      }
+      if (ns === 'ct') {
+        await need(ctx, 'products.manage');
+        const tree = await categoryTree();
+        const rootKey = (id: string | null) => id ?? 'root';
+        const label = (t: { icon: string | null; name: string; isActive: boolean }) => `${t.isActive ? '' : '⚪ '}${t.icon ?? '📁'} ${t.name}`;
+        if (a === 'l') {
+          const pid = b === 'root' ? null : b;
+          const here = pid ? tree.find((t) => t.id === pid) : undefined;
+          if (pid && !here) throw new AppError('NOT_FOUND', 'دسته یافت نشد');
+          const kids = tree.filter((t) => t.parentId === pid);
+          return show(ctx, `🗂 ${here ? here.path : 'دسته‌بندی منوی خرید'}\n${kids.length ? '' : '\nهنوز زیرمجموعه‌ای نیست.'}\nمحصولات داخل هر دسته در منوی خرید به مشتری نمایش داده می‌شوند. دسته‌ی بدون محصول فعال برای مشتری پنهان است.`, [
+            ...kids.map((t): Button[] => [{ text: `${label(t)} (${t.activeProductCount}/${t.productCount})`, data: `ct:v:${t.id}` }]),
+            [{ text: '➕ دسته‌ی جدید', data: `ct:n:${rootKey(pid)}` }],
+            ...(here ? [[{ text: '⚙️ تنظیمات این دسته', data: `ct:v:${here.id}` }]] : []),
+            back(here ? `ct:l:${rootKey(here.parentId)}` : 'adm:home'),
+          ]);
+        }
+        if (a === 'n') {
+          const pid = b === 'root' ? null : b;
+          if (pid) await getCategory(pid);
+          ctx.session.step = 'a_cat_new'; ctx.session.data = { parentId: pid };
+          return show(ctx, '➕ نام دسته (یا چند دسته، هر کدام یک خط) را بفرستید.\nمی‌توانید اول نام یک ایموجی بگذارید:\n\n🗓 ماهانه\n📦 حجمی\n👨‍👩‍👧 خانوادگی', [back(`ct:l:${b}`)]);
+        }
+        const t = tree.find((x) => x.id === b);
+        if (!t) throw new AppError('NOT_FOUND', 'دسته یافت نشد');
+        if (a === 'v') {
+          const kids = tree.filter((x) => x.parentId === t.id).length;
+          return show(ctx, `🗂 ${t.path}\n${t.description ? t.description + '\n' : ''}\nوضعیت: ${t.isActive ? '🟢 فعال' : '⚪ غیرفعال (برای مشتری پنهان)'}\nمحصولات این دسته: ${t.productCount} (فعال در کل شاخه: ${t.activeProductCount})\nزیرمجموعه‌ها: ${kids}`, [
+            [{ text: '📂 زیرمجموعه‌ها', data: `ct:l:${t.id}` }, { text: '➕ زیرمجموعه', data: `ct:n:${t.id}` }],
+            [{ text: '✏️ نام / آیکون', data: `ct:rn:${t.id}` }, { text: '📝 توضیح', data: `ct:ds:${t.id}` }],
+            [{ text: '🔼 بالا', data: `ct:mu:${t.id}` }, { text: '🔽 پایین', data: `ct:md:${t.id}` }, { text: '↪️ انتقال', data: `ct:mv:${t.id}` }],
+            [{ text: t.isActive ? '⏸ غیرفعال' : '▶️ فعال', data: `ct:tg:${t.id}` }, { text: '📦 محصولات', data: `ct:p:${t.id}` }],
+            [{ text: '🗑 حذف', data: `ct:d:${t.id}` }],
+            back(`ct:l:${rootKey(t.parentId)}`),
+          ]);
+        }
+        if (a === 'rn') { ctx.session.step = 'a_cat_rename'; ctx.session.data = { id: t.id }; return show(ctx, `✏️ نام فعلی: ${label(t)}\nنام جدید را بفرستید (می‌توانید اول ایموجی بگذارید):`, [back(`ct:v:${t.id}`)]); }
+        if (a === 'ds') { ctx.session.step = 'a_cat_desc'; ctx.session.data = { id: t.id }; return show(ctx, '📝 توضیح کوتاه دسته (زیر عنوان به مشتری نمایش داده می‌شود). برای پاک کردن: -', [back(`ct:v:${t.id}`)]); }
+        if (a === 'mu' || a === 'md') { await moveCategory(actor(ctx), t.id, a === 'mu' ? 'up' : 'down'); return show(ctx, '✅ ترتیب تغییر کرد.', [[{ text: '🗂 بازگشت به لیست', data: `ct:l:${rootKey(t.parentId)}` }]]); }
+        if (a === 'tg') { await updateCategory(actor(ctx), t.id, { isActive: !t.isActive }); return show(ctx, t.isActive ? '⏸ دسته غیرفعال شد (برای مشتری پنهان است).' : '▶️ دسته فعال شد.', [back(`ct:v:${t.id}`)]); }
+        if (a === 'p') {
+          const ps = await prisma.product.findMany({ where: { categoryId: t.id }, orderBy: [{ sortOrder: 'asc' }, { price: 'asc' }], take: 30 });
+          return show(ctx, `📦 محصولات «${t.path}»${ps.length ? '' : '\n\nمحصولی ندارد. از صفحه‌ی هر محصول «🗂 دسته‌بندی» را بزنید یا در افزودن گروهی از category= استفاده کنید.'}`, [...ps.map((p): Button[] => [{ text: `${p.isActive ? '🟢' : '⚪'} ${p.name}`, data: `pr:v:${p.id}` }]), back(`ct:v:${t.id}`)]);
+        }
+        if (a === 'mv') {
+          const bad = new Set<string>([t.id]);
+          const collect = (pid: string) => tree.filter((x) => x.parentId === pid).forEach((x) => { bad.add(x.id); collect(x.id); });
+          collect(t.id);
+          return show(ctx, `↪️ «${t.name}» به کجا منتقل شود؟`, [
+            [{ text: '🏠 سطح اول (ریشه)', data: `ct:mv2:${t.id}:root` }],
+            ...tree.filter((x) => !bad.has(x.id)).slice(0, 40).map((x): Button[] => [{ text: `${'· '.repeat(x.depth)}${label(x)}`, data: `ct:mv2:${t.id}:${x.id}` }]),
+            back(`ct:v:${t.id}`),
+          ]);
+        }
+        if (a === 'mv2') {
+          const np = d.split(':')[3];
+          await updateCategory(actor(ctx), t.id, { parentId: np === 'root' ? null : np });
+          return show(ctx, '✅ منتقل شد.', [back(`ct:v:${t.id}`)]);
+        }
+        if (a === 'd') return show(ctx, `⚠️ حذف دسته «${t.path}»؟\nمحصولات داخلش به دسته‌ی بالاتر (یا صفحه‌ی اول) منتقل می‌شوند و حذف نمی‌شوند. اگر زیرمجموعه دارد حذف نمی‌شود.`, [[{ text: '🗑 بله، حذف شود', data: `ct:d2:${t.id}` }, { text: '↩️ انصراف', data: `ct:v:${t.id}` }]]);
+        if (a === 'd2') {
+          const r = await deleteCategory(actor(ctx), t.id);
+          return show(ctx, `🗑 دسته حذف شد.${r.movedProducts ? `\n${r.movedProducts} محصول به دسته‌ی بالاتر منتقل شد.` : ''}`, [[{ text: '🗂 بازگشت به لیست', data: `ct:l:${rootKey(t.parentId)}` }]]);
+        }
       }
       if (ns === 'cp') {
         await need(ctx, 'coupons.manage');
@@ -384,6 +465,27 @@ export function adminHandlers() {
         ctx.session.step = undefined;
         return void (await ctx.reply(`✅ محصول «${p.name}» ساخته شد.`));
       }
+      if (step === 'a_cat_new') {
+        await need(ctx, 'products.manage');
+        const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 20);
+        const made: string[] = [];
+        for (const line of lines) { const { icon, name } = splitIconName(line); const c = await createCategory(actor(ctx), { name, icon, parentId: data.parentId ?? null }); made.push(`${c.icon ?? '📁'} ${c.name}`); }
+        ctx.session.step = undefined;
+        return void (await ctx.reply(`✅ ${made.length} دسته ساخته شد:\n${made.join('\n')}`, { reply_markup: { inline_keyboard: [[{ text: '🗂 مشاهده', callback_data: `ct:l:${data.parentId ?? 'root'}` }]] } }));
+      }
+      if (step === 'a_cat_rename') {
+        await need(ctx, 'products.manage');
+        const { icon, name } = splitIconName(text);
+        await updateCategory(actor(ctx), data.id, { name, ...(icon ? { icon } : {}) });
+        ctx.session.step = undefined;
+        return void (await ctx.reply('✅ ذخیره شد.', { reply_markup: { inline_keyboard: [[{ text: '🗂 مشاهده دسته', callback_data: `ct:v:${data.id}` }]] } }));
+      }
+      if (step === 'a_cat_desc') {
+        await need(ctx, 'products.manage');
+        await updateCategory(actor(ctx), data.id, { description: text === '-' ? null : text });
+        ctx.session.step = undefined;
+        return void (await ctx.reply('✅ ذخیره شد.', { reply_markup: { inline_keyboard: [[{ text: '🗂 مشاهده دسته', callback_data: `ct:v:${data.id}` }]] } }));
+      }
       if (step === 'a_bulk') {
         await need(ctx, 'products.manage');
         const created = await createProductsBulk(actor(ctx), text);
@@ -427,7 +529,7 @@ export function adminHandlers() {
       }
     } catch (e) {
       // validation errors on multi-line / field edits keep the step, so the admin can just resend a corrected text
-      const retry = e instanceof AppError && e.code === 'VALIDATION' && (step === 'a_bulk' || step === 'a_pfield');
+      const retry = e instanceof AppError && (e.code === 'VALIDATION' || e.code === 'CONFLICT') && ['a_bulk', 'a_pfield', 'a_cat_new', 'a_cat_rename'].includes(step ?? '');
       if (!retry) ctx.session.step = undefined;
       return handleError(ctx, e, step === 'a_bulk' ? 'adm:products' : 'adm:home');
     }

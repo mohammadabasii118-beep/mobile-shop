@@ -16,6 +16,7 @@ const F = {
   protocol: z.nativeEnum(Protocol),
   isActive: z.boolean(),
   sortOrder: z.number().int(),
+  categoryId: z.string().min(1).nullable(),
 };
 export const productInput = z.object({
   ...F,
@@ -25,6 +26,7 @@ export const productInput = z.object({
   protocol: F.protocol.default('VLESS'),
   isActive: F.isActive.default(true),
   sortOrder: F.sortOrder.default(0),
+  categoryId: F.categoryId.optional(),
 });
 /** Update patch: same validators, but NO defaults — an edit must only touch the fields that were sent. */
 export const productPatch = z.object(F).partial();
@@ -39,8 +41,13 @@ export async function getProduct(id: string) {
   return p;
 }
 
+async function assertCategory(id: string) {
+  if (!(await prisma.category.findUnique({ where: { id }, select: { id: true } }))) throw new ValidationError('دسته‌بندی انتخاب‌شده وجود ندارد');
+}
+
 export async function createProduct(actor: string, input: ProductInput) {
   const data = productInput.parse(input);
+  if (data.categoryId) await assertCategory(data.categoryId);
   const p = await prisma.product.create({ data });
   await audit({ actor, action: 'product.create', target: 'Product', targetId: p.id, metadata: data });
   return p;
@@ -49,6 +56,7 @@ export async function createProduct(actor: string, input: ProductInput) {
 export async function updateProduct(actor: string, id: string, patch: Partial<ProductInput>) {
   const before = await getProduct(id);
   const data = productPatch.parse(patch);
+  if (data.categoryId) await assertCategory(data.categoryId);
   const p = await prisma.product.update({ where: { id }, data });
   await audit({
     actor,
@@ -75,21 +83,25 @@ const num = (s: string) =>
   Number(s.replace(/[۰-۹]/g, (c) => String(FA_DIGITS.indexOf(c))).replace(/[٠-٩]/g, (c) => String(AR_DIGITS.indexOf(c))).replace(/[,٬،\s]/g, ''));
 
 const PROTOCOLS = ['VLESS', 'VMESS', 'TROJAN', 'SHADOWSOCKS'] as const;
-export interface BulkDefaults { inbound?: number; protocol?: Protocol }
+export interface BulkDefaults { inbound?: number; protocol?: Protocol; category?: string }
+type ParsedProduct = ProductInput & { categoryPath?: string };
 
 /**
  * One product per line:  name | days | GB | price | [inbound] | [protocol] | [description]
- * Directive lines (`inbound=23 protocol=VLESS`) set defaults for the lines below, so the inbound is typed once.
+ * Directive lines (`inbound=23 protocol=VLESS`, `category=ماهانه ▸ حجمی`) set defaults for the lines below.
+ * `category=` creates the menu path if it does not exist; `category=-` goes back to the root.
  * Persian digits and thousands separators are accepted. Lines starting with # are comments.
  */
 export function parseProductLines(text: string, defaults: BulkDefaults = {}) {
-  const items: ProductInput[] = [];
+  const items: ParsedProduct[] = [];
   const errors: string[] = [];
   const def: BulkDefaults = { ...defaults };
   text.split(/\r?\n/).forEach((raw, idx) => {
     const line = raw.trim();
     const at = `خط ${idx + 1}`;
     if (!line || line.startsWith('#')) return;
+    const cat = line.match(/^(?:category|دسته)\s*=\s*(.*)$/i);
+    if (cat) { def.category = cat[1].trim() === '-' ? undefined : cat[1].trim() || undefined; return; }
     if (/^(inbound|protocol)\s*=/i.test(line)) {
       for (const m of line.matchAll(/(inbound|protocol)\s*=\s*(\S+)/gi)) {
         if (m[1].toLowerCase() === 'inbound') {
@@ -117,7 +129,7 @@ export function parseProductLines(text: string, defaults: BulkDefaults = {}) {
       const i = parsed.error.issues[0];
       return void errors.push(`${at}: ${labels[String(i.path[0])] ?? i.path[0]} نامعتبر است`);
     }
-    items.push(parsed.data as ProductInput);
+    items.push({ ...(parsed.data as ProductInput), ...(def.category ? { categoryPath: def.category } : {}) });
   });
   return { items, errors };
 }
@@ -133,8 +145,14 @@ export async function createProductsBulk(actor: string, text: string, defaults: 
   items.forEach((p, n) => { if (seen.has(key(p as any))) out.push(`محصول ${n + 1} («${p.name}»): تکراری است`); seen.add(key(p as any)); });
   if (out.length) throw new ValidationError(`هیچ محصولی ثبت نشد:\n${out.slice(0, 10).join('\n')}${out.length > 10 ? `\n… و ${out.length - 10} خطای دیگر` : ''}`);
   const top = (await prisma.product.aggregate({ _max: { sortOrder: true } }))._max.sortOrder ?? 0;
-  const created = await prisma.$transaction(items.map((p, n) => prisma.product.create({ data: { ...productInput.parse(p), sortOrder: p.sortOrder || top + n + 1 } })));
-  await audit({ actor, action: 'product.bulk_create', target: 'Product', metadata: { count: created.length, names: created.map((c) => c.name).slice(0, 30) } });
+  const { ensureCategoryPath } = await import('../categories/service');
+  const catIds = new Map<string, string>();
+  for (const p of items) if (p.categoryPath && !catIds.has(p.categoryPath)) catIds.set(p.categoryPath, await ensureCategoryPath(actor, p.categoryPath));
+  const created = await prisma.$transaction(items.map((p, n) => {
+    const { categoryPath, ...rest } = p;
+    return prisma.product.create({ data: { ...productInput.parse(rest), categoryId: categoryPath ? catIds.get(categoryPath) : null, sortOrder: p.sortOrder || top + n + 1 } });
+  }));
+  await audit({ actor, action: 'product.bulk_create', target: 'Product', metadata: { count: created.length, names: created.map((c) => c.name).slice(0, 30), categories: [...catIds.keys()] } });
   return created;
 }
 
