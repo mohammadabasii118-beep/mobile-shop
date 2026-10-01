@@ -35,11 +35,13 @@ export async function show(ctx: Ctx, text: string, rows: Button[][] = [], opts: 
   await ctx.reply(text, { reply_markup, parse_mode, link_preview_options: { is_disabled: true } });
 }
 
-export const mainMenuRows = (): Button[][] => [
+/** `isAdmin` adds the management entry — it is only ever rendered for Telegram admins. */
+export const mainMenuRows = (isAdmin = false): Button[][] => [
   [{ text: '🛒 خرید VPN', data: 'menu:buy' }],
   [{ text: '📦 سرویس‌های من', data: 'menu:services' }, { text: '💳 سفارش‌های من', data: 'menu:orders' }],
   [{ text: '👤 حساب من', data: 'menu:account' }, { text: '🎁 کد تخفیف', data: 'menu:coupon' }],
   [{ text: '🎫 پشتیبانی', data: 'menu:support' }, { text: '📜 قوانین', data: 'menu:rules' }],
+  ...(isAdmin ? [[{ text: '🛠 پنل مدیریت', data: 'adm:home' }]] : []),
 ];
 export const back = (to = 'menu:main'): Button[] => [{ text: BACK, data: to }];
 /** Navigation row for dead-end screens: back + home. */

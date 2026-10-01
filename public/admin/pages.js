@@ -111,7 +111,8 @@ async function openUser(id) {
 /* ================================= Products ================================= */
 export function products(ctx, root) {
   const newBtn = can(ctx, 'products.manage') ? button('محصول جدید', { kind: 'primary', ico: 'plus', onClick: () => productForm(null, () => reload()) }) : null;
-  root.append(pageHead('محصولات', 'پلن‌های قابل فروش و تنظیمات inbound', newBtn));
+  const bulkBtn = can(ctx, 'products.manage') ? button('افزودن گروهی', { ico: 'plus', onClick: () => bulkProductsForm(() => reload()) }) : null;
+  root.append(pageHead('محصولات', 'پلن‌های قابل فروش و تنظیمات inbound', bulkBtn, newBtn));
   const card = h('div', { class: 'card' });
   root.append(card);
   async function reload() {
@@ -134,6 +135,23 @@ export function products(ctx, root) {
     } catch (e) { clear(card); card.append(errorState(errMsg(e), reload)); }
   }
   reload();
+}
+function bulkProductsForm(done) {
+  const text = h('textarea', { class: 'textarea ltr', dir: 'auto', style: 'min-height:200px;font-family:var(--mono);font-size:13px', placeholder: 'اقتصادی ۵۰ گیگ | 30 | 50 | 250000\nویژه ۱۰۰ گیگ | 60 | 100 | 450000\nویژه ۲۰۰ گیگ | 90 | 200 | 800000 | 25 | VLESS | توضیح', 'aria-label': 'لیست محصولات' });
+  const inbound = h('input', { class: 'input', type: 'number', inputmode: 'numeric', placeholder: 'مثلاً ۲۳', 'aria-label': 'Inbound پیش‌فرض' });
+  const proto = h('select', { class: 'select', 'aria-label': 'پروتکل پیش‌فرض' }, ['VLESS', 'VMESS', 'TROJAN', 'SHADOWSOCKS'].map((x) => h('option', { value: x }, x)));
+  const err = h('pre', { class: 'form-error', hidden: true, style: 'white-space:pre-wrap;margin:0;font-family:inherit' });
+  const ok = button('ثبت همه', { kind: 'primary', onClick: async () => {
+    err.hidden = true;
+    try {
+      const r = await api('/products/bulk', { method: 'POST', body: { text: text.value, inbound: inbound.value ? Number(inbound.value) : null, protocol: proto.value } });
+      toast(`${num(r.created)} محصول ثبت شد`); m.close(); done();
+    } catch (e) { err.hidden = false; err.textContent = errMsg(e); }
+  } });
+  const m = modal({ title: 'افزودن گروهی محصولات', body: h('div', { class: 'stack' },
+    h('div', { class: 'callout' }, icon('info'), h('div', null, 'هر محصول یک خط: ', h('b', { class: 'ltr', text: 'نام | روز | حجم GB | قیمت | [inbound] | [پروتکل] | [توضیح]' }), '. اگر inbound یکی است، پایین فقط یک‌بار تعیینش کنید. اگر یک خط خطا داشته باشد هیچ‌کدام ثبت نمی‌شود.')),
+    h('div', { class: 'form-grid' }, h('div', { class: 'field' }, h('label', { text: 'Inbound پیش‌فرض' }), inbound), h('div', { class: 'field' }, h('label', { text: 'پروتکل پیش‌فرض' }), proto)),
+    h('div', { class: 'field' }, h('label', { text: 'لیست محصولات' }), text), err), footer: [ok, button('انصراف', { onClick: () => m.close() })] });
 }
 function productForm(p, done) {
   const f = (label, name, type = 'text', val = '', hint) => h('div', { class: 'field' }, h('label', { for: `pf-${name}`, text: label }), h('input', { class: 'input', id: `pf-${name}`, name, type, value: val, inputmode: type === 'number' ? 'numeric' : false }), hint ? h('div', { class: 'hint', text: hint }) : null);

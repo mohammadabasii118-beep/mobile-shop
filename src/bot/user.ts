@@ -15,6 +15,7 @@ import { Button } from '../modules/notifications/service';
 import { Ctx, RULES_HTML, back, mainMenuRows, nav, show } from './ui';
 import { CATEGORY_FA, ORDER_STATUS, RULE, SERVICE_STATUS, TICKET_STATUS, b, bar, code, daysLeft, esc, fa, fail, header, i, jdate, jdatetime, money, ok, timeline, wait } from './format';
 import { logger } from '../utils/logger';
+import { getAdmin } from '../modules/admin/rbac';
 import { telegramApiRoot, telegramGet } from './telegramNet';
 
 export type FileFetcher = (ctx: Ctx, fileId: string) => Promise<Buffer>;
@@ -32,14 +33,17 @@ const H = { html: true } as const;
 export function userHandlers(fetchFile: FileFetcher) {
   const c = new Composer<Ctx>();
 
-  const mainMenu = (ctx: Ctx) => {
+  /** Main menu rows; the management button is rendered ONLY for admins (authorisation is re-checked on every admin callback). */
+  const menuRows = async (ctx: Ctx) => mainMenuRows(!!(await getAdmin(BigInt(ctx.from!.id))));
+
+  const mainMenu = async (ctx: Ctx) => {
     ctx.session.step = undefined;
     const name = ctx.dbUser.firstName ? ` ${esc(ctx.dbUser.firstName)}` : '';
-    return show(ctx, `👋 سلام${name}، خوش آمدید!\n${RULE}\n🔒 اینترنت آزاد، سریع و امن\n⚡️ تحویل خودکار سرویس بعد از پرداخت\n🎧 پشتیبانی همراه شما\n${RULE}\nیکی از گزینه‌ها را انتخاب کنید 👇`, mainMenuRows(), H);
+    return show(ctx, `👋 سلام${name}، خوش آمدید!\n${RULE}\n🔒 اینترنت آزاد، سریع و امن\n⚡️ تحویل خودکار سرویس بعد از پرداخت\n🎧 پشتیبانی همراه شما\n${RULE}\nیکی از گزینه‌ها را انتخاب کنید 👇`, await menuRows(ctx), H);
   };
 
   c.command('start', mainMenu);
-  c.command('help', (ctx) => show(ctx, `ℹ️ ${b('راهنما')}\n${RULE}\n/start منوی اصلی\n/services سرویس‌های من\n/orders سفارش‌های من\n/account حساب من\n/support پشتیبانی`, mainMenuRows(), H));
+  c.command('help', async (ctx) => show(ctx, `ℹ️ ${b('راهنما')}\n${RULE}\n/start منوی اصلی\n/services سرویس‌های من\n/orders سفارش‌های من\n/account حساب من\n/support پشتیبانی`, await menuRows(ctx), H));
   c.command('support', (ctx) => supportMenu(ctx));
   c.command('services', (ctx) => servicesList(ctx));
   c.command('orders', (ctx) => ordersList(ctx));
@@ -390,7 +394,7 @@ export function userHandlers(fetchFile: FileFetcher) {
         const returnTo = ctx.session.data?.returnTo as string | undefined;
         ctx.session.coupon = v.coupon.code; ctx.session.step = undefined; ctx.session.data = undefined;
         await ctx.reply(`${ok('کد تخفیف ثبت شد')}\n🎁 ${code(v.coupon.code)} روی سفارش بعدی اعمال می‌شود.`, { parse_mode: 'HTML' });
-        return returnTo ? orderSummary(ctx, returnTo) : show(ctx, 'ادامه دهید 👇', mainMenuRows());
+        return returnTo ? orderSummary(ctx, returnTo) : show(ctx, 'ادامه دهید 👇', await menuRows(ctx));
       }
       if (step === 'ticket') {
         const [first] = text.split('\n');
@@ -410,12 +414,12 @@ export function userHandlers(fetchFile: FileFetcher) {
   });
 
   // Fallbacks: the user is never left in a silent dead end.
-  c.on('callback_query:data', (ctx) => show(ctx, `${wait('این دکمه دیگر معتبر نیست', 'منوی اصلی را باز می‌کنیم.')}`, mainMenuRows(), H));
+  c.on('callback_query:data', async (ctx) => show(ctx, `${wait('این دکمه دیگر معتبر نیست', 'منوی اصلی را باز می‌کنیم.')}`, await menuRows(ctx), H));
   c.on('message', async (ctx) => {
     if (ctx.session.step === 'receipt' || ctx.session.step === 'receipt_track') {
       return void (await ctx.reply('📸 لطفاً «عکس رسید» یا «کد پیگیری» را ارسال کنید.'));
     }
-    await show(ctx, `🤔 متوجه نشدم.\nلطفاً از منوی زیر استفاده کنید 👇`, mainMenuRows());
+    await show(ctx, `🤔 متوجه نشدم.\nلطفاً از منوی زیر استفاده کنید 👇`, await menuRows(ctx));
   });
 
   return c;

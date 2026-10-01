@@ -161,6 +161,20 @@ describe('web panel: products, coupons, services, settings, support, audit', () 
     const acts = (await prisma.auditLog.findMany()).map((a) => a.action);
     expect(acts).toEqual(expect.arrayContaining(['product.create', 'product.price_change', 'product.delete']));
   });
+  it('products bulk: one request creates all lines (default inbound), errors are listed, permission enforced; PATCH keeps untouched fields', async () => {
+    const c = await login();
+    const ok = await call(c, 'POST', '/products/bulk', { text: 'A | 30 | 50 | 1000\nB | 60 | 100 | 2000', inbound: 23, protocol: 'VMESS' });
+    expect(ok.json.created).toBe(2);
+    expect(ok.json.items.every((x: any) => x.xuiInboundId === 23 && x.protocol === 'VMESS')).toBe(true);
+    const bad = await call(c, 'POST', '/products/bulk', { text: 'C | 30 | 50 | 1000\nD | x | 5 | 1' , inbound: 23 });
+    expect(bad.status).toBe(400); expect(bad.json.message).toContain('خط 2');
+    expect((await call(c, 'GET', '/products')).json.items).toHaveLength(2);
+    const id = ok.json.items[0].id;
+    await call(c, 'PATCH', `/products/${id}`, { price: 5 });
+    expect((await call(c, 'GET', '/products')).json.items.find((x: any) => x.id === id)).toMatchObject({ price: 5, protocol: 'VMESS', isActive: true, xuiInboundId: 23 });
+    await prisma.admin.create({ data: { telegramId: 31n, role: 'SUPPORT_ADMIN' } });
+    expect((await call(await login(31n), 'POST', '/products/bulk', { text: 'E|1|1|1|1' })).status).toBe(403);
+  });
   it('coupons: create, duplicate rejected, toggle', async () => {
     const c = await login();
     const made = await call(c, 'POST', '/coupons', { code: 'off10', type: 'PERCENT', value: 10, maxUses: 5 });

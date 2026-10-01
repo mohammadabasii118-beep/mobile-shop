@@ -4,19 +4,30 @@ import { prisma } from '../../db/client';
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import { audit } from '../admin/audit';
 
-export const productInput = z.object({
+const F = {
   name: z.string().trim().min(1).max(80),
-  description: z.string().trim().max(500).optional(),
+  description: z.string().trim().max(500),
   durationDays: z.number().int().min(1).max(3650),
   trafficGB: z.number().int().min(1).max(100000),
   price: z.number().int().min(0).max(2_000_000_000),
-  currency: z.string().default('IRT'),
-  xuiProviderId: z.string().default('default'),
+  currency: z.string(),
+  xuiProviderId: z.string(),
   xuiInboundId: z.number().int().min(1),
-  protocol: z.nativeEnum(Protocol).default('VLESS'),
-  isActive: z.boolean().default(true),
-  sortOrder: z.number().int().default(0),
+  protocol: z.nativeEnum(Protocol),
+  isActive: z.boolean(),
+  sortOrder: z.number().int(),
+};
+export const productInput = z.object({
+  ...F,
+  description: F.description.optional(),
+  currency: F.currency.default('IRT'),
+  xuiProviderId: F.xuiProviderId.default('default'),
+  protocol: F.protocol.default('VLESS'),
+  isActive: F.isActive.default(true),
+  sortOrder: F.sortOrder.default(0),
 });
+/** Update patch: same validators, but NO defaults — an edit must only touch the fields that were sent. */
+export const productPatch = z.object(F).partial();
 export type ProductInput = z.input<typeof productInput>;
 
 export const listActiveProducts = () => prisma.product.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: 'asc' }, { price: 'asc' }] });
@@ -37,7 +48,7 @@ export async function createProduct(actor: string, input: ProductInput) {
 
 export async function updateProduct(actor: string, id: string, patch: Partial<ProductInput>) {
   const before = await getProduct(id);
-  const data = productInput.partial().parse(patch);
+  const data = productPatch.parse(patch);
   const p = await prisma.product.update({ where: { id }, data });
   await audit({
     actor,
@@ -54,4 +65,93 @@ export async function deleteProduct(actor: string, id: string) {
   if (used > 0) throw new ValidationError('این محصول در سفارش‌ها استفاده شده است؛ به‌جای حذف، آن را غیرفعال کنید.');
   await prisma.product.delete({ where: { id } });
   await audit({ actor, action: 'product.delete', target: 'Product', targetId: id, metadata: { name: p.name } });
+}
+
+/* ------------------------- bulk add + single-field edit ------------------------- */
+
+const FA_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
+const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
+const num = (s: string) =>
+  Number(s.replace(/[۰-۹]/g, (c) => String(FA_DIGITS.indexOf(c))).replace(/[٠-٩]/g, (c) => String(AR_DIGITS.indexOf(c))).replace(/[,٬،\s]/g, ''));
+
+const PROTOCOLS = ['VLESS', 'VMESS', 'TROJAN', 'SHADOWSOCKS'] as const;
+export interface BulkDefaults { inbound?: number; protocol?: Protocol }
+
+/**
+ * One product per line:  name | days | GB | price | [inbound] | [protocol] | [description]
+ * Directive lines (`inbound=23 protocol=VLESS`) set defaults for the lines below, so the inbound is typed once.
+ * Persian digits and thousands separators are accepted. Lines starting with # are comments.
+ */
+export function parseProductLines(text: string, defaults: BulkDefaults = {}) {
+  const items: ProductInput[] = [];
+  const errors: string[] = [];
+  const def: BulkDefaults = { ...defaults };
+  text.split(/\r?\n/).forEach((raw, idx) => {
+    const line = raw.trim();
+    const at = `خط ${idx + 1}`;
+    if (!line || line.startsWith('#')) return;
+    if (/^(inbound|protocol)\s*=/i.test(line)) {
+      for (const m of line.matchAll(/(inbound|protocol)\s*=\s*(\S+)/gi)) {
+        if (m[1].toLowerCase() === 'inbound') {
+          const n = num(m[2]);
+          if (!Number.isInteger(n) || n < 1) errors.push(`${at}: شماره inbound نامعتبر است`); else def.inbound = n;
+        } else if ((PROTOCOLS as readonly string[]).includes(m[2].toUpperCase())) def.protocol = m[2].toUpperCase() as Protocol;
+        else errors.push(`${at}: پروتکل باید یکی از ${PROTOCOLS.join('/')} باشد`);
+      }
+      return;
+    }
+    const f = line.split(/\s*[|\t]\s*/).map((x) => x.trim());
+    if (f.length < 4) return void errors.push(`${at}: حداقل ۴ بخش لازم است (نام | روز | حجم | قیمت)`);
+    if (f.length > 7) return void errors.push(`${at}: بیش از ۷ بخش دارد`);
+    const [name, days, gb, price, inbound, protocol, description] = f;
+    const proto = (protocol || def.protocol || 'VLESS').toUpperCase();
+    if (!(PROTOCOLS as readonly string[]).includes(proto)) return void errors.push(`${at}: پروتکل «${protocol}» نامعتبر است`);
+    const inboundId = inbound ? num(inbound) : def.inbound;
+    if (inboundId === undefined) return void errors.push(`${at}: inbound مشخص نشده (در خط یا با inbound=شماره بالای لیست)`);
+    const parsed = productInput.safeParse({
+      name, description: description || undefined, durationDays: num(days), trafficGB: num(gb), price: num(price),
+      xuiInboundId: inboundId, protocol: proto,
+    });
+    if (!parsed.success) {
+      const labels: Record<string, string> = { name: 'نام', durationDays: 'روز', trafficGB: 'حجم', price: 'قیمت', xuiInboundId: 'inbound' };
+      const i = parsed.error.issues[0];
+      return void errors.push(`${at}: ${labels[String(i.path[0])] ?? i.path[0]} نامعتبر است`);
+    }
+    items.push(parsed.data as ProductInput);
+  });
+  return { items, errors };
+}
+
+/** All-or-nothing bulk create. Exact duplicates (same name/days/GB/price/inbound) are rejected to guard against double paste. */
+export async function createProductsBulk(actor: string, text: string, defaults: BulkDefaults = {}) {
+  const { items, errors } = parseProductLines(text, defaults);
+  if (!items.length && !errors.length) throw new ValidationError('هیچ محصولی در متن پیدا نشد');
+  const existing = await prisma.product.findMany({ select: { name: true, durationDays: true, trafficGB: true, price: true, xuiInboundId: true } });
+  const key = (p: { name: string; durationDays: number; trafficGB: number; price: number; xuiInboundId: number }) => `${p.name}|${p.durationDays}|${p.trafficGB}|${p.price}|${p.xuiInboundId}`;
+  const seen = new Set(existing.map(key));
+  const out = [...errors];
+  items.forEach((p, n) => { if (seen.has(key(p as any))) out.push(`محصول ${n + 1} («${p.name}»): تکراری است`); seen.add(key(p as any)); });
+  if (out.length) throw new ValidationError(`هیچ محصولی ثبت نشد:\n${out.slice(0, 10).join('\n')}${out.length > 10 ? `\n… و ${out.length - 10} خطای دیگر` : ''}`);
+  const top = (await prisma.product.aggregate({ _max: { sortOrder: true } }))._max.sortOrder ?? 0;
+  const created = await prisma.$transaction(items.map((p, n) => prisma.product.create({ data: { ...productInput.parse(p), sortOrder: p.sortOrder || top + n + 1 } })));
+  await audit({ actor, action: 'product.bulk_create', target: 'Product', metadata: { count: created.length, names: created.map((c) => c.name).slice(0, 30) } });
+  return created;
+}
+
+export const PRODUCT_FIELDS = {
+  name: 'نام', description: 'توضیح', price: 'قیمت (تومان)', trafficGB: 'حجم (GB)', durationDays: 'مدت (روز)', xuiInboundId: 'Inbound ID', sortOrder: 'ترتیب نمایش',
+} as const;
+export type ProductField = keyof typeof PRODUCT_FIELDS;
+export const isProductField = (f: string): f is ProductField => f in PRODUCT_FIELDS;
+
+/** Parse one edited field from user text into an update patch (validated by the same schema as create). */
+export function parseProductField(field: ProductField, raw: string): Partial<ProductInput> {
+  const text = raw.trim();
+  const patch: Record<string, unknown> =
+    field === 'name' ? { name: text } :
+    field === 'description' ? { description: text === '-' ? '' : text } :
+    { [field]: num(text) };
+  const r = productPatch.safeParse(patch);
+  if (!r.success || (field !== 'name' && field !== 'description' && !Number.isFinite(patch[field] as number))) throw new ValidationError(`مقدار «${PRODUCT_FIELDS[field]}» نامعتبر است`);
+  return r.data as Partial<ProductInput>;
 }

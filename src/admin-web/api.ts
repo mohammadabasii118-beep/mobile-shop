@@ -7,7 +7,7 @@ import { AdminRole, Protocol } from '@prisma/client';
 import { Permission, ROLE_PERMISSIONS, adminActor, requirePermission } from '../modules/admin/rbac';
 import { audit } from '../modules/admin/audit';
 import { approvePayment, rejectPayment, requestReview } from '../modules/payments/service';
-import { createProduct, deleteProduct, listAllProducts, updateProduct } from '../modules/products/service';
+import { createProduct, createProductsBulk, deleteProduct, listAllProducts, updateProduct } from '../modules/products/service';
 import { createCoupon, listCoupons, setCouponActive } from '../modules/coupons/service';
 import { adminRenew, deleteService, resumeService, suspendService, syncService } from '../modules/vpn/service';
 import { adminRetry } from '../modules/vpn/provisioning';
@@ -89,6 +89,14 @@ export const routes: Route[] = [
 
   { method: 'GET', re: /^\/products$/, perm: 'products.manage', run: async () => ({ items: await listAllProducts() }) },
   { method: 'POST', re: /^\/products$/, perm: 'products.manage', run: async (c) => createProduct(actor(c), productBody.parse(c.body) as any) },
+  {
+    method: 'POST', re: /^\/products\/bulk$/, perm: 'products.manage',
+    run: async (c) => {
+      const b = z.object({ text: z.string().min(1).max(20_000), inbound: z.number().int().min(1).optional().nullable(), protocol: z.nativeEnum(Protocol).optional().nullable() }).parse(c.body);
+      const created = await createProductsBulk(actor(c), b.text, { inbound: b.inbound ?? undefined, protocol: b.protocol ?? undefined });
+      return { created: created.length, items: created };
+    },
+  },
   { method: 'PATCH', re: /^\/products\/([\w-]+)$/, perm: 'products.manage', run: async (c) => updateProduct(actor(c), c.params[0], productBody.partial().parse(c.body) as any) },
   { method: 'DELETE', re: /^\/products\/([\w-]+)$/, perm: 'products.manage', run: async (c) => { await deleteProduct(actor(c), c.params[0]); return { ok: true }; } },
 

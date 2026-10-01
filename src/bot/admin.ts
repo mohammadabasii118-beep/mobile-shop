@@ -5,7 +5,7 @@ import { formatMoney, formatBytes } from '../utils/misc';
 import { Permission, adminActor, getAdmin, hasPermission, requirePermission } from '../modules/admin/rbac';
 import { dashboardStats } from '../modules/admin/stats';
 import { PaymentFilter, approvePayment, getPaymentDetail, listPayments, rejectPayment, requestReview } from '../modules/payments/service';
-import { createProduct, getProduct, listAllProducts, updateProduct } from '../modules/products/service';
+import { PRODUCT_FIELDS, createProduct, createProductsBulk, deleteProduct, getProduct, isProductField, listAllProducts, parseProductField, updateProduct } from '../modules/products/service';
 import { createCoupon, listCoupons } from '../modules/coupons/service';
 import { adminRenew, deleteService, getServiceAdmin, listServicesAdmin, resumeService, suspendService, syncService } from '../modules/vpn/service';
 import { adminRetry } from '../modules/vpn/provisioning';
@@ -44,6 +44,7 @@ export function adminHandlers() {
     await add('support.reply', { text: '🎫 پشتیبانی', data: 'adm:tickets' });
     await add('settings.manage', { text: '⚙️ تنظیمات', data: 'adm:settings' });
     await add('audit.view', { text: '🧾 Audit Log', data: 'adm:audit' });
+    if (panelEnabled()) rows.push([{ text: '🖥 ورود به پنل وب', data: 'adm:web' }]);
     rows.push([{ text: '🏠 منوی کاربر', data: 'menu:main' }]);
     await show(ctx, `🛠 پنل مدیریت (${a.role})`, rows);
   }
@@ -172,12 +173,18 @@ export function adminHandlers() {
       if (ns === 'adm') {
         switch (a) {
           case 'home': return panel(ctx);
+          case 'web': {
+            if (!panelEnabled()) throw new AppError('VALIDATION', 'پنل وب پیکربندی نشده است');
+            const url = loginUrl(createLoginToken(BigInt(ctx.from!.id)));
+            await audit({ actor: actor(ctx), action: 'admin.panel_link' });
+            return ctx.reply(`🖥 ورود به پنل مدیریت\n\nاین لینک یک‌بارمصرف است و ۵ دقیقه اعتبار دارد:\n${url}`, { link_preview_options: { is_disabled: true } });
+          }
           case 'dash': return dashboard(ctx);
           case 'pays': await need(ctx, 'payments.view'); return show(ctx, '💳 پرداخت‌ها', [...FILTERS.map(([f, t]): Button[] => [{ text: t, data: `pl:${f}:0` }]), back('adm:home')]);
           case 'products': {
             await need(ctx, 'products.manage');
             const ps = await listAllProducts();
-            return show(ctx, '📦 محصولات', [[{ text: '➕ محصول جدید', data: 'pr:new' }], ...ps.map((p): Button[] => [{ text: `${p.isActive ? '🟢' : '⚪'} ${p.name} · ${p.price}`, data: `pr:v:${p.id}` }]), back('adm:home')]);
+            return show(ctx, `📦 محصولات (${ps.length})`, [[{ text: '➕ محصول جدید', data: 'pr:new' }, { text: '📥 افزودن گروهی', data: 'pr:bulk' }], ...ps.map((p): Button[] => [{ text: `${p.isActive ? '🟢' : '⚪'} ${p.name} · ${p.price}`, data: `pr:v:${p.id}` }]), back('adm:home')]);
           }
           case 'coupons': {
             await need(ctx, 'coupons.manage');
@@ -250,11 +257,61 @@ export function adminHandlers() {
       if (ns === 'pr') {
         await need(ctx, 'products.manage');
         if (a === 'new') { ctx.session.step = 'a_product'; return show(ctx, 'فرمت: نام|روز|حجم GB|قیمت|inboundId|پروتکل(VLESS/VMESS/TROJAN)\nمثال:\n50GB یک‌ماهه|30|50|250000|1|VLESS', [back('adm:products')]); }
+        if (a === 'bulk') {
+          ctx.session.step = 'a_bulk';
+          return show(ctx, [
+            '📥 افزودن گروهی محصولات', '',
+            'همه‌ی محصولات را در «یک پیام» بفرستید؛ هر محصول یک خط:',
+            'نام | روز | حجم GB | قیمت تومان | [inbound] | [پروتکل] | [توضیح]', '',
+            'اگر inbound یکی است، یک‌بار بالای لیست بنویسید:', 'inbound=23', '',
+            'مثال:', 'inbound=23', 'اقتصادی ۵۰ گیگ | 30 | 50 | 250000', 'ویژه ۱۰۰ گیگ | 60 | 100 | 450,000', 'ویژه ۲۰۰ گیگ | 90 | 200 | 800000 | 25 | VLESS | مناسب خانواده', '',
+            '• ارقام فارسی و جداکننده هزارگان مجازند.', '• اگر حتی یک خط خطا داشته باشد هیچ‌کدام ثبت نمی‌شود.', '• محصول کاملاً تکراری رد می‌شود (برای جلوگیری از ارسال دوباره).',
+          ].join('\n'), [back('adm:products')]);
+        }
         if (a === 'v') {
           const p = await getProduct(b);
-          return show(ctx, `📦 ${p.name}\n${p.durationDays} روز / ${p.trafficGB}GB\nقیمت: ${p.price}\ninbound: ${p.xuiInboundId} ${p.protocol}\nفعال: ${p.isActive}`, [[{ text: p.isActive ? '⏸ غیرفعال' : '▶️ فعال', data: `pr:tg:${p.id}` }, { text: '💰 تغییر قیمت', data: `pr:pc:${p.id}` }], back('adm:products')]);
+          return show(ctx, `📦 ${p.name}\n${p.description ? p.description + '\n' : ''}⏱ ${p.durationDays} روز · 📊 ${p.trafficGB} GB\n💰 قیمت: ${formatMoney(p.price)}\n🔌 inbound: ${p.xuiInboundId} · ${p.protocol}\n🔢 ترتیب: ${p.sortOrder}\nوضعیت: ${p.isActive ? '🟢 فعال' : '⚪ غیرفعال'}`, [
+            [{ text: '✏️ ویرایش', data: `pr:e:${p.id}` }, { text: '🗑 حذف', data: `pr:d:${p.id}` }],
+            [{ text: p.isActive ? '⏸ غیرفعال‌سازی' : '▶️ فعال‌سازی', data: `pr:tg:${p.id}` }],
+            back('adm:products'),
+          ]);
         }
-        if (a === 'tg') { const p = await getProduct(b); await updateProduct(actor(ctx), b, { isActive: !p.isActive }); return ctx.reply('✅ انجام شد.'); }
+        if (a === 'e') {
+          await getProduct(b);
+          return show(ctx, '✏️ کدام بخش را ویرایش کنیم؟', [
+            ...Object.entries(PRODUCT_FIELDS).reduce<Button[][]>((rows, [f, label], n) => { if (n % 2 === 0) rows.push([]); rows[rows.length - 1].push({ text: label, data: `pr:f:${b}:${f}` }); return rows; }, []),
+            [{ text: '🔌 پروتکل', data: `pr:pt:${b}` }],
+            back(`pr:v:${b}`),
+          ]);
+        }
+        if (a === 'f') {
+          const field = d.split(':')[3];
+          if (!isProductField(field)) throw new AppError('VALIDATION', 'بخش نامعتبر');
+          const p = await getProduct(b);
+          ctx.session.step = 'a_pfield'; ctx.session.data = { id: b, field };
+          const cur = String((p as unknown as Record<string, unknown>)[field] ?? '');
+          return show(ctx, `✏️ ${PRODUCT_FIELDS[field]}\nمقدار فعلی: ${cur || '—'}\n\nمقدار جدید را بفرستید${field === 'description' ? ' (برای پاک کردن: -)' : ''}:`, [back(`pr:e:${b}`)]);
+        }
+        if (a === 'pt') {
+          await getProduct(b);
+          return show(ctx, 'پروتکل را انتخاب کنید (باید با inbound سازگار باشد):', [['VLESS', 'VMESS'].map((x) => ({ text: x, data: `pr:ps:${b}:${x}` })), ['TROJAN', 'SHADOWSOCKS'].map((x) => ({ text: x, data: `pr:ps:${b}:${x}` })), back(`pr:e:${b}`)]);
+        }
+        if (a === 'ps') {
+          const proto = d.split(':')[3];
+          if (!['VLESS', 'VMESS', 'TROJAN', 'SHADOWSOCKS'].includes(proto)) throw new AppError('VALIDATION', 'پروتکل نامعتبر');
+          await updateProduct(actor(ctx), b, { protocol: proto as never });
+          await ctx.reply('✅ پروتکل تغییر کرد.');
+          return show(ctx, '✅ انجام شد', [back(`pr:v:${b}`)]);
+        }
+        if (a === 'd') {
+          const p = await getProduct(b);
+          return show(ctx, `⚠️ حذف محصول «${p.name}»؟\nاگر در سفارشی استفاده شده باشد حذف نمی‌شود (به‌جایش غیرفعالش کنید).`, [[{ text: '🗑 بله، حذف شود', data: `pr:d2:${b}` }, { text: '↩️ انصراف', data: `pr:v:${b}` }]]);
+        }
+        if (a === 'd2') {
+          await deleteProduct(actor(ctx), b);
+          return show(ctx, '🗑 محصول حذف شد.', [back('adm:products')]);
+        }
+        if (a === 'tg') { const p = await getProduct(b); await updateProduct(actor(ctx), b, { isActive: !p.isActive }); return ctx.reply(p.isActive ? '⏸ غیرفعال شد.' : '▶️ فعال شد.'); }
         if (a === 'pc') { ctx.session.step = 'a_price'; ctx.session.data = { id: b }; return show(ctx, 'قیمت جدید (عدد):', [back(`pr:v:${b}`)]); }
       }
       if (ns === 'cp') {
@@ -327,6 +384,20 @@ export function adminHandlers() {
         ctx.session.step = undefined;
         return void (await ctx.reply(`✅ محصول «${p.name}» ساخته شد.`));
       }
+      if (step === 'a_bulk') {
+        await need(ctx, 'products.manage');
+        const created = await createProductsBulk(actor(ctx), text);
+        ctx.session.step = undefined;
+        return void (await ctx.reply(`✅ ${created.length} محصول ثبت شد:\n${created.map((c) => `• ${c.name} — ${formatMoney(c.price)}`).join('\n')}`));
+      }
+      if (step === 'a_pfield') {
+        await need(ctx, 'products.manage');
+        if (!isProductField(data.field)) throw new AppError('VALIDATION', 'بخش نامعتبر');
+        await updateProduct(actor(ctx), data.id, parseProductField(data.field, text));
+        ctx.session.step = undefined;
+        await ctx.reply('✅ ذخیره شد.');
+        return void (await ctx.reply('بازگشت به محصول:', { reply_markup: { inline_keyboard: [[{ text: '📦 مشاهده محصول', callback_data: `pr:v:${data.id}` }]] } }));
+      }
       if (step === 'a_price') {
         await need(ctx, 'products.manage');
         await updateProduct(actor(ctx), data.id, { price: Number(text) });
@@ -355,8 +426,10 @@ export function adminHandlers() {
         return void (await ctx.reply('✅ ارسال شد.'));
       }
     } catch (e) {
-      ctx.session.step = undefined;
-      return handleError(ctx, e);
+      // validation errors on multi-line / field edits keep the step, so the admin can just resend a corrected text
+      const retry = e instanceof AppError && e.code === 'VALIDATION' && (step === 'a_bulk' || step === 'a_pfield');
+      if (!retry) ctx.session.step = undefined;
+      return handleError(ctx, e, step === 'a_bulk' ? 'adm:products' : 'adm:home');
     }
     return next();
   });
