@@ -75,7 +75,7 @@ export function userHandlers(fetchFile: FileFetcher) {
       return show(ctx, `${header('🛒', title)}\n😕 ${lvl.here ? 'این بخش فعلاً پلنی ندارد.' : 'در حال حاضر پلنی برای فروش موجود نیست.\nلطفاً بعداً سر بزنید.'}`, [parentBack ? back(parentBack) : nav()], H);
     }
     const cards = lvl.products.map((p, n) => [
-      `${fa(n + 1)}️⃣ ${b(p.name)}  ✅ موجود`,
+      `\u200f${fa(n + 1)}- ${b(p.name)}\u200f  ✅ موجود`,
       `   ⏱ ${fa(p.durationDays)} روز  ·  📊 ${fa(p.trafficGB)} GB`,
       `   💰 ${b(money(p.price, p.currency))}`,
       p.description ? `   ${i(p.description)}` : '',
@@ -85,7 +85,7 @@ export function userHandlers(fetchFile: FileFetcher) {
     for (let k = 0; k < lvl.children.length; k += 2) {
       rows.push(lvl.children.slice(k, k + 2).map((c) => ({ text: `${c.icon ?? '📁'} ${c.name}`, data: `bc:${c.id}` })));
     }
-    rows.push(...lvl.products.map((p, n): Button[] => [{ text: `🛒 ${fa(n + 1)}) ${p.name} · ${money(p.price, p.currency)}`, data: `buy:${p.id}` }]));
+    rows.push(...lvl.products.map((p, n): Button[] => [{ text: `🛒 ${p.name}\u200f · ${money(p.price, p.currency)}`, data: `buy:${p.id}` }]));
     rows.push(parentBack ? back(parentBack) : nav());
     const desc = lvl.here?.description ? `\n${i(lvl.here.description)}` : '';
     await show(ctx, `${header('🛒', title, sub)}${desc}${cards.length ? `\n\n${cards.join('\n\n')}` : ''}`, rows, H);
