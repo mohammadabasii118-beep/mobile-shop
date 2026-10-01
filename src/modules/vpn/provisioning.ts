@@ -79,7 +79,12 @@ async function doCreate(order: Order, product: Product, telegramId: bigint) {
     });
   } else {
     if (svc.provisioningStatus === 'SUCCESS') return; // idempotent
-    svc = await prisma.vpnService.update({ where: { id: svc.id }, data: { provisioningStatus: 'PROCESSING', expiresAt: addDays(new Date(), product.durationDays) } });
+    // A retry re-reads the product's panel target, so an admin can fix a wrong inbound/protocol and retry.
+    // (Only reached while provisioning is not SUCCESS; the client uuid/email stay the same.)
+    svc = await prisma.vpnService.update({
+      where: { id: svc.id },
+      data: { provisioningStatus: 'PROCESSING', expiresAt: addDays(new Date(), product.durationDays), inboundId: product.xuiInboundId, protocol: product.protocol, provider: product.xuiProviderId },
+    });
   }
 
   const ref = refOf(svc);

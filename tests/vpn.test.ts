@@ -94,6 +94,18 @@ describe('provisioning', () => {
     expect(ctx.vpn.clients.size).toBe(0);
   });
 
+  it('admin fixes a wrong inbound on the product, retry then uses the corrected inbound', async () => {
+    ctx.vpn.inbounds.set(23, { enable: true, protocol: 'vless' });
+    const { product, order, p } = await paidOrder({ xuiInboundId: 99 });
+    await approvePayment(p.id, { actor: 'admin:1' });
+    expect((await prisma.vpnService.findUniqueOrThrow({ where: { orderId: order.id } })).provisioningStatus).toBe('FAILED');
+    await prisma.product.update({ where: { id: product.id }, data: { xuiInboundId: 23 } });
+    expect(await adminRetry(order.id, 'admin:1')).toBe('done');
+    const svc = await prisma.vpnService.findUniqueOrThrow({ where: { orderId: order.id } });
+    expect(svc).toMatchObject({ inboundId: 23, provisioningStatus: 'SUCCESS' });
+    expect(ctx.vpn.clients.size).toBe(1);
+  });
+
   it('stale PROCESSING lock is recovered, fresh one is not', async () => {
     const { order, p } = await paidOrder();
     await prisma.provisioningTask.deleteMany();
