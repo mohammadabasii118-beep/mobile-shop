@@ -12,6 +12,7 @@ export interface CreateServiceRequest extends ServiceRef {
   telegramId: string;
   trafficLimitBytes: bigint;
   expiresAt: Date;
+  comment?: string; // free text stored on the panel client (name + order), searchable in the panel
 }
 
 export interface RenewServiceRequest extends ServiceRef {
@@ -52,7 +53,8 @@ export interface VpnProvider {
   deleteService(ref: ServiceRef): Promise<void>;
   getServiceStatus(ref: ServiceRef): Promise<ServiceStatus | null>;
   getTraffic(ref: ServiceRef): Promise<{ up: bigint; down: bigint; used: bigint; total: bigint } | null>;
-  getConfig(ref: ServiceRef & { subId: string }): Promise<ServiceConfig>;
+  /** `remark` = name shown by client apps for the generated direct link (defaults to the client email). */
+  getConfig(ref: ServiceRef & { subId: string; remark?: string }): Promise<ServiceConfig>;
   getInbound(inboundId: number): Promise<InboundInfo | null>;
   healthCheck(): Promise<{ ok: boolean; detail: string }>;
 }

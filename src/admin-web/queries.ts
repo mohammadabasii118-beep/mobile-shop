@@ -74,7 +74,7 @@ export async function listServices(q: string, status: string, page: number) {
     prisma.vpnService.findMany({ where, orderBy: { createdAt: 'desc' }, ...skip(page), include: { user: true, product: true, order: { include: { task: true } } } }),
     prisma.vpnService.count({ where }),
   ]);
-  return paged(rows.map((s) => ({ id: s.id, orderId: s.orderId, externalId: s.externalId, uuid: s.uuid, protocol: s.protocol, inboundId: s.inboundId, product: s.product.name, status: s.status, provisioningStatus: s.provisioningStatus, trafficLimit: s.trafficLimit, trafficUsed: s.trafficUsed, synced: !!s.lastSyncAt, lastSyncAt: s.lastSyncAt, expiresAt: s.expiresAt, createdAt: s.createdAt, taskAttempts: s.order.task?.attempts ?? 0, lastError: s.order.task?.lastError ?? null, user: { telegramId: s.user.telegramId, username: s.user.username, name: s.user.firstName } })), total, page);
+  return paged(rows.map((s) => ({ id: s.id, orderId: s.orderId, externalId: s.externalId, displayName: s.displayName, uuid: s.uuid, protocol: s.protocol, inboundId: s.inboundId, product: s.product.name, status: s.status, provisioningStatus: s.provisioningStatus, trafficLimit: s.trafficLimit, trafficUsed: s.trafficUsed, synced: !!s.lastSyncAt, lastSyncAt: s.lastSyncAt, expiresAt: s.expiresAt, createdAt: s.createdAt, taskAttempts: s.order.task?.attempts ?? 0, lastError: s.order.task?.lastError ?? null, user: { telegramId: s.user.telegramId, username: s.user.username, name: s.user.firstName } })), total, page);
 }
 
 export async function getServiceDetail(id: string) {

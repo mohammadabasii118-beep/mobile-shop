@@ -2,10 +2,11 @@ import { Composer, InputFile } from 'grammy';
 import QRCode from 'qrcode';
 import { AppError } from '../utils/errors';
 import { listActiveProducts, getProduct } from '../modules/products/service';
-import { cancelOrder, createOrder, getOrderForUser, listUserOrders } from '../modules/orders/service';
+import { cancelOrder, createOrder, getOrderForUser, listUserOrders, setOrderServiceName } from '../modules/orders/service';
 import { isPaymentMethodEnabled, startPayment, submitReceipt } from '../modules/payments/service';
 import { accountSummary } from '../modules/users/service';
-import { getServiceForUser, listUserServices } from '../modules/vpn/service';
+import { getServiceForUser, listUserServices, renameService } from '../modules/vpn/service';
+import { serviceLabel } from '../utils/names';
 import { createTicket, getTicketForUser, listUserTickets, userReply } from '../modules/support/service';
 import { validateCoupon } from '../modules/coupons/service';
 import { getSetting } from '../modules/settings/service';
@@ -114,6 +115,7 @@ export function userHandlers(fetchFile: FileFetcher) {
     const text = [
       header('💳', 'پرداخت کارت‌به‌کارت', `مرحله ۲ از ۳ · سفارش ${o.orderNumber}`),
       `📦 ${esc(o.product.name)}`,
+      `📛 نام سرویس: ${o.serviceName ? b(o.serviceName) : i('خودکار — می‌توانید نام دلخواه بگذارید')}`,
       o.discountAmount ? `🎁 تخفیف: ${money(o.discountAmount, o.currency)}` : '',
       `💰 مبلغ قابل پرداخت: ${b(money(o.finalAmount, o.currency))}`,
       RULE,
@@ -132,6 +134,7 @@ export function userHandlers(fetchFile: FileFetcher) {
     const rows: Button[][] = [];
     if (o.status === 'PENDING_PAYMENT') rows.push([{ text: '📤 ارسال رسید', data: `rc:${o.id}` }], [{ text: '❌ لغو سفارش', data: `oc:${o.id}` }]);
     else if (o.status !== 'CANCELLED' && o.status !== 'REFUNDED') rows.push([{ text: '🔄 به‌روزرسانی وضعیت', data: `ov:${o.id}` }]);
+    if (['PENDING_PAYMENT', 'PAYMENT_SUBMITTED', 'PAYMENT_REVIEW', 'PAID'].includes(o.status)) rows.push([{ text: '✏️ نام دلخواه سرویس', data: `nm:o:${o.id}` }]);
     if (o.status === 'FULFILLED') rows.push([{ text: '📦 سرویس‌های من', data: 'menu:services' }]);
     rows.push(nav('menu:orders'));
     return rows;
@@ -172,10 +175,10 @@ export function userHandlers(fetchFile: FileFetcher) {
       const left = daysLeft(s.expiresAt);
       const line2 = s.status === 'ACTIVE' ? `${SERVICE_STATUS.ACTIVE} · ${fa(Math.max(left, 0))} روز مانده` : SERVICE_STATUS[s.status];
       const usage = s.lastSyncAt && s.trafficLimit > 0n ? `\n   ${bar(s.trafficUsed, s.trafficLimit)}` : '';
-      return `${b(s.product.name)}\n   ${line2} · 📅 ${jdate(s.expiresAt)}${usage}`;
+      return `${b(serviceLabel(s.displayName, s.externalId))}\n   ${i(s.product.name)}\n   ${line2} · 📅 ${jdate(s.expiresAt)}${usage}`;
     });
     await show(ctx, `${header('📦', 'سرویس‌های من', `${fa(list.length)} سرویس`)}\n\n${cards.join('\n\n')}`, [
-      ...list.map((s): Button[] => [{ text: `${s.status === 'ACTIVE' ? '🟢' : s.status === 'EXPIRED' ? '🔴' : '⏸'} ${s.product.name}`, data: `sv:v:${s.id}` }]),
+      ...list.map((s): Button[] => [{ text: `${s.status === 'ACTIVE' ? '🟢' : s.status === 'EXPIRED' ? '🔴' : '⏸'} ${serviceLabel(s.displayName, s.externalId)}`, data: `sv:v:${s.id}` }]),
       nav(),
     ], H);
   }
@@ -244,6 +247,7 @@ export function userHandlers(fetchFile: FileFetcher) {
         if (ctx.session.step !== 'receipt_track' || orderId !== a) return show(ctx, `${wait('این دکمه منقضی شده است')}`, [nav()], H);
         return await doSubmit(ctx, orderId, { fileId });
       }
+      if (ns === 'nm') return await nameCallbacks(ctx, a, b2);
       if (ns === 'sv') return await serviceCallbacks(ctx, a, b2);
       if (ns === 'rn') {
         const { order } = await createOrder({ userId: ctx.dbUser.id, productId: b2, paymentMethod: 'CARD_TO_CARD', renewalOfServiceId: a, couponCode: ctx.session.coupon });
@@ -263,7 +267,12 @@ export function userHandlers(fetchFile: FileFetcher) {
       const rows: Button[][] = [];
       let note = '';
       if (s.status === 'ACTIVE') {
-        rows.push([{ text: '🔗 لینک', data: `sv:link:${s.id}` }, { text: '📱 QR', data: `sv:qr:${s.id}` }], [{ text: '⚙️ Config', data: `sv:cfg:${s.id}` }, { text: '🔄 تمدید', data: `sv:renew:${s.id}` }]);
+        rows.push(
+          s.subscriptionUrl
+            ? [{ text: '📡 لینک اشتراک', data: `sv:link:${s.id}` }, { text: '⚙️ کانفیگ مستقیم', data: `sv:cfg:${s.id}` }]
+            : [{ text: '🔗 لینک', data: `sv:link:${s.id}` }, { text: '⚙️ Config', data: `sv:cfg:${s.id}` }],
+          [{ text: '📱 QR', data: `sv:qr:${s.id}` }, { text: '🔄 تمدید', data: `sv:renew:${s.id}` }],
+        );
       } else if (s.status === 'EXPIRED') {
         note = `\n${RULE}\n⛔ ${b('این سرویس منقضی شده است')}\nبا تمدید، همان لینک قبلی دوباره فعال می‌شود.`;
         rows.push([{ text: '🔄 تمدید سرویس', data: `sv:renew:${s.id}` }]);
@@ -271,6 +280,7 @@ export function userHandlers(fetchFile: FileFetcher) {
         note = `\n${RULE}\n⏸ ${b('این سرویس موقتاً معلق شده است')}\nبرای اطلاع از دلیل و رفع مشکل با پشتیبانی در ارتباط باشید.`;
         rows.push([{ text: '🎫 تماس با پشتیبانی', data: 'menu:support' }]);
       } else note = `\n${RULE}\n⚫ این سرویس لغو شده است.`;
+      if (s.status !== 'CANCELLED') rows.push([{ text: '✏️ نام سرویس', data: `nm:s:${s.id}` }]);
       rows.push(nav('menu:services'));
       return show(ctx, serviceCard(s) + note, rows, H);
     }
@@ -281,13 +291,31 @@ export function userHandlers(fetchFile: FileFetcher) {
     }
     if (a === 'qr') {
       if (!s.config) return ctx.reply('⏳ کانفیگ هنوز آماده نیست؛ کمی بعد دوباره تلاش کنید.');
-      const png = await QRCode.toBuffer(s.config, { width: 512, margin: 2 });
-      return ctx.replyWithPhoto(new InputFile(png, 'qr.png'), { caption: `📱 QR سرویس ${s.product.name}\nبا برنامه V2Ray/Hiddify اسکن کنید.` });
+      const payload = s.subscriptionUrl ?? s.config; // the subscription link is preferred; falls back to the direct config
+      const png = await QRCode.toBuffer(payload, { width: 512, margin: 2 });
+      return ctx.replyWithPhoto(new InputFile(png, 'qr.png'), { caption: `📱 QR ${s.subscriptionUrl ? 'لینک اشتراک' : 'کانفیگ'} · ${serviceLabel(s.displayName, s.externalId)}\nبا برنامه V2Ray/Hiddify اسکن کنید.` });
     }
     if (a === 'renew') {
       const ps = (await listActiveProducts()).filter((p) => p.xuiInboundId === s.inboundId && p.xuiProviderId === s.provider);
       if (!ps.length) return show(ctx, `${fail('پلن تمدید مناسبی موجود نیست', 'لطفاً با پشتیبانی در ارتباط باشید.')}`, [[{ text: '🎫 پشتیبانی', data: 'menu:support' }], back(`sv:v:${s.id}`)], H);
       return show(ctx, `${header('🔄', 'تمدید سرویس', s.product.name)}\nپلن تمدید را انتخاب کنید:\n${i('زمان و حجم به سرویس فعلی اضافه می‌شود.')}`, [...ps.map((p): Button[] => [{ text: `${p.name} · ${money(p.price, p.currency)}`, data: `rn:${s.id}:${p.id}` }]), back(`sv:v:${s.id}`)], H);
+    }
+    return undefined;
+  }
+
+  const NAME_HINT = `${i('۲ تا ۳۲ حرف؛ فارسی یا انگلیسی، عدد، فاصله و - _ . ( )')}`;
+  async function nameCallbacks(ctx: Ctx, a: string, id: string) {
+    if (a === 'o' || a === 'oa') { // naming an order's future service
+      const o = await getOrderForUser(ctx.dbUser.id, id);
+      if (a === 'oa') { await setOrderServiceName(ctx.dbUser.id, id, null); return await orderDetail(ctx, id); }
+      ctx.session.step = 'name_order'; ctx.session.data = { orderId: o.id };
+      return show(ctx, `${header('✏️', 'نام سرویس')}\nیک نام دلخواه برای سرویس بفرستید تا راحت‌تر پیدایش کنید.\n${NAME_HINT}\n\n📌 یک کد خودکار هم کنار نام شما ثبت می‌شود.`, [[{ text: '⏭ نام خودکار', data: `nm:oa:${o.id}` }], back(`ov:${o.id}`)], H);
+    }
+    const s = await getServiceForUser(ctx.dbUser.id, id); // ownership
+    if (a === 'sa') { await renameService(ctx.dbUser.id, id, null); return await serviceCallbacks(ctx, 'v', id); }
+    if (a === 's') {
+      ctx.session.step = 'name_service'; ctx.session.data = { serviceId: s.id };
+      return show(ctx, `${header('✏️', 'تغییر نام سرویس', serviceLabel(s.displayName, s.externalId))}\nنام جدید را بفرستید.\n${NAME_HINT}\n\n📌 کد خودکار سرویس تغییر نمی‌کند.`, [[{ text: '↩️ بازگشت به نام خودکار', data: `nm:sa:${s.id}` }], back(`sv:v:${s.id}`)], H);
     }
     return undefined;
   }
@@ -343,6 +371,20 @@ export function userHandlers(fetchFile: FileFetcher) {
     try {
       if (step === 'receipt') return await doSubmit(ctx, ctx.session.data!.orderId, { trackingCode: text, caption: text });
       if (step === 'receipt_track') return await doSubmit(ctx, ctx.session.data!.orderId, { fileId: ctx.session.data!.fileId, trackingCode: text, caption: text });
+      if (step === 'name_order') {
+        const orderId = ctx.session.data!.orderId as string;
+        const name = await setOrderServiceName(ctx.dbUser.id, orderId, text);
+        ctx.session.step = undefined; ctx.session.data = undefined;
+        await ctx.reply(`${ok('نام سرویس ثبت شد')}\n📛 ${b(name)}`, { parse_mode: 'HTML' });
+        return await orderDetail(ctx, orderId);
+      }
+      if (step === 'name_service') {
+        const sid = ctx.session.data!.serviceId as string;
+        const svc = await renameService(ctx.dbUser.id, sid, text);
+        ctx.session.step = undefined; ctx.session.data = undefined;
+        await ctx.reply(`${ok('نام سرویس تغییر کرد')}\n📛 ${b(serviceLabel(svc.displayName, svc.externalId))}`, { parse_mode: 'HTML' });
+        return await serviceCallbacks(ctx, 'v', sid);
+      }
       if (step === 'coupon') {
         const v = await validateCoupon(text, ctx.dbUser.id, 1_000_000);
         const returnTo = ctx.session.data?.returnTo as string | undefined;

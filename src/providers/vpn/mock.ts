@@ -43,10 +43,10 @@ export class MockVpnProvider implements VpnProvider {
   async deleteService(ref: ServiceRef) { this.clients.delete(ref.email); }
   async getServiceStatus(ref: ServiceRef) { const c = this.clients.get(ref.email); return c ? this.st(c) : null; }
   async getTraffic(ref: ServiceRef) { const c = this.clients.get(ref.email); return c ? { up: c.up, down: c.down, used: c.up + c.down, total: c.trafficLimitBytes } : null; }
-  async getConfig(ref: ServiceRef & { subId: string }): Promise<ServiceConfig> {
+  async getConfig(ref: ServiceRef & { subId: string; remark?: string }): Promise<ServiceConfig> {
     const c = this.clients.get(ref.email);
     if (!c) throw new ProviderError('missing client', false);
-    return { config: `vless://${c.credential}@mock.invalid:443?type=tcp&security=none#${ref.email}`, subscriptionUrl: undefined };
+    return { config: `vless://${c.credential}@mock.invalid:443?type=tcp&security=none#${encodeURIComponent(ref.remark ?? ref.email)}`, subscriptionUrl: process.env.MOCK_SUB_BASE ? `${process.env.MOCK_SUB_BASE}/${ref.subId}` : undefined };
   }
   async healthCheck() { return { ok: true, detail: 'mock provider (non-production)' }; }
 }

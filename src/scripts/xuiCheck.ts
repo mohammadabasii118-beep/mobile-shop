@@ -11,7 +11,7 @@ import { GB } from '../utils/misc';
 
 export interface CheckStep { name: string; ok: boolean; detail: string }
 
-export async function runXuiCheck(client: XuiClient, provider: XuiVpnProvider, inboundId: number | undefined, log: (s: CheckStep) => void = () => undefined): Promise<CheckStep[]> {
+export async function runXuiCheck(client: XuiClient, provider: XuiVpnProvider, inboundId: number | undefined, log: (s: CheckStep) => void = () => undefined, fetchImpl: typeof fetch = fetch): Promise<CheckStep[]> {
   const steps: CheckStep[] = [];
   const rec = (name: string, ok: boolean, detail: string) => { const s = { name, ok, detail }; steps.push(s); log(s); return ok; };
   const guard = async (name: string, fn: () => Promise<string>) => {
@@ -66,6 +66,15 @@ export async function runXuiCheck(client: XuiClient, provider: XuiVpnProvider, i
       const masked = c.config.replace(credential, '<credential>');
       return `${masked}${c.subscriptionUrl ? ` | sub: ${c.subscriptionUrl.replace(/[^/]+$/, '<subId>')}` : ' | no subscription url (XUI_SUB_BASE_URL unset)'}`;
     });
+    await guard('subscription link serves the client', async () => {
+      // the client above was created with a random subId; re-read its real subId from the panel
+      const cfg = await provider.getConfig({ ...ref, subId: 'unused' });
+      if (!cfg.subscriptionUrl) return 'skipped: XUI_SUB_BASE_URL not set (users get the direct config only)';
+      const r = await fetchImpl(cfg.subscriptionUrl, { signal: AbortSignal.timeout(10_000), redirect: 'manual' });
+      const body = (await r.text()).trim();
+      if (r.status !== 200 || !body) throw new Error(`subscription URL ${cfg.subscriptionUrl.replace(/[^/]+$/, '<subId>')} answered HTTP ${r.status} with ${body ? 'a body' : 'no body'} — check XUI_SUB_BASE_URL (port/path/domain) and that the panel subscription service is enabled`);
+      return `HTTP 200, ${body.length} bytes (${cfg.subscriptionUrl.replace(/[^/]+$/, '<subId>')})`;
+    });
     await guard('renew (update expiry/traffic)', async () => {
       const exp2 = new Date(Date.now() + 2 * 86_400_000);
       const s = await provider.renewService({ ...ref, trafficLimitBytes: 2n * GB, expiresAt: exp2 });
@@ -103,7 +112,7 @@ async function main() {
   const argIdx = process.argv.indexOf('--inbound');
   const inbound = argIdx > 0 ? Number(process.argv[argIdx + 1]) : process.env.XUI_CHECK_INBOUND ? Number(process.env.XUI_CHECK_INBOUND) : undefined;
   console.log(`X-UI check → ${new URL(e.XUI_BASE_URL).origin}  auth=${e.XUI_API_TOKEN ? 'api-token' : 'session'}  inbound=${inbound ?? '(none)'}`);
-  const steps = await runXuiCheck(client, provider, inbound, (s) => console.log(`${s.ok ? '✅ PASS' : '❌ FAIL'}  ${s.name}: ${s.detail}`));
+  const steps = await runXuiCheck(client, provider, inbound, (s) => console.log(`${s.ok ? '✅ PASS' : '❌ FAIL'}  ${s.name}: ${s.detail}`), (await import('../providers/vpn/xui/net')).xuiFetch() ?? fetch);
   const failed = steps.filter((s) => !s.ok).length;
   console.log(failed ? `\n${failed} step(s) FAILED — do not sell until fixed.` : '\nAll steps passed.');
   process.exit(failed ? 1 : 0);

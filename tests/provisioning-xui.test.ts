@@ -97,7 +97,7 @@ describe('provisioning against the X-UI HTTP adapter: idempotency + timeouts', (
 });
 
 describe('xui:check tool', () => {
-  const mk = (over = {}) => { const client = new XuiClient({ baseUrl: panel.url, username: 'admin', password: 'secret', ...over }); return { client, provider: new XuiVpnProvider({ client, publicHost: 'vpn.example.com', subBaseUrl: 'https://sub.example.com/sub/' }) }; };
+  const mk = (over = {}) => { const client = new XuiClient({ baseUrl: panel.url, username: 'admin', password: 'secret', ...over }); return { client, provider: new XuiVpnProvider({ client, publicHost: 'vpn.example.com', subBaseUrl: `${panel.url}/sub` }) }; };
 
   it('all capabilities pass and the test client is cleaned up', async () => {
     const { client, provider } = mk();

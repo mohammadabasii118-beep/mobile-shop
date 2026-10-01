@@ -67,7 +67,7 @@ export class XuiVpnProvider implements VpnProvider {
       enable: true,
       tgId: req.telegramId,
       subId: req.subId,
-      comment: 'telegram-vpn-bot',
+      comment: (req.comment ?? 'telegram-vpn-bot').slice(0, 120),
       reset: 0,
     };
     if (req.protocol === 'VLESS' || req.protocol === 'VMESS') client.id = req.credential;
@@ -130,11 +130,11 @@ export class XuiVpnProvider implements VpnProvider {
     return { up, down, used: up + down, total: BigInt(Math.round(t.total)) };
   }
 
-  async getConfig(ref: ServiceRef & { subId: string }): Promise<ServiceConfig> {
+  async getConfig(ref: ServiceRef & { subId: string; remark?: string }): Promise<ServiceConfig> {
     const ib = await this.inboundOrThrow(ref.inboundId);
     const client = this.findClient(ib, ref.email);
     if (!client) throw new ProviderError('client does not exist in panel', false);
-    const config = buildLink({ inbound: ib, client, host: this.o.publicHost, remark: ref.email });
+    const config = buildLink({ inbound: ib, client, host: this.o.publicHost, remark: ref.remark ?? ref.email });
     const subscriptionUrl = this.o.subBaseUrl && (client.subId ?? ref.subId) ? `${this.o.subBaseUrl.replace(/\/+$/, '')}/${client.subId ?? ref.subId}` : undefined;
     return { config, subscriptionUrl };
   }

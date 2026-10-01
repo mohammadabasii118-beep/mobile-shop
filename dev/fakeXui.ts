@@ -75,6 +75,14 @@ export class FakeXui {
       };
       const fail = (msg: string) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end(JSON.stringify({ success: false, msg })); };
 
+      const subm = u.pathname.match(/^\/sub\/([\w-]+)$/);
+      if (subm) {
+        for (const ib of this.inbounds.values()) {
+          const c = (ib.settings.clients as any[]).find((x) => x.subId === subm[1] && x.enable);
+          if (c) { res.writeHead(200, { 'content-type': 'text/plain; charset=utf-8', 'profile-title': c.email }); return void res.end(Buffer.from(`vless://${c.id}@fake:443#${c.email}`).toString('base64')); }
+        }
+        res.writeHead(404); return void res.end('not found');
+      }
       if (u.pathname === '/login') {
         this.logins++;
         if (body.get('username') === this.username && body.get('password') === this.password) return send(null, { 'set-cookie': '3x-ui=sess-ok; Path=/; HttpOnly' });

@@ -173,6 +173,7 @@ model Order {
   paymentMethod       PaymentMethod
   couponId            String?
   renewalOfServiceId  String?
+  serviceName         String?
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
 
@@ -277,6 +278,7 @@ model VpnService {
   provider           String
   inboundId          Int
   externalId         String             @unique
+  displayName        String?
   clientId           String?
   uuid               String             @unique
   subId              String

@@ -9,6 +9,7 @@ import { notifyAdmins, notifyUser } from '../notifications/service';
 import { getVpnProvider } from '../../providers/vpn';
 import { ProviderError, ServiceRef } from '../../providers/vpn/types';
 import * as T from '../notifications/templates';
+import { linkRemark, slugify } from '../../utils/names';
 
 export const refOf = (s: Pick<VpnService, 'inboundId' | 'externalId' | 'uuid' | 'protocol'>): ServiceRef => ({
   inboundId: s.inboundId, email: s.externalId, credential: s.uuid, protocol: s.protocol,
@@ -17,9 +18,14 @@ export const refOf = (s: Pick<VpnService, 'inboundId' | 'externalId' | 'uuid' | 
 const credentialFor = (p: Protocol) => (p === 'VLESS' || p === 'VMESS' ? randomUUID() : randomBytes(18).toString('base64url'));
 const subIdGen = () => randomBytes(8).toString('hex');
 
-/** `tg_<telegramId>_<order>`: lowercase, [a-z0-9_-], <= 64 chars. Searchable in X-UI. */
-export function clientEmail(telegramId: bigint, orderNumber: string) {
-  return `tg_${telegramId}_${orderNumber}`.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 64);
+/**
+ * Automatic client name `tg_<telegramId>_<order>` (searchable in X-UI), plus `_<slug>` when the customer chose a name
+ * that has latin letters/digits. Lowercase, [a-z0-9_-], <= 64 chars. Fixed at creation => retries are idempotent.
+ */
+export function clientEmail(telegramId: bigint, orderNumber: string, customName?: string | null) {
+  const auto = `tg_${telegramId}_${orderNumber}`.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 64);
+  const slug = customName ? slugify(customName) : '';
+  return slug && auto.length + 1 + slug.length <= 64 ? `${auto}_${slug}` : auto;
 }
 
 const sanitizeErr = (e: unknown) => String((e as any)?.message ?? e).replace(/(password|token|secret)=\S+/gi, '$1=[REDACTED]').slice(0, 300);
@@ -65,7 +71,7 @@ export async function runProvisioning(orderId: string, opts: { force?: boolean }
 
 async function doCreate(order: Order, product: Product, telegramId: bigint) {
   const provider = getVpnProvider();
-  const email = clientEmail(telegramId, order.orderNumber);
+  const email = clientEmail(telegramId, order.orderNumber, order.serviceName);
   let svc = await prisma.vpnService.findUnique({ where: { orderId: order.id } });
   const trafficLimit = gbToBytes(product.trafficGB);
   if (!svc) {
@@ -73,7 +79,7 @@ async function doCreate(order: Order, product: Product, telegramId: bigint) {
     svc = await prisma.vpnService.create({
       data: {
         userId: order.userId, orderId: order.id, productId: product.id, provider: product.xuiProviderId,
-        inboundId: product.xuiInboundId, externalId: email, uuid: credentialFor(product.protocol), subId: subIdGen(),
+        inboundId: product.xuiInboundId, externalId: email, displayName: order.serviceName, uuid: credentialFor(product.protocol), subId: subIdGen(),
         protocol: product.protocol, trafficLimit, expiresAt: addDays(new Date(), product.durationDays), provisioningStatus: 'PROCESSING',
       },
     });
@@ -83,16 +89,17 @@ async function doCreate(order: Order, product: Product, telegramId: bigint) {
     // (Only reached while provisioning is not SUCCESS; the client uuid/email stay the same.)
     svc = await prisma.vpnService.update({
       where: { id: svc.id },
-      data: { provisioningStatus: 'PROCESSING', expiresAt: addDays(new Date(), product.durationDays), inboundId: product.xuiInboundId, protocol: product.protocol, provider: product.xuiProviderId },
+      data: { provisioningStatus: 'PROCESSING', expiresAt: addDays(new Date(), product.durationDays), inboundId: product.xuiInboundId, protocol: product.protocol, provider: product.xuiProviderId, displayName: order.serviceName ?? svc.displayName },
     });
   }
 
   const ref = refOf(svc);
   const { status, adopted } = await provider.createService({
     ...ref, subId: svc.subId, telegramId: String(telegramId), trafficLimitBytes: svc.trafficLimit, expiresAt: svc.expiresAt,
+    comment: `${svc.displayName ? svc.displayName + ' | ' : ''}${order.orderNumber}`,
   });
   if (!status.exists) throw new ProviderError('client missing after create', true);
-  const cfg = await provider.getConfig({ ...ref, subId: svc.subId });
+  const cfg = await provider.getConfig({ ...ref, subId: svc.subId, remark: linkRemark(svc.displayName, svc.externalId) });
 
   const updated = await prisma.$transaction(async (tx) => {
     const s = await tx.vpnService.update({
@@ -113,9 +120,13 @@ async function doCreate(order: Order, product: Product, telegramId: bigint) {
   });
 }
 
+/** Subscription link is the primary action when the panel provides one; the direct config stays available. */
 export const deliveryButtons = (s: Pick<VpnService, 'id' | 'subscriptionUrl'>) => [
-  [{ text: '🔗 دریافت لینک', data: `sv:link:${s.id}` }, { text: '📋 دریافت کانفیگ', data: `sv:cfg:${s.id}` }],
-  [{ text: '📱 QR Code', data: `sv:qr:${s.id}` }, { text: '📦 سرویس‌های من', data: 'menu:services' }],
+  s.subscriptionUrl
+    ? [{ text: '📡 لینک اشتراک', data: `sv:link:${s.id}` }, { text: '⚙️ کانفیگ مستقیم', data: `sv:cfg:${s.id}` }]
+    : [{ text: '🔗 دریافت لینک', data: `sv:link:${s.id}` }, { text: '📋 دریافت کانفیگ', data: `sv:cfg:${s.id}` }],
+  [{ text: '📱 QR Code', data: `sv:qr:${s.id}` }, { text: '✏️ نام سرویس', data: `nm:s:${s.id}` }],
+  [{ text: '📦 سرویس‌های من', data: 'menu:services' }],
 ];
 
 async function doRenew(taskId: string, order: Order, product: Product) {

@@ -9,6 +9,7 @@ import { notifyUser } from '../notifications/service';
 import * as T from '../notifications/templates';
 import { getVpnProvider } from '../../providers/vpn';
 import { refOf } from './provisioning';
+import { linkRemark, validateServiceName } from '../../utils/names';
 
 export const listUserServices = (userId: string) =>
   prisma.vpnService.findMany({ where: { userId, provisioningStatus: 'SUCCESS' }, orderBy: { createdAt: 'desc' }, include: { product: true } });
@@ -127,7 +128,7 @@ export async function deleteService(id: string, actor: string) {
 /** Re-fetch the real link from the panel (inbound settings may have changed). */
 export async function refreshConfig(id: string) {
   const s = await mustBeProvisioned(id);
-  const cfg = await getVpnProvider().getConfig({ ...refOf(s), subId: s.subId });
+  const cfg = await getVpnProvider().getConfig({ ...refOf(s), subId: s.subId, remark: linkRemark(s.displayName, s.externalId) });
   return prisma.vpnService.update({ where: { id }, data: { config: cfg.config, subscriptionUrl: cfg.subscriptionUrl ?? null } });
 }
 
@@ -151,3 +152,15 @@ export async function adminRenew(serviceId: string, productId: string, actor: st
 
 export const listServicesAdmin = (skip = 0, take = 8) =>
   prisma.vpnService.findMany({ orderBy: { createdAt: 'desc' }, skip, take, include: { product: true, user: true } });
+
+/** Customer renames their service: DB name + the remark inside the direct link. The panel client email never changes. */
+export async function renameService(userId: string, id: string, rawName: string | null) {
+  const s = await getServiceForUser(userId, id);
+  const name = rawName === null ? null : validateServiceName(rawName);
+  await prisma.vpnService.update({ where: { id }, data: { displayName: name } });
+  await audit({ actor: `user:${userId}`, action: 'vpn.rename', target: 'VpnService', targetId: id, metadata: { name } });
+  if (s.provisioningStatus === 'SUCCESS') {
+    try { await refreshConfig(id); } catch (e: any) { logger.warn({ id, err: String(e?.message) }, 'rename: config refresh failed (name saved)'); }
+  }
+  return prisma.vpnService.findUniqueOrThrow({ where: { id }, include: { product: true } });
+}

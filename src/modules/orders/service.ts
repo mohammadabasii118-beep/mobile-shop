@@ -5,6 +5,7 @@ import { randomId } from '../../utils/misc';
 import { consumeCoupon, releaseCoupon, validateCoupon } from '../coupons/service';
 import { audit } from '../admin/audit';
 import { isPaymentMethodEnabled } from '../payments/service';
+import { validateServiceName } from '../../utils/names';
 
 const newOrderNumber = () => {
   const d = new Date();
@@ -108,4 +109,14 @@ export async function expireStaleOrders(olderThanMinutes: number) {
     try { await cancelOrder(o.userId, o.id); n++; } catch { /* raced with payment */ }
   }
   return n;
+}
+
+/** The customer may name the service before it is provisioned (afterwards use renameService). */
+export async function setOrderServiceName(userId: string, orderId: string, rawName: string | null) {
+  const o = await getOrderForUser(userId, orderId);
+  if (!['PENDING_PAYMENT', 'PAYMENT_SUBMITTED', 'PAYMENT_REVIEW', 'PAID'].includes(o.status)) throw new ConflictError('سرویس این سفارش قبلاً ساخته شده؛ از «سرویس‌های من» نام را تغییر دهید');
+  const name = rawName === null ? null : validateServiceName(rawName);
+  await prisma.order.update({ where: { id: orderId }, data: { serviceName: name } });
+  await audit({ actor: `user:${userId}`, action: 'order.set_name', target: 'Order', targetId: orderId, metadata: { name } });
+  return name;
 }
