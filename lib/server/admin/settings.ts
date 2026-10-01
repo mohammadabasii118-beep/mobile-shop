@@ -26,6 +26,15 @@ export const SETTING_SCHEMAS = {
     maxDiscountPercent: z.coerce.number().min(0).max(100).multipleOf(0.01, "حداکثر دو رقم اعشار.").default(0),
     capAtRetail: z.boolean().default(true),
   }).refine((v) => v.maxDiscountPercent === 0 || v.maxDiscountPercent >= v.minDiscountPercent, { path: ["maxDiscountPercent"], message: "حداکثر تخفیف عمده نمی‌تواند از حداقل کمتر باشد." }),
+  // Top announcement bar: how it rotates. Items are managed as rows (TopBarItem).
+  topbar: z.object({
+    enabled: z.boolean().default(true),
+    mode: z.enum(["auto", "manual", "both"]).default("auto"), // auto = rotates by itself, manual = swipe/arrows only, both = rotates and can be swiped
+    displaySeconds: z.coerce.number().min(2, "حداقل ۲ ثانیه.").max(30, "حداکثر ۳۰ ثانیه.").default(4),
+    transitionMs: z.coerce.number().int().min(150, "حداقل ۱۵۰ میلی‌ثانیه.").max(2000, "حداکثر ۲۰۰۰ میلی‌ثانیه.").default(700),
+    animation: z.enum(["rise", "fade", "slide"]).default("rise"),
+    pauseOnHover: z.boolean().default(true),
+  }),
   general: z.object({ currency: t(20), lowStockNotify: z.boolean().default(true) }),
 } as const;
 export type SettingKey = keyof typeof SETTING_SCHEMAS;

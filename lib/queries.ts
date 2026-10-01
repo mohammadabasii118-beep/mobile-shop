@@ -5,7 +5,8 @@ import { lineCtx } from "@/lib/server/price-engine/line";
 import { legacyFixedOf, loadActiveDiscounts, resolveUnitDiscount } from "@/lib/server/price-engine/discounts";
 import { queryHomeReviews } from "@/lib/server/reviews";
 import { cachedPublic } from "@/lib/server/public-cache";
-import type { CardProduct, MenuCategory, SiteInfo } from "@/lib/types";
+import type { CardProduct, MenuCategory, SiteInfo, TopBarData } from "@/lib/types";
+import { SETTING_SCHEMAS } from "@/lib/server/admin/settings";
 
 const cardInclude = {
   extraCategories: { select: { categoryId: true, category: { select: { parentId: true } } } },
@@ -91,6 +92,16 @@ export const getSiteInfo = cachedPublic("site-info", async (): Promise<SiteInfo>
   const row = await db.siteSetting.findUnique({ where: { key: "site" } });
   return { ...DEFAULT_SITE, ...((row?.value as Partial<SiteInfo>) ?? {}) };
 });
+/** Top announcement bar: rotation settings + the active, currently valid items (changes in the admin invalidate this cache). */
+export const getTopBar = cachedPublic("topbar", async (): Promise<TopBarData> => {
+  const now = new Date();
+  const [row, items] = await Promise.all([
+    db.siteSetting.findUnique({ where: { key: "topbar" } }),
+    db.topBarItem.findMany({ where: { isActive: true, AND: [{ OR: [{ startsAt: null }, { startsAt: { lte: now } }] }, { OR: [{ endsAt: null }, { endsAt: { gte: now } }] }] }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { id: true, kind: true, title: true, subtitle: true, ctaLabel: true, link: true, copyText: true } }),
+  ]);
+  return { settings: SETTING_SCHEMAS.topbar.parse(row?.value ?? {}), items };
+}, 60);
+
 export async function getSetting<T>(key: string, fallback: T): Promise<T> {
   const row = await db.siteSetting.findUnique({ where: { key } });
   return (row?.value as T) ?? fallback;

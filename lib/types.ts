@@ -50,3 +50,7 @@ export interface VariantOption {
   price: number; oldPrice?: number;
   wholesale?: { unit: number; min: number } | null;
 }
+
+export interface TopBarItemView { id: string; kind: string; title: string; subtitle: string | null; ctaLabel: string | null; link: string | null; copyText: string | null }
+export interface TopBarSettings { enabled: boolean; mode: "auto" | "manual" | "both"; displaySeconds: number; transitionMs: number; animation: "rise" | "fade" | "slide"; pauseOnHover: boolean }
+export interface TopBarData { settings: TopBarSettings; items: TopBarItemView[] }

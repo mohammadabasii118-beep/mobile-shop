@@ -1,6 +1,7 @@
 "use client";
 import { Fragment, useState } from "react";
 import { Card, ErrorBox, ImageInput, Label, Spinner, act, btnPrimary, inputCls, useApi } from "@/components/admin/kit";
+import { ResourceManager } from "@/components/admin/resource-manager";
 import { cn } from "@/lib/utils";
 
 type F = { key: string; label: string; group?: string; type?: "text" | "textarea" | "number" | "image" | "bool" | "select"; ltr?: boolean; hint?: string; options?: [string, string][] };
@@ -10,6 +11,14 @@ const SECTIONS: { key: string; title: string; desc?: string; fields: F[] }[] = [
     { key: "phone", label: "تلفن", ltr: true, group: "اطلاعات تماس، شبکه‌های اجتماعی و فوتر" }, { key: "email", label: "ایمیل", ltr: true }, { key: "address", label: "آدرس" }, { key: "hours", label: "ساعت کاری" },
     { key: "telegram", label: "تلگرام (لینک)", ltr: true }, { key: "instagram", label: "اینستاگرام (لینک)", ltr: true }, { key: "whatsapp", label: "واتساپ (لینک)", ltr: true }, { key: "aparat", label: "آپارات (لینک)", ltr: true }, { key: "youtube", label: "یوتیوب (لینک)", ltr: true },
     { key: "topBar", label: "متن نوار بالای سایت" }, { key: "footerText", label: "متن فوتر", type: "textarea" },
+  ] },
+  { key: "topbar", title: "نوار بالای سایت (پیام‌های چرخان)", desc: "کانال تلگرام، رهگیری سفارش، کد تخفیف و… در یک نوار باریک بالای سایت. اینجا شیوهٔ نمایش را تنظیم می‌کنید و پیام‌ها را در جدول پایین اضافه، ویرایش، فعال/غیرفعال و حذف می‌کنید. اگر هیچ پیام فعالی نباشد، همان متن ساده قبلی نمایش داده می‌شود.", fields: [
+    { key: "enabled", label: "نوار بالا نمایش داده شود", type: "bool" },
+    { key: "mode", label: "حالت نمایش", type: "select", options: [["auto", "خودکار (خودش می‌چرخد)"], ["manual", "دستی (کشیدن به چپ و راست / فلش)"], ["both", "خودکار + قابل کشیدن"]] },
+    { key: "displaySeconds", label: "مدت نمایش هر پیام (ثانیه)", type: "number", ltr: true, hint: "۲ تا ۳۰؛ فقط در حالت خودکار" },
+    { key: "transitionMs", label: "مدت انیمیشن جابه‌جایی (میلی‌ثانیه)", type: "number", ltr: true, hint: "۱۵۰ تا ۲۰۰۰؛ هرچه بیشتر، نرم‌تر و کندتر" },
+    { key: "animation", label: "نوع انیمیشن (حالت خودکار)", type: "select", options: [["rise", "بالا آمدن"], ["fade", "محو شدن"], ["slide", "اسلاید افقی"]] },
+    { key: "pauseOnHover", label: "با نگه‌داشتن موس/انگشت متوقف شود", type: "bool" },
   ] },
   { key: "payment", title: "اطلاعات پرداخت کارت‌به‌کارت", desc: "این اطلاعات مستقیماً در صفحه پرداخت و صفحه سفارش مشتری نمایش داده می‌شود.", fields: [
     { key: "bankName", label: "نام بانک" }, { key: "accountHolder", label: "به نام" }, { key: "cardNumber", label: "شماره کارت", ltr: true }, { key: "accountNumber", label: "شماره حساب", ltr: true }, { key: "iban", label: "شماره شبا", ltr: true }, { key: "description", label: "توضیح برای مشتری", type: "textarea" },
@@ -66,5 +75,27 @@ export function SettingsClient() {
   const { data, error, loading } = useApi<Record<string, Record<string, unknown>>>("/api/admin/settings");
   if (error) return <ErrorBox message={error} />;
   if (loading || !data) return <Spinner />;
-  return <div className="space-y-4">{SECTIONS.map((s) => <Section key={s.key} s={s} initial={data[s.key] ?? {}} />)}</div>;
+  return <div className="space-y-4">{SECTIONS.map((s) => <Fragment key={s.key}><Section s={s} initial={data[s.key] ?? {}} />{s.key === "topbar" && <TopBarItems />}</Fragment>)}</div>;
+}
+
+const KINDS: [string, string][] = [["telegram", "تلگرام"], ["instagram", "اینستاگرام"], ["tracking", "کانال رهگیری سفارش"], ["discount", "کد تخفیف"], ["link", "لینک / اعلان"]];
+/** Rows of the rotating bar: add, edit, activate/deactivate, reorder (arrows), delete — all through the generic admin CRUD. */
+function TopBarItems() {
+  return (
+    <div data-testid="topbar-items">
+      <h3 className="mb-1 mt-2 text-sm font-black">پیام‌های نوار بالا</h3>
+      <ResourceManager resource="topbar-items" noun="پیام" sortable defaults={{ isActive: true, kind: "telegram" }}
+        columns={[{ key: "title", label: "عنوان" }, { key: "kind", label: "نوع", map: Object.fromEntries(KINDS) }, { key: "link", label: "لینک", kind: "code" }, { key: "copyText", label: "کد قابل کپی", kind: "code" }, { key: "isActive", label: "وضعیت", kind: "bool" }]}
+        fields={[
+          { key: "kind", label: "نوع پیام (آیکون)", type: "select", required: true, options: KINDS.map(([value, label]) => ({ value, label })) },
+          { key: "title", label: "عنوان (مثلاً تلگرام ما)", type: "text", required: true },
+          { key: "subtitle", label: "توضیح کوتاه (فقط در نمایشگرهای بزرگ‌تر)", type: "text", nullable: true },
+          { key: "link", label: "لینک (مثلاً https://t.me/…)", type: "text", ltr: true, nullable: true },
+          { key: "ctaLabel", label: "متن دکمه (خالی = پیش‌فرض نوع)", type: "text", nullable: true },
+          { key: "copyText", label: "متن قابل کپی (کد تخفیف)", type: "text", ltr: true, nullable: true },
+          { key: "startsAt", label: "شروع نمایش (اختیاری)", type: "date", nullable: true }, { key: "endsAt", label: "پایان نمایش (اختیاری)", type: "date", nullable: true },
+          { key: "isActive", label: "وضعیت", type: "bool" },
+        ]} />
+    </div>
+  );
 }

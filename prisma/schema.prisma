@@ -973,6 +973,24 @@ model ChatAttachment {
   @@index([messageId])
 }
 
+/// Rotating announcements in the bar at the very top of the site (managed under admin → settings → site identity).
+model TopBarItem {
+  id        String    @id @default(cuid())
+  kind      String    @default("link") // telegram | instagram | tracking | discount | link
+  title     String
+  subtitle  String?
+  ctaLabel  String?
+  link      String?
+  copyText  String? // e.g. a discount code with a "copy" button
+  isActive  Boolean   @default(true)
+  sortOrder Int       @default(0)
+  startsAt  DateTime?
+  endsAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([isActive, sortOrder])
+}
+
 /// Staff presence for the "support is online" indicator (heartbeat written while a staff member has the chat console open).
 model ChatAgent {
   userId     String   @id

@@ -5,7 +5,8 @@ import { Search, ShoppingBag, Smartphone, Headphones, PenLine, Store, User } fro
 import { Container } from "@/components/ui";
 import { NightButton } from "@/components/theme";
 import { CategoryMenu, MobileMenu } from "@/components/category-menu";
-import type { MenuCategory, SiteInfo } from "@/lib/types";
+import { TopBar } from "@/components/top-bar";
+import type { MenuCategory, SiteInfo, TopBarData } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export function Logo({ className, logo, name }: { className?: string; logo?: string; name?: string }) {
@@ -26,7 +27,7 @@ export function Logo({ className, logo, name }: { className?: string; logo?: str
 }
 
 const iconBtn = "grid size-10 cursor-pointer place-items-center rounded-full bg-surface text-foreground/80 shadow-sm ring-1 ring-transparent transition-all duration-200 hover:bg-primary/10 hover:text-primary hover:shadow-md hover:ring-primary/35";
-export interface HeaderProps { menu: MenuCategory[]; info: SiteInfo; links: { label: string; link: string }[]; mobileLinks?: { label: string; link: string }[]; loggedIn?: boolean }
+export interface HeaderProps { topBar?: TopBarData; menu: MenuCategory[]; info: SiteInfo; links: { label: string; link: string }[]; mobileLinks?: { label: string; link: string }[]; loggedIn?: boolean }
 const navLink = "rounded-full px-3.5 py-2 transition-colors hover:bg-primary/10 hover:text-primary";
 
 function CartBtn() {
@@ -39,12 +40,15 @@ function CartBtn() {
 }
 
 /** Header 1: static, lives at the top of the page and scrolls away. */
-export function TopHeader({ menu, info, links, mobileLinks, loggedIn }: HeaderProps) {
+export function TopHeader({ menu, info, links, mobileLinks, loggedIn, topBar }: HeaderProps) {
   return (
     <header>
-      <div className="bg-primary/10 text-center text-[11px] leading-7 text-muted sm:text-xs">
-        <span dir="ltr" className="font-bold text-primary">@Caseline_shop</span> {info.topBar}
-      </div>
+      {/* Rotating announcements (managed in the admin). With no active items the original static line stays exactly as it was; switched off = no bar. */}
+      {topBar && !topBar.settings.enabled ? null : topBar && topBar.items.length > 0 ? <TopBar items={topBar.items} settings={topBar.settings} /> : (
+        <div className="bg-primary/10 text-center text-[11px] leading-7 text-muted sm:text-xs">
+          <span dir="ltr" className="font-bold text-primary">@Caseline_shop</span> {info.topBar}
+        </div>
+      )}
       <Container className="py-2 sm:py-4">
         <div className="flex h-12 items-center gap-3 sm:glass sm:h-14 sm:rounded-full sm:px-5 sm:shadow-sm">
           <Logo logo={info.logo} name={info.name} />

@@ -112,6 +112,21 @@ export const RESOURCES: Record<string, Resource> = {
       if (a.isSystem) throw conflict("مقادیر مدل گوشی و رنگ از بخش «مدل‌های گوشی» و «رنگ‌ها» مدیریت می‌شوند.");
     },
   },
+  "topbar-items": {
+    model: "topBarItem", perm: "settings.write", label: "پیام نوار بالا", auditName: "topbar_item", hasSort: true,
+    create: z.object({
+      kind: z.enum(["telegram", "instagram", "tracking", "discount", "link"]), title: req(80), subtitle: opt(120), ctaLabel: opt(30), link, copyText: opt(40),
+      isActive: bool.optional(), sortOrder: int(0, 100000).optional(), startsAt: dateOpt, endsAt: dateOpt,
+    }),
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], search: ["title"], filters: ["isActive", "kind"],
+    guard: async (_tx, data, existing) => {
+      const kind = (data.kind ?? existing?.kind) as string | undefined;
+      const copy = data.copyText !== undefined ? data.copyText : existing?.copyText, lnk = data.link !== undefined ? data.link : existing?.link;
+      if (kind === "discount" && !copy && !lnk) throw conflict("برای کد تخفیف، «متن قابل کپی» (کد) یا لینک لازم است.");
+      const s = (data.startsAt !== undefined ? data.startsAt : existing?.startsAt) as Date | null | undefined, e = (data.endsAt !== undefined ? data.endsAt : existing?.endsAt) as Date | null | undefined;
+      if (s && e && e <= s) throw conflict("پایان باید بعد از شروع باشد.");
+    },
+  },
   coupons: {
     model: "coupon", perm: "coupon.write", label: "کوپن", auditName: "coupon", immutable: ["code"],
     create: z.object({
