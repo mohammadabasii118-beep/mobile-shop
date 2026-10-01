@@ -1,0 +1,13 @@
+[Unit]
+Description=PCL Transfer Telegram bot
+After=network-online.target
+
+[Service]
+WorkingDirectory=/opt/pcl-transfer
+ExecStart=/opt/pcl-transfer/.venv/bin/python run.py
+Restart=always
+RestartSec=5
+User=pclbot
+
+[Install]
+WantedBy=multi-user.target
