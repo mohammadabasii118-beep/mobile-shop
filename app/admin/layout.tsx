@@ -13,6 +13,7 @@ const ROLE_NAMES: Record<string, string> = { super_admin: "مدیر ارشد", a
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/account?next=/admin");
+  if (user.isStaff && user.mustChangePassword) redirect("/account/edit?password=required"); // temporary password: replace it first
   if (!user.isStaff) {
     return (
       <main id="main" tabIndex={-1} className="grid min-h-screen place-items-center p-6 text-center">

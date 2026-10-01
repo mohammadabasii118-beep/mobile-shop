@@ -24,6 +24,7 @@ model User {
   isActive          Boolean   @default(true)
   phoneVerifiedAt   DateTime?
   passwordChangedAt DateTime?
+  mustChangePassword Boolean   @default(false) // set for accounts created by an admin with a temporary password
   lastLoginAt       DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt

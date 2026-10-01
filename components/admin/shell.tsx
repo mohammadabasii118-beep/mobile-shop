@@ -1,8 +1,8 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { Bell, ChevronLeft, ExternalLink, LogOut, Menu, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Bell, ChevronLeft, ExternalLink, LogOut, Menu, Sparkles, X } from "lucide-react";
 import { ThemeToggle } from "@/components/theme";
 import { ADMIN_NAV, BREADCRUMB, canSee } from "@/lib/admin/nav";
 import { api } from "@/lib/client/api";
@@ -19,6 +19,10 @@ export function AdminShell({ user, perms, notices, children }: ShellProps) {
   const [open, setOpen] = useState(false);
   const [bell, setBell] = useState(false);
   const [menu, setMenu] = useState(false);
+  // Motion is on by default; each admin can switch it off (remembered in this browser).
+  const [fx, setFx] = useState(true);
+  useEffect(() => { try { if (localStorage.getItem("cl-admin-fx") === "off") setFx(false); } catch { /* storage blocked */ } }, []); // eslint-disable-line react-hooks/set-state-in-effect
+  const toggleFx = () => setFx((v) => { try { localStorage.setItem("cl-admin-fx", v ? "off" : "on"); } catch { /* ignore */ } return !v; });
   const items = ADMIN_NAV.filter((n) => canSee(perms, n));
   const isActive = (href: string) => (href === "/admin" ? path === "/admin" : path === href || path.startsWith(href + "/"));
   const segs = path.split("/").filter(Boolean).slice(1);
@@ -35,9 +39,9 @@ export function AdminShell({ user, perms, notices, children }: ShellProps) {
         <div key={n.href} className="contents">
           {n.group && items[i - 1]?.group !== n.group && <div className="px-3 pb-1 pt-3 text-[11px] font-black text-muted">{n.group}</div>}
           <Link href={n.href} onClick={() => setOpen(false)} aria-current={isActive(n.href) ? "page" : undefined}
-            className={cn("flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-bold transition-colors", n.group && "ms-3", isActive(n.href) ? "bg-primary text-primary-fg shadow-sm" : "text-foreground/80 hover:bg-primary/10 hover:text-primary")}>
+            className={cn("fx-nav flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-bold transition-colors", n.group && "ms-3", isActive(n.href) ? "bg-primary text-primary-fg shadow-sm" : "text-foreground/80 hover:bg-primary/10 hover:text-primary")}>
             <n.icon className="size-[18px] shrink-0" />{n.label}
-            {BADGED.has(n.href) && notices.find((x) => x.href.split("?")[0] === n.href)?.count ? <span className="ms-auto rounded-full bg-hot px-1.5 text-[10px] text-white" data-testid={`badge-${n.href.split("/").pop()}`}>{notices.find((x) => x.href.split("?")[0] === n.href)!.count.toLocaleString("fa-IR")}</span> : null}
+            {BADGED.has(n.href) && notices.find((x) => x.href.split("?")[0] === n.href)?.count ? <span className="fx-badge ms-auto rounded-full bg-hot px-1.5 text-[10px] text-white" data-testid={`badge-${n.href.split("/").pop()}`}>{notices.find((x) => x.href.split("?")[0] === n.href)!.count.toLocaleString("fa-IR")}</span> : null}
           </Link>
         </div>
       ))}
@@ -45,7 +49,7 @@ export function AdminShell({ user, perms, notices, children }: ShellProps) {
   );
 
   return (
-    <div className="min-h-screen bg-surface-2 text-foreground">
+    <div className="min-h-screen bg-surface-2 text-foreground" data-admin-fx={fx ? "on" : "off"}>
       <aside className="fixed inset-y-0 start-0 z-30 hidden w-60 flex-col border-e border-border bg-surface lg:flex">
         <div className="flex h-16 items-center px-5 text-xl font-black text-primary"><span dir="ltr">Case<span className="text-foreground">line</span></span><span className="ms-2 rounded bg-primary/10 px-1.5 py-0.5 text-[10px]">مدیریت</span></div>
         {nav}
@@ -67,6 +71,7 @@ export function AdminShell({ user, perms, notices, children }: ShellProps) {
           </ol>
           <div className="ms-auto flex items-center gap-2">
             <Link href="/" target="_blank" className="hidden h-9 items-center gap-1 rounded-md px-3 text-xs font-bold hover:bg-surface-2 sm:flex"><ExternalLink className="size-3.5" />مشاهده سایت</Link>
+            <button type="button" onClick={toggleFx} aria-pressed={fx} className="hidden h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 text-xs font-bold hover:bg-surface-2 sm:flex" data-testid="fx-toggle" title="روشن/خاموش کردن انیمیشن‌های پنل"><Sparkles className="size-3.5" />انیمیشن {fx ? "روشن" : "خاموش"}</button>
             <ThemeToggle />
             <div className="relative">
               <button onClick={() => { setBell((b) => !b); setMenu(false); }} className="relative grid size-10 cursor-pointer place-items-center rounded-full hover:bg-surface-2" aria-label="اعلان‌ها">
@@ -94,7 +99,7 @@ export function AdminShell({ user, perms, notices, children }: ShellProps) {
             </div>
           </div>
         </header>
-        <main id="main" tabIndex={-1} className="p-4 sm:p-6">{children}</main>
+        <main id="main" tabIndex={-1} className="p-4 sm:p-6"><div key={path} className="fx-page">{children}</div></main>
       </div>
       <Toaster />
     </div>

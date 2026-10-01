@@ -47,7 +47,7 @@ export async function AccountShell({ active, children }: { active: string; child
               </nav>
               <LogoutButton />
             </div>
-            <div className="p-1 pt-5 sm:p-2 sm:pt-6">{user && !partner && active === "orders" && <PartnerCard status={appStatus} />}{children}</div>
+            <div className="p-1 pt-5 sm:p-2 sm:pt-6">{user?.mustChangePassword && <p role="alert" className="mb-4 rounded-2xl border border-warning/40 bg-warning/10 p-3 text-xs leading-6" data-testid="must-change">رمز عبور شما موقت است. لطفاً در «اطلاعات حساب کاربری» یک رمز جدید انتخاب کنید{user.isStaff ? "؛ تا آن زمان پنل مدیریت بسته است" : ""}.</p>}{user && !partner && active === "orders" && <PartnerCard status={appStatus} />}{children}</div>
           </div>
         </Container>
       </main>

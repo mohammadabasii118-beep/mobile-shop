@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import type { Prisma } from "@/lib/generated/prisma/client";
-import { forbidden } from "@/lib/server/errors";
+import { AppError, forbidden } from "@/lib/server/errors";
 import { clientIp, route } from "@/lib/server/http";
 import { invalidatePublic } from "@/lib/server/public-cache";
 import { rateLimit } from "@/lib/server/rate-limit";
@@ -15,6 +15,8 @@ export interface AdminCtx { admin: SessionUser; ip: string }
 export async function authorizeAdmin(perm: string | string[]): Promise<SessionUser> {
   const admin = await requireUser();
   if (!admin.isStaff) throw forbidden();
+  // A temporary password must be replaced first: until then the admin API is closed (the account page and password change stay open).
+  if (admin.mustChangePassword) throw new AppError(403, "password_change_required", "ابتدا رمز موقت خود را از «اطلاعات حساب کاربری» تغییر دهید.");
   const list = Array.isArray(perm) ? perm : [perm];
   if (!list.some((p) => admin.permissions.includes(p))) requirePermission(admin, list[0]!);
   return admin;

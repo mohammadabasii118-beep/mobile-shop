@@ -1,3 +1,4 @@
+import { CountUp } from "@/components/admin/count-up";
 import Link from "next/link";
 import { AlertTriangle, Banknote, Boxes, Clock, Package, PackageCheck, Percent, ShoppingBag, Store, Star, TrendingUp, UserPlus, Wallet, CalendarDays, ClipboardCheck } from "lucide-react";
 import { Card, PageHead } from "@/components/admin/kit";
@@ -51,7 +52,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       <PageHead title="داشبورد" sub="خلاصه وضعیت فروشگاه (داده‌ها مستقیم از پایگاه‌داده)" />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {tiles.map((t) => {
-          const body = <Card className={cn("h-full transition-colors", t.href && "hover:border-primary")}><t.icon className={cn("mb-2 size-5 text-primary", t.tone)} /><div className="text-[11px] font-bold text-muted">{t.label}</div><div className={cn("mt-1 text-lg font-black", t.tone)}>{t.value}</div></Card>;
+          const body = <Card className={cn("h-full transition-colors", t.href && "hover:border-primary")}><t.icon className={cn("mb-2 size-5 text-primary", t.tone)} /><div className="text-[11px] font-bold text-muted">{t.label}</div><div className={cn("mt-1 text-lg font-black tabular-nums", t.tone)}><CountUp text={t.value} /></div></Card>;
           return t.href ? <Link key={t.label} href={t.href}>{body}</Link> : <div key={t.label}>{body}</div>;
         })}
       </div>
@@ -59,7 +60,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         <Card className="lg:col-span-2">
           <h2 className="mb-3 text-sm font-black">فروش ۱۴ روز گذشته</h2>
           <div className="flex h-40 items-end gap-1.5" role="img" aria-label="نمودار فروش روزانه">
-            {d.chart.map((c) => <div key={c.date} className="group relative flex h-full flex-1 items-end"><div className="w-full rounded-t bg-primary/80 transition-colors group-hover:bg-primary" style={{ height: `${Math.max(2, (c.value / max) * 100)}%` }} /><span className="pointer-events-none absolute -top-7 start-1/2 z-10 hidden -translate-x-1/2 whitespace-nowrap rounded bg-secondary px-2 py-0.5 text-[10px] text-secondary-fg group-hover:block">{new Date(c.date).toLocaleDateString("fa-IR", { day: "numeric", month: "short" })}: {toman(c.value)}</span></div>)}
+            {d.chart.map((c) => <div key={c.date} className="group relative flex h-full flex-1 items-end"><div className="fx-bar w-full rounded-t bg-primary/80 transition-colors group-hover:bg-primary" style={{ animationDelay: `${(d.chart.indexOf(c) * 35) + 250}ms`, height: `${Math.max(2, (c.value / max) * 100)}%` }} /><span className="pointer-events-none absolute -top-7 start-1/2 z-10 hidden -translate-x-1/2 whitespace-nowrap rounded bg-secondary px-2 py-0.5 text-[10px] text-secondary-fg group-hover:block">{new Date(c.date).toLocaleDateString("fa-IR", { day: "numeric", month: "short" })}: {toman(c.value)}</span></div>)}
           </div>
           <div className="mt-1 flex justify-between text-[10px] text-muted"><span>{new Date(d.chart[0]!.date).toLocaleDateString("fa-IR", { day: "numeric", month: "short" })}</span><span>امروز</span></div>
         </Card>

@@ -31,7 +31,7 @@ export function Toaster() {
   }, []);
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[100] flex flex-col items-center gap-2 px-4" role="status" aria-live="polite">
-      {items.map((t) => <div key={t.id} className={cn("pointer-events-auto max-w-md rounded-lg px-4 py-2.5 text-sm font-medium shadow-lg", t.tone === "err" ? "bg-error text-white" : "bg-secondary text-secondary-fg")}>{t.message}</div>)}
+      {items.map((t) => <div key={t.id} className={cn("fx-toast pointer-events-auto max-w-md rounded-lg px-4 py-2.5 text-sm font-medium shadow-lg", t.tone === "err" ? "bg-error text-white" : "bg-secondary text-secondary-fg")}>{t.message}</div>)}
     </div>
   );
 }
@@ -68,8 +68,10 @@ export function PageHead({ title, sub, actions }: { title: string; sub?: string;
     </div>
   );
 }
-export const Card = ({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) => <div className={cn("rounded-xl border border-border bg-surface p-4 shadow-sm", className)} {...p} />;
+export const Card = ({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) => <div className={cn("fx-card rounded-xl border border-border bg-surface p-4 shadow-sm", className)} {...p} />;
 export const Spinner = () => <div className="grid place-items-center py-16 text-muted"><Loader2 className="size-6 animate-spin" /></div>;
+/** Skeleton rows shown instead of a bare spinner while a list loads. */
+export const Skeleton = ({ rows = 5 }: { rows?: number }) => <div className="space-y-2.5 py-2" aria-busy="true" aria-label="در حال بارگذاری">{Array.from({ length: rows }, (_, i) => <i key={i} className="fx-skel block h-10 rounded-lg bg-surface-2" />)}</div>;
 export const ErrorBox = ({ message }: { message: string }) => <div className="rounded-lg border border-error/30 bg-error/10 p-4 text-sm text-error">{message}</div>;
 export const Empty = ({ text = "موردی پیدا نشد." }: { text?: string }) => <div className="py-14 text-center text-sm text-muted">{text}</div>;
 
@@ -112,8 +114,8 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
     return () => window.removeEventListener("keydown", k);
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label={title} className={cn("max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-surface p-5 shadow-lg sm:rounded-2xl", wide ? "sm:max-w-3xl" : "sm:max-w-xl")}>
+    <div className="fx-overlay fixed inset-0 z-[80] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal="true" aria-label={title} className={cn("fx-dialog max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-surface p-5 shadow-lg sm:rounded-2xl", wide ? "sm:max-w-3xl" : "sm:max-w-xl")}>
         <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-black">{title}</h2><button onClick={onClose} className="cursor-pointer rounded-md px-2 py-1 text-muted hover:bg-surface-2" aria-label="بستن">✕</button></div>
         {children}
       </div>

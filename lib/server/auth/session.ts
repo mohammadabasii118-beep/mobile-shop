@@ -18,6 +18,8 @@ export interface SessionUser {
   roles: string[];
   permissions: string[];
   isStaff: boolean;
+  /** An admin created this account with a temporary password: it must be replaced before the admin panel can be used. */
+  mustChangePassword: boolean;
   /** Present only for an approved wholesale partner whose tier is active. Always derived from the DB. */
   wholesale: { tierKey: string; tierName: string; discountPercent: number; minOrder: number; storeName: string } | null;
 }
@@ -85,6 +87,6 @@ export const getCurrentUser = cache(async (): Promise<SessionUser | null> => {
     : null;
   return {
     id: u.id, phone: u.phone, email: u.email, firstName: u.firstName, lastName: u.lastName, displayName: u.displayName,
-    roles, permissions, isStaff: u.roles.some((r) => r.role.isStaff), wholesale,
+    roles, permissions, isStaff: u.roles.some((r) => r.role.isStaff), mustChangePassword: u.mustChangePassword, wholesale,
   };
 });

@@ -111,7 +111,7 @@ export async function changePassword(userId: string, oldPassword: string | undef
   if (user.passwordHash) {
     if (!oldPassword || !(await verifyPassword(oldPassword, user.passwordHash))) throw badRequest("رمز عبور فعلی نادرست است.", "bad_password");
   }
-  await db.user.update({ where: { id: userId }, data: { passwordHash: await hashPassword(newPassword), passwordChangedAt: new Date() } });
+  await db.user.update({ where: { id: userId }, data: { passwordHash: await hashPassword(newPassword), passwordChangedAt: new Date(), mustChangePassword: false } });
   await destroyAllSessions(userId, await currentTokenHash()); // keep only this device signed in
 }
 
