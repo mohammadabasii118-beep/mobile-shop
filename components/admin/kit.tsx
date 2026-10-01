@@ -1,5 +1,6 @@
 "use client";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { api, type ApiResult } from "@/lib/client/api";
 import { cn } from "@/lib/utils";
@@ -113,13 +114,22 @@ export function Modal({ title, onClose, children, wide }: { title: string; onClo
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
   }, [onClose]);
-  return (
+  // Portal to the admin root: an animated ancestor (transform) would otherwise be the containing block of `fixed`.
+  // The root (not <body>) keeps the scoped motion/theme styles applying.
+  const host = useSyncExternalStore(
+    () => () => {},
+    () => (document.querySelector("[data-admin-fx]") as HTMLElement | null) ?? document.body,
+    () => null,
+  );
+  if (!host) return null;
+  return createPortal(
     <div className="fx-overlay fixed inset-0 z-[80] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label={title} className={cn("fx-dialog max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-surface p-5 shadow-lg sm:rounded-2xl", wide ? "sm:max-w-3xl" : "sm:max-w-xl")}>
+      <div role="dialog" aria-modal="true" aria-label={title} className={cn("fx-dialog max-h-[92dvh] w-full overflow-y-auto overscroll-contain rounded-t-2xl bg-surface p-5 shadow-lg sm:rounded-2xl", wide ? "sm:max-w-3xl" : "sm:max-w-xl")}>
         <div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-black">{title}</h2><button onClick={onClose} className="cursor-pointer rounded-md px-2 py-1 text-muted hover:bg-surface-2" aria-label="بستن">✕</button></div>
         {children}
       </div>
-    </div>
+    </div>,
+    host,
   );
 }
 
