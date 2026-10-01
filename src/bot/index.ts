@@ -2,9 +2,15 @@ import { Bot, session } from 'grammy';
 import { prisma } from '../db/client';
 import { RateLimiter } from '../utils/ratelimit';
 import { logger } from '../utils/logger';
-import { upsertUser } from '../modules/users/service';
+import { registerUser } from '../modules/users/service';
+import { checkMembership } from '../modules/channels/service';
+import { getAdmin } from '../modules/admin/rbac';
+import { loadTexts } from '../modules/texts/service';
+import { getBool } from '../modules/settings/service';
+import { notifyAdmins } from '../modules/notifications/service';
 import { setSender } from '../modules/notifications/service';
 import { Ctx, Session, toKb } from './ui';
+import type { Button } from '../modules/notifications/service';
 import { adminHandlers } from './admin';
 import { FileFetcher, telegramFileFetcher, userHandlers } from './user';
 import { telegramClientOptions } from './telegramNet';
@@ -35,10 +41,15 @@ export function createBot(token: string, opts: { fetchFile?: FileFetcher; botInf
       if (ctx.callbackQuery) await ctx.answerCallbackQuery({ text: 'لطفاً کمی آهسته‌تر.' }).catch(() => undefined);
       return;
     }
-    if (ctx.callbackQuery) await ctx.answerCallbackQuery().catch(() => undefined);
-    const user = await upsertUser(ctx.from);
+    if (ctx.callbackQuery && ctx.callbackQuery.data !== 'chk:join') await ctx.answerCallbackQuery().catch(() => undefined); // chk:join answers itself (alert)
+    const { user, isNew } = await registerUser(ctx.from);
+    if (isNew) await announceNewUser(user).catch((e) => logger.warn({ err: String(e?.message) }, 'new-user notification failed'));
     if (user.isBlocked) return;
     (ctx as Ctx).dbUser = user;
+
+    // ---- mandatory channel membership (admins are exempt) ----
+    const gate = await membershipGate(ctx as Ctx);
+    if (gate === 'blocked') return;
     return next();
   });
   bot.use(session<Session, Ctx>({ initial: () => ({}), storage, getSessionKey: (ctx) => (ctx.from ? String(ctx.from.id) : undefined) }));
@@ -53,6 +64,34 @@ export function createBot(token: string, opts: { fetchFile?: FileFetcher; botInf
     });
   });
   return bot;
+}
+
+async function announceNewUser(user: { id: string; telegramId: bigint; username: string | null; firstName: string | null; lastName: string | null }) {
+  if (!(await getBool('notify.newUser'))) return;
+  const total = await prisma.user.count();
+  const name = [user.firstName, user.lastName].filter(Boolean).join(' ') || '—';
+  await notifyAdmins('new_user', `🆕 کاربر جدید وارد ربات شد\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n👤 نام: ${name}\n🔗 یوزرنیم: ${user.username ? '@' + user.username : '—'}\n🪪 آیدی: ${user.telegramId}\n👥 تعداد کل کاربران: ${total}`, { roles: [], dedupeKey: `new_user:${user.id}` });
+}
+
+/**
+ * Users must be members of every active required channel. Returns 'blocked' after showing the join screen.
+ * `chk:join` ("I joined") re-checks and, on success, continues as a "menu:main" tap.
+ */
+async function membershipGate(ctx: Ctx): Promise<'ok' | 'blocked'> {
+  if (await getAdmin(BigInt(ctx.from!.id))) return 'ok';
+  const { ok, missing } = await checkMembership(BigInt(ctx.from!.id));
+  const isCheck = ctx.callbackQuery?.data === 'chk:join';
+  if (ok) {
+    if (isCheck) { (ctx.update.callback_query as { data?: string }).data = 'menu:main'; await ctx.answerCallbackQuery().catch(() => undefined); }
+    return 'ok';
+  }
+  const T = await loadTexts();
+  if (isCheck) await ctx.answerCallbackQuery({ text: T.plain('join.still'), show_alert: true }).catch(() => undefined);
+  const rows: Button[][] = [...missing.map((c): Button[] => [{ text: `📢 ${c.title}`, url: c.inviteUrl }]), [{ text: T.plain('btn.joined'), data: 'chk:join' }]];
+  const text = T.html('join.required');
+  if (isCheck && ctx.callbackQuery?.message) await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: toKb(rows) }).catch(() => undefined);
+  else await ctx.reply(text, { parse_mode: 'HTML', reply_markup: toKb(rows) }).catch(() => undefined);
+  return 'blocked';
 }
 
 export const USER_COMMANDS = [

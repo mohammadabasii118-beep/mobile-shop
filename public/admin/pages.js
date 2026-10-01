@@ -478,7 +478,7 @@ export async function settings(ctx, root) {
     section('تأیید خودکار و ریسک', 'پیش‌فرض‌ها امن‌اند: رسید تنها هرگز تأیید قطعی نیست', choice('verification.mode', 'حالت تأیید', [['AUTO_VERIFICATION', 'تأیید خودکار (با لجر بانک)'], ['MANUAL_REVIEW', 'همیشه بررسی دستی']]),
       choice('verification.provider', 'منبع تأیید', [['ledger', 'لجر تراکنش‌های بانکی'], ['none', 'هیچ (همه به بررسی دستی)']]), toggle('verification.allowReceiptOnlyAutoApprove', 'تأیید خودکار فقط با رسید', 'پیشنهاد نمی‌شود؛ بدون تأیید بانکی ریسک دارد'),
       choice('risk.highAction', 'رفتار در ریسک بالا', [['MANUAL_REVIEW', 'بررسی دستی'], ['REJECT', 'رد خودکار']]), text('risk.mediumAt', 'آستانه ریسک متوسط', { num: true }), text('risk.highAt', 'آستانه ریسک بالا', { num: true }), text('risk.maxSubmissions24h', 'حداکثر ارسال رسید در ۲۴ ساعت', { num: true })),
-    section('Provisioning و اعلان‌ها', 'تلاش مجدد خودکار و یادآوری انقضا', text('provisioning.maxRetries', 'حداکثر تلاش مجدد', { num: true }), text('provisioning.backoffSeconds', 'فاصله تلاش‌ها (ثانیه)', { ltr: true, hint: 'مثال: 60,300,900' }), text('notify.expiryDays', 'یادآوری انقضا (روز مانده)', { ltr: true, hint: 'مثال: 3,1' }), text('orders.expireMinutes', 'انقضای سفارش پرداخت‌نشده (دقیقه)', { num: true })),
+    section('Provisioning و اعلان‌ها', 'تلاش مجدد خودکار و یادآوری انقضا', toggle('notify.newUser', 'اعلان کاربر جدید به ادمین', 'هر کس برای اولین بار ربات را استارت کند، پیام می‌آید'), text('provisioning.maxRetries', 'حداکثر تلاش مجدد', { num: true }), text('provisioning.backoffSeconds', 'فاصله تلاش‌ها (ثانیه)', { ltr: true, hint: 'مثال: 60,300,900' }), text('notify.expiryDays', 'یادآوری انقضا (روز مانده)', { ltr: true, hint: 'مثال: 3,1' }), text('orders.expireMinutes', 'انقضای سفارش پرداخت‌نشده (دقیقه)', { num: true })),
     section('اتصال X-UI', 'اعتبارنامه‌ها فقط در env سرور نگه‌داری می‌شوند و در پنل نمایش داده نمی‌شوند', xuiBox, info('Provider', rt.vpnProvider === 'xui', 'X-UI واقعی', rt.vpnProvider), info('احراز هویت', rt.xuiAuth !== 'none', rt.xuiAuth === 'api-token' ? 'API Token' : 'نام کاربری/رمز', 'تنظیم نشده'), info('لینک Subscription', rt.xuiSubscription, 'فعال', 'غیرفعال (XUI_SUB_BASE_URL)')),
     section('سیستم', 'وضعیت اجزای محیطی', info('Webhook تراکنش‌های بانکی', rt.bankWebhook, 'پیکربندی شده', 'پیکربندی نشده — تأیید خودکار ممکن نیست'), info('پرداخت کریپتو', false, '', 'غیرفعال تا اتصال تأییدکننده‌ی زنجیره'), info('محیط اجرا', rt.nodeEnv === 'production', 'Production', rt.nodeEnv)));
   checkXui();
@@ -590,4 +590,39 @@ function textForm(t, done) {
     try { await api('/texts', { method: 'PUT', body: { key: t.key, value: input.value } }); toast('متن ذخیره شد'); m.close(); done(); } catch (e) { err.hidden = false; err.textContent = errMsg(e); }
   } });
   const m = modal({ title: t.label, body: h('div', { class: 'stack' }, h('div', { class: 'field' }, h('label', { text: 'متن' }), input, count), chips, h('div', null, h('div', { class: 'section-t', text: 'پیش‌نمایش (با مقادیر نمونه)' }), prev), err), footer: [ok, button('انصراف', { onClick: () => m.close() })] });
+}
+
+/* ============================ Required channels ============================ */
+export function channels(ctx, root) {
+  const nb = button('افزودن کانال', { kind: 'primary', ico: 'plus', onClick: () => channelForm(reload) });
+  root.append(pageHead('کانال‌های اجباری', 'کاربر تا عضو همه‌ی کانال‌های فعال نشود نمی‌تواند از ربات استفاده کند', nb));
+  root.append(h('div', { class: 'callout' }, icon('info'), h('div', { text: 'ربات باید در هر کانال «ادمین» باشد تا بتواند عضویت را بررسی کند. ادمین‌های ربات از این شرط معاف‌اند. اگر ربات دسترسی‌اش را از دست بدهد، برای اینکه مشتریان قفل نشوند آن کانال موقتاً اعمال نمی‌شود و به شما هشدار داده می‌شود.' })));
+  const card = h('div', { class: 'card' }); root.append(card);
+  async function reload() {
+    clear(card); card.append(h('div', { class: 'table-wrap' }, h('table', { class: 'table' }, skeletonRows(4, 3))));
+    try {
+      const { items } = await api('/channels'); clear(card);
+      if (!items.length) return void card.append(emptyState('هنوز کانالی اضافه نشده', 'تا کانالی اضافه نکنید، عضویت اجباری خاموش است و همه می‌توانند از ربات استفاده کنند.', 'bell', button('افزودن کانال', { kind: 'primary', ico: 'plus', onClick: () => channelForm(reload) })));
+      card.append(table([
+        { label: 'کانال', cls: 'wrap', render: (c) => h('div', null, h('div', { class: 'cell-main', text: c.title }), h('div', { class: 'cell-sub' }, c.username ? ltr('@' + c.username) : null, c.username ? ' · ' : '', ltr(c.chatId, 'mono'))) },
+        { label: 'لینک', render: (c) => h('a', { href: c.inviteUrl, target: '_blank', rel: 'noopener noreferrer', class: 'ltr', text: c.inviteUrl.replace('https://', '') }) },
+        { label: 'وضعیت', render: (c) => h('span', { class: `badge ${c.isActive ? 'ok' : ''}`, text: c.isActive ? 'اجباری' : 'غیرفعال' }) },
+        { label: '', render: (c) => h('div', { class: 'actions' },
+          button('تست', { size: 'sm', onClick: async () => { try { const r = await api(`/channels/${c.id}/test`, { method: 'POST' }); toast(r.detail, r.ok ? 'ok' : 'err'); } catch (e) { toast(errMsg(e), 'err'); } } }),
+          button(c.isActive ? 'غیرفعال' : 'فعال‌سازی', { size: 'sm', onClick: async () => { try { await api(`/channels/${c.id}`, { method: 'PATCH', body: { isActive: !c.isActive } }); reload(); } catch (e) { toast(errMsg(e), 'err'); } } }),
+          button('', { size: 'sm', kind: 'ghost', ico: 'trash', title: 'حذف', onClick: async () => { if (!(await confirmDialog({ title: 'حذف کانال', message: `«${c.title}» از لیست اجباری حذف شود؟`, confirmLabel: 'حذف', kind: 'danger' }))) return; try { await api(`/channels/${c.id}`, { method: 'DELETE' }); toast('حذف شد'); reload(); } catch (e) { toast(errMsg(e), 'err'); } } })) },
+      ], items));
+    } catch (e) { clear(card); card.append(errorState(errMsg(e), reload)); }
+  }
+  reload();
+}
+function channelForm(done) {
+  const ref = h('input', { class: 'input ltr', dir: 'ltr', placeholder: '@mychannel یا https://t.me/mychannel یا -1001234567890', 'aria-label': 'آدرس کانال' });
+  const invite = h('input', { class: 'input ltr', dir: 'ltr', placeholder: 'فقط برای کانال خصوصی: https://t.me/+xxxx', 'aria-label': 'لینک دعوت' });
+  const err = h('div', { class: 'form-error', hidden: true });
+  const ok = button('بررسی و افزودن', { kind: 'primary', onClick: async () => {
+    err.hidden = true;
+    try { const c = await api('/channels', { method: 'POST', body: { ref: ref.value.trim(), inviteUrl: invite.value.trim() || null } }); toast(`«${c.title}» اضافه شد`); m.close(); done(); } catch (e) { err.hidden = false; err.textContent = errMsg(e); }
+  } });
+  const m = modal({ title: 'افزودن کانال اجباری', body: h('div', { class: 'stack' }, h('div', { class: 'callout warn' }, icon('alert'), h('div', { text: 'ابتدا ربات را در کانال «ادمین» کنید؛ در غیر این‌صورت اضافه نمی‌شود.' })), h('div', { class: 'field' }, h('label', { text: 'آدرس یا شناسه کانال' }), ref), h('div', { class: 'field' }, h('label', { text: 'لینک دعوت (اختیاری)' }), invite), err), footer: [ok, button('انصراف', { onClick: () => m.close() })] });
 }

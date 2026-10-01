@@ -24,6 +24,7 @@ export const SETTING_DEFAULTS = {
   'notify.expiryDays': () => '3,1',
   'xui.defaultInboundId': () => '',
   'orders.expireMinutes': () => '1440',
+  'notify.newUser': () => 'true', // tell admins when someone starts the bot for the first time
 } as const;
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
 

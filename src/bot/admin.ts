@@ -12,6 +12,7 @@ import { adminRetry } from '../modules/vpn/provisioning';
 import { adminReply, closeTicket, listOpenTickets } from '../modules/support/service';
 import { SETTING_DEFAULTS, SettingKey, allSettings, getSetting, setSetting } from '../modules/settings/service';
 import { audit } from '../modules/admin/audit';
+import { addChannel, deleteChannel, listChannels, setChannelActive, testChannel } from '../modules/channels/service';
 import { isTextKey, listTexts, previewText, resetText, setText, textDef } from '../modules/texts/service';
 import { categoryTree, createCategory, deleteCategory, getCategory, moveCategory, setProductCategory, splitIconName, updateCategory } from '../modules/categories/service';
 import { getVpnProvider } from '../providers/vpn';
@@ -43,6 +44,7 @@ export function adminHandlers() {
     await add('products.manage', { text: '📦 محصولات', data: 'adm:products' });
     await add('products.manage', { text: '🗂 دسته‌بندی منوی خرید', data: 'ct:l:root' });
     await add('texts.manage', { text: '✏️ ویرایش متن‌های ربات', data: 'tx:l' });
+    await add('settings.manage', { text: '📢 کانال‌های اجباری', data: 'ch:l' });
     await add('products.manage', { text: '🎁 کدهای تخفیف', data: 'adm:coupons' });
     await add('users.view', { text: '👥 کاربران / سفارش‌ها', data: 'adm:orders' });
     await add('support.reply', { text: '🎫 پشتیبانی', data: 'adm:tickets' });
@@ -169,7 +171,7 @@ export function adminHandlers() {
   c.on('callback_query:data', async (ctx, next) => {
     const d = ctx.callbackQuery.data;
     const [ns, a, b] = d.split(':');
-    const adminNs = ['adm', 'pl', 'ap', 'av', 'vl', 'pr', 'cp', 'st', 'at', 'ao', 'ct', 'tx'];
+    const adminNs = ['adm', 'pl', 'ap', 'av', 'vl', 'pr', 'cp', 'st', 'at', 'ao', 'ct', 'tx', 'ch'];
     if (!adminNs.includes(ns)) return next();
     try {
       // every admin callback re-checks authorization server-side (callback data is untrusted)
@@ -332,6 +334,31 @@ export function adminHandlers() {
         if (a === 'tg') { const p = await getProduct(b); await updateProduct(actor(ctx), b, { isActive: !p.isActive }); return ctx.reply(p.isActive ? '⏸ غیرفعال شد.' : '▶️ فعال شد.'); }
         if (a === 'pc') { ctx.session.step = 'a_price'; ctx.session.data = { id: b }; return show(ctx, 'قیمت جدید (عدد):', [back(`pr:v:${b}`)]); }
       }
+      if (ns === 'ch') {
+        await need(ctx, 'settings.manage');
+        if (a === 'l') {
+          const chans = await listChannels();
+          return show(ctx, `📢 کانال‌های اجباری\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\nتا کاربر عضو «همه‌ی کانال‌های فعال» نشود نمی‌تواند از ربات استفاده کند (ادمین‌ها معاف‌اند).\nربات باید در هر کانال «ادمین» باشد.${chans.length ? '' : '\n\nهنوز کانالی اضافه نشده؛ پس عضویت اجباری خاموش است.'}`, [
+            ...chans.map((c): Button[] => [{ text: `${c.isActive ? '🟢' : '⚪'} ${c.title}${c.username ? ` (@${c.username})` : ''}`, data: `ch:v:${c.id}` }]),
+            [{ text: '➕ افزودن کانال', data: 'ch:n' }],
+            back('adm:home'),
+          ]);
+        }
+        if (a === 'n') {
+          ctx.session.step = 'a_chan_add';
+          return show(ctx, '➕ آدرس کانال را بفرستید:\n\n• کانال عمومی: @mychannel یا https://t.me/mychannel\n• کانال خصوصی: خط اول شناسه عددی (مثل -1001234567890) و خط دوم لینک دعوت (https://t.me/+…)\n\n⚠️ قبل از افزودن، ربات را «ادمین» کانال کنید.', [back('ch:l')]);
+        }
+        const chan = (await listChannels()).find((x) => x.id === b);
+        if (!chan) throw new AppError('NOT_FOUND', 'کانال یافت نشد');
+        if (a === 'v') return show(ctx, `📢 ${chan.title}${chan.username ? `\n@${chan.username}` : ''}\n${chan.inviteUrl}\nوضعیت: ${chan.isActive ? '🟢 اجباری (فعال)' : '⚪ غیرفعال'}`, [
+          [{ text: '🧪 تست دسترسی ربات', data: `ch:t:${chan.id}` }, { text: chan.isActive ? '⏸ غیرفعال' : '▶️ فعال', data: `ch:tg:${chan.id}` }],
+          [{ text: '🗑 حذف', data: `ch:d:${chan.id}` }], back('ch:l'),
+        ]);
+        if (a === 't') { const r = await testChannel(chan.id); return show(ctx, `${r.ok ? '✅' : '❌'} ${r.detail}`, [back(`ch:v:${chan.id}`)]); }
+        if (a === 'tg') { await setChannelActive(actor(ctx), chan.id, !chan.isActive); return show(ctx, chan.isActive ? '⏸ غیرفعال شد (دیگر اجباری نیست).' : '▶️ فعال شد.', [back(`ch:v:${chan.id}`)]); }
+        if (a === 'd') return show(ctx, `⚠️ کانال «${chan.title}» از لیست اجباری حذف شود؟`, [[{ text: '🗑 بله، حذف', data: `ch:d2:${chan.id}` }, { text: '↩️ انصراف', data: `ch:v:${chan.id}` }]]);
+        if (a === 'd2') { await deleteChannel(actor(ctx), chan.id); return show(ctx, '🗑 حذف شد.', [back('ch:l')]); }
+      }
       if (ns === 'tx') {
         await need(ctx, 'texts.manage');
         const items = await listTexts();
@@ -489,6 +516,12 @@ export function adminHandlers() {
         ctx.session.step = undefined;
         return void (await ctx.reply(`✅ محصول «${p.name}» ساخته شد.`));
       }
+      if (step === 'a_chan_add') {
+        await need(ctx, 'settings.manage');
+        const c = await addChannel(actor(ctx), text);
+        ctx.session.step = undefined;
+        return void (await ctx.reply(`✅ کانال «${c.title}» اضافه شد. از این لحظه عضویت در آن اجباری است.`, { reply_markup: { inline_keyboard: [[{ text: '📢 کانال‌ها', callback_data: 'ch:l' }]] } }));
+      }
       if (step === 'a_text') {
         await need(ctx, 'texts.manage');
         if (!isTextKey(data.key)) throw new AppError('VALIDATION', 'متن نامعتبر');
@@ -563,7 +596,7 @@ export function adminHandlers() {
       }
     } catch (e) {
       // validation errors on multi-line / field edits keep the step, so the admin can just resend a corrected text
-      const retry = e instanceof AppError && (e.code === 'VALIDATION' || e.code === 'CONFLICT') && ['a_bulk', 'a_pfield', 'a_cat_new', 'a_cat_rename', 'a_text'].includes(step ?? '');
+      const retry = e instanceof AppError && (e.code === 'VALIDATION' || e.code === 'CONFLICT') && ['a_bulk', 'a_pfield', 'a_cat_new', 'a_cat_rename', 'a_text', 'a_chan_add'].includes(step ?? '');
       if (!retry) ctx.session.step = undefined;
       return handleError(ctx, e, step === 'a_bulk' ? 'adm:products' : 'adm:home');
     }

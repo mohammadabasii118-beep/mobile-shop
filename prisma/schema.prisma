@@ -451,3 +451,16 @@ model BotSession {
   data      String
   updatedAt DateTime @updatedAt
 }
+
+/// Channels/supergroups users must have joined before they can use the bot.
+model RequiredChannel {
+  id        String   @id @default(cuid())
+  chatId    BigInt   @unique
+  title     String
+  username  String?
+  inviteUrl String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

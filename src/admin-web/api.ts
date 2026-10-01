@@ -17,6 +17,7 @@ import { flushPending } from '../modules/notifications/service';
 import { getVpnProvider } from '../providers/vpn';
 import { categoryTree, createCategory, deleteCategory, moveCategory, updateCategory } from '../modules/categories/service';
 import { isTextKey, listTexts, previewText, resetText, setText } from '../modules/texts/service';
+import { addChannel, deleteChannel, listChannels, setChannelActive, testChannel } from '../modules/channels/service';
 import * as Q from './queries';
 
 export interface ApiCtx {
@@ -55,6 +56,7 @@ export const SETTING_RULES: Partial<Record<SettingKey, z.ZodType<string>>> = {
   'provisioning.backoffSeconds': csvInts,
   'notify.expiryDays': csvInts,
   'orders.expireMinutes': int(10, 10080),
+  'notify.newUser': bool,
 };
 
 async function putSetting(c: ApiCtx) {
@@ -126,6 +128,15 @@ export const routes: Route[] = [
     },
   },
   { method: 'DELETE', re: /^\/texts\/([\w.]+)$/, perm: 'texts.manage', run: async (c) => { if (!isTextKey(c.params[0])) throw new NotFoundError('text'); await resetText(actor(c), c.params[0]); return { ok: true }; } },
+
+  { method: 'GET', re: /^\/channels$/, perm: 'settings.manage', run: async () => ({ items: (await listChannels()).map((c) => ({ ...c, chatId: String(c.chatId) })) }) },
+  {
+    method: 'POST', re: /^\/channels$/, perm: 'settings.manage',
+    run: async (c) => { const b = z.object({ ref: z.string().min(2).max(200), inviteUrl: z.string().max(200).nullable().optional() }).parse(c.body); const ch = await addChannel(actor(c), b.ref, b.inviteUrl ?? undefined); return { ...ch, chatId: String(ch.chatId) }; },
+  },
+  { method: 'PATCH', re: /^\/channels\/([\w-]+)$/, perm: 'settings.manage', run: async (c) => { const ch = await setChannelActive(actor(c), c.params[0], z.object({ isActive: z.boolean() }).parse(c.body).isActive); return { ...ch, chatId: String(ch.chatId) }; } },
+  { method: 'POST', re: /^\/channels\/([\w-]+)\/test$/, perm: 'settings.manage', run: (c) => testChannel(c.params[0]) },
+  { method: 'DELETE', re: /^\/channels\/([\w-]+)$/, perm: 'settings.manage', run: async (c) => { await deleteChannel(actor(c), c.params[0]); return { ok: true }; } },
 
   { method: 'GET', re: /^\/orders$/, perm: 'users.view', run: (c) => Q.listOrders(str(c, 'q'), str(c, 'status'), page(c)) },
 

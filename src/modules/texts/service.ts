@@ -31,6 +31,11 @@ export const TEXT_DEFS = {
   'btn.support': { label: 'دکمه‌ی پشتیبانی', group: 'منو و خوش‌آمد', max: 30, plain: true, default: '🎫 پشتیبانی' },
   'btn.rules': { label: 'دکمه‌ی قوانین', group: 'منو و خوش‌آمد', max: 30, plain: true, default: '📜 قوانین' },
 
+  'join.required': { label: 'پیام عضویت اجباری در کانال', group: 'منو و خوش‌آمد', max: 600,
+    default: `🔒 *عضویت در کانال*\n${RULE}\nبرای استفاده از ربات، ابتدا در کانال‌های زیر عضو شوید و سپس دکمه «عضو شدم» را بزنید.` },
+  'btn.joined': { label: 'دکمه‌ی «عضو شدم»', group: 'منو و خوش‌آمد', max: 30, plain: true, default: '✅ عضو شدم' },
+  'join.still': { label: 'پیام وقتی هنوز عضو نشده', group: 'منو و خوش‌آمد', max: 200, plain: true, default: 'هنوز عضو همه‌ی کانال‌ها نشده‌اید' },
+
   'buy.intro': { label: 'متن بالای صفحه‌ی خرید (اختیاری)', group: 'خرید و پرداخت', max: 500, optional: true, default: '' },
   'buy.prompt': { label: 'جمله‌ی انتخاب پلن', group: 'خرید و پرداخت', max: 200, default: 'یکی را انتخاب کنید 👇' },
   'payment.note': { label: 'توضیح پایین صفحه‌ی پرداخت', group: 'خرید و پرداخت', max: 600, default: '⚠️ مبلغ را *دقیقاً* برابر عدد بالا واریز کنید.\nبعد از پرداخت، دکمه «📤 ارسال رسید» را بزنید.' },

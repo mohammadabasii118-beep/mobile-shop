@@ -1,15 +1,24 @@
+import { User } from '@prisma/client';
 import { prisma } from '../../db/client';
 import { NotFoundError } from '../../utils/errors';
 
 export interface TgUser { id: number | bigint; username?: string; first_name?: string; last_name?: string; language_code?: string }
 
-export async function upsertUser(tg: TgUser) {
+export async function registerUser(tg: TgUser): Promise<{ user: User; isNew: boolean }> {
   const telegramId = BigInt(tg.id);
-  return prisma.user.upsert({
-    where: { telegramId },
-    create: { telegramId, username: tg.username, firstName: tg.first_name, lastName: tg.last_name, language: 'fa' },
-    update: { username: tg.username, firstName: tg.first_name, lastName: tg.last_name },
-  });
+  const profile = { username: tg.username, firstName: tg.first_name, lastName: tg.last_name };
+  const existing = await prisma.user.findUnique({ where: { telegramId } });
+  if (existing) return { user: await prisma.user.update({ where: { telegramId }, data: profile }), isNew: false };
+  try {
+    return { user: await prisma.user.create({ data: { telegramId, ...profile, language: 'fa' } }), isNew: true };
+  } catch (e: any) {
+    if (e?.code !== 'P2002') throw e; // two first updates raced: the loser is not "new"
+    return { user: await prisma.user.update({ where: { telegramId }, data: profile }), isNew: false };
+  }
+}
+
+export async function upsertUser(tg: TgUser) {
+  return (await registerUser(tg)).user;
 }
 
 export async function getUserByTelegramId(telegramId: bigint) {
