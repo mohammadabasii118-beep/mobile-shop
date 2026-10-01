@@ -74,21 +74,15 @@ export function userHandlers(fetchFile: FileFetcher) {
     if (!lvl.children.length && !lvl.products.length) {
       return show(ctx, `${header('🛒', title)}\n😕 ${lvl.here ? 'این بخش فعلاً پلنی ندارد.' : 'در حال حاضر پلنی برای فروش موجود نیست.\nلطفاً بعداً سر بزنید.'}`, [parentBack ? back(parentBack) : nav()], H);
     }
-    const cards = lvl.products.map((p, n) => [
-      `\u200f${fa(n + 1)}- ${b(p.name)}\u200f  ✅ موجود`,
-      `   ⏱ ${fa(p.durationDays)} روز  ·  📊 ${fa(p.trafficGB)} GB`,
-      `   💰 ${b(money(p.price, p.currency))}`,
-      p.description ? `   ${i(p.description)}` : '',
-    ].filter(Boolean).join('\n'));
-    const sub = lvl.children.length && lvl.products.length ? 'یک دسته یا یکی از پلن‌ها را انتخاب کنید' : lvl.children.length ? 'یک دسته را انتخاب کنید' : 'یکی از پلن‌ها را انتخاب کنید';
+    // Clean screen: a one-line prompt; each plan is a button ("name · price"). Full details show on the order summary.
     const rows: Button[][] = [];
     for (let k = 0; k < lvl.children.length; k += 2) {
       rows.push(lvl.children.slice(k, k + 2).map((c) => ({ text: `${c.icon ?? '📁'} ${c.name}`, data: `bc:${c.id}` })));
     }
-    rows.push(...lvl.products.map((p, n): Button[] => [{ text: `🛒 ${p.name}\u200f · ${money(p.price, p.currency)}`, data: `buy:${p.id}` }]));
+    rows.push(...lvl.products.map((p): Button[] => [{ text: `🛒 ${p.name}\u200f · ${money(p.price, p.currency)}`, data: `buy:${p.id}` }]));
     rows.push(parentBack ? back(parentBack) : nav());
     const desc = lvl.here?.description ? `\n${i(lvl.here.description)}` : '';
-    await show(ctx, `${header('🛒', title, sub)}${desc}${cards.length ? `\n\n${cards.join('\n\n')}` : ''}`, rows, H);
+    await show(ctx, `${header('🛒', title)}${desc}\nیکی را انتخاب کنید 👇`, rows, H);
   }
 
   async function orderSummary(ctx: Ctx, productId: string) {

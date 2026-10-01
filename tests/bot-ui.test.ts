@@ -45,7 +45,9 @@ describe('Telegram UX', () => {
     const p = await makeProduct({ name: 'پلن طلایی', price: 300000, description: 'عالی' });
     await createCoupon('t', { code: 'OFF10', type: 'PERCENT', value: 10 });
     await tap('menu:buy');
-    expect(text()).toMatch(/پلن طلایی[\s\S]*موجود[\s\S]*۳۰ روز[\s\S]*۵۰ GB[\s\S]*۳۰۰,۰۰۰ تومان/);
+    expect(text()).toContain('یکی را انتخاب کنید'); // short prompt only — no long plan cards
+    expect(text()).not.toContain('موجود');
+    expect(labels().join(' ')).toMatch(/پلن طلایی[\s\S]*۳۰۰,۰۰۰ تومان/); // plan = one button: name · price
     expect(cbs()).toContain(`buy:${p.id}`);
     await tap(`buy:${p.id}`);
     expect(text()).toMatch(/قیمت اصلی: ۳۰۰,۰۰۰[\s\S]*تخفیف: —[\s\S]*مبلغ نهایی: <b>۳۰۰,۰۰۰/);
@@ -126,9 +128,12 @@ describe('Telegram UX', () => {
   });
 
   it('HTML safety: hostile product names/ticket text are escaped; only b/i/code tags are emitted', async () => {
-    await makeProduct({ name: '<script>alert(1)</script> & co' });
+    const hostile = await makeProduct({ name: '<script>alert(1)</script> & co' });
     await tap('menu:buy');
-    expect(text()).toContain('&lt;script&gt;alert(1)&lt;/script&gt; &amp; co');
+    expect(text()).not.toContain('<script>'); // buy list: names live in plain-text buttons only
+    expect(labels().join(' ')).toContain('<script>alert(1)</script> & co'); // button text is never parsed as HTML
+    await tap(`buy:${hostile.id}`);
+    expect(text()).toContain('&lt;script&gt;alert(1)&lt;/script&gt; &amp; co'); // HTML screens escape it
     for (const c of api) {
       if (c.payload.parse_mode !== 'HTML') continue;
       const stripped = String(c.payload.text).replace(/<\/?(b|i|code)>/g, '');
