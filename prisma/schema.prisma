@@ -1,0 +1,429 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  PAYMENT_ADMIN
+  VPN_ADMIN
+  SUPPORT_ADMIN
+  PRODUCT_ADMIN
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAYMENT_SUBMITTED
+  PAYMENT_REVIEW
+  PAID
+  PROVISIONING
+  FULFILLED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CARD_TO_CARD
+  CRYPTO
+  ONLINE_GATEWAY
+}
+
+enum PaymentStatus {
+  PENDING
+  SUBMITTED
+  NEEDS_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum VerificationStatus {
+  VERIFIED
+  REJECTED
+  NEEDS_REVIEW
+  UNKNOWN
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum VpnStatus {
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+  CANCELLED
+}
+
+enum ProvisioningStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+}
+
+enum TaskKind {
+  CREATE
+  RENEW
+}
+
+enum Protocol {
+  VLESS
+  VMESS
+  TROJAN
+  SHADOWSOCKS
+}
+
+enum CouponType {
+  PERCENT
+  FIXED
+}
+
+enum TicketCategory {
+  VPN_ISSUE
+  PAYMENT_ISSUE
+  RENEWAL
+  OTHER
+}
+
+enum TicketStatus {
+  OPEN
+  ANSWERED
+  CLOSED
+}
+
+enum NotificationAudience {
+  USER
+  ADMIN
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+model User {
+  id          String   @id @default(cuid())
+  telegramId  BigInt   @unique
+  username    String?
+  firstName   String?
+  lastName    String?
+  language    String   @default("fa")
+  isBlocked   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orders        Order[]
+  payments      Payment[]
+  services      VpnService[]
+  tickets       Ticket[]
+  couponUsages  CouponUsage[]
+  notifications Notification[]
+}
+
+model Admin {
+  id         String    @id @default(cuid())
+  telegramId BigInt    @unique
+  role       AdminRole
+  name       String?
+  isActive   Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model Product {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  durationDays   Int
+  trafficGB      Int
+  price          Int
+  currency       String   @default("IRT")
+  xuiProviderId  String   @default("default")
+  xuiInboundId   Int
+  protocol       Protocol @default(VLESS)
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  orders   Order[]
+  services VpnService[]
+
+  @@index([isActive, sortOrder])
+}
+
+model Order {
+  id                  String        @id @default(cuid())
+  orderNumber         String        @unique
+  userId              String
+  productId           String
+  amount              Int
+  discountAmount      Int           @default(0)
+  finalAmount         Int
+  currency            String        @default("IRT")
+  status              OrderStatus   @default(PENDING_PAYMENT)
+  paymentMethod       PaymentMethod
+  couponId            String?
+  renewalOfServiceId  String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id])
+  coupon   Coupon?  @relation(fields: [couponId], references: [id])
+  renewalOf VpnService? @relation("RenewalOrders", fields: [renewalOfServiceId], references: [id])
+  payments Payment[]
+  service  VpnService? @relation("OriginOrder")
+  task     ProvisioningTask?
+  couponUsage CouponUsage?
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+model Payment {
+  id                 String              @id @default(cuid())
+  orderId            String
+  userId             String
+  provider           PaymentMethod
+  amount             Int
+  currency           String              @default("IRT")
+  receiptFileId      String?
+  receiptPath        String?
+  receiptHash        String?
+  trackingCode       String?
+  submittedAmount    Int?
+  submittedAt        DateTime?
+  status             PaymentStatus       @default(PENDING)
+  verificationStatus VerificationStatus?
+  autoApproved       Boolean             @default(false)
+  receiptData        Json?
+  riskScore          Int?
+  riskLevel          RiskLevel?
+  riskFactors        Json?
+  reviewedAt         DateTime?
+  reviewedBy         String?
+  rejectionReason    String?
+  network            String?
+  asset              String?
+  address            String?
+  cryptoAmount       String?
+  txHash             String?
+  confirmations      Int?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  order         Order                 @relation(fields: [orderId], references: [id])
+  user          User                  @relation(fields: [userId], references: [id])
+  verifications PaymentVerification[]
+  bankTx        BankTransaction?
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([trackingCode])
+  @@index([receiptHash])
+  @@index([txHash])
+  @@index([status, createdAt])
+}
+
+model PaymentVerification {
+  id         String             @id @default(cuid())
+  paymentId  String
+  provider   String
+  result     VerificationStatus
+  reason     String?
+  evidence   Json?
+  createdAt  DateTime           @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+}
+
+/// Ledger of real incoming bank transfers (fed by bank API / SMS gateway webhook).
+model BankTransaction {
+  id                 String    @id @default(cuid())
+  externalId         String    @unique
+  trackingCode       String?
+  amount             Int
+  currency           String    @default("IRT")
+  destination        String?
+  occurredAt         DateTime
+  status             String    @default("SUCCESS")
+  source             String
+  raw                Json?
+  claimedByPaymentId String?   @unique
+  createdAt          DateTime  @default(now())
+
+  claimedBy Payment? @relation(fields: [claimedByPaymentId], references: [id])
+
+  @@index([trackingCode])
+  @@index([amount, occurredAt])
+}
+
+model VpnService {
+  id                 String             @id @default(cuid())
+  userId             String
+  orderId            String             @unique
+  productId          String
+  provider           String
+  inboundId          Int
+  externalId         String             @unique
+  clientId           String?
+  uuid               String             @unique
+  subId              String
+  protocol           Protocol
+  config             String?
+  subscriptionUrl    String?
+  trafficLimit       BigInt
+  trafficUsed        BigInt             @default(0)
+  expiresAt          DateTime
+  status             VpnStatus          @default(ACTIVE)
+  provisioningStatus ProvisioningStatus @default(PENDING)
+  lastSyncAt         DateTime?
+  expiryNotified     Json?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id])
+  order    Order    @relation("OriginOrder", fields: [orderId], references: [id])
+  renewals Order[]  @relation("RenewalOrders")
+
+  @@index([userId])
+  @@index([status, expiresAt])
+}
+
+model ProvisioningTask {
+  id            String             @id @default(cuid())
+  orderId       String             @unique
+  kind          TaskKind
+  serviceId     String?
+  status        ProvisioningStatus @default(PENDING)
+  attempts      Int                @default(0)
+  nextAttemptAt DateTime           @default(now())
+  lockedAt      DateTime?
+  lastError     String?
+  adminAlerted  Boolean            @default(false)
+  targetExpiresAt    DateTime?
+  targetTrafficLimit BigInt?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([status, nextAttemptAt])
+}
+
+model Ticket {
+  id        String         @id @default(cuid())
+  userId    String
+  category  TicketCategory
+  subject   String
+  status    TicketStatus   @default(OPEN)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  user     User            @relation(fields: [userId], references: [id])
+  messages TicketMessage[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model TicketMessage {
+  id        String   @id @default(cuid())
+  ticketId  String
+  fromAdmin Boolean  @default(false)
+  adminId   String?
+  text      String
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+}
+
+model Coupon {
+  id        String     @id @default(cuid())
+  code      String     @unique
+  type      CouponType
+  value     Int
+  maxUses   Int?
+  usedCount Int        @default(0)
+  expiresAt DateTime?
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+
+  orders Order[]
+  usages CouponUsage[]
+}
+
+model CouponUsage {
+  id        String   @id @default(cuid())
+  couponId  String
+  userId    String
+  orderId   String   @unique
+  createdAt DateTime @default(now())
+
+  coupon Coupon @relation(fields: [couponId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+  order  Order  @relation(fields: [orderId], references: [id])
+
+  @@index([couponId, userId])
+}
+
+model Notification {
+  id          String               @id @default(cuid())
+  audience    NotificationAudience
+  userId      String?
+  chatId      BigInt
+  type        String
+  text        String
+  dedupeKey   String?              @unique
+  meta        Json?
+  status      NotificationStatus   @default(PENDING)
+  attempts    Int                  @default(0)
+  lastError   String?
+  createdAt   DateTime             @default(now())
+  sentAt      DateTime?
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([status, createdAt])
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actor      String
+  action     String
+  target     String?
+  targetId   String?
+  metadata   Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([target, targetId])
+  @@index([action, createdAt])
+  @@index([createdAt])
+}
+
+model BotSession {
+  key       String   @id
+  data      String
+  updatedAt DateTime @updatedAt
+}

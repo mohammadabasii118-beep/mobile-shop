@@ -1,0 +1,21 @@
+# systemd alternative to Docker. Install: /opt/vpn-bot (npm ci && npm run build), /etc/vpn-bot.env (chmod 600)
+[Unit]
+Description=Telegram VPN Sales Bot
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+User=vpnbot
+WorkingDirectory=/opt/vpn-bot
+EnvironmentFile=/etc/vpn-bot.env
+ExecStartPre=/usr/bin/npx prisma migrate deploy
+ExecStart=/usr/bin/node dist/index.js
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+ReadWritePaths=/opt/vpn-bot/data
+
+[Install]
+WantedBy=multi-user.target

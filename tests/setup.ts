@@ -1,0 +1,10 @@
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'postgresql://vpn:vpn@localhost:5432/vpnbot_test?schema=public';
+process.env.NODE_ENV = 'test';
+process.env.VPN_PROVIDER = 'mock';
+process.env.ADMIN_TELEGRAM_ID = '9000';
+process.env.CARD_TO_CARD_ENABLED = 'true';
+process.env.CARD_HOLDER = 'Test Holder';
+process.env.CARD_NUMBER = '6037991122334455';
+process.env.BANK_NAME = 'TestBank';
+process.env.RECEIPT_DIR = './data/test-receipts';
+process.env.LOG_LEVEL = 'silent';
