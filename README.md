@@ -60,8 +60,8 @@ Adapter از API پنل زیر استفاده می‌کند: `POST /login`، `GE
 
 ## چک‌لیست راه‌اندازی واقعی
 ```bash
-npm run preflight                     # ENV، دیتابیس/مایگریشن، Telegram getMe، ورود به X-UI
-npm run xui:check -- --inbound <id>   # تست زنده روی پنل واقعی (Client موقت tgtest_* که همیشه حذف می‌شود)
+npm run preflight                     # (Docker: docker compose run --rm bot node dist/scripts/preflight.js)
+npm run xui:check -- --inbound <id>   # (Docker: docker compose run --rm bot node dist/scripts/xuiCheck.js --inbound <id>)
 ```
 `xui:check` این مراحل را جدا PASS/FAIL می‌دهد: authentication، list/lookup inbound، create client، verify، traffic (واحد بایت)، expiry (epoch ms)، ساخت لینک، renew، suspend/resume، idempotency، cleanup. اگر هر مرحله FAIL شد، خطای خود پنل چاپ می‌شود؛ تا قبل از PASS کامل فروش را شروع نکنید.
 
@@ -69,7 +69,7 @@ npm run xui:check -- --inbound <id>   # تست زنده روی پنل واقعی
 ```bash
 cp .env.example .env      # BOT_TOKEN, ADMIN_TELEGRAM_ID, POSTGRES_PASSWORD, XUI_*, CARD_*, BANK_WEBHOOK_SECRET
 docker compose up -d --build
-docker compose exec bot npx tsx src/scripts/seed.ts 1   # اختیاری: دو پلن نمونه روی inbound 1 (یا از /admin بسازید)
+docker compose exec bot node dist/scripts/seed.js 1   # اختیاری: دو پلن نمونه روی inbound 1 (یا از /admin بسازید)
 curl localhost:3000/health
 ```
 Bot با long-polling کار می‌کند (دامنه/وب‌هوک تلگرام لازم نیست). فقط اگر لجر بانکی را با webhook تغذیه می‌کنید، پورت 3000 را پشت Caddy/nginx با HTTPS قرار دهید.
