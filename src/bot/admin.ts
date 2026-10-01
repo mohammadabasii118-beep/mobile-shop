@@ -17,6 +17,7 @@ import { serviceSummary } from '../modules/vpn/messages';
 import { Button } from '../modules/notifications/service';
 import { Ctx, back, show } from './ui';
 import { handleError } from './user';
+import { createLoginToken, loginUrl, panelEnabled } from '../admin-web/auth';
 
 const actor = (ctx: Ctx) => adminActor(BigInt(ctx.from!.id));
 async function need(ctx: Ctx, perm: Permission) {
@@ -116,6 +117,15 @@ export function adminHandlers() {
   }
 
   c.command('admin', async (ctx) => { try { await panel(ctx); } catch (e) { await handleError(ctx, e); } });
+  c.command('panel', async (ctx) => {
+    try {
+      if (!(await getAdmin(BigInt(ctx.from!.id)))) throw new ForbiddenError();
+      if (!panelEnabled()) return void (await ctx.reply('پنل وب پیکربندی نشده است (PANEL_SESSION_SECRET).'));
+      const url = loginUrl(createLoginToken(BigInt(ctx.from!.id)));
+      await audit({ actor: actor(ctx), action: 'admin.panel_link' });
+      await ctx.reply(`🖥 ورود به پنل مدیریت\n\nاین لینک یک‌بارمصرف است و ۵ دقیقه اعتبار دارد:\n${url}`, { link_preview_options: { is_disabled: true } });
+    } catch (e) { await handleError(ctx, e); }
+  });
   c.command('stats', async (ctx) => { try { await dashboard(ctx); } catch (e) { await handleError(ctx, e); } });
   c.command('payments', async (ctx) => { try { await paymentList(ctx, 'review', 0); } catch (e) { await handleError(ctx, e); } });
   c.command('services', async (ctx, next) => {

@@ -3,6 +3,7 @@ import { prisma } from '../../db/client';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../utils/errors';
 import { audit } from '../admin/audit';
 import { notifyAdmins, notifyUser } from '../notifications/service';
+import * as T from '../notifications/templates';
 
 export async function createTicket(userId: string, category: TicketCategory, subject: string, text: string) {
   const t = text.trim();
@@ -41,7 +42,7 @@ export async function adminReply(adminTelegramId: bigint, id: string, text: stri
     prisma.ticket.update({ where: { id }, data: { status: 'ANSWERED' } }),
   ]);
   await audit({ actor: `admin:${adminTelegramId}`, action: 'ticket.reply', target: 'Ticket', targetId: id });
-  await notifyUser(t.userId, 'ticket_answer', `📩 پاسخ پشتیبانی به تیکت #${id.slice(-6)}:\n\n${text.trim()}`);
+  await notifyUser(t.userId, 'ticket_answer', T.ticketAnswer(id, text.trim()), { html: true, buttons: [[{ text: '💬 پاسخ', data: `tk:r:${id}` }, { text: '🎫 تیکت‌ها', data: 'menu:support' }]] });
 }
 
 export async function closeTicket(actor: string, id: string) {

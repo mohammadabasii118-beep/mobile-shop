@@ -33,6 +33,8 @@ export async function runPreflight(source: NodeJS.ProcessEnv = process.env, opts
     add(env.BANK_NAME ? 'PASS' : 'WARN', 'BANK_NAME');
   } else add('WARN', 'CARD_TO_CARD_ENABLED=false', 'users cannot buy');
   add(env.BANK_WEBHOOK_SECRET && env.BANK_WEBHOOK_SECRET.length >= 24 ? 'PASS' : 'WARN', 'BANK_WEBHOOK_SECRET', 'without a bank-transaction feed nothing is auto-approved (all payments go to manual review)');
+  add(env.APP_URL?.startsWith('https://') ? 'PASS' : 'WARN', 'APP_URL (admin panel link)', env.APP_URL ? (env.APP_URL.startsWith('https://') ? env.APP_URL : 'not https — panel login cookie will not be marked Secure; put a TLS proxy in front') : 'unset → /panel links point to localhost');
+  add(env.PANEL_SESSION_SECRET || env.BOT_TOKEN ? 'PASS' : 'FAIL', 'PANEL_SESSION_SECRET', env.PANEL_SESSION_SECRET ? 'set' : 'derived from BOT_TOKEN (set an explicit secret for rotation)');
   add(!env.CRYPTO_ENABLED ? 'PASS' : 'WARN', 'CRYPTO_ENABLED', 'crypto stays disabled without a chain verifier');
 
   try {

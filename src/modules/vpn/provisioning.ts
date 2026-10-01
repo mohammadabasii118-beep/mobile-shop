@@ -8,7 +8,7 @@ import { getNumber, getNumberList } from '../settings/service';
 import { notifyAdmins, notifyUser } from '../notifications/service';
 import { getVpnProvider } from '../../providers/vpn';
 import { ProviderError, ServiceRef } from '../../providers/vpn/types';
-import { deliveryMessage } from './messages';
+import * as T from '../notifications/templates';
 
 export const refOf = (s: Pick<VpnService, 'inboundId' | 'externalId' | 'uuid' | 'protocol'>): ServiceRef => ({
   inboundId: s.inboundId, email: s.externalId, credential: s.uuid, protocol: s.protocol,
@@ -101,7 +101,8 @@ async function doCreate(order: Order, product: Product, telegramId: bigint) {
     await audit({ actor: 'system', action: 'vpn.provision.success', target: 'VpnService', targetId: s.id, metadata: { orderId: order.id, adopted, inboundId: s.inboundId } }, tx);
     return s;
   });
-  await notifyUser(order.userId, 'vpn_created', deliveryMessage(updated, product, 'created'), {
+  await notifyUser(order.userId, 'vpn_created', T.delivery(updated, product, 'created'), {
+    html: true,
     buttons: deliveryButtons(updated),
     dedupeKey: `delivery:${updated.id}`,
   });
@@ -134,7 +135,7 @@ async function doRenew(taskId: string, order: Order, product: Product) {
     await audit({ actor: 'system', action: 'vpn.renew.success', target: 'VpnService', targetId: s.id, metadata: { orderId: order.id, expiresAt: targetExpiry } }, tx);
     return s;
   });
-  await notifyUser(order.userId, 'vpn_renewed', deliveryMessage(updated, product, 'renewed'), { buttons: deliveryButtons(updated), dedupeKey: `renew:${order.id}` });
+  await notifyUser(order.userId, 'vpn_renewed', T.delivery(updated, product, 'renewed'), { html: true, buttons: deliveryButtons(updated), dedupeKey: `renew:${order.id}` });
 }
 
 async function onFailure(taskId: string, orderId: string, attempts: number, e: unknown) {

@@ -46,7 +46,7 @@ describe('payment verification + auto approval', () => {
     const svc = await prisma.vpnService.findUniqueOrThrow({ where: { orderId: order.id } });
     expect(svc.provisioningStatus).toBe('SUCCESS');
     expect(svc.config).toContain('vless://');
-    expect(ctx.sent.some((m) => m.text.includes('پرداخت شما تأیید شد') && m.text.includes('vless://'))).toBe(true);
+    expect(ctx.sent.some((m) => m.text.includes('سرویس شما آماده است') && m.text.includes('vless://'))).toBe(true);
     const audits = await prisma.auditLog.findMany({ select: { action: true } });
     expect(audits.map((a) => a.action)).toEqual(expect.arrayContaining(['payment.auto_approve', 'vpn.provision.success']));
   });

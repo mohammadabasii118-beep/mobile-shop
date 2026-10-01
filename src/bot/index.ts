@@ -48,6 +48,7 @@ export function createBot(token: string, opts: { fetchFile?: FileFetcher; botInf
     await bot.api.sendMessage(Number(m.chatId), m.text.slice(0, 4000), {
       reply_markup: m.buttons ? toKb(m.buttons) : undefined,
       link_preview_options: { is_disabled: true },
+      ...(m.html ? { parse_mode: 'HTML' as const } : {}),
     });
   });
   return bot;

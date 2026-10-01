@@ -9,6 +9,7 @@ import { logger } from '../../utils/logger';
 import { audit } from '../admin/audit';
 import { getBool, getNumber, getSetting } from '../settings/service';
 import { notifyAdmins, notifyUser } from '../notifications/service';
+import * as T from '../notifications/templates';
 import { OcrEngine, extractReceipt, ReceiptData } from './receipt';
 import { assessRisk, RiskResult } from './risk';
 import { CardToCardProvider } from '../../providers/payments/cardToCard';
@@ -120,7 +121,7 @@ export async function submitReceipt(input: SubmitReceiptInput) {
   if (!claimed) throw new ConflictError('رسید قبلاً ثبت شده است');
 
   await audit({ actor: `user:${input.userId}`, action: 'payment.submit', target: 'Payment', targetId: payment.id, metadata: { tracking: !!tracking, hasImage: !!input.image } });
-  await notifyUser(input.userId, 'payment_submitted', `✅ رسید شما برای سفارش ${order.orderNumber} ثبت شد و در حال بررسی است.`);
+  await notifyUser(input.userId, 'payment_submitted', T.paymentSubmitted(order.orderNumber), { html: true, buttons: [[{ text: '📍 پیگیری سفارش', data: `ov:${order.id}` }], [{ text: '🏠 منوی اصلی', data: 'menu:main' }]] });
   await processPayment(payment.id);
   return prisma.payment.findUniqueOrThrow({ where: { id: payment.id } });
 }
@@ -213,7 +214,7 @@ async function markNeedsReview(paymentId: string, risk: RiskResult, outcome: Ver
     `${risk.level === 'HIGH' ? '🚨 پرداخت پرریسک' : '🔎 پرداخت نیازمند بررسی'}\nسفارش: ${p.order.orderNumber}\nمبلغ: ${formatMoney(p.amount)}\nریسک: ${risk.level} (${risk.score})\nنتیجه تأیید: ${outcome.result}${outcome.reason ? ` — ${outcome.reason}` : ''}`,
     { roles: ['PAYMENT_ADMIN'], buttons: [[{ text: '🔎 مشاهده', data: `ap:v:${paymentId}` }]], dedupeKey: `needs_review:${paymentId}:${outcome.result}` },
   );
-  await notifyUser(p.userId, 'payment_review', `⏳ پرداخت سفارش ${p.order.orderNumber} در صف بررسی است. پس از تأیید، سرویس برای شما ارسال می‌شود.`, { dedupeKey: `user_review:${paymentId}` });
+  await notifyUser(p.userId, 'payment_review', T.paymentReview(p.order.orderNumber), { dedupeKey: `user_review:${paymentId}`, html: true, buttons: [[{ text: '📍 پیگیری سفارش', data: `ov:${p.orderId}` }]] });
 }
 
 /* ------------------------------ state changes ----------------------------- */
@@ -256,7 +257,7 @@ export async function approvePayment(paymentId: string, opts: ApproveOpts): Prom
   }
   if (!order) return { changed: false };
 
-  await notifyUser(order.userId, 'payment_verified', `✅ پرداخت شما برای سفارش ${order.orderNumber} تأیید شد. در حال آماده‌سازی سرویس...`, { dedupeKey: `verified:${paymentId}` });
+  await notifyUser(order.userId, 'payment_verified', T.paymentVerified(order.orderNumber), { dedupeKey: `verified:${paymentId}`, html: true });
   try {
     await runProvisioning(order.id);
   } catch (e: any) {
@@ -281,7 +282,7 @@ export async function rejectPayment(paymentId: string, opts: { actor: string; re
   });
   if (!done) return { changed: false };
   const order = await prisma.order.findUniqueOrThrow({ where: { id: done.orderId } });
-  await notifyUser(done.userId, 'payment_rejected', `❌ پرداخت سفارش ${order.orderNumber} تأیید نشد.\nدلیل: ${opts.reason}\nدر صورت اشتباه بودن با پشتیبانی تماس بگیرید.`);
+  await notifyUser(done.userId, 'payment_rejected', T.paymentRejected(order.orderNumber, opts.reason), { html: true, buttons: [[{ text: '📤 ارسال رسید جدید', data: `rc:${order.id}` }], [{ text: '🎫 پشتیبانی', data: 'menu:support' }]] });
   return { changed: true };
 }
 

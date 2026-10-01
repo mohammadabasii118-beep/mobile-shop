@@ -1,17 +1,18 @@
 import { Composer, InputFile } from 'grammy';
 import QRCode from 'qrcode';
 import { AppError } from '../utils/errors';
-import { formatMoney, toPersianDigits } from '../utils/misc';
 import { listActiveProducts, getProduct } from '../modules/products/service';
 import { cancelOrder, createOrder, getOrderForUser, listUserOrders } from '../modules/orders/service';
-import { startPayment, submitReceipt } from '../modules/payments/service';
+import { isPaymentMethodEnabled, startPayment, submitReceipt } from '../modules/payments/service';
 import { accountSummary } from '../modules/users/service';
 import { getServiceForUser, listUserServices } from '../modules/vpn/service';
-import { serviceSummary } from '../modules/vpn/messages';
 import { createTicket, getTicketForUser, listUserTickets, userReply } from '../modules/support/service';
 import { validateCoupon } from '../modules/coupons/service';
+import { getSetting } from '../modules/settings/service';
+import { serviceCard } from '../modules/notifications/templates';
 import { Button } from '../modules/notifications/service';
-import { Ctx, RULES_TEXT, back, mainMenuRows, show } from './ui';
+import { Ctx, RULES_HTML, back, mainMenuRows, nav, show } from './ui';
+import { CATEGORY_FA, ORDER_STATUS, RULE, SERVICE_STATUS, TICKET_STATUS, b, bar, code, daysLeft, esc, fa, fail, header, i, jdate, jdatetime, money, ok, timeline, wait } from './format';
 import { logger } from '../utils/logger';
 
 export type FileFetcher = (ctx: Ctx, fileId: string) => Promise<Buffer>;
@@ -22,19 +23,21 @@ export const telegramFileFetcher = (token: string): FileFetcher => async (ctx, f
   return Buffer.from(await res.arrayBuffer());
 };
 
-export const orderStatusFa: Record<string, string> = {
-  PENDING_PAYMENT: '⏳ در انتظار پرداخت', PAYMENT_SUBMITTED: '📤 رسید ارسال شد', PAYMENT_REVIEW: '🔎 در حال بررسی',
-  PAID: '✅ پرداخت شد', PROVISIONING: '⚙️ در حال راه‌اندازی', FULFILLED: '🎉 تحویل شد', CANCELLED: '❌ لغو شده', REFUNDED: '↩️ بازگشت وجه',
-};
-const catFa = { VPN_ISSUE: 'مشکل VPN', PAYMENT_ISSUE: 'مشکل پرداخت', RENEWAL: 'تمدید', OTHER: 'سایر' } as const;
+/** Short status used on list buttons. */
+export const orderStatusFa: Record<string, string> = Object.fromEntries(Object.entries(ORDER_STATUS).map(([k, v]) => [k, v.label]));
+const H = { html: true } as const;
 
 export function userHandlers(fetchFile: FileFetcher) {
   const c = new Composer<Ctx>();
 
-  const mainMenu = (ctx: Ctx) => { ctx.session.step = undefined; return show(ctx, '👋 به ربات فروش VPN خوش آمدید.\nیکی از گزینه‌ها را انتخاب کنید:', mainMenuRows()); };
+  const mainMenu = (ctx: Ctx) => {
+    ctx.session.step = undefined;
+    const name = ctx.dbUser.firstName ? ` ${esc(ctx.dbUser.firstName)}` : '';
+    return show(ctx, `👋 سلام${name}، خوش آمدید!\n${RULE}\n🔒 اینترنت آزاد، سریع و امن\n⚡️ تحویل خودکار سرویس بعد از پرداخت\n🎧 پشتیبانی همراه شما\n${RULE}\nیکی از گزینه‌ها را انتخاب کنید 👇`, mainMenuRows(), H);
+  };
 
   c.command('start', mainMenu);
-  c.command('help', (ctx) => show(ctx, 'دستورات: /start /services /orders /account /support', mainMenuRows()));
+  c.command('help', (ctx) => show(ctx, `ℹ️ ${b('راهنما')}\n${RULE}\n/start منوی اصلی\n/services سرویس‌های من\n/orders سفارش‌های من\n/account حساب من\n/support پشتیبانی`, mainMenuRows(), H));
   c.command('support', (ctx) => supportMenu(ctx));
   c.command('services', (ctx) => servicesList(ctx));
   c.command('orders', (ctx) => ordersList(ctx));
@@ -42,164 +45,279 @@ export function userHandlers(fetchFile: FileFetcher) {
 
   async function account(ctx: Ctx) {
     const s = await accountSummary(ctx.dbUser.id);
-    await show(ctx, `👤 حساب من\n\nشناسه: ${s.user.telegramId}\nنام: ${s.user.firstName ?? '-'}\nتعداد سفارش‌ها: ${toPersianDigits(s.orders)}\nسرویس‌های فعال/ثبت‌شده: ${toPersianDigits(s.services)}`, [back()]);
+    const active = (await listUserServices(ctx.dbUser.id)).filter((x) => x.status === 'ACTIVE').length;
+    await show(ctx, [
+      header('👤', 'حساب من'),
+      `🪪 شناسه: ${code(s.user.telegramId)}`,
+      s.user.username ? `🔗 نام کاربری: @${esc(s.user.username)}` : '',
+      `📅 عضویت: ${jdate(s.user.createdAt)}`,
+      RULE,
+      `💳 سفارش‌ها: ${b(fa(s.orders))}`,
+      `🟢 سرویس‌های فعال: ${b(fa(active))} از ${fa(s.services)}`,
+    ].filter(Boolean).join('\n'), [[{ text: '📦 سرویس‌های من', data: 'menu:services' }, { text: '💳 سفارش‌ها', data: 'menu:orders' }], nav()], H);
   }
+
+  /* ----------------------------- buy flow ----------------------------- */
 
   async function buyMenu(ctx: Ctx) {
     const ps = await listActiveProducts();
-    if (!ps.length) return show(ctx, 'در حال حاضر پلنی موجود نیست.', [back()]);
-    await show(ctx, '🛒 یکی از پلن‌ها را انتخاب کنید:', [
-      ...ps.map((p): Button[] => [{ text: `${p.name} — ${formatMoney(p.price, p.currency)}`, data: `buy:${p.id}` }]),
-      back(),
-    ]);
+    if (!ps.length) return show(ctx, `${header('🛒', 'خرید VPN')}\n😕 در حال حاضر پلنی برای فروش موجود نیست.\nلطفاً بعداً سر بزنید.`, [nav()], H);
+    const cards = ps.map((p, n) => [
+      `${fa(n + 1)}️⃣ ${b(p.name)}  ✅ موجود`,
+      `   ⏱ ${fa(p.durationDays)} روز  ·  📊 ${fa(p.trafficGB)} GB`,
+      `   💰 ${b(money(p.price, p.currency))}`,
+      p.description ? `   ${i(p.description)}` : '',
+    ].filter(Boolean).join('\n'));
+    await show(ctx, `${header('🛒', 'خرید VPN', 'یکی از پلن‌ها را انتخاب کنید')}\n\n${cards.join('\n\n')}`, [
+      ...ps.map((p, n): Button[] => [{ text: `🛒 ${fa(n + 1)}) ${p.name} · ${money(p.price, p.currency)}`, data: `buy:${p.id}` }]),
+      nav(),
+    ], H);
   }
 
-  async function servicesList(ctx: Ctx) {
-    const list = await listUserServices(ctx.dbUser.id);
-    if (!list.length) return show(ctx, 'هنوز سرویسی ندارید.', [[{ text: '🛒 خرید VPN', data: 'menu:buy' }], back()]);
-    await show(ctx, '📦 سرویس‌های من', [...list.map((s): Button[] => [{ text: `${s.product.name} · ${s.status === 'ACTIVE' ? '🟢' : '🔴'}`, data: `sv:v:${s.id}` }]), back()]);
-  }
-
-  async function ordersList(ctx: Ctx) {
-    const list = await listUserOrders(ctx.dbUser.id);
-    if (!list.length) return show(ctx, 'هنوز سفارشی ثبت نکرده‌اید.', [back()]);
-    await show(ctx, '💳 سفارش‌های من', [...list.map((o): Button[] => [{ text: `${o.orderNumber} · ${orderStatusFa[o.status]}`, data: `ov:${o.id}` }]), back()]);
-  }
-
-  async function supportMenu(ctx: Ctx) {
-    const ts = await listUserTickets(ctx.dbUser.id);
-    await show(ctx, '🎫 پشتیبانی', [
-      [{ text: '➕ تیکت جدید', data: 'tk:new' }],
-      ...ts.map((t): Button[] => [{ text: `#${t.id.slice(-6)} ${t.subject.slice(0, 20)} · ${t.status}`, data: `tk:v:${t.id}` }]),
-      back(),
-    ]);
-  }
-
-  function orderActions(o: { id: string; status: string }): Button[][] {
-    const rows: Button[][] = [];
-    if (o.status === 'PENDING_PAYMENT') rows.push([{ text: '📤 ارسال رسید', data: `rc:${o.id}` }], [{ text: '❌ لغو سفارش', data: `oc:${o.id}` }]);
-    rows.push(back('menu:orders'));
-    return rows;
+  async function orderSummary(ctx: Ctx, productId: string) {
+    const p = await getProduct(productId);
+    if (!p.isActive) return show(ctx, fail('این پلن در دسترس نیست', 'لطفاً پلن دیگری انتخاب کنید.'), [back('menu:buy')], H);
+    let discount = 0;
+    let couponNote = '';
+    if (ctx.session.coupon) {
+      try {
+        discount = (await validateCoupon(ctx.session.coupon, ctx.dbUser.id, p.price)).discount;
+        couponNote = `🎁 کد تخفیف ${code(ctx.session.coupon)} اعمال می‌شود`;
+      } catch (e) {
+        couponNote = `⚠️ ${esc(e instanceof AppError ? e.message : 'کد تخفیف معتبر نیست')} — اعمال نشد`;
+        ctx.session.coupon = undefined;
+      }
+    }
+    const methods: Button[][] = (await isPaymentMethodEnabled('CARD_TO_CARD')) ? [[{ text: '💳 پرداخت کارت‌به‌کارت', data: `bo:${p.id}` }]] : [];
+    const text = [
+      header('🧾', 'خلاصه سفارش', 'مرحله ۱ از ۳ · بررسی'),
+      `📦 محصول: ${b(p.name)}`,
+      `⏱ مدت: ${fa(p.durationDays)} روز`,
+      `📊 حجم: ${fa(p.trafficGB)} GB`,
+      RULE,
+      `💰 قیمت اصلی: ${money(p.price, p.currency)}`,
+      `🎁 تخفیف: ${discount ? money(discount, p.currency) : '—'}`,
+      `✅ مبلغ نهایی: ${b(money(p.price - discount, p.currency))}`,
+      couponNote ? `\n${couponNote}` : '',
+      '',
+      methods.length ? `${b('روش پرداخت را انتخاب کنید')} 👇` : fail('در حال حاضر روش پرداختی فعال نیست', 'لطفاً بعداً تلاش کنید یا با پشتیبانی در ارتباط باشید.'),
+    ].join('\n');
+    await show(ctx, text, [...methods, [{ text: '🎁 ثبت کد تخفیف', data: `uc:${p.id}` }], back('menu:buy')], H);
   }
 
   async function showPaymentInstructions(ctx: Ctx, orderId: string) {
     const { instructions } = await startPayment(ctx.dbUser.id, orderId);
     const o = await getOrderForUser(ctx.dbUser.id, orderId);
-    await show(ctx, `🧾 سفارش ${o.orderNumber}\nپلن: ${o.product.name}\n\n${instructions.text}\n\nپس از پرداخت، دکمه «ارسال رسید» را بزنید.\n⚠️ مبلغ باید دقیقاً برابر مبلغ بالا باشد.`, orderActions(o));
+    const extra = (await getSetting('card.instructions')).trim();
+    const L = (label: string) => instructions.lines.find((l) => l.label === label)?.value;
+    const text = [
+      header('💳', 'پرداخت کارت‌به‌کارت', `مرحله ۲ از ۳ · سفارش ${o.orderNumber}`),
+      `📦 ${esc(o.product.name)}`,
+      o.discountAmount ? `🎁 تخفیف: ${money(o.discountAmount, o.currency)}` : '',
+      `💰 مبلغ قابل پرداخت: ${b(money(o.finalAmount, o.currency))}`,
+      RULE,
+      `💳 شماره کارت (برای کپی لمس کنید):\n${code(L('شماره کارت') ?? '')}`,
+      L('به نام') ? `👤 به نام: ${b(L('به نام'))}` : '',
+      L('بانک') ? `🏦 بانک: ${esc(L('بانک'))}` : '',
+      extra ? `\nℹ️ ${esc(extra)}` : '',
+      RULE,
+      `⚠️ مبلغ را ${b('دقیقاً')} برابر عدد بالا واریز کنید.`,
+      `بعد از پرداخت، دکمه «📤 ارسال رسید» را بزنید.`,
+    ].filter(Boolean).join('\n');
+    await show(ctx, text, orderActions(o), H);
   }
+
+  function orderActions(o: { id: string; status: string }): Button[][] {
+    const rows: Button[][] = [];
+    if (o.status === 'PENDING_PAYMENT') rows.push([{ text: '📤 ارسال رسید', data: `rc:${o.id}` }], [{ text: '❌ لغو سفارش', data: `oc:${o.id}` }]);
+    else if (o.status !== 'CANCELLED' && o.status !== 'REFUNDED') rows.push([{ text: '🔄 به‌روزرسانی وضعیت', data: `ov:${o.id}` }]);
+    if (o.status === 'FULFILLED') rows.push([{ text: '📦 سرویس‌های من', data: 'menu:services' }]);
+    rows.push(nav('menu:orders'));
+    return rows;
+  }
+
+  /* --------------------------- orders / services --------------------------- */
+
+  async function ordersList(ctx: Ctx) {
+    const list = await listUserOrders(ctx.dbUser.id);
+    if (!list.length) return show(ctx, `${header('💳', 'سفارش‌های من')}\n📭 هنوز سفارشی ثبت نکرده‌اید.`, [[{ text: '🛒 خرید VPN', data: 'menu:buy' }], nav()], H);
+    await show(ctx, `${header('💳', 'سفارش‌های من', 'برای مشاهده جزئیات روی سفارش بزنید')}\n\n` + list.map((o) => `${orderStatusFa[o.status].split(' ')[0]} ${code(o.orderNumber)} · ${esc(o.product.name)}\n    ${money(o.finalAmount, o.currency)} · ${jdate(o.createdAt)}`).join('\n\n'), [
+      ...list.map((o): Button[] => [{ text: `${orderStatusFa[o.status].split(' ')[0]} ${o.orderNumber}`, data: `ov:${o.id}` }]),
+      nav(),
+    ], H);
+  }
+
+  async function orderDetail(ctx: Ctx, id: string) {
+    const o = await getOrderForUser(ctx.dbUser.id, id);
+    if (o.status === 'PENDING_PAYMENT') return await showPaymentInstructions(ctx, o.id);
+    const st = ORDER_STATUS[o.status];
+    await show(ctx, [
+      header('🧾', `سفارش ${o.orderNumber}`),
+      timeline(o.status),
+      '',
+      `${b(st.label)}`,
+      st.hint ? i(st.hint) : '',
+      RULE,
+      `📦 ${esc(o.product.name)}`,
+      `💰 مبلغ: ${money(o.finalAmount, o.currency)}${o.discountAmount ? ` (تخفیف ${money(o.discountAmount, o.currency)})` : ''}`,
+      `📅 ثبت: ${jdatetime(o.createdAt)}`,
+    ].filter((x) => x !== '').join('\n'), orderActions(o), H);
+  }
+
+  async function servicesList(ctx: Ctx) {
+    const list = await listUserServices(ctx.dbUser.id);
+    if (!list.length) return show(ctx, `${header('📦', 'سرویس‌های من')}\n📭 هنوز سرویسی ندارید.\nبا خرید اولین پلن، سرویس شما همین‌جا نمایش داده می‌شود.`, [[{ text: '🛒 خرید VPN', data: 'menu:buy' }], nav()], H);
+    const cards = list.map((s) => {
+      const left = daysLeft(s.expiresAt);
+      const line2 = s.status === 'ACTIVE' ? `${SERVICE_STATUS.ACTIVE} · ${fa(Math.max(left, 0))} روز مانده` : SERVICE_STATUS[s.status];
+      const usage = s.lastSyncAt && s.trafficLimit > 0n ? `\n   ${bar(s.trafficUsed, s.trafficLimit)}` : '';
+      return `${b(s.product.name)}\n   ${line2} · 📅 ${jdate(s.expiresAt)}${usage}`;
+    });
+    await show(ctx, `${header('📦', 'سرویس‌های من', `${fa(list.length)} سرویس`)}\n\n${cards.join('\n\n')}`, [
+      ...list.map((s): Button[] => [{ text: `${s.status === 'ACTIVE' ? '🟢' : s.status === 'EXPIRED' ? '🔴' : '⏸'} ${s.product.name}`, data: `sv:v:${s.id}` }]),
+      nav(),
+    ], H);
+  }
+
+  async function supportMenu(ctx: Ctx) {
+    const ts = await listUserTickets(ctx.dbUser.id);
+    await show(ctx, `${header('🎫', 'پشتیبانی', 'ما کنار شما هستیم')}\n${ts.length ? `\n${b('تیکت‌های شما')}\n` + ts.map((t) => `${TICKET_STATUS[t.status].split(' ')[0]} ${code('#' + t.id.slice(-6))} ${esc(t.subject.slice(0, 28))}`).join('\n') : '\n📭 هنوز تیکتی ندارید.'}`, [
+      [{ text: '➕ تیکت جدید', data: 'tk:new' }],
+      ...ts.map((t): Button[] => [{ text: `${TICKET_STATUS[t.status].split(' ')[0]} #${t.id.slice(-6)} ${t.subject.slice(0, 22)}`, data: `tk:v:${t.id}` }]),
+      nav(),
+    ], H);
+  }
+
+  /* ------------------------------- callbacks ------------------------------- */
 
   c.on('callback_query:data', async (ctx, next) => {
     const d = ctx.callbackQuery.data;
-    const [ns, a, b] = d.split(':');
+    const [ns, a, b2] = d.split(':');
     try {
       if (ns === 'menu') {
         ctx.session.step = undefined;
         switch (a) {
-          case 'main': return mainMenu(ctx);
-          case 'buy': return buyMenu(ctx);
-          case 'services': return servicesList(ctx);
-          case 'orders': return ordersList(ctx);
-          case 'account': return account(ctx);
-          case 'support': return supportMenu(ctx);
-          case 'rules': return show(ctx, RULES_TEXT, [back()]);
+          case 'main': return await mainMenu(ctx);
+          case 'buy': return await buyMenu(ctx);
+          case 'services': return await servicesList(ctx);
+          case 'orders': return await ordersList(ctx);
+          case 'account': return await account(ctx);
+          case 'support': return await supportMenu(ctx);
+          case 'rules': return show(ctx, RULES_HTML, [nav()], H);
           case 'coupon':
             ctx.session.step = 'coupon';
-            return show(ctx, '🎁 کد تخفیف را ارسال کنید (روی سفارش بعدی شما اعمال می‌شود):', [back()]);
+            return show(ctx, `${header('🎁', 'کد تخفیف')}\nکد تخفیف خود را ارسال کنید.\n${i('کد روی سفارش بعدی شما اعمال می‌شود.')}`, [nav()], H);
         }
       }
-      if (ns === 'buy') {
-        const p = await getProduct(a);
-        if (!p.isActive) return show(ctx, 'این پلن در دسترس نیست.', [back('menu:buy')]);
-        const cp = ctx.session.coupon ? `\n🎁 کد تخفیف: ${ctx.session.coupon}` : '';
-        return show(ctx, `📦 ${p.name}\n${p.description ?? ''}\n\n📊 حجم: ${toPersianDigits(p.trafficGB)} GB\n📅 مدت: ${toPersianDigits(p.durationDays)} روز\n💰 قیمت: ${formatMoney(p.price, p.currency)}${cp}`, [
-          [{ text: '💳 پرداخت کارت‌به‌کارت', data: `bo:${p.id}` }], back('menu:buy'),
-        ]);
+      if (ns === 'buy') return await orderSummary(ctx, a);
+      if (ns === 'uc') { // coupon entry from the order summary, returns to it afterwards
+        ctx.session.step = 'coupon'; ctx.session.data = { returnTo: a };
+        return show(ctx, `${header('🎁', 'کد تخفیف')}\nکد تخفیف را ارسال کنید:`, [back(`buy:${a}`)], H);
       }
       if (ns === 'bo') {
         const { order } = await createOrder({ userId: ctx.dbUser.id, productId: a, paymentMethod: 'CARD_TO_CARD', couponCode: ctx.session.coupon }).catch(async (e) => {
-          if (ctx.session.coupon && e instanceof AppError) { ctx.session.coupon = undefined; }
+          if (ctx.session.coupon && e instanceof AppError) ctx.session.coupon = undefined;
           throw e;
         });
         ctx.session.coupon = undefined;
-        return showPaymentInstructions(ctx, order.id);
+        return await showPaymentInstructions(ctx, order.id);
       }
-      if (ns === 'ov') {
-        const o = await getOrderForUser(ctx.dbUser.id, a);
-        const lines = [`🧾 ${o.orderNumber}`, `پلن: ${o.product.name}`, `مبلغ: ${formatMoney(o.finalAmount, o.currency)}`, o.discountAmount ? `تخفیف: ${formatMoney(o.discountAmount, o.currency)}` : '', `وضعیت: ${orderStatusFa[o.status]}`].filter(Boolean);
-        if (o.status === 'PENDING_PAYMENT') return showPaymentInstructions(ctx, o.id);
-        return show(ctx, lines.join('\n'), orderActions(o));
-      }
+      if (ns === 'ov') return await orderDetail(ctx, a);
       if (ns === 'oc') {
+        const o = await getOrderForUser(ctx.dbUser.id, a);
+        return show(ctx, `⚠️ ${b('لغو سفارش')}\n${RULE}\nسفارش ${code(o.orderNumber)} لغو شود؟\n${i('این کار قابل بازگشت نیست.')}`, [[{ text: '✅ بله، لغو شود', data: `oc2:${a}` }, { text: '↩️ خیر، بازگشت', data: `ov:${a}` }]], H);
+      }
+      if (ns === 'oc2') {
         await cancelOrder(ctx.dbUser.id, a);
-        return show(ctx, '✅ سفارش لغو شد.', [back('menu:orders')]);
+        return show(ctx, `${ok('سفارش لغو شد')}\nهر زمان خواستید می‌توانید دوباره خرید کنید.`, [[{ text: '🛒 خرید VPN', data: 'menu:buy' }], nav('menu:orders')], H);
       }
       if (ns === 'rc') {
         const o = await getOrderForUser(ctx.dbUser.id, a);
-        if (o.status !== 'PENDING_PAYMENT') return show(ctx, 'برای این سفارش رسیدی قابل ثبت نیست.', [back('menu:orders')]);
+        if (o.status !== 'PENDING_PAYMENT') return show(ctx, `${fail('برای این سفارش رسیدی قابل ثبت نیست', 'وضعیت سفارش را بررسی کنید.')}`, [[{ text: '📍 وضعیت سفارش', data: `ov:${a}` }], nav('menu:orders')], H);
         ctx.session.step = 'receipt';
         ctx.session.data = { orderId: a };
-        return show(ctx, '📤 تصویر رسید را ارسال کنید (ترجیحاً با کد پیگیری در کپشن)،\nیا فقط کد پیگیری را به‌صورت متن بفرستید.', [back(`ov:${a}`)]);
+        return show(ctx, [header('📤', 'ارسال رسید', 'مرحله ۳ از ۳ · تأیید'), '📸 عکس رسید را ارسال کنید', `${i('بهتر است کد پیگیری را در کپشن بنویسید.')}`, '', 'یا فقط ✍️ کد پیگیری را به‌صورت متن بفرستید.'].join('\n'), [back(`ov:${a}`)], H);
       }
       if (ns === 'rs') { // submit pending photo without tracking code
         const { orderId, fileId } = ctx.session.data ?? {};
-        if (ctx.session.step !== 'receipt_track' || orderId !== a) return;
-        return doSubmit(ctx, orderId, { fileId });
+        if (ctx.session.step !== 'receipt_track' || orderId !== a) return show(ctx, `${wait('این دکمه منقضی شده است')}`, [nav()], H);
+        return await doSubmit(ctx, orderId, { fileId });
       }
-      if (ns === 'sv') {
-        if (a === 'v') {
-          const s = await getServiceForUser(ctx.dbUser.id, b);
-          return show(ctx, serviceSummary(s), [
-            [{ text: '🔗 لینک', data: `sv:link:${s.id}` }, { text: '📱 QR', data: `sv:qr:${s.id}` }],
-            [{ text: '📋 Config', data: `sv:cfg:${s.id}` }, { text: '🔄 تمدید', data: `sv:renew:${s.id}` }],
-            back('menu:services'),
-          ]);
-        }
-        const s = await getServiceForUser(ctx.dbUser.id, b); // ownership enforced for every action
-        if (a === 'link' || a === 'cfg') {
-          if (s.subscriptionUrl && a === 'link') return ctx.reply(`📡 لینک اشتراک:\n${s.subscriptionUrl}`);
-          if (!s.config) return ctx.reply('کانفیگ هنوز آماده نیست.');
-          return ctx.reply(a === 'link' ? `🔗 لینک اتصال:\n${s.config}` : `📋 کانفیگ:\n${s.config}`);
-        }
-        if (a === 'qr') {
-          if (!s.config) return ctx.reply('کانفیگ هنوز آماده نیست.');
-          const png = await QRCode.toBuffer(s.config, { width: 512, margin: 2 });
-          return ctx.replyWithPhoto(new InputFile(png, 'qr.png'), { caption: `📱 QR سرویس ${s.product.name}` });
-        }
-        if (a === 'renew') {
-          const ps = (await listActiveProducts()).filter((p) => p.xuiInboundId === s.inboundId && p.xuiProviderId === s.provider);
-          if (!ps.length) return show(ctx, 'پلن تمدید مناسبی موجود نیست.', [back(`sv:v:${s.id}`)]);
-          return show(ctx, '🔄 پلن تمدید را انتخاب کنید:', [...ps.map((p): Button[] => [{ text: `${p.name} — ${formatMoney(p.price, p.currency)}`, data: `rn:${s.id}:${p.id}` }]), back(`sv:v:${s.id}`)]);
-        }
-      }
+      if (ns === 'sv') return await serviceCallbacks(ctx, a, b2);
       if (ns === 'rn') {
-        const { order } = await createOrder({ userId: ctx.dbUser.id, productId: b, paymentMethod: 'CARD_TO_CARD', renewalOfServiceId: a, couponCode: ctx.session.coupon });
+        const { order } = await createOrder({ userId: ctx.dbUser.id, productId: b2, paymentMethod: 'CARD_TO_CARD', renewalOfServiceId: a, couponCode: ctx.session.coupon });
         ctx.session.coupon = undefined;
-        return showPaymentInstructions(ctx, order.id);
+        return await showPaymentInstructions(ctx, order.id);
       }
-      if (ns === 'tk') {
-        if (a === 'new') return show(ctx, 'موضوع تیکت:', [[{ text: 'مشکل VPN', data: 'tk:c:VPN_ISSUE' }, { text: 'مشکل پرداخت', data: 'tk:c:PAYMENT_ISSUE' }], [{ text: 'تمدید', data: 'tk:c:RENEWAL' }, { text: 'سایر', data: 'tk:c:OTHER' }], back('menu:support')]);
-        if (a === 'c') { ctx.session.step = 'ticket'; ctx.session.data = { category: b }; return show(ctx, `📝 پیام خود را بنویسید (دسته: ${catFa[b as keyof typeof catFa] ?? 'سایر'}). خط اول به‌عنوان موضوع ثبت می‌شود.`, [back('menu:support')]); }
-        if (a === 'v') {
-          const t = await getTicketForUser(ctx.dbUser.id, b);
-          const txt = t.messages.map((m) => `${m.fromAdmin ? '🧑‍💼 پشتیبان' : '👤 شما'}: ${m.text}`).join('\n\n');
-          return show(ctx, `🎫 #${t.id.slice(-6)} · ${t.subject}\nوضعیت: ${t.status}\n\n${txt}`, [t.status !== 'CLOSED' ? [{ text: '💬 پاسخ', data: `tk:r:${t.id}` }] : [], back('menu:support')].filter((r) => r.length));
-        }
-        if (a === 'r') { await getTicketForUser(ctx.dbUser.id, b); ctx.session.step = 'ticket_reply'; ctx.session.data = { ticketId: b }; return show(ctx, 'پاسخ خود را بنویسید:', [back(`tk:v:${b}`)]); }
-      }
+      if (ns === 'tk') return await ticketCallbacks(ctx, a, b2);
     } catch (e) {
       return handleError(ctx, e);
     }
     return next();
   });
 
+  async function serviceCallbacks(ctx: Ctx, a: string, id: string) {
+    const s = await getServiceForUser(ctx.dbUser.id, id); // ownership enforced for every action
+    if (a === 'v') {
+      const rows: Button[][] = [];
+      let note = '';
+      if (s.status === 'ACTIVE') {
+        rows.push([{ text: '🔗 لینک', data: `sv:link:${s.id}` }, { text: '📱 QR', data: `sv:qr:${s.id}` }], [{ text: '⚙️ Config', data: `sv:cfg:${s.id}` }, { text: '🔄 تمدید', data: `sv:renew:${s.id}` }]);
+      } else if (s.status === 'EXPIRED') {
+        note = `\n${RULE}\n⛔ ${b('این سرویس منقضی شده است')}\nبا تمدید، همان لینک قبلی دوباره فعال می‌شود.`;
+        rows.push([{ text: '🔄 تمدید سرویس', data: `sv:renew:${s.id}` }]);
+      } else if (s.status === 'SUSPENDED') {
+        note = `\n${RULE}\n⏸ ${b('این سرویس موقتاً معلق شده است')}\nبرای اطلاع از دلیل و رفع مشکل با پشتیبانی در ارتباط باشید.`;
+        rows.push([{ text: '🎫 تماس با پشتیبانی', data: 'menu:support' }]);
+      } else note = `\n${RULE}\n⚫ این سرویس لغو شده است.`;
+      rows.push(nav('menu:services'));
+      return show(ctx, serviceCard(s) + note, rows, H);
+    }
+    if (a === 'link' || a === 'cfg') {
+      if (s.subscriptionUrl && a === 'link') return ctx.reply(`📡 ${b('لینک اشتراک')}\n${code(s.subscriptionUrl)}\n${i('برای کپی روی لینک بزنید.')}`, { parse_mode: 'HTML' });
+      if (!s.config) return ctx.reply('⏳ کانفیگ هنوز آماده نیست؛ کمی بعد دوباره تلاش کنید.');
+      return ctx.reply(`${a === 'link' ? '🔗' : '⚙️'} ${b(a === 'link' ? 'لینک اتصال' : 'کانفیگ')}\n${code(s.config)}\n${i('برای کپی روی متن بزنید.')}`, { parse_mode: 'HTML' });
+    }
+    if (a === 'qr') {
+      if (!s.config) return ctx.reply('⏳ کانفیگ هنوز آماده نیست؛ کمی بعد دوباره تلاش کنید.');
+      const png = await QRCode.toBuffer(s.config, { width: 512, margin: 2 });
+      return ctx.replyWithPhoto(new InputFile(png, 'qr.png'), { caption: `📱 QR سرویس ${s.product.name}\nبا برنامه V2Ray/Hiddify اسکن کنید.` });
+    }
+    if (a === 'renew') {
+      const ps = (await listActiveProducts()).filter((p) => p.xuiInboundId === s.inboundId && p.xuiProviderId === s.provider);
+      if (!ps.length) return show(ctx, `${fail('پلن تمدید مناسبی موجود نیست', 'لطفاً با پشتیبانی در ارتباط باشید.')}`, [[{ text: '🎫 پشتیبانی', data: 'menu:support' }], back(`sv:v:${s.id}`)], H);
+      return show(ctx, `${header('🔄', 'تمدید سرویس', s.product.name)}\nپلن تمدید را انتخاب کنید:\n${i('زمان و حجم به سرویس فعلی اضافه می‌شود.')}`, [...ps.map((p): Button[] => [{ text: `${p.name} · ${money(p.price, p.currency)}`, data: `rn:${s.id}:${p.id}` }]), back(`sv:v:${s.id}`)], H);
+    }
+    return undefined;
+  }
+
+  async function ticketCallbacks(ctx: Ctx, a: string, id: string) {
+    if (a === 'new') return show(ctx, `${header('➕', 'تیکت جدید', 'موضوع را انتخاب کنید')}`, [[{ text: '🛠 مشکل VPN', data: 'tk:c:VPN_ISSUE' }, { text: '💳 مشکل پرداخت', data: 'tk:c:PAYMENT_ISSUE' }], [{ text: '🔄 تمدید', data: 'tk:c:RENEWAL' }, { text: '💬 سایر', data: 'tk:c:OTHER' }], back('menu:support')], H);
+    if (a === 'c') {
+      ctx.session.step = 'ticket'; ctx.session.data = { category: id };
+      return show(ctx, `${header('📝', 'پیام شما', CATEGORY_FA[id] ?? 'سایر')}\nمشکل را کوتاه و واضح بنویسید.\n${i('خط اول به‌عنوان عنوان تیکت ثبت می‌شود.')}`, [back('menu:support')], H);
+    }
+    if (a === 'v') {
+      const t = await getTicketForUser(ctx.dbUser.id, id);
+      const chat = t.messages.map((m) => `${m.fromAdmin ? '🧑‍💼 پشتیبان' : '👤 شما'} · ${i(jdatetime(m.createdAt))}\n${esc(m.text)}`).join('\n\n');
+      return show(ctx, `${header('🎫', `تیکت #${t.id.slice(-6)}`, `${esc(CATEGORY_FA[t.category])} · ${TICKET_STATUS[t.status]}`)}\n\n${chat}`, [...(t.status !== 'CLOSED' ? [[{ text: '💬 پاسخ', data: `tk:r:${t.id}` }]] : []), nav('menu:support')], H);
+    }
+    if (a === 'r') {
+      await getTicketForUser(ctx.dbUser.id, id);
+      ctx.session.step = 'ticket_reply'; ctx.session.data = { ticketId: id };
+      return show(ctx, `${header('💬', 'پاسخ به تیکت')}\nپاسخ خود را بنویسید:`, [back(`tk:v:${id}`)], H);
+    }
+    return undefined;
+  }
+
   async function doSubmit(ctx: Ctx, orderId: string, input: { fileId?: string; caption?: string; trackingCode?: string }) {
     try {
       const image = input.fileId ? await fetchFile(ctx, input.fileId) : undefined;
       await submitReceipt({ userId: ctx.dbUser.id, orderId, fileId: input.fileId, image, caption: input.caption, trackingCode: input.trackingCode });
       ctx.session.step = undefined; ctx.session.data = undefined;
-      await show(ctx, 'منوی اصلی', mainMenuRows());
+      // the status card (+ delivery when verified) is sent by the notification service
     } catch (e) {
-      await handleError(ctx, e);
+      await handleError(ctx, e, `ov:${orderId}`);
     }
   }
 
@@ -208,11 +326,12 @@ export function userHandlers(fetchFile: FileFetcher) {
     const orderId = ctx.session.data?.orderId as string;
     const photo = ctx.message.photo.at(-1)!;
     const caption = ctx.message.caption;
-    if (caption) return doSubmit(ctx, orderId, { fileId: photo.file_id, caption, trackingCode: caption });
+    if (caption) return await doSubmit(ctx, orderId, { fileId: photo.file_id, caption, trackingCode: caption });
     ctx.session.step = 'receipt_track';
     ctx.session.data = { orderId, fileId: photo.file_id };
-    await ctx.reply('📎 تصویر دریافت شد. کد پیگیری را به‌صورت متن بفرستید (بدون کد پیگیری بررسی طولانی‌تر می‌شود).', {
-      reply_markup: { inline_keyboard: [[{ text: '⏭ ارسال بدون کد پیگیری', callback_data: `rs:${orderId}` }]] },
+    await ctx.reply(`📎 ${b('تصویر دریافت شد')}\n${RULE}\n✍️ حالا ${b('کد پیگیری')} را به‌صورت متن بفرستید.\n${i('با کد پیگیری، تأیید سریع‌تر انجام می‌شود.')}`, {
+      parse_mode: 'HTML',
+      reply_markup: { inline_keyboard: [[{ text: '⏭ ارسال بدون کد پیگیری', callback_data: `rs:${orderId}` }], [{ text: '⬅️ بازگشت', callback_data: `ov:${orderId}` }]] },
     });
   });
 
@@ -221,39 +340,52 @@ export function userHandlers(fetchFile: FileFetcher) {
     if (text.startsWith('/')) return next();
     const step = ctx.session.step;
     try {
-      if (step === 'receipt') return doSubmit(ctx, ctx.session.data!.orderId, { trackingCode: text, caption: text });
-      if (step === 'receipt_track') return doSubmit(ctx, ctx.session.data!.orderId, { fileId: ctx.session.data!.fileId, trackingCode: text, caption: text });
+      if (step === 'receipt') return await doSubmit(ctx, ctx.session.data!.orderId, { trackingCode: text, caption: text });
+      if (step === 'receipt_track') return await doSubmit(ctx, ctx.session.data!.orderId, { fileId: ctx.session.data!.fileId, trackingCode: text, caption: text });
       if (step === 'coupon') {
-        const v = await validateCoupon(text, ctx.dbUser.id, 1_000_000).catch((e) => { throw e; });
-        ctx.session.coupon = v.coupon.code; ctx.session.step = undefined;
-        return show(ctx, `✅ کد «${v.coupon.code}» ثبت شد و روی سفارش بعدی اعمال می‌شود.`, mainMenuRows());
+        const v = await validateCoupon(text, ctx.dbUser.id, 1_000_000);
+        const returnTo = ctx.session.data?.returnTo as string | undefined;
+        ctx.session.coupon = v.coupon.code; ctx.session.step = undefined; ctx.session.data = undefined;
+        await ctx.reply(`${ok('کد تخفیف ثبت شد')}\n🎁 ${code(v.coupon.code)} روی سفارش بعدی اعمال می‌شود.`, { parse_mode: 'HTML' });
+        return returnTo ? orderSummary(ctx, returnTo) : show(ctx, 'ادامه دهید 👇', mainMenuRows());
       }
       if (step === 'ticket') {
         const [first] = text.split('\n');
         const t = await createTicket(ctx.dbUser.id, ctx.session.data!.category, first, text);
         ctx.session.step = undefined;
-        return show(ctx, `✅ تیکت #${t.id.slice(-6)} ثبت شد.`, [back('menu:support')]);
+        return show(ctx, `${ok('تیکت شما ثبت شد')}\n🎫 ${code('#' + t.id.slice(-6))}\nپاسخ پشتیبانی همین‌جا برای شما ارسال می‌شود.`, [[{ text: '🎫 تیکت‌های من', data: 'menu:support' }], nav()], H);
       }
       if (step === 'ticket_reply') {
         await userReply(ctx.dbUser.id, ctx.session.data!.ticketId, text);
         ctx.session.step = undefined;
-        return show(ctx, '✅ پاسخ شما ثبت شد.', [back('menu:support')]);
+        return show(ctx, `${ok('پاسخ شما ثبت شد')}`, [nav('menu:support')], H);
       }
     } catch (e) {
-      return handleError(ctx, e);
+      return handleError(ctx, e, step === 'coupon' ? 'menu:main' : 'menu:main');
     }
     return next();
+  });
+
+  // Fallbacks: the user is never left in a silent dead end.
+  c.on('callback_query:data', (ctx) => show(ctx, `${wait('این دکمه دیگر معتبر نیست', 'منوی اصلی را باز می‌کنیم.')}`, mainMenuRows(), H));
+  c.on('message', async (ctx) => {
+    if (ctx.session.step === 'receipt' || ctx.session.step === 'receipt_track') {
+      return void (await ctx.reply('📸 لطفاً «عکس رسید» یا «کد پیگیری» را ارسال کنید.'));
+    }
+    await show(ctx, `🤔 متوجه نشدم.\nلطفاً از منوی زیر استفاده کنید 👇`, mainMenuRows());
   });
 
   return c;
 }
 
-export async function handleError(ctx: Ctx, e: unknown) {
+export async function handleError(ctx: Ctx, e: unknown, backTo = 'menu:main') {
+  const rows = [nav(backTo)];
+  const send = (t: string) => ctx.reply(t, { parse_mode: 'HTML', reply_markup: { inline_keyboard: rows.map((r) => r.map((b) => ({ text: b.text, callback_data: b.data! }))) } }).catch(() => undefined);
   if (e instanceof AppError) {
-    const msg = e.code === 'FORBIDDEN' ? '⛔ دسترسی غیرمجاز.' : e.code === 'NOT_FOUND' ? 'موردی یافت نشد.' : e.message;
-    await ctx.reply(msg).catch(() => undefined);
-    return;
+    if (e.code === 'FORBIDDEN') return void (await send(fail('دسترسی غیرمجاز')));
+    if (e.code === 'NOT_FOUND') return void (await send(fail('موردی یافت نشد')));
+    return void (await send(fail(e.message)));
   }
   logger.error({ err: String((e as any)?.message ?? e) }, 'bot handler error');
-  await ctx.reply('⚠️ خطای داخلی. لطفاً دوباره تلاش کنید.').catch(() => undefined);
+  await send(fail('خطای موقت', 'لطفاً چند لحظه بعد دوباره تلاش کنید.'));
 }

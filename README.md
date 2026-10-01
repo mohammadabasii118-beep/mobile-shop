@@ -50,6 +50,14 @@ Adapter از API پنل زیر استفاده می‌کند: `POST /login`، `GE
 
 ⚠️ **راستی‌آزمایی روی پنل شما الزامی است** (بخش Known limitations): در `/admin → ⚙️ تنظیمات → 🔌 تست اتصال X-UI` و سپس یک خرید آزمایشی روی یک inbound تست.
 
+## پنل مدیریت وب (`/admin`)
+داشبورد SaaS فارسی/RTL با تم روشن و تیره، ریسپانسیو (دسکتاپ/تبلت/موبایل)، روی همان serviceهای ربات (بدون business logic جدا).
+- **ورود:** در ربات (به‌عنوان ادمین) `/panel` را بفرستید → لینک **یک‌بارمصرف ۵ دقیقه‌ای** → نشست ۱۲ ساعته (کوکی HttpOnly + SameSite=Strict، تأیید مجدد ادمین بودن در هر درخواست، هدر CSRF برای تغییرات).
+- بخش‌ها: Dashboard، Users، Products، Orders، Payments (drawer: رسید خصوصی، OCR، ریسک، تأیید بانکی، Audit)، VPN Services (Sync/Retry/Suspend/Resume/Renew/Delete با تأیید تایپی)، Coupons، Support (چت دوپنلی)، Notifications، Settings، Audit Logs.
+- فقط داده‌ی واقعی دیتابیس نمایش داده می‌شود؛ بدون داده ⇒ Empty State. لینک/کانفیگ VPN در پنل نمایش داده نمی‌شود.
+- فایل‌های UI در `public/admin/` (بدون build، بدون CDN/فونت خارجی). CSP سخت‌گیرانه (`script-src 'self'`).
+- دسترسی هر بخش بر اساس نقش ادمین (RBAC) در سرور اعمال می‌شود. برای HTTPS پشت reverse proxy: `APP_URL=https://…` و در صورت نیاز `TRUST_PROXY=true`.
+
 ## چک‌لیست راه‌اندازی واقعی
 ```bash
 npm run preflight                     # ENV، دیتابیس/مایگریشن، Telegram getMe، ورود به X-UI

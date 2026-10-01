@@ -17,6 +17,7 @@ import QRCode from 'qrcode';
 
 export interface SimMessage { id: number; chat: number; text?: string; buttons?: { text: string; data?: string }[][]; image?: string; at: number }
 
+const plain = (t: string) => t.replace(/<\/?(b|i|code)>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 export async function createEngine(opts: { editInPlace?: boolean } = {}) {
   const panel = await new FakeXui().start();
   setVpnProvider(new XuiVpnProvider({
@@ -47,9 +48,10 @@ export async function createEngine(opts: { editInPlace?: boolean } = {}) {
       const buttons = payload.reply_markup?.inline_keyboard?.map((r: any[]) => r.map((b) => ({ text: b.text, data: b.callback_data })));
       if (method.startsWith('edit') && opts.editInPlace) {
         const last = [...log].reverse().find((m) => m.chat === Number(payload.chat_id) && m.buttons !== undefined);
-        if (last && payload.text) { last.text = payload.text; last.buttons = buttons; return { ok: true, result: { message_id: last.id, date: 0, chat: { id: payload.chat_id, type: 'private' } } } as any; }
+        if (last && payload.text) { last.text = payload.parse_mode === 'HTML' ? plain(payload.text) : payload.text; last.buttons = buttons; return { ok: true, result: { message_id: last.id, date: 0, chat: { id: payload.chat_id, type: 'private' } } } as any; }
       }
-      log.push({ id, chat: Number(payload.chat_id), text: payload.text ?? payload.caption, buttons, image, at: Date.now() });
+      const txt = payload.text ?? payload.caption;
+      log.push({ id, chat: Number(payload.chat_id), text: txt && payload.parse_mode === 'HTML' ? plain(txt) : txt, buttons, image, at: Date.now() });
       return { ok: true, result: { message_id: id, date: 0, chat: { id: payload.chat_id, type: 'private' }, text: payload.text } } as any;
     }
     return { ok: true, result: true } as any;

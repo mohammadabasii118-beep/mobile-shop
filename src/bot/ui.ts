@@ -21,17 +21,18 @@ export function toKb(rows: Button[][]): InlineKeyboard {
 }
 
 /** Edit the current message when called from a button, otherwise send a new one. */
-export async function show(ctx: Ctx, text: string, rows: Button[][] = []) {
+export async function show(ctx: Ctx, text: string, rows: Button[][] = [], opts: { html?: boolean } = {}) {
   const reply_markup = rows.length ? toKb(rows) : undefined;
+  const parse_mode = opts.html ? ('HTML' as const) : undefined;
   if (ctx.callbackQuery?.message) {
     try {
-      await ctx.editMessageText(text, { reply_markup, link_preview_options: { is_disabled: true } });
+      await ctx.editMessageText(text, { reply_markup, parse_mode, link_preview_options: { is_disabled: true } });
       return;
     } catch (e: any) {
       if (String(e?.description ?? e?.message).includes('not modified')) return;
     }
   }
-  await ctx.reply(text, { reply_markup, link_preview_options: { is_disabled: true } });
+  await ctx.reply(text, { reply_markup, parse_mode, link_preview_options: { is_disabled: true } });
 }
 
 export const mainMenuRows = (): Button[][] => [
@@ -41,13 +42,15 @@ export const mainMenuRows = (): Button[][] => [
   [{ text: '🎫 پشتیبانی', data: 'menu:support' }, { text: '📜 قوانین', data: 'menu:rules' }],
 ];
 export const back = (to = 'menu:main'): Button[] => [{ text: BACK, data: to }];
+/** Navigation row for dead-end screens: back + home. */
+export const nav = (to = 'menu:main'): Button[] => (to === 'menu:main' ? [{ text: '🏠 منوی اصلی', data: 'menu:main' }] : [{ text: BACK, data: to }, { text: '🏠 منو', data: 'menu:main' }]);
 
-export const RULES_TEXT = [
-  '📜 قوانین استفاده',
-  '',
-  '۱. سرویس‌ها فقط برای استفاده شخصی هستند.',
-  '۲. فروش مجدد یا اشتراک‌گذاری لینک سرویس مجاز نیست.',
-  '۳. پس از تحویل سرویس، بازگشت وجه فقط در صورت عدم‌ارائه خدمات امکان‌پذیر است.',
-  '۴. پرداخت فقط با مبلغ دقیق سفارش و به کارت اعلام‌شده انجام شود.',
-  '۵. ارسال رسید جعلی یا تکراری منجر به مسدود شدن حساب می‌شود.',
+export const RULES_HTML = [
+  `📜 <b>قوانین استفاده</b>`,
+  '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈',
+  '1️⃣ سرویس‌ها فقط برای استفاده شخصی هستند.',
+  '2️⃣ فروش مجدد یا اشتراک‌گذاری لینک مجاز نیست.',
+  '3️⃣ بازگشت وجه فقط در صورت عدم‌ارائه خدمات امکان‌پذیر است.',
+  '4️⃣ پرداخت را با <b>مبلغ دقیق</b> سفارش و به کارت اعلام‌شده انجام دهید.',
+  '5️⃣ ارسال رسید جعلی یا تکراری منجر به مسدود شدن حساب می‌شود.',
 ].join('\n');

@@ -6,6 +6,7 @@ import { hmacSha256, safeEqual, sha256 } from './utils/misc';
 import { RateLimiter } from './utils/ratelimit';
 import { logger } from './utils/logger';
 import { ingestBankTransaction } from './modules/payments/service';
+import { handleAdmin } from './admin-web/http';
 
 const bankTxSchema = z.object({
   externalId: z.string().max(128).optional(),
@@ -28,6 +29,7 @@ export function createServer() {
   return http.createServer(async (req, res) => {
     const send = (code: number, body: unknown) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
     try {
+      if (await handleAdmin(req, res)) return;
       if (req.method === 'GET' && req.url === '/health') {
         await prisma.$queryRaw`SELECT 1`;
         return send(200, { ok: true, uptime: Math.round(process.uptime()) });

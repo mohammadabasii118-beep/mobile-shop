@@ -59,6 +59,7 @@ async function photo(id: number, caption?: string) {
   await bot.handleUpdate({ update_id: uid++, message: { message_id: uid, date: 0, chat: chat(id), from: from(id), photo: [{ file_id: `file-${uid}`, file_unique_id: 'u', width: 1, height: 1 }], caption } } as any);
 }
 const texts = () => api.filter((c) => c.method === 'sendMessage' || c.method === 'editMessageText').map((c) => String(c.payload.text));
+const unesc = (t: string) => t.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 const lastText = () => texts().at(-1) ?? '';
 const buttons = () => api.flatMap((c) => (c.payload?.reply_markup?.inline_keyboard ?? []).flat().map((b: any) => b.callback_data)).filter(Boolean) as string[];
 async function postBankTx(body: object, secret = 'whsec') {
@@ -106,9 +107,10 @@ describe('E2E: Telegram → order → card-to-card → verification → X-UI →
     expect(svc.config).toContain('pbk=PUBKEY123');
     expect(svc.subscriptionUrl).toBe(`https://sub.example.com:2096/sub/${svc.subId}`);
 
-    const delivery = api.find((c) => c.method === 'sendMessage' && c.payload.chat_id === USER && String(c.payload.text).includes('پرداخت شما تأیید شد') && String(c.payload.text).includes('vless://'));
+    const delivery = api.find((c) => c.method === 'sendMessage' && c.payload.chat_id === USER && String(c.payload.text).includes('سرویس شما آماده است') && String(c.payload.text).includes('vless://'));
     expect(delivery).toBeTruthy();
-    expect(String(delivery!.payload.text)).toContain(svc.config!);
+    expect(delivery!.payload.parse_mode).toBe('HTML');
+    expect(unesc(String(delivery!.payload.text))).toContain(svc.config!);
     expect(JSON.stringify(delivery!.payload.reply_markup)).toContain('sv:qr:');
 
     // QR for the real config, my services, link

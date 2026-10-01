@@ -6,6 +6,7 @@ import { DAY_MS } from '../../utils/misc';
 import { audit } from '../admin/audit';
 import { getNumberList } from '../settings/service';
 import { notifyUser } from '../notifications/service';
+import * as T from '../notifications/templates';
 import { getVpnProvider } from '../../providers/vpn';
 import { refOf } from './provisioning';
 
@@ -69,7 +70,8 @@ export async function processExpirations(now = new Date()): Promise<{ expired: n
       try { await getVpnProvider().suspendService(refOf(s)); } catch { /* panel disables expired clients itself */ }
       await audit({ actor: 'system', action: 'vpn.expire', target: 'VpnService', targetId: s.id });
       if (!flags.expired) {
-        await notifyUser(s.userId, 'vpn_expired', `⛔ سرویس «${s.product.name}» منقضی شد. برای ادامه از «سرویس‌های من» تمدید کنید.`, {
+        await notifyUser(s.userId, 'vpn_expired', T.expired(s.product.name), {
+          html: true,
           buttons: [[{ text: '🔄 تمدید', data: `sv:renew:${s.id}` }]], dedupeKey: `expired:${s.id}:${s.expiresAt.getTime()}`,
         });
         notified++;
@@ -83,7 +85,8 @@ export async function processExpirations(now = new Date()): Promise<{ expired: n
       const d = Math.min(...due);
       const next = { ...flags, ...Object.fromEntries(due.map((x) => [String(x), true])) };
       await prisma.vpnService.update({ where: { id: s.id }, data: { expiryNotified: next } });
-      await notifyUser(s.userId, 'vpn_expiring', `⏳ سرویس «${s.product.name}» حدود ${d} روز دیگر منقضی می‌شود.`, {
+      await notifyUser(s.userId, 'vpn_expiring', T.expiring(s.product.name, d, s.expiresAt), {
+        html: true,
         buttons: [[{ text: '🔄 تمدید', data: `sv:renew:${s.id}` }]], dedupeKey: `expiring:${s.id}:${d}:${s.expiresAt.getTime()}`,
       });
       notified++;

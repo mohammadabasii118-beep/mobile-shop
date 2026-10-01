@@ -43,3 +43,9 @@ export async function createCoupon(actor: string, input: { code: string; type: C
   return c;
 }
 export const listCoupons = () => prisma.coupon.findMany({ orderBy: { createdAt: 'desc' }, take: 30 });
+
+export async function setCouponActive(actor: string, id: string, isActive: boolean) {
+  const c = await prisma.coupon.update({ where: { id }, data: { isActive } });
+  await audit({ actor, action: isActive ? 'coupon.enable' : 'coupon.disable', target: 'Coupon', targetId: id });
+  return c;
+}

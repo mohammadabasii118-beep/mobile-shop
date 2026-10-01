@@ -1,7 +1,7 @@
 import { Protocol } from '@prisma/client';
 import { z } from 'zod';
 import { prisma } from '../../db/client';
-import { NotFoundError } from '../../utils/errors';
+import { NotFoundError, ValidationError } from '../../utils/errors';
 import { audit } from '../admin/audit';
 
 export const productInput = z.object({
@@ -45,4 +45,13 @@ export async function updateProduct(actor: string, id: string, patch: Partial<Pr
     target: 'Product', targetId: id, metadata: { before: { price: before.price, isActive: before.isActive }, patch: data },
   });
   return p;
+}
+
+/** Hard delete is only allowed when nothing references the product (keeps order history intact). */
+export async function deleteProduct(actor: string, id: string) {
+  const p = await getProduct(id);
+  const used = (await prisma.order.count({ where: { productId: id } })) + (await prisma.vpnService.count({ where: { productId: id } }));
+  if (used > 0) throw new ValidationError('این محصول در سفارش‌ها استفاده شده است؛ به‌جای حذف، آن را غیرفعال کنید.');
+  await prisma.product.delete({ where: { id } });
+  await audit({ actor, action: 'product.delete', target: 'Product', targetId: id, metadata: { name: p.name } });
 }

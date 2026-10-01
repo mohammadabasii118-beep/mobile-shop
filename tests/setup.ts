@@ -8,3 +8,4 @@ process.env.CARD_NUMBER = '6037991122334455';
 process.env.BANK_NAME = 'TestBank';
 process.env.RECEIPT_DIR = './data/test-receipts';
 process.env.LOG_LEVEL = 'silent';
+process.env.PANEL_SESSION_SECRET = 'test-panel-secret-0123456789abcdef';

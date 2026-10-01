@@ -4,7 +4,7 @@ import { logger } from '../../utils/logger';
 import { env } from '../../config/env';
 
 export interface Button { text: string; data?: string; url?: string }
-export interface OutMessage { chatId: bigint; text: string; buttons?: Button[][] }
+export interface OutMessage { chatId: bigint; text: string; buttons?: Button[][]; html?: boolean }
 export type Sender = (msg: OutMessage) => Promise<void>;
 
 let sender: Sender | undefined;
@@ -18,6 +18,7 @@ export interface NotifyInput {
   buttons?: Button[][];
   dedupeKey?: string;
   audience?: 'USER' | 'ADMIN';
+  html?: boolean; // text is Telegram HTML (all dynamic parts already escaped)
 }
 
 /** Persist then try to deliver; undelivered rows are retried by flushPending(). */
@@ -30,7 +31,7 @@ export async function notify(input: NotifyInput) {
         chatId: input.chatId,
         type: input.type,
         text: input.text,
-        meta: input.buttons ? ({ buttons: input.buttons } as unknown as Prisma.InputJsonValue) : undefined,
+        meta: input.buttons || input.html ? ({ buttons: input.buttons, html: input.html } as unknown as Prisma.InputJsonValue) : undefined,
         dedupeKey: input.dedupeKey,
       },
     });
@@ -47,8 +48,8 @@ async function deliver(id: string) {
   if (!n || n.status === 'SENT') return;
   if (!sender) return;
   try {
-    const buttons = (n.meta as any)?.buttons as Button[][] | undefined;
-    await sender({ chatId: n.chatId, text: n.text, buttons });
+    const meta = n.meta as any;
+    await sender({ chatId: n.chatId, text: n.text, buttons: meta?.buttons as Button[][] | undefined, html: !!meta?.html });
     await prisma.notification.update({ where: { id }, data: { status: 'SENT', sentAt: new Date(), attempts: { increment: 1 } } });
   } catch (e: any) {
     logger.warn({ id, err: String(e?.message) }, 'notification delivery failed');
@@ -85,7 +86,7 @@ export async function notifyAdmins(type: string, text: string, opts: { roles?: s
   }
 }
 
-export async function notifyUser(userId: string, type: string, text: string, opts: { buttons?: Button[][]; dedupeKey?: string } = {}) {
+export async function notifyUser(userId: string, type: string, text: string, opts: { buttons?: Button[][]; dedupeKey?: string; html?: boolean } = {}) {
   const u = await prisma.user.findUnique({ where: { id: userId } });
   if (!u) return;
   return notify({ chatId: u.telegramId, userId, type, text, ...opts });

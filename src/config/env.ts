@@ -32,6 +32,8 @@ const schema = z.object({
 
   CRYPTO_ENABLED: bool(false),
   BANK_WEBHOOK_SECRET: str(),
+  PANEL_SESSION_SECRET: str(),
+  TRUST_PROXY: bool(false),
   OCR_ENABLED: bool(false),
 });
 
