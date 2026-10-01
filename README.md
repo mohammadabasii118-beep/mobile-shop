@@ -99,6 +99,14 @@ npm run demo          # شبیه‌ساز تلگرام در مرورگر: http:/
 
 **آنلاین کردن دمو:** (۱) روی هر VPS: `npm run demo` و پشت HTTPS یا `cloudflared tunnel --url http://localhost:8080`؛ (۲) دموی واقعی تلگرام: توکن را از @BotFather بگیرید، `.env` را پر کنید و `docker compose up -d` — کاربران با لینک `t.me/<bot>` وارد می‌شوند.
 
+## سرور داخل ایران / فیلتر بودن تلگرام
+اگر `curl -m 10 https://api.telegram.org` از سرور جواب نمی‌دهد، یکی از این‌ها را انتخاب کنید:
+1. **پیشنهادی:** ربات را روی یک VPS خارج از ایران اجرا کنید (فقط باید به پنل X-UI دسترسی داشته باشد).
+2. `TELEGRAM_PROXY_URL=socks5://127.0.0.1:1080` (یا `http://…`) — تمام ترافیک تلگرام (API و دانلود رسید) از این پروکسی رد می‌شود.
+3. `TELEGRAM_API_ROOT=https://relay.example.com` — Bot API reverse-proxy خودتان.
+
+پنل X-UI اگر روی HTTPS است از `https://` استفاده کنید؛ اگر گواهی self-signed است: `XUI_TLS_INSECURE=true` (فقط opt-in؛ MITM را ممکن می‌کند — بهتر است دامنه + گواهی معتبر بگذارید).
+
 ## Known limitations
 - Adapter 3x-ui بر اساس API مستند پنل نوشته شده و **علیه یک پنل 2.9.4 واقعی اجرا نشده** (در محیط توسعه به سورس/پنل دسترسی نبود). تست‌ها روی `dev/fakeXui.ts` (HTTP) هستند. اگر 2.9.4 مسیر/فیلدی را عوض کرده، فقط `src/providers/vpn/xui/client.ts` تغییر می‌کند.
 - Verification خودکار به تغذیه‌ی لجر بانکی نیاز دارد؛ اتصال مستقیم به API بانک خاصی پیاده نشده.

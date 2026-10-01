@@ -6,6 +6,8 @@ import { loadEnv } from '../config/env';
 type Level = 'PASS' | 'WARN' | 'FAIL';
 export interface Check { level: Level; name: string; detail: string }
 
+const root0 = (e: { TELEGRAM_API_ROOT?: string }) => e.TELEGRAM_API_ROOT ?? 'api.telegram.org';
+
 export async function runPreflight(source: NodeJS.ProcessEnv = process.env, opts: { network?: boolean } = {}): Promise<Check[]> {
   const out: Check[] = [];
   const add = (level: Level, name: string, detail = '') => out.push({ level, name, detail });
@@ -21,6 +23,7 @@ export async function runPreflight(source: NodeJS.ProcessEnv = process.env, opts
   add(env.VPN_PROVIDER === 'xui' ? 'PASS' : 'FAIL', 'VPN_PROVIDER', env.VPN_PROVIDER);
   add(env.XUI_BASE_URL && /^https?:\/\//.test(env.XUI_BASE_URL) ? 'PASS' : 'FAIL', 'XUI_BASE_URL', 'include the panel web base path, e.g. https://host:2053/<webBasePath>');
   if (env.XUI_BASE_URL?.startsWith('http://') && !/(localhost|127\.0\.0\.1)/.test(env.XUI_BASE_URL)) add('WARN', 'XUI_BASE_URL uses http://', 'credentials travel in clear text; prefer https or a private network');
+  if (env.XUI_TLS_INSECURE) add('WARN', 'XUI_TLS_INSECURE=true', 'panel certificate is NOT verified; use a valid certificate/domain when possible');
   add(env.XUI_API_TOKEN || (env.XUI_USERNAME && env.XUI_PASSWORD) ? 'PASS' : 'FAIL', 'X-UI credentials', env.XUI_API_TOKEN ? 'api token' : 'username/password');
   add(env.XUI_PUBLIC_HOST || env.XUI_BASE_URL ? 'PASS' : 'WARN', 'XUI_PUBLIC_HOST', env.XUI_PUBLIC_HOST ?? 'falls back to the panel hostname — set it if clients connect through a different domain/IP');
   add(env.XUI_SUB_BASE_URL ? 'PASS' : 'WARN', 'XUI_SUB_BASE_URL', env.XUI_SUB_BASE_URL ? 'subscription links enabled' : 'unset → no subscription link shown to users');
@@ -56,14 +59,17 @@ export async function runPreflight(source: NodeJS.ProcessEnv = process.env, opts
     } catch (e: any) { add('FAIL', 'database + migrations', String(e?.message).split('\n').at(-1)?.slice(0, 160) ?? 'error'); }
     if (env.BOT_TOKEN) {
       try {
-        const r = (await (await fetch(`https://api.telegram.org/bot${env.BOT_TOKEN}/getMe`, { signal: AbortSignal.timeout(10_000) })).json()) as any;
-        add(r.ok ? 'PASS' : 'FAIL', 'Telegram getMe', r.ok ? `@${r.result.username}` : 'token rejected');
-      } catch { add('FAIL', 'Telegram getMe', 'api.telegram.org unreachable from this host'); }
+        const { telegramGet } = await import('../bot/telegramNet');
+        const root = (env.TELEGRAM_API_ROOT ?? 'https://api.telegram.org').replace(/\/+$/, '');
+        const res = await telegramGet(`${root}/bot${env.BOT_TOKEN}/getMe`, 10_000);
+        const r = JSON.parse(res.body.toString('utf8')) as any;
+        add(r.ok ? 'PASS' : 'FAIL', 'Telegram getMe', r.ok ? `@${r.result.username}${env.TELEGRAM_PROXY_URL ? ' (via proxy)' : env.TELEGRAM_API_ROOT ? ' (via API root)' : ''}` : 'token rejected');
+      } catch (e: any) { add('FAIL', 'Telegram getMe', `${root0(env)} unreachable from this host (${String(e?.code ?? e?.message).slice(0, 60)}). Set TELEGRAM_PROXY_URL or TELEGRAM_API_ROOT, or host the bot outside the blocked network`); }
     }
     if (env.XUI_BASE_URL) {
       try {
         const { XuiClient } = await import('../providers/vpn/xui/client');
-        const list = await new XuiClient({ baseUrl: env.XUI_BASE_URL, username: env.XUI_USERNAME, password: env.XUI_PASSWORD, apiToken: env.XUI_API_TOKEN }).listInbounds();
+        const list = await new XuiClient({ baseUrl: env.XUI_BASE_URL, username: env.XUI_USERNAME, password: env.XUI_PASSWORD, apiToken: env.XUI_API_TOKEN, fetchImpl: (await import('../providers/vpn/xui/net')).xuiFetch() }).listInbounds();
         add('PASS', 'X-UI auth + inbounds', `${list.length} inbound(s)`);
       } catch (e: any) { add('FAIL', 'X-UI auth + inbounds', String(e?.message)); }
     }

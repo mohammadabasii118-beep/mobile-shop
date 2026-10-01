@@ -14,13 +14,14 @@ import { Button } from '../modules/notifications/service';
 import { Ctx, RULES_HTML, back, mainMenuRows, nav, show } from './ui';
 import { CATEGORY_FA, ORDER_STATUS, RULE, SERVICE_STATUS, TICKET_STATUS, b, bar, code, daysLeft, esc, fa, fail, header, i, jdate, jdatetime, money, ok, timeline, wait } from './format';
 import { logger } from '../utils/logger';
+import { telegramApiRoot, telegramGet } from './telegramNet';
 
 export type FileFetcher = (ctx: Ctx, fileId: string) => Promise<Buffer>;
 export const telegramFileFetcher = (token: string): FileFetcher => async (ctx, fileId) => {
   const f = await ctx.api.getFile(fileId);
-  const res = await fetch(`https://api.telegram.org/file/bot${token}/${f.file_path}`);
-  if (!res.ok) throw new Error('file download failed');
-  return Buffer.from(await res.arrayBuffer());
+  const res = await telegramGet(`${telegramApiRoot()}/file/bot${token}/${f.file_path}`);
+  if (res.status !== 200) throw new Error('file download failed');
+  return res.body;
 };
 
 /** Short status used on list buttons. */

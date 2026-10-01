@@ -33,6 +33,12 @@ const schema = z.object({
   CRYPTO_ENABLED: bool(false),
   BANK_WEBHOOK_SECRET: str(),
   PANEL_SESSION_SECRET: str(),
+  /** Reverse-proxy for the Telegram Bot API, e.g. https://tg-proxy.example.com (no trailing /bot) */
+  TELEGRAM_API_ROOT: str(),
+  /** http(s):// or socks5:// proxy used for ALL Telegram traffic (for servers where api.telegram.org is blocked) */
+  TELEGRAM_PROXY_URL: str(),
+  /** Accept a self-signed/invalid TLS certificate from the X-UI panel (opt-in; weakens MITM protection) */
+  XUI_TLS_INSECURE: bool(false),
   TRUST_PROXY: bool(false),
   OCR_ENABLED: bool(false),
 });

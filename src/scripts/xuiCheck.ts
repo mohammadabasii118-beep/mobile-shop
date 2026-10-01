@@ -98,7 +98,7 @@ async function main() {
   const { env } = await import('../config/env');
   const e = env();
   if (!e.XUI_BASE_URL) throw new Error('XUI_BASE_URL is not set');
-  const client = new XuiClient({ baseUrl: e.XUI_BASE_URL, username: e.XUI_USERNAME, password: e.XUI_PASSWORD, apiToken: e.XUI_API_TOKEN });
+  const client = new XuiClient({ baseUrl: e.XUI_BASE_URL, username: e.XUI_USERNAME, password: e.XUI_PASSWORD, apiToken: e.XUI_API_TOKEN, fetchImpl: (await import('../providers/vpn/xui/net')).xuiFetch() });
   const provider = new XuiVpnProvider({ client, publicHost: e.XUI_PUBLIC_HOST ?? new URL(e.XUI_BASE_URL).hostname, subBaseUrl: e.XUI_SUB_BASE_URL });
   const argIdx = process.argv.indexOf('--inbound');
   const inbound = argIdx > 0 ? Number(process.argv[argIdx + 1]) : process.env.XUI_CHECK_INBOUND ? Number(process.env.XUI_CHECK_INBOUND) : undefined;

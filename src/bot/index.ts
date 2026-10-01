@@ -7,6 +7,7 @@ import { setSender } from '../modules/notifications/service';
 import { Ctx, Session, toKb } from './ui';
 import { adminHandlers } from './admin';
 import { FileFetcher, telegramFileFetcher, userHandlers } from './user';
+import { telegramClientOptions } from './telegramNet';
 
 const storage = {
   async read(key: string): Promise<Session | undefined> {
@@ -22,7 +23,7 @@ const storage = {
 };
 
 export function createBot(token: string, opts: { fetchFile?: FileFetcher; botInfo?: any; limiter?: RateLimiter } = {}) {
-  const bot = new Bot<Ctx>(token, opts.botInfo ? { botInfo: opts.botInfo } : undefined);
+  const bot = new Bot<Ctx>(token, { client: telegramClientOptions(), ...(opts.botInfo ? { botInfo: opts.botInfo } : {}) });
   const limiter = opts.limiter ?? new RateLimiter(25, 10_000);
 
   bot.catch((err) => logger.error({ err: String(err.error) }, 'unhandled bot error'));

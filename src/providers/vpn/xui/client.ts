@@ -40,7 +40,15 @@ export class XuiClient {
     try {
       return await this.f(this.base + path, { method, headers, body, redirect: 'manual', signal: AbortSignal.timeout(this.o.timeoutMs ?? 15_000) });
     } catch (e: any) {
-      throw new ProviderError(`X-UI unreachable: ${e?.name === 'TimeoutError' ? 'timeout' : (e?.cause?.code ?? e?.message ?? 'network error')}`, true);
+      const code: string = e?.cause?.code ?? e?.code ?? '';
+      const detail = `${code} ${e?.cause?.name ?? ''} ${e?.cause?.message ?? ''}`;
+      if (/HPE_|HTTPParserError|does not match the HTTP/.test(detail) && this.base.startsWith('http://')) {
+        throw new ProviderError('X-UI answered with non-HTTP data: the panel port is probably HTTPS. Use https:// in XUI_BASE_URL', false);
+      }
+      if (/CERT|SELF_SIGNED|UNABLE_TO_VERIFY|ALTNAME/.test(code)) {
+        throw new ProviderError(`X-UI TLS certificate is not trusted (${code}). Use a valid certificate/domain, or set XUI_TLS_INSECURE=true to accept it`, false);
+      }
+      throw new ProviderError(`X-UI unreachable: ${e?.name === 'TimeoutError' ? 'timeout' : (code || e?.message || 'network error')}`, true);
     }
   }
 

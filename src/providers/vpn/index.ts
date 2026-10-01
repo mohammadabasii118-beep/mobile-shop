@@ -3,6 +3,7 @@ import { VpnProvider } from './types';
 import { XuiClient } from './xui/client';
 import { XuiVpnProvider } from './xui/provider';
 import { MockVpnProvider } from './mock';
+import { xuiFetch } from './xui/net';
 
 let provider: VpnProvider | undefined;
 
@@ -15,7 +16,7 @@ export function createVpnProvider(): VpnProvider {
   if (!e.XUI_BASE_URL) throw new Error('XUI_BASE_URL is not configured');
   const publicHost = e.XUI_PUBLIC_HOST ?? new URL(e.XUI_BASE_URL).hostname;
   return new XuiVpnProvider({
-    client: new XuiClient({ baseUrl: e.XUI_BASE_URL, username: e.XUI_USERNAME, password: e.XUI_PASSWORD, apiToken: e.XUI_API_TOKEN }),
+    client: new XuiClient({ baseUrl: e.XUI_BASE_URL, username: e.XUI_USERNAME, password: e.XUI_PASSWORD, apiToken: e.XUI_API_TOKEN, fetchImpl: xuiFetch() }),
     publicHost, subBaseUrl: e.XUI_SUB_BASE_URL,
   });
 }
