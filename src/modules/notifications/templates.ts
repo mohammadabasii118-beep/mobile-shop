@@ -2,20 +2,15 @@
 import { Product, VpnService } from '@prisma/client';
 import { RULE, b, bar, code, daysLeft, esc, fa, gb, header, i, jdatetime } from '../../bot/format';
 import { serviceLabel } from '../../utils/names';
+import { loadTexts } from '../texts/service';
 
-export const paymentSubmitted = (orderNumber: string) =>
-  `📤 ${b('رسید شما ثبت شد')}\n${RULE}\nسفارش ${code(orderNumber)}\nپرداخت شما در حال بررسی است. نتیجه همین‌جا به شما اعلام می‌شود.`;
+export const paymentSubmitted = async (orderNumber: string) => (await loadTexts()).html('msg.submitted', { order: orderNumber });
+export const paymentReview = async (orderNumber: string) => (await loadTexts()).html('msg.review', { order: orderNumber });
+export const paymentVerified = async (orderNumber: string) => (await loadTexts()).html('msg.verified', { order: orderNumber });
+export const paymentRejected = async (orderNumber: string, reason: string) => (await loadTexts()).html('msg.rejected', { order: orderNumber, reason });
 
-export const paymentReview = (orderNumber: string) =>
-  `🔎 ${b('پرداخت در صف بررسی است')}\n${RULE}\nسفارش ${code(orderNumber)}\nپس از تأیید، سرویس به‌صورت خودکار ساخته و ارسال می‌شود. نیازی به اقدام دیگری نیست.`;
-
-export const paymentVerified = (orderNumber: string) =>
-  `✅ ${b('پرداخت شما تأیید شد')}\n${RULE}\nسفارش ${code(orderNumber)}\n⏳ سرویس شما در حال آماده‌سازی است...`;
-
-export const paymentRejected = (orderNumber: string, reason: string) =>
-  `❌ ${b('پرداخت شما تأیید نشد')}\n${RULE}\nسفارش ${code(orderNumber)}\nدلیل: ${esc(reason)}\n\nاگر پرداخت انجام داده‌اید، رسید درست را دوباره ارسال کنید یا با پشتیبانی در ارتباط باشید.`;
-
-export function delivery(s: VpnService, p: Product, kind: 'created' | 'renewed'): string {
+export async function delivery(s: VpnService, p: Product, kind: 'created' | 'renewed'): Promise<string> {
+  const X = await loadTexts();
   const lines = [
     kind === 'created' ? `🎉 ${b('سرویس شما آماده است')}` : `🔄 ${b('تمدید سرویس با موفقیت انجام شد')}`,
     kind === 'created' ? `از همین‌جا لینک، کانفیگ و QR را دریافت کنید.` : `سرویس شما تمدید شد و همان لینک قبلی فعال است.`,
@@ -27,20 +22,19 @@ export function delivery(s: VpnService, p: Product, kind: 'created' | 'renewed')
     `⏰ ${b('انقضا')}: ${jdatetime(s.expiresAt)}`,
   ];
   if (s.subscriptionUrl) {
-    lines.push(RULE, `📡 ${b('لینک اشتراک (Subscription) — پیشنهادی')}`, code(s.subscriptionUrl), i('این لینک را در برنامه وارد کنید؛ با تمدید یا تغییر سرور خودکار به‌روز می‌شود.'));
+    lines.push(RULE, `📡 ${b('لینک اشتراک (Subscription) — پیشنهادی')}`, code(s.subscriptionUrl), ...(X.plain('delivery.sub_hint') ? [i(X.plain('delivery.sub_hint'))] : []));
     if (s.config) lines.push('', `⚙️ ${b('کانفیگ مستقیم (جایگزین)')}`, code(s.config));
   } else if (s.config) {
     lines.push(RULE, `🔗 ${b('لینک اتصال')} ${esc('(برای کپی، روی لینک بزنید)')}`, code(s.config));
   }
-  lines.push(RULE, '💡 لینک را در برنامه‌ی V2Ray/Hiddify/Streisand وارد کنید یا QR را اسکن کنید.');
+  if (X.plain('delivery.tips')) lines.push(RULE, X.html('delivery.tips'));
   return lines.join('\n');
 }
 
-export const expiring = (name: string, days: number, expiresAt: Date) =>
-  `⏳ ${b('سرویس شما رو به پایان است')}\n${RULE}\n📦 ${esc(name)}\nحدود ${fa(days)} روز دیگر (${jdatetime(expiresAt)}) منقضی می‌شود.\nبرای جلوگیری از قطعی، همین حالا تمدید کنید.`;
+export const expiring = async (name: string, days: number, expiresAt: Date) =>
+  (await loadTexts()).html('msg.expiring', { service: name, days: fa(days), date: jdatetime(expiresAt) });
 
-export const expired = (name: string) =>
-  `⛔ ${b('سرویس شما منقضی شد')}\n${RULE}\n📦 ${esc(name)} منقضی شده است.\nبا تمدید، همان لینک قبلی دوباره فعال می‌شود.`;
+export const expired = async (name: string) => (await loadTexts()).html('msg.expired', { service: name });
 
 export const ticketAnswer = (id: string, text: string) =>
   `📩 ${b('پاسخ پشتیبانی')} ${code('#' + id.slice(-6))}\n${RULE}\n${esc(text)}`;

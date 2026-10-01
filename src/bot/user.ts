@@ -13,7 +13,8 @@ import { validateCoupon } from '../modules/coupons/service';
 import { getSetting } from '../modules/settings/service';
 import { serviceCard } from '../modules/notifications/templates';
 import { Button } from '../modules/notifications/service';
-import { Ctx, RULES_HTML, back, mainMenuRows, nav, show } from './ui';
+import { Ctx, back, mainMenuRows, nav, show } from './ui';
+import { loadTexts } from '../modules/texts/service';
 import { CATEGORY_FA, ORDER_STATUS, RULE, SERVICE_STATUS, TICKET_STATUS, b, bar, code, daysLeft, esc, fa, fail, header, i, jdate, jdatetime, money, ok, timeline, wait } from './format';
 import { logger } from '../utils/logger';
 import { getAdmin } from '../modules/admin/rbac';
@@ -35,12 +36,12 @@ export function userHandlers(fetchFile: FileFetcher) {
   const c = new Composer<Ctx>();
 
   /** Main menu rows; the management button is rendered ONLY for admins (authorisation is re-checked on every admin callback). */
-  const menuRows = async (ctx: Ctx) => mainMenuRows(!!(await getAdmin(BigInt(ctx.from!.id))));
+  const menuRows = async (ctx: Ctx) => mainMenuRows(!!(await getAdmin(BigInt(ctx.from!.id))), await loadTexts());
 
   const mainMenu = async (ctx: Ctx) => {
     ctx.session.step = undefined;
-    const name = ctx.dbUser.firstName ? ` ${esc(ctx.dbUser.firstName)}` : '';
-    return show(ctx, `👋 سلام${name}، خوش آمدید!\n${RULE}\n🔒 اینترنت آزاد، سریع و امن\n⚡️ تحویل خودکار سرویس بعد از پرداخت\n🎧 پشتیبانی همراه شما\n${RULE}\nیکی از گزینه‌ها را انتخاب کنید 👇`, await menuRows(ctx), H);
+    const T = await loadTexts();
+    return show(ctx, T.html('welcome', { name: ctx.dbUser.firstName || 'دوست عزیز' }), await menuRows(ctx), H);
   };
 
   c.command('start', mainMenu);
@@ -81,8 +82,10 @@ export function userHandlers(fetchFile: FileFetcher) {
     }
     rows.push(...lvl.products.map((p): Button[] => [{ text: `🛒 ${p.name}\u200f · ${money(p.price, p.currency)}`, data: `buy:${p.id}` }]));
     rows.push(parentBack ? back(parentBack) : nav());
+    const T = await loadTexts();
     const desc = lvl.here?.description ? `\n${i(lvl.here.description)}` : '';
-    await show(ctx, `${header('🛒', title)}${desc}\nیکی را انتخاب کنید 👇`, rows, H);
+    const intro = !lvl.here && T.plain('buy.intro') ? `\n${T.html('buy.intro')}` : '';
+    await show(ctx, `${header('🛒', title)}${desc}${intro}\n${T.html('buy.prompt')}`, rows, H);
   }
 
   async function orderSummary(ctx: Ctx, productId: string) {
@@ -133,8 +136,7 @@ export function userHandlers(fetchFile: FileFetcher) {
       L('بانک') ? `🏦 بانک: ${esc(L('بانک'))}` : '',
       extra ? `\nℹ️ ${esc(extra)}` : '',
       RULE,
-      `⚠️ مبلغ را ${b('دقیقاً')} برابر عدد بالا واریز کنید.`,
-      `بعد از پرداخت، دکمه «📤 ارسال رسید» را بزنید.`,
+      (await loadTexts()).html('payment.note'),
     ].filter(Boolean).join('\n');
     await show(ctx, text, orderActions(o), H);
   }
@@ -194,7 +196,7 @@ export function userHandlers(fetchFile: FileFetcher) {
 
   async function supportMenu(ctx: Ctx) {
     const ts = await listUserTickets(ctx.dbUser.id);
-    await show(ctx, `${header('🎫', 'پشتیبانی', 'ما کنار شما هستیم')}\n${ts.length ? `\n${b('تیکت‌های شما')}\n` + ts.map((t) => `${TICKET_STATUS[t.status].split(' ')[0]} ${code('#' + t.id.slice(-6))} ${esc(t.subject.slice(0, 28))}`).join('\n') : '\n📭 هنوز تیکتی ندارید.'}`, [
+    await show(ctx, `${header('🎫', 'پشتیبانی')}\n${(await loadTexts()).html('support.intro')}\n${ts.length ? `\n${b('تیکت‌های شما')}\n` + ts.map((t) => `${TICKET_STATUS[t.status].split(' ')[0]} ${code('#' + t.id.slice(-6))} ${esc(t.subject.slice(0, 28))}`).join('\n') : '\n📭 هنوز تیکتی ندارید.'}`, [
       [{ text: '➕ تیکت جدید', data: 'tk:new' }],
       ...ts.map((t): Button[] => [{ text: `${TICKET_STATUS[t.status].split(' ')[0]} #${t.id.slice(-6)} ${t.subject.slice(0, 22)}`, data: `tk:v:${t.id}` }]),
       nav(),
@@ -216,10 +218,10 @@ export function userHandlers(fetchFile: FileFetcher) {
           case 'orders': return await ordersList(ctx);
           case 'account': return await account(ctx);
           case 'support': return await supportMenu(ctx);
-          case 'rules': return show(ctx, RULES_HTML, [nav()], H);
+          case 'rules': return await show(ctx, `${header('📜', 'قوانین استفاده')}\n${(await loadTexts()).html('rules')}`, [nav()], H);
           case 'coupon':
             ctx.session.step = 'coupon';
-            return show(ctx, `${header('🎁', 'کد تخفیف')}\nکد تخفیف خود را ارسال کنید.\n${i('کد روی سفارش بعدی شما اعمال می‌شود.')}`, [nav()], H);
+            return await show(ctx, `${header('🎁', 'کد تخفیف')}\n${(await loadTexts()).html('coupon.prompt')}`, [nav()], H);
         }
       }
       if (ns === 'bc') return await buyMenu(ctx, a);
@@ -250,7 +252,7 @@ export function userHandlers(fetchFile: FileFetcher) {
         if (o.status !== 'PENDING_PAYMENT') return show(ctx, `${fail('برای این سفارش رسیدی قابل ثبت نیست', 'وضعیت سفارش را بررسی کنید.')}`, [[{ text: '📍 وضعیت سفارش', data: `ov:${a}` }], nav('menu:orders')], H);
         ctx.session.step = 'receipt';
         ctx.session.data = { orderId: a };
-        return show(ctx, [header('📤', 'ارسال رسید', 'مرحله ۳ از ۳ · تأیید'), '📸 عکس رسید را ارسال کنید', `${i('بهتر است کد پیگیری را در کپشن بنویسید.')}`, '', 'یا فقط ✍️ کد پیگیری را به‌صورت متن بفرستید.'].join('\n'), [back(`ov:${a}`)], H);
+        return await show(ctx, `${header('📤', 'ارسال رسید', 'مرحله ۳ از ۳ · تأیید')}\n${(await loadTexts()).html('receipt.prompt')}`, [back(`ov:${a}`)], H);
       }
       if (ns === 'rs') { // submit pending photo without tracking code
         const { orderId, fileId } = ctx.session.data ?? {};

@@ -24,9 +24,9 @@ const NAV = [
   ['dashboard', 'داشبورد', 'dashboard', 'stats.view'], ['users', 'کاربران', 'users', 'users.view'], ['products', 'محصولات', 'box', 'products.manage'], ['categories', 'دسته‌بندی منو', 'folder', 'products.manage'],
   ['orders', 'سفارش‌ها', 'receipt', 'users.view'], ['payments', 'پرداخت‌ها', 'card', 'payments.view'], ['services', 'سرویس‌های VPN', 'shield', 'vpn.view'],
   ['coupons', 'کدهای تخفیف', 'ticket', 'coupons.manage'], ['support', 'پشتیبانی', 'headset', 'support.reply'], ['notifications', 'اعلان‌ها', 'bell', 'stats.view'],
-  ['settings', 'تنظیمات', 'settings', 'settings.manage'], ['audit', 'Audit Logs', 'audit', 'audit.view'],
+  ['texts', 'متن‌های ربات', 'edit', 'texts.manage'], ['settings', 'تنظیمات', 'settings', 'settings.manage'], ['audit', 'Audit Logs', 'audit', 'audit.view'],
 ];
-const PAGES = { dashboard: P.dashboard, users: P.users, products: P.products, categories: P.categories, orders: P.orders, payments: P.payments, services: P.services, coupons: P.coupons, support: P.support, notifications: P.notifications, settings: P.settings, audit: P.audit };
+const PAGES = { dashboard: P.dashboard, users: P.users, products: P.products, categories: P.categories, orders: P.orders, payments: P.payments, services: P.services, coupons: P.coupons, support: P.support, notifications: P.notifications, settings: P.settings, texts: P.texts, audit: P.audit };
 const parse = () => { const raw = location.hash.replace(/^#\/?/, ''); const [route, qs = ''] = raw.split('?'); return { route: route || 'dashboard', q: new URLSearchParams(qs) }; };
 const ctx = {
   me: null,

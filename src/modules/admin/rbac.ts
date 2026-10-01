@@ -8,11 +8,11 @@ export type Permission =
   | 'vpn.view' | 'vpn.manage' | 'vpn.delete'
   | 'products.manage' | 'coupons.manage'
   | 'support.reply' | 'users.view'
-  | 'settings.manage' | 'audit.view' | 'stats.view' | 'admins.manage';
+  | 'settings.manage' | 'audit.view' | 'stats.view' | 'admins.manage' | 'texts.manage';
 
 const ALL: Permission[] = [
   'payments.view', 'payments.review', 'vpn.view', 'vpn.manage', 'vpn.delete', 'products.manage',
-  'coupons.manage', 'support.reply', 'users.view', 'settings.manage', 'audit.view', 'stats.view', 'admins.manage',
+  'coupons.manage', 'support.reply', 'users.view', 'settings.manage', 'audit.view', 'stats.view', 'admins.manage', 'texts.manage',
 ];
 
 export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
@@ -20,7 +20,7 @@ export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
   PAYMENT_ADMIN: ['payments.view', 'payments.review', 'stats.view', 'users.view'],
   VPN_ADMIN: ['vpn.view', 'vpn.manage', 'stats.view', 'users.view'],
   SUPPORT_ADMIN: ['support.reply', 'users.view', 'vpn.view', 'payments.view'],
-  PRODUCT_ADMIN: ['products.manage', 'coupons.manage', 'stats.view'],
+  PRODUCT_ADMIN: ['products.manage', 'coupons.manage', 'stats.view', 'texts.manage'],
 };
 
 export async function getAdmin(telegramId: bigint) {

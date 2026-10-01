@@ -12,6 +12,7 @@ import { adminRetry } from '../modules/vpn/provisioning';
 import { adminReply, closeTicket, listOpenTickets } from '../modules/support/service';
 import { SETTING_DEFAULTS, SettingKey, allSettings, getSetting, setSetting } from '../modules/settings/service';
 import { audit } from '../modules/admin/audit';
+import { isTextKey, listTexts, previewText, resetText, setText, textDef } from '../modules/texts/service';
 import { categoryTree, createCategory, deleteCategory, getCategory, moveCategory, setProductCategory, splitIconName, updateCategory } from '../modules/categories/service';
 import { getVpnProvider } from '../providers/vpn';
 import { serviceSummary } from '../modules/vpn/messages';
@@ -41,6 +42,7 @@ export function adminHandlers() {
     await add('vpn.view', { text: '🛰 سرویس‌های VPN', data: 'vl:0' });
     await add('products.manage', { text: '📦 محصولات', data: 'adm:products' });
     await add('products.manage', { text: '🗂 دسته‌بندی منوی خرید', data: 'ct:l:root' });
+    await add('texts.manage', { text: '✏️ ویرایش متن‌های ربات', data: 'tx:l' });
     await add('products.manage', { text: '🎁 کدهای تخفیف', data: 'adm:coupons' });
     await add('users.view', { text: '👥 کاربران / سفارش‌ها', data: 'adm:orders' });
     await add('support.reply', { text: '🎫 پشتیبانی', data: 'adm:tickets' });
@@ -167,7 +169,7 @@ export function adminHandlers() {
   c.on('callback_query:data', async (ctx, next) => {
     const d = ctx.callbackQuery.data;
     const [ns, a, b] = d.split(':');
-    const adminNs = ['adm', 'pl', 'ap', 'av', 'vl', 'pr', 'cp', 'st', 'at', 'ao', 'ct'];
+    const adminNs = ['adm', 'pl', 'ap', 'av', 'vl', 'pr', 'cp', 'st', 'at', 'ao', 'ct', 'tx'];
     if (!adminNs.includes(ns)) return next();
     try {
       // every admin callback re-checks authorization server-side (callback data is untrusted)
@@ -330,6 +332,28 @@ export function adminHandlers() {
         if (a === 'tg') { const p = await getProduct(b); await updateProduct(actor(ctx), b, { isActive: !p.isActive }); return ctx.reply(p.isActive ? '⏸ غیرفعال شد.' : '▶️ فعال شد.'); }
         if (a === 'pc') { ctx.session.step = 'a_price'; ctx.session.data = { id: b }; return show(ctx, 'قیمت جدید (عدد):', [back(`pr:v:${b}`)]); }
       }
+      if (ns === 'tx') {
+        await need(ctx, 'texts.manage');
+        const items = await listTexts();
+        const groups = [...new Set(items.map((x) => x.group))];
+        if (a === 'l') return show(ctx, '✏️ ویرایش متن‌های ربات\nکدام بخش؟', [...groups.map((g, n): Button[] => [{ text: g, data: `tx:g:${n}` }]), back('adm:home')]);
+        if (a === 'g') {
+          const g = groups[Number(b)];
+          if (!g) throw new AppError('NOT_FOUND', 'بخش یافت نشد');
+          return show(ctx, `✏️ ${g}`, [...items.filter((x) => x.group === g).map((x): Button[] => [{ text: `${x.isDefault ? '' : '✅ '}${x.label}`, data: `tx:v:${x.key}` }]), back('tx:l')]);
+        }
+        if (!isTextKey(b)) throw new AppError('NOT_FOUND', 'متن یافت نشد');
+        const it = items.find((x) => x.key === b)!;
+        if (a === 'v') {
+          const vars = it.vars.length ? `\n\nمتغیرها (جایگزین می‌شوند):\n${it.vars.map((v) => `{${v.name}} = ${v.label}`).join('\n')}` : '';
+          return show(ctx, `✏️ ${it.label}\n${it.isDefault ? '(متن پیش‌فرض)' : '(متن سفارشی)'}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n${it.value || '— خالی —'}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈${vars}\n\nقالب‌بندی: *متن* = پررنگ. حداکثر ${it.max} حرف.`, [
+            [{ text: '✏️ ویرایش', data: `tx:e:${b}` }, ...(it.isDefault ? [] : [{ text: '↩️ بازگشت به پیش‌فرض', data: `tx:r:${b}` }])],
+            back(`tx:g:${groups.indexOf(it.group)}`),
+          ]);
+        }
+        if (a === 'e') { ctx.session.step = 'a_text'; ctx.session.data = { key: b }; return show(ctx, `✏️ متن جدید «${it.label}» را بفرستید.${it.vars.length ? `\nمتغیرها: ${it.vars.map((v) => `{${v.name}}`).join(' ')}` : ''}${it.optional ? '\nبرای خالی کردن: -' : ''}\n(*متن* = پررنگ)`, [back(`tx:v:${b}`)]); }
+        if (a === 'r') { await resetText(actor(ctx), b); return show(ctx, '↩️ به متن پیش‌فرض برگشت.', [back(`tx:v:${b}`)]); }
+      }
       if (ns === 'ct') {
         await need(ctx, 'products.manage');
         const tree = await categoryTree();
@@ -465,6 +489,16 @@ export function adminHandlers() {
         ctx.session.step = undefined;
         return void (await ctx.reply(`✅ محصول «${p.name}» ساخته شد.`));
       }
+      if (step === 'a_text') {
+        await need(ctx, 'texts.manage');
+        if (!isTextKey(data.key)) throw new AppError('VALIDATION', 'متن نامعتبر');
+        await setText(actor(ctx), data.key, text === '-' && textDef(data.key).optional ? '' : text);
+        ctx.session.step = undefined;
+        await ctx.reply('✅ ذخیره شد. پیش‌نمایش:');
+        const pv = previewText(data.key, text === '-' ? '' : text.trim());
+        if (pv) await ctx.reply(pv, { parse_mode: textDef(data.key).plain ? undefined : 'HTML' });
+        return void (await ctx.reply('بازگشت:', { reply_markup: { inline_keyboard: [[{ text: '✏️ مشاهده متن', callback_data: `tx:v:${data.key}` }]] } }));
+      }
       if (step === 'a_cat_new') {
         await need(ctx, 'products.manage');
         const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 20);
@@ -529,7 +563,7 @@ export function adminHandlers() {
       }
     } catch (e) {
       // validation errors on multi-line / field edits keep the step, so the admin can just resend a corrected text
-      const retry = e instanceof AppError && (e.code === 'VALIDATION' || e.code === 'CONFLICT') && ['a_bulk', 'a_pfield', 'a_cat_new', 'a_cat_rename'].includes(step ?? '');
+      const retry = e instanceof AppError && (e.code === 'VALIDATION' || e.code === 'CONFLICT') && ['a_bulk', 'a_pfield', 'a_cat_new', 'a_cat_rename', 'a_text'].includes(step ?? '');
       if (!retry) ctx.session.step = undefined;
       return handleError(ctx, e, step === 'a_bulk' ? 'adm:products' : 'adm:home');
     }

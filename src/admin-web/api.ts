@@ -16,6 +16,7 @@ import { SETTING_DEFAULTS, SettingKey, allSettings, setSetting } from '../module
 import { flushPending } from '../modules/notifications/service';
 import { getVpnProvider } from '../providers/vpn';
 import { categoryTree, createCategory, deleteCategory, moveCategory, updateCategory } from '../modules/categories/service';
+import { isTextKey, listTexts, previewText, resetText, setText } from '../modules/texts/service';
 import * as Q from './queries';
 
 export interface ApiCtx {
@@ -113,6 +114,18 @@ export const routes: Route[] = [
   },
   { method: 'POST', re: /^\/categories\/([\w-]+)\/move$/, perm: 'products.manage', run: async (c) => ({ moved: await moveCategory(actor(c), c.params[0], z.object({ dir: z.enum(['up', 'down']) }).parse(c.body).dir) }) },
   { method: 'DELETE', re: /^\/categories\/([\w-]+)$/, perm: 'products.manage', run: async (c) => deleteCategory(actor(c), c.params[0]) },
+
+  { method: 'GET', re: /^\/texts$/, perm: 'texts.manage', run: async () => ({ items: (await listTexts()).map((t) => ({ ...t, preview: previewText(t.key, t.value) })) }) },
+  {
+    method: 'PUT', re: /^\/texts$/, perm: 'texts.manage',
+    run: async (c) => {
+      const b = z.object({ key: z.string(), value: z.string().max(5000) }).parse(c.body);
+      if (!isTextKey(b.key)) throw new NotFoundError('text');
+      await setText(actor(c), b.key, b.value);
+      return { ok: true };
+    },
+  },
+  { method: 'DELETE', re: /^\/texts\/([\w.]+)$/, perm: 'texts.manage', run: async (c) => { if (!isTextKey(c.params[0])) throw new NotFoundError('text'); await resetText(actor(c), c.params[0]); return { ok: true }; } },
 
   { method: 'GET', re: /^\/orders$/, perm: 'users.view', run: (c) => Q.listOrders(str(c, 'q'), str(c, 'status'), page(c)) },
 

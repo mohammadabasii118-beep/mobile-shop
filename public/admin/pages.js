@@ -542,3 +542,52 @@ function categoryForm(cat, parentId, all, done) {
   } });
   const m = modal({ title: cat ? 'ویرایش دسته' : 'دسته‌ی جدید', body: h('div', { class: 'form-grid' }, h('div', { class: 'field' }, h('label', { text: 'نام' }), name), h('div', { class: 'field' }, h('label', { text: 'آیکون (ایموجی)' }), iconIn), h('div', { class: 'field full' }, h('label', { text: 'توضیح' }), desc), h('div', { class: 'field full' }, h('label', { text: 'قرار گرفتن در' }), parent), h('div', { class: 'full' }, err)), footer: [ok, button('انصراف', { onClick: () => m.close() })] });
 }
+
+/* =================================== Texts =================================== */
+/** Mirrors the server renderer for the live preview: *bold* and {var} → sample value (DOM nodes, never innerHTML). */
+function renderPreview(value, vars) {
+  const box = h('div', { class: 'panel', style: 'white-space:pre-wrap;line-height:1.9;word-break:break-word' });
+  const samples = Object.fromEntries(vars.map((v) => [v.name, v.sample]));
+  for (const part of value.split(/(\*[^*\n]+\*)/g)) {
+    const bold = /^\*[^*\n]+\*$/.test(part);
+    const text = (bold ? part.slice(1, -1) : part).replace(/\{(\w+)\}/g, (m, n) => samples[n] ?? m);
+    box.append(bold ? h('b', { text }) : text);
+  }
+  return box;
+}
+export function texts(ctx, root) {
+  root.append(pageHead('متن‌های ربات', 'متن همه‌ی بخش‌های ربات را ویرایش کنید؛ هر متن را می‌توانید به پیش‌فرض برگردانید'));
+  const wrap = h('div', { class: 'stack' }); root.append(wrap);
+  async function reload() {
+    clear(wrap); wrap.append(skeletonBlock(160), skeletonBlock(160));
+    try {
+      const { items } = await api('/texts'); clear(wrap);
+      const groups = [...new Set(items.map((x) => x.group))];
+      wrap.append(h('div', { class: 'callout' }, icon('info'), h('div', { text: 'برای پررنگ کردن بخشی از متن، آن را بین ستاره بگذارید: *مثال*. بخش‌هایی مثل {name} هنگام ارسال با مقدار واقعی جایگزین می‌شوند. متن‌ها همیشه امن (escape) نمایش داده می‌شوند.' })));
+      for (const g of groups) {
+        wrap.append(h('div', { class: 'card' }, h('div', { class: 'card-h' }, h('h3', { text: g })),
+          table([
+            { label: 'بخش', cls: 'wrap', render: (t) => h('div', null, h('div', { class: 'cell-main', text: t.label }), h('div', { class: 'cell-sub', style: 'max-width:520px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: t.value.replace(/\n+/g, ' ⏎ ') || '— خالی —' })) },
+            { label: 'وضعیت', render: (t) => h('span', { class: `badge ${t.isDefault ? '' : 'brand'}`, text: t.isDefault ? 'پیش‌فرض' : 'سفارشی' }) },
+            { label: '', render: (t) => h('div', { class: 'actions' }, button('ویرایش', { size: 'sm', ico: 'edit', onClick: () => textForm(t, reload) }),
+              t.isDefault ? null : button('پیش‌فرض', { size: 'sm', kind: 'ghost', onClick: async () => { if (!(await confirmDialog({ title: 'بازگشت به پیش‌فرض', message: `متن «${t.label}» به نسخه‌ی پیش‌فرض برگردد؟`, confirmLabel: 'بازگردانی' }))) return; try { await api(`/texts/${t.key}`, { method: 'DELETE' }); toast('به پیش‌فرض برگشت'); reload(); } catch (e) { toast(errMsg(e), 'err'); } } })) },
+          ], items.filter((x) => x.group === g))));
+      }
+    } catch (e) { clear(wrap); wrap.append(errorState(errMsg(e), reload)); }
+  }
+  reload();
+}
+function textForm(t, done) {
+  const multi = !t.plain;
+  const input = multi ? h('textarea', { class: 'textarea', style: 'min-height:200px', maxlength: String(t.max), 'aria-label': t.label }) : h('input', { class: 'input', maxlength: String(t.max), 'aria-label': t.label });
+  input.value = t.value;
+  const prev = h('div'); const count = h('div', { class: 'hint' });
+  const refresh = () => { clear(prev); prev.append(multi ? renderPreview(input.value, t.vars) : h('div', { class: 'panel', text: input.value })); count.textContent = `${faDigits(input.value.length)} / ${faDigits(t.max)}`; };
+  input.addEventListener('input', refresh); refresh();
+  const chips = t.vars.length ? h('div', { class: 'row', style: 'gap:6px' }, h('span', { class: 'muted', text: 'درج متغیر:' }), t.vars.map((v) => button(`{${v.name}} · ${v.label}`, { size: 'sm', onClick: () => { const a = input.selectionStart ?? input.value.length; input.setRangeText(`{${v.name}}`, a, input.selectionEnd ?? a, 'end'); input.focus(); refresh(); } }))) : null;
+  const err = h('div', { class: 'form-error', hidden: true });
+  const ok = button('ذخیره', { kind: 'primary', onClick: async () => {
+    try { await api('/texts', { method: 'PUT', body: { key: t.key, value: input.value } }); toast('متن ذخیره شد'); m.close(); done(); } catch (e) { err.hidden = false; err.textContent = errMsg(e); }
+  } });
+  const m = modal({ title: t.label, body: h('div', { class: 'stack' }, h('div', { class: 'field' }, h('label', { text: 'متن' }), input, count), chips, h('div', null, h('div', { class: 'section-t', text: 'پیش‌نمایش (با مقادیر نمونه)' }), prev), err), footer: [ok, button('انصراف', { onClick: () => m.close() })] });
+}
