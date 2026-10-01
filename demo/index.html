@@ -1,0 +1,255 @@
+<title>دمو ربات PCL Transfer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap">
+<style>
+/* Layout: right rail of feature shortcuts + a phone-sized Telegram chat simulator in the middle of the page */
+:root{
+  --bg:#e6ecf1; --panel:#ffffff; --ink:#17212b; --mute:#6b7b8c; --line:#d3dce4;
+  --chat:#cfdde8; --bubble:#ffffff; --mine:#d6f1c3; --kb:#2f6fa8; --kbtxt:#ffffff; --kbhover:#27608f;
+  --accent:#2a84d6; --ok:#1f9d55; --warn:#d98a00; --bad:#d64545; --head:#527da3;
+  --font:'Vazirmatn',Tahoma,system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0b1118; --panel:#14202c; --ink:#e8eef4; --mute:#8696a7; --line:#24364a;
+  --chat:#0e1621; --bubble:#182533; --mine:#2b5278; --kb:#2b4a68; --kbtxt:#e8f1fa; --kbhover:#34597d;
+  --accent:#5eb5f7; --ok:#4cc38a; --warn:#f0b34a; --bad:#ef7676; --head:#17212b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b1118; --panel:#14202c; --ink:#e8eef4; --mute:#8696a7; --line:#24364a;
+  --chat:#0e1621; --bubble:#182533; --mine:#2b5278; --kb:#2b4a68; --kbtxt:#e8f1fa; --kbhover:#34597d;
+  --accent:#5eb5f7; --ok:#4cc38a; --warn:#f0b34a; --bad:#ef7676; --head:#17212b; color-scheme:dark}
+*{box-sizing:border-box}[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);margin:0;padding-inline:16px;padding-block:20px;direction:rtl}
+button{font-family:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1000px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:24px;align-items:start}
+.top{max-width:1000px;margin:0 auto 18px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between}
+.top h1{font-size:1.35rem;margin:0;text-wrap:balance}
+.top p{margin:0;color:var(--mute);font-size:.85rem}
+.stage{display:flex;justify-content:center;min-width:0}
+.phone{width:100%;max-width:400px;height:740px;max-height:calc(100vh - 40px);min-height:520px;border:1px solid var(--line);border-radius:22px;overflow:hidden;display:flex;flex-direction:column;background:var(--chat);box-shadow:0 12px 40px rgba(10,30,50,.18)}
+.bar{background:var(--head);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px}
+.ava{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#2a84d6,#1b4f86);display:grid;place-items:center;font-weight:700;font-size:.8rem;color:#fff;flex:none}
+.bar b{display:block;font-size:.95rem}.bar small{opacity:.75;font-size:.72rem}
+.seg{margin-inline-start:auto;display:flex;background:rgba(255,255,255,.16);border-radius:9px;padding:2px}
+.seg button{border:0;background:transparent;color:#fff;padding:4px 10px;border-radius:7px;font-size:.75rem}
+.seg button[aria-pressed="true"]{background:rgba(255,255,255,.95);color:#17212b}
+.chat{flex:1;overflow-y:auto;padding:12px 10px;display:flex;flex-direction:column;gap:8px;scroll-behavior:smooth}
+.msg{max-width:92%;display:flex;flex-direction:column;gap:4px;min-width:0}
+.msg.bot{align-self:flex-start}.msg.me{align-self:flex-end}
+.bub{background:var(--bubble);padding:9px 12px;border-radius:14px;font-size:.88rem;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere;box-shadow:0 1px 1px rgba(0,0,0,.08)}
+.me .bub{background:var(--mine)}
+.bub code{font-family:ui-monospace,Menlo,monospace;background:rgba(127,140,155,.2);padding:0 4px;border-radius:4px;direction:ltr;unicode-bidi:isolate}
+.bub a{color:var(--accent)}
+.bub .tag{color:var(--accent)}
+.bub .star{display:inline-block;background:linear-gradient(90deg,#f5b72e,#f08a24);color:#3a2300;font-weight:700;border-radius:6px;padding:0 8px;font-size:.78rem}
+.card{height:120px;border-radius:10px;margin-bottom:6px;background:linear-gradient(135deg,#102a43,#1d5f8f 60%,#d4a72c);color:#fff;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:2px;direction:ltr}
+.card b{font-size:1.5rem;letter-spacing:.06em}.card span{opacity:.85;font-size:.75rem}
+.kb{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.kb.dead{opacity:.55;pointer-events:none}
+.kb button{background:var(--kb);color:var(--kbtxt);border:0;border-radius:9px;padding:9px 6px;font-size:.8rem;min-height:38px;overflow-wrap:anywhere}
+.kb button:hover{background:var(--kbhover)}
+.kb button.wide{grid-column:1/-1}
+.kb a{display:block;text-align:center;text-decoration:none;background:var(--kb);color:var(--kbtxt);border-radius:9px;padding:9px;font-size:.8rem;grid-column:1/-1}
+.input{display:flex;gap:8px;padding:8px;background:var(--panel);border-top:1px solid var(--line)}
+.input input{flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:18px;padding:8px 14px;font-family:inherit;font-size:.85rem}
+.input button{border:0;background:var(--accent);color:#06121e;border-radius:50%;width:38px;height:38px;font-size:1rem}
+.hint{font-size:.72rem;color:var(--mute);padding:0 12px 6px;background:var(--panel)}
+.rail{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;position:sticky;top:16px;min-width:0}
+.rail h2{margin:0;font-size:.9rem}
+.rail h3{margin:6px 0 0;font-size:.72rem;color:var(--mute);letter-spacing:.04em;font-weight:500}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:5px 11px;font-size:.78rem}
+.chips button:hover,.chips button[aria-pressed="true"]{background:var(--accent);color:#06121e;border-color:var(--accent)}
+.note{font-size:.75rem;color:var(--mute);line-height:1.7;margin:0}
+.modal{position:fixed;inset:0;background:rgba(5,12,20,.6);display:grid;place-items:center;padding:16px;z-index:5}
+.gate{background:#fff;color:#1b1b1b;border-radius:14px;width:100%;max-width:360px;overflow:hidden;font-size:.88rem}
+.gate .u{background:#f0f0f0;padding:8px 12px;font-size:.72rem;direction:ltr;color:#444;font-family:ui-monospace,monospace;overflow-wrap:anywhere}
+.gate .b{padding:18px;display:flex;flex-direction:column;gap:10px}
+.gate .b p{margin:0}.gate .row{display:flex;gap:8px}
+.gate button{flex:1;border:0;border-radius:9px;padding:11px;font-size:.88rem}
+.gate .go{background:#f9b800;color:#2a1c00;font-weight:700}.gate .no{background:#e8e8e8;color:#333}
+@media(max-width:820px){.wrap{grid-template-columns:minmax(0,1fr)}.rail{position:static;order:2}}
+@media(prefers-reduced-motion:reduce){.chat{scroll-behavior:auto}}
+</style>
+<div class="top"><h1>دمو ربات PCL Transfer</h1><p>شبیه‌ساز تعاملی؛ همه دکمه‌ها کار می‌کنند. داده‌ها نمونه‌اند و جایی ذخیره نمی‌شوند.</p></div>
+<div class="wrap">
+  <div class="stage"><div class="phone">
+    <div class="bar"><div class="ava">PCL</div><div><b id="title">PCL Transfer</b><small id="sub">ربات</small></div>
+      <div class="seg" role="group" aria-label="نقش"><button id="r-user" aria-pressed="true">👤 کاربر</button><button id="r-admin" aria-pressed="false">🛠 مدیر</button></div></div>
+    <div class="chat" id="chat" aria-live="polite"></div>
+    <div class="hint" id="hint"></div>
+    <form class="input" id="form"><input id="txt" autocomplete="off" placeholder="پیام..."><button aria-label="ارسال">➤</button></form>
+  </div></div>
+  <aside class="rail">
+    <h2>پرش سریع به قابلیت‌ها</h2>
+    <p class="note">برای دیدن هر بخش روی آن بزنید یا از منوی خود ربات شروع کنید.</p>
+    <div id="chips"></div>
+    <p class="note">درگاه پرداخت و گروه انتشار هم شبیه‌سازی شده‌اند. برای دیدن آگهی در گروه، یک آگهی را از نقش «مدیر» تأیید کنید.</p>
+  </aside>
+</div>
+<div class="modal" id="gateway" hidden><div class="gate"><div class="u" id="gurl"></div><div class="b"><p><b>درگاه پرداخت زرین‌پال</b></p><p id="gamt"></p><div class="row"><button class="go" id="gok">پرداخت</button><button class="no" id="gno">انصراف</button></div></div></div></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const fmt=n=>n.toLocaleString('en-US')+' تومان';
+const L='━━━━━━━━━━━━━━';
+const FIELDS={
+ player:[['name','👤 نام بازیکن'],['psn','🆔 آیدی PSN یا EA ID'],['pos1','🎯 پست اصلی'],['pos2','🎯 پست دوم'],['history','🏟 سابقه حضور در تیم‌ها'],['honors','🏆 افتخارات بازیکن'],['hours','⏰ ساعات فعالیت'],['notes','📝 توضیحات تکمیلی'],['photo','🖼 تصویر کارت بازیکن']],
+ team:[['team','🛡 نام تیم'],['logo','🖼 لوگوی تیم'],['captain','👑 نام کاپیتان'],['captain_tg','✈️ آیدی تلگرام کاپیتان'],['positions','🎯 پست‌های موردنیاز'],['count','🔢 تعداد بازیکنان موردنیاز'],['hours','⏰ ساعات فعالیت'],['terms','📋 شرایط جذب'],['notes','📝 توضیحات تکمیلی']]};
+const OPT=['photo','logo','notes'];
+const SAMPLE={player:{name:'امیرحسین کریمی',psn:'Amir_CAM10',pos1:'CAM',pos2:'CM',history:'Phoenix FC، Iron Wolves',honors:'قهرمان لیگ دسته ۲ فصل ۱۴',hours:'۲۱ تا ۲۴',notes:'بازیکن تیمی، میکروفون دارم',photo:'card'},
+ team:{team:'Shadow Lions',logo:'card',captain:'مهدی صادقی',captain_tg:'@mehdi_sl',positions:'GK، CB',count:'2',hours:'۲۰ تا ۲۴',terms:'حضور منظم در تمرین، آیدی PSN فعال',notes:'تیم در لیگ برتر دسته ۱'}};
+const BADGES=[['🥉','برنزی',5],['🥈','نقره‌ای',15],['🥇','طلایی',30],['💎','الماسی',50],['👑','افسانه‌ای',100]];
+const NAMES={price_normal:'تعرفه ثبت عادی',price_special:'تعرفه ثبت ویژه',renew_normal:'تعرفه تمدید عادی',renew_special:'تعرفه تمدید ویژه',upgrade_price:'تعرفه ارتقا به ویژه',days_normal:'اعتبار عادی (روز)',days_special:'اعتبار ویژه (روز)',referral_reward:'پاداش دعوت'};
+let S;
+function init(){S={role:'user',tab:'bot',balance:30000,counted:4,nextId:3,expect:null,flow:null,group:'گروه نقل‌وانتقالات PCL',
+ cfg:{price_normal:20000,price_special:50000,renew_normal:15000,renew_special:40000,upgrade_price:30000,days_normal:7,days_special:14,referral_reward:10000},
+ tx:[{amt:50000,t:'💳 افزایش موجودی'},{amt:-20000,t:'📝 ثبت آگهی'}],gifts:{PCL2026:{amt:20000,left:50}},used:[],invited:3,done:2,
+ badges:BADGES.map(b=>[...b]),
+ ads:[{id:1,kind:'player',special:0,st:'approved',d:{...SAMPLE.player,name:'علی رضایی',psn:'Ali_PCL7',pos1:'ST',pos2:'LW'},exp:'1405/07/18',posted:true},
+      {id:2,kind:'team',special:1,st:'expired',d:{...SAMPLE.team,team:'Iron Wolves',captain_tg:'@wolf_cap'},exp:'1405/06/02'}],
+ chats:{user:[],admin:[]}}}
+const chat=()=>S.chats[S.role];
+function say(html,kb,o={}){const c=S.chats[o.role||S.role];c.forEach(m=>m.live=false);c.push({from:o.me?'me':'bot',html,kb,live:!o.me&&!!kb,card:o.card});paint()}
+function screen(html,kb){const c=chat(),l=c[c.length-1];if(l&&l.live&&l.from==='bot'){l.html=html;l.kb=kb;l.card=null;paint()}else say(html,kb)}
+function paint(){
+ const el=$('#chat');
+ if(S.tab==='group'){el.innerHTML='';groupView();return}
+ el.innerHTML=chat().map((m,i)=>`<div class="msg ${m.from}"><div class="bub">${m.card?cardHtml(m.card):''}${m.html}</div>${m.kb?kbHtml(m.kb,m.live,i):''}</div>`).join('');
+ el.scrollTop=el.scrollHeight;
+ $('#hint').textContent=S.expect?S.expect.hint:'';
+ $('#txt').placeholder=S.expect?'بنویس و ارسال کن...':'پیام...';
+}
+function cardHtml(t){return `<div class="card"><b>${t==='card'?'CAM  87':t}</b><span>PCL PLAYER CARD</span></div>`}
+const norm=kb=>kb.map(r=>typeof r[0]==='string'?[r]:r);
+function kbHtml(kb,live){return `<div class="kb ${live?'':'dead'}">`+norm(kb).map(row=>row.map(b=>`<button class="${row.length===1?'wide':''}" data-a="${esc(b[1])}">${b[0]}</button>`).join('')).join('')+'</div>'}
+function groupView(){
+ const el=$('#chat');$('#hint').textContent='';
+ const posts=S.ads.filter(a=>a.posted);
+ el.innerHTML=`<div class="msg bot"><div class="bub">📌 ${esc(S.group)}\nآگهی‌های تأییدشده این‌جا به‌صورت خودکار منتشر می‌شن.</div></div>`+(posts.length?posts.map(a=>`<div class="msg bot"><div class="bub">${a.d.photo||a.d.logo?cardHtml('card'):''}${adHtml(a)}</div></div>`).join(''):'<div class="msg bot"><div class="bub">هنوز آگهی‌ای منتشر نشده. از نقش «مدیر» یک آگهی را تأیید کن.</div></div>');
+}
+function adHtml(a,prev){
+ const d=a.d,st=a.special?`<span class="star">⭐️ ویژه</span>\n`:'';
+ if(a.kind==='player')return `🎮 <b>بازیکن آزاد</b>\n${st}${L}\n👤 <b>نام:</b> ${esc(d.name)}\n🆔 <b>آیدی:</b> <code>${esc(d.psn)}</code>\n🎯 <b>پست اصلی:</b> ${esc(d.pos1)}\n🎯 <b>پست دوم:</b> ${esc(d.pos2)}\n🏟 <b>سوابق:</b> ${esc(d.history)}\n🏆 <b>افتخارات:</b> ${esc(d.honors)}\n⏰ <b>ساعات فعالیت:</b> ${esc(d.hours)}\n${d.notes?`📝 <b>توضیحات:</b> ${esc(d.notes)}\n`:''}${L}\n📩 <b>ارتباط:</b> @ali_pcl\n\n<span class="tag">#بازیکن_آزاد #PCL</span>`;
+ return `🛡 <b>جذب بازیکن</b>\n${st}${L}\n🏷 <b>تیم:</b> ${esc(d.team)}\n👑 <b>کاپیتان:</b> ${esc(d.captain)}\n🎯 <b>پست‌های موردنیاز:</b> ${esc(d.positions)}\n🔢 <b>تعداد موردنیاز:</b> ${esc(d.count)}\n⏰ <b>ساعات فعالیت:</b> ${esc(d.hours)}\n📋 <b>شرایط جذب:</b> ${esc(d.terms)}\n${d.notes?`📝 <b>توضیحات:</b> ${esc(d.notes)}\n`:''}${L}\n📩 <b>ارتباط:</b> ${esc(d.captain_tg)}\n\n<span class="tag">#جذب_بازیکن #PCL</span>`}
+const BK=(to='menu',t='🔙 بازگشت')=>[[t,to]];
+const STT={pending:'⏳ در انتظار تأیید',approved:'✅ تأییدشده و منتشرشده',rejected:'❌ ردشده',expired:'⌛️ منقضی‌شده'};
+function menu(){
+ const kb=[['📝 ثبت آگهی جدید','ad:new'],['🗄 آگهی‌های ثبت‌شده','myads'],['☎️ ارتباط با ما','support'],['💰 افزایش موجودی','wallet'],['👤 مشخصات من','profile'],['🎁 کارت هدیه','gift'],['👥 دعوت دوستان','invite'],['🏅 نشان‌های افتخار','badges']];
+ const rows=[];for(let i=0;i<kb.length;i+=2)rows.push(kb.slice(i,i+2));
+ if(S.role==='admin')rows.push([['🛠 پنل مدیریت','adm']]);
+ screen('👋 به ربات <b>PCL Transfer</b> خوش اومدی!\n\nاینجا می‌تونی آگهی بازیکن آزاد یا جذب بازیکن برای تیم پروکلابت ثبت کنی.',rows)}
+function badgeInfo(){const c=S.counted;let cur=null,nxt=null;for(const b of S.badges){if(c>=b[2])cur=b;else if(!nxt)nxt=b}return{cur,nxt,c}}
+function act(a){
+ S.expect=null;const p=a.split(':');
+ const A={
+ menu(){S.flow=null;menu()},
+ profile(){const{cur,nxt,c}=badgeInfo();screen(`👤 <b>مشخصات من</b>\n${L}\n🙍 نام: علی رضایی\n🆔 آیدی تلگرام: @ali_pcl\n🔢 شناسه: <code>412908765</code>\n📅 عضویت: 1405/04/12 10:21\n💰 موجودی: <b>${fmt(S.balance)}</b>\n📝 آگهی‌های ثبت‌شده: ${S.ads.length}\n✅ آگهی‌های معتبر: ${c}\n👥 دعوت‌های موفق: ${S.done}\n🏅 نشان فعلی: ${cur?cur[0]+' '+cur[1]:'— (هنوز نشانی نداری)'}\n🎯 تا نشان بعدی: ${nxt?(nxt[2]-c)+' آگهی تا '+nxt[0]+' '+nxt[1]:'🏁 به بالاترین نشان رسیدی'}`,[[['💰 افزایش موجودی','wallet'],['🏅 نشان‌ها','badges']],BK()])},
+ badges(){const{c}=badgeInfo();screen(`🏅 <b>نشان‌های افتخار</b>\n${L}\n`+S.badges.map(b=>`${c>=b[2]?'✅':'🔒'} ${b[0]} <b>${b[1]}</b> — ثبت ${b[2]} آگهی معتبر`).join('\n')+`\n\n📊 آگهی‌های معتبر تو: <b>${c}</b>\nℹ️ فقط آگهی‌های تأییدشده و غیرتکراری حساب می‌شن؛ ویرایش و تمدید چیزی اضافه نمی‌کنه.`,[BK()[0]])},
+ invite(){screen(`👥 <b>دعوت دوستان</b>\n${L}\n🔗 لینک اختصاصی تو:\n<code>https://t.me/PCLTransferBot?start=ref_412908765</code>\n\n👤 دعوت‌شده‌ها: ${S.invited}\n✅ دعوت‌های موفق: ${S.done}\n💰 مجموع پاداش: <b>${fmt(S.done*S.cfg.referral_reward)}</b>\n\n🎁 به‌ازای هر دعوت موفق <b>${fmt(S.cfg.referral_reward)}</b> اعتبار می‌گیری. دعوت وقتی موفق حساب می‌شه که دوستت اولین آگهی معتبرش رو ثبت کنه.`,[BK()[0]])},
+ wallet(){screen(`💰 <b>کیف پول</b>\n${L}\nموجودی: <b>${fmt(S.balance)}</b>\n\nمبلغ شارژ رو انتخاب کن:`,[[ '50,000 تومان','pay:50000'],['100,000 تومان','pay:100000'],['200,000 تومان','pay:200000'],['500,000 تومان','pay:500000'],['✍️ مبلغ دلخواه','custom'],['📜 تراکنش‌ها','hist'],...[BK()[0]]].reduce((r,b,i,arr)=>{if(i%2===0)r.push(arr.slice(i,i+2));return r},[]))},
+ pay(){const amt=+p[1];screen(`💳 مبلغ <b>${fmt(amt)}</b>\nروی دکمه بزن تا به صفحه پرداخت بری. بعد از پرداخت، موجودی خودکار شارژ می‌شه.`,[['💳 پرداخت آنلاین','gate:'+amt],BK('wallet')[0]])},
+ gate(){const amt=+p[1];$('#gurl').textContent='https://sub.pclproclubss.ir/pg/StartPay/A00000000000000000000000'+Math.floor(1000+Math.random()*8999);$('#gamt').textContent='مبلغ قابل پرداخت: '+fmt(amt);$('#gateway').hidden=false;S.pending=amt},
+ custom(){S.expect={hint:'مبلغ را به تومان بنویس. مثال: 75000',fn:t=>{const n=parseInt(t.replace(/[^0-9]/g,''));if(!n||n<10000)return say('⚠️ یه عدد معتبر بفرست (حداقل 10,000 تومان).');act('pay:'+n)}};screen('✍️ مبلغ شارژ رو به تومان بفرست (حداقل 10,000 تومان):',[BK('wallet')[0]]);paint()},
+ hist(){screen('📜 <b>تراکنش‌های اخیر</b>\n\n'+S.tx.slice().reverse().slice(0,10).map(t=>`${t.amt>0?'➕':'➖'} ${fmt(Math.abs(t.amt))} — ${t.t}\n   🕒 1405/07/${10+S.tx.indexOf(t)} 14:2${S.tx.indexOf(t)%10}`).join('\n'),[BK('wallet')[0]])},
+ gift(){S.expect={hint:'کد نمونه: PCL2026',fn:t=>{const c=t.trim().toUpperCase(),g=S.gifts[c];if(!g)return say('❌ کد نامعتبره.\nدوباره امتحان کن یا برگرد.',[BK()[0]]);if(S.used.includes(c))return say('⚠️ قبلاً از این کد استفاده کردی.',[BK()[0]]);if(g.left<1)return say('😕 ظرفیت استفاده از این کد تموم شده.',[BK()[0]]);g.left--;S.used.push(c);S.balance+=g.amt;S.tx.push({amt:g.amt,t:'🎁 کارت هدیه'});say(`🎉 <b>${fmt(g.amt)}</b> به کیف پولت اضافه شد.`,[[['👤 مشخصات من','profile']].flat(),BK()[0]])}};screen('🎁 <b>کارت هدیه</b>\n\nکد هدیه‌ات رو بفرست:',[BK()[0]]);paint()},
+ support(){screen('☎️ <b>ارتباط با ما</b>\n\nموضوع پیامت رو انتخاب کن:',[['💳 مشکل پرداخت','sup:مشکل پرداخت'],['📝 سؤال درباره آگهی','sup:سؤال درباره آگهی'],[ '💬 سایر موارد','sup:سایر موارد'],BK()[0]].reduce((r,b,i,arr)=>{if(i%2===0)r.push(arr.slice(i,i+2));return r},[]))},
+ sup(){const cat=p[1];S.expect={hint:'پیام خود را برای پشتیبانی بنویس',fn:t=>{say('✅ پیامت برای پشتیبانی ارسال شد. به‌زودی جواب می‌گیری.',[BK()[0]]);say(`📨 <b>پیام پشتیبانی</b> — ${cat}\n👤 علی رضایی | @ali_pcl | <code>412908765</code>\n${L}\n${esc(t)}`,[['↩️ پاسخ','reply']],{role:'admin'})}};screen(`✍️ پیامت رو برای «${cat}» بنویس و بفرست:`,[BK('support')[0]]);paint()},
+ reply(){S.expect={hint:'پاسخ را بنویس',fn:t=>{say('✅ ارسال شد.',[BK('adm')[0]]);say('📩 <b>پاسخ پشتیبانی</b>\n'+L+'\n'+esc(t),[BK()[0]],{role:'user'})}};say('✍️ پاسخ رو بنویس:',[BK('adm','🔙 انصراف')[0]]);paint()},
+ // ----- new ad -----
+ 'ad'(){if(p[1]==='new'){S.flow=null;return screen('📝 <b>ثبت آگهی جدید</b>\n\nنوع آگهی رو انتخاب کن:',[[['🎮 بازیکن آزاد','k:player'],['🛡 جذب بازیکن','k:team']],BK()])}},
+ k(){const k=p[1];screen(`<b>${k==='player'?'🎮 آگهی بازیکن آزاد':'🛡 آگهی جذب بازیکن'}</b>\n\nنوع انتشار رو انتخاب کن:\n\n📄 عادی: ${fmt(S.cfg.price_normal)} — ${S.cfg.days_normal} روز\n⭐️ ویژه (با نشان مخصوص): ${fmt(S.cfg.price_special)} — ${S.cfg.days_special} روز`,[[['📄 عادی','s:'+k+':0'],['⭐️ ویژه','s:'+k+':1']],BK('ad:new')].map(r=>r))},
+ s(){S.flow={kind:p[1],special:+p[2],vals:{},idx:0,mode:'new'};ask()},
+ skip(){S.flow.vals[curKey()]=null;adv()},
+ prevf(){S.flow.idx=Math.max(0,S.flow.idx-1);ask()},
+ sample(){S.flow.vals={...SAMPLE[S.flow.kind]};preview()},
+ photo(){S.flow.vals[curKey()]='card';say('',null,{me:true,card:'card'});adv()},
+ edit(){const f=S.flow;f.mode='edit';screen('✏️ کدوم بخش رو ویرایش کنیم؟',[...FIELDS[f.kind].map((x,i)=>[x[1],'ef:'+i]).reduce((r,b,i,arr)=>{if(i%2===0)r.push(arr.slice(i,i+2));return r},[]),[['🔙 بازگشت به پیش‌نمایش','resume']]])},
+ ef(){S.flow.idx=+p[1];ask()},
+ resume(){S.flow.mode='new';preview()},
+ ok(){const f=S.flow,price=f.special?S.cfg.price_special:S.cfg.price_normal;
+  if(S.balance<price){const sh=price-S.balance;return screen(`💰 موجودی کافی نیست.\nهزینه: ${fmt(price)}\nموجودی تو: ${fmt(S.balance)}\n\nبعد از شارژ، «ادامه ثبت آگهی» رو بزن؛ اطلاعاتت حفظ می‌شه.`,[[`💳 شارژ ${fmt(sh)}`,'pay:'+sh],['▶️ ادامه ثبت آگهی','resume'],BK()[0]].map(b=>[b]))}
+  S.balance-=price;S.tx.push({amt:-price,t:'📝 ثبت آگهی'});const ad={id:S.nextId++,kind:f.kind,special:f.special,st:'pending',d:{...f.vals}};S.ads.push(ad);S.flow=null;
+  screen(`✅ آگهی شماره <b>${ad.id}</b> ثبت شد و بعد از تأیید مدیر منتشر می‌شه.\n💰 ${fmt(price)} از کیفت کسر شد.`,[[['🗄 آگهی‌های من','myads']],BK()[0]]);
+  say(`🆕 آگهی جدید #${ad.id} از علی رضایی (<code>412908765</code>)`,[['✅ تأیید','adm:ok:'+ad.id],['❌ رد','adm:no:'+ad.id],['🗑 حذف','adm:del:'+ad.id],['📋 لیست','adm:ads']],{role:'admin',card:ad.d.photo||ad.d.logo?'card':null});
+  S.chats.admin[S.chats.admin.length-1].html+='\n\n'+adHtml(ad)},
+ // ----- my ads -----
+ myads(){screen('🗄 <b>آگهی‌های ثبت‌شده</b>',[[['🟢 فعال و در انتظار','myl:a'],['🔴 منقضی و ردشده','myl:x']],BK()[0]].map(r=>Array.isArray(r[0])?r:[r]))},
+ myl(){const act_=p[1]==='a',ads=S.ads.filter(a=>act_?['pending','approved'].includes(a.st):['expired','rejected'].includes(a.st));
+  if(!ads.length)return screen('📭 آگهی‌ای در این بخش نداری.',[BK('myads')]);
+  const b=ads.map(a=>[`${a.special?'⭐️':a.kind==='player'?'🎮':'🛡'} #${a.id} ${a.d.name||a.d.team}`,'v:'+a.id]);
+  screen('یکی از آگهی‌ها رو انتخاب کن:',[...b.reduce((r,x,i,arr)=>{if(i%2===0)r.push(arr.slice(i,i+2));return r},[]),BK('myads')[0]])},
+ v(){const a=S.ads.find(x=>x.id==p[1]);if(!a)return;const live=['pending','approved'].includes(a.st);const r1=[];if(live)r1.push(['✏️ ویرایش','ed:'+a.id]);if(a.st==='approved'||a.st==='expired')r1.push(['🔁 تمدید','rn:'+a.id]);const r2=[['🗑 حذف','del:'+a.id]];if(live&&!a.special)r2.unshift(['⭐️ ارتقا به ویژه','up:'+a.id]);
+  screen(adHtml(a)+`\n\n📌 وضعیت: <b>${STT[a.st]}</b>`+(a.exp?`\n⏳ انقضا: ${a.exp}`:'')+(a.d.photo||a.d.logo?'\n🖼 تصویر: دارد':''),[...(r1.length?[r1]:[]),r2,BK(live?'myl:a':'myl:x')])},
+ ed(){screen('✏️ کدوم بخش آگهی رو ویرایش کنیم؟\n⚠️ بعد از ویرایش، آگهی دوباره برای تأیید مدیر ارسال می‌شه.\n(در دمو ویرایش نام نمایش داده می‌شود)',[['برگشت','v:'+p[1]]].map(b=>[b]))},
+ del(){screen(`🗑 آگهی #${p[1]} حذف بشه؟`,[[['✅ بله، حذف کن','delok:'+p[1]],['🔙 نه','v:'+p[1]]]])},
+ delok(){S.ads=S.ads.filter(a=>a.id!=p[1]);screen('🗑 آگهی حذف شد.',[BK('myads')])},
+ rn(){const a=S.ads.find(x=>x.id==p[1]),pr=a.special?S.cfg.renew_special:S.cfg.renew_normal,d=a.special?S.cfg.days_special:S.cfg.days_normal;screen(`🔁 تمدید آگهی #${a.id}\n💰 هزینه: <b>${fmt(pr)}</b>\n⏳ مدت: ${d} روز`,[['✅ پرداخت از کیف پول','rnok:'+a.id],BK('v:'+a.id)[0]].map(b=>[b]))},
+ rnok(){const a=S.ads.find(x=>x.id==p[1]),pr=a.special?S.cfg.renew_special:S.cfg.renew_normal;if(S.balance<pr)return screen(`💰 موجودی کافی نیست (${fmt(pr)} لازمه).`,[['💳 افزایش موجودی','wallet'],BK('v:'+a.id)[0]].map(b=>[b]));S.balance-=pr;S.tx.push({amt:-pr,t:'🔁 تمدید آگهی'});a.st='approved';a.posted=true;a.exp='1405/07/'+(20+S.cfg.days_normal);screen(`✅ آگهی تمدید شد تا ${a.exp}.`,[BK('myads')])},
+ up(){screen(`⭐️ ارتقای آگهی #${p[1]} به ویژه\n💰 هزینه: <b>${fmt(S.cfg.upgrade_price)}</b>\nآگهی با نشان ویژه منتشر می‌شه.`,[['✅ پرداخت از کیف پول','upok:'+p[1]],BK('v:'+p[1])[0]].map(b=>[b]))},
+ upok(){const a=S.ads.find(x=>x.id==p[1]);if(S.balance<S.cfg.upgrade_price)return screen('💰 موجودی کافی نیست.',[['💳 افزایش موجودی','wallet'],BK('v:'+a.id)[0]].map(b=>[b]));S.balance-=S.cfg.upgrade_price;S.tx.push({amt:-S.cfg.upgrade_price,t:'⭐ ارتقا به ویژه'});a.special=1;screen('⭐️ آگهی به حالت ویژه ارتقا پیدا کرد.',[BK('v:'+a.id)])},
+ // ----- admin -----
+ adm(){screen('🛠 <b>پنل مدیریت</b>',[['📊 آمار','adm:stats'],['👥 کاربران','adm:users'],['📋 آگهی‌ها','adm:ads'],['💵 تراکنش‌ها','adm:tx'],['⚙️ تعرفه و تنظیمات','adm:set'],['🎁 کارت‌های هدیه','adm:gifts'],['🏅 نشان‌ها','adm:badges'],['📡 گروه انتشار','adm:pub'],['📣 پیام همگانی','adm:bc'],['🔙 منوی اصلی','menu']].reduce((r,b,i,arr)=>{if(i%2===0)r.push(arr.slice(i,i+2));return r},[]))}};
+ (A[p[0]]||(()=>{}))();
+}
+function curKey(){return FIELDS[S.flow.kind][S.flow.idx][0]}
+function ask(){const f=S.flow,[key,label]=FIELDS[f.kind][f.idx],isP=['photo','logo'].includes(key),tot=FIELDS[f.kind].length;
+ const rows=[];const r=[];if(OPT.includes(key))r.push(['⏭ رد کردن','skip']);if(isP)r.push(['📸 ارسال عکس نمونه','photo']);if(f.mode==='new'&&f.idx>0)r.push(['◀️ مرحله قبل','prevf']);if(r.length)rows.push(r);
+ rows.push([['⚡ پر کردن نمونه (فقط دمو)','sample']]);rows.push(BK('menu','🔙 لغو')); 
+ S.expect=isP?null:{hint:'جواب را بنویس و ارسال کن',fn:t=>{S.flow.vals[key]=t;adv()}};
+ screen(`<b>${f.kind==='player'?'🎮 آگهی بازیکن آزاد':'🛡 آگهی جذب بازیکن'}</b>${f.mode==='new'?` — مرحله ${f.idx+1} از ${tot}`:''}\n\n${label}\n${isP?'📸 تصویر رو بفرست':'✍️ بنویس و بفرست'}${OPT.includes(key)?'\n(اختیاری)':''}`,rows);paint()}
+function adv(){const f=S.flow;if(f.mode==='new'){if(f.idx+1<FIELDS[f.kind].length){f.idx++;ask()}else preview()}else{f.mode='new';preview()}}
+function preview(){const f=S.flow;S.expect=null;const price=f.special?S.cfg.price_special:S.cfg.price_normal,days=f.special?S.cfg.days_special:S.cfg.days_normal;
+ const ad={kind:f.kind,special:f.special,d:f.vals};say(adHtml(ad),null,{card:f.vals.photo||f.vals.logo?'card':null});
+ say(`👆 پیش‌نمایش آگهی\n💰 هزینه: <b>${fmt(price)}</b> | ⏳ اعتبار: ${days} روز\nاگه همه‌چی درسته تأیید کن:`,[[['✅ تأیید و ارسال','ok'],['✏️ ویرایش','edit']],BK('menu','❌ لغو')].map(r=>Array.isArray(r[0])?r:[r]))}
+// ----- admin sub-screens (dispatch by prefix adm:*) -----
+const orig=act;
+act=function(a){const p=a.split(':');if(p[0]!=='adm'||!p[1])return orig(a);S.expect=null;
+ const B=BK('adm')[0],pairs=(arr)=>arr.reduce((r,b,i)=>{if(i%2===0)r.push(arr.slice(i,i+2));return r},[]);
+ const cnt=s=>S.ads.filter(x=>x.st===s).length;
+ switch(p[1]){
+ case'stats':screen(`📊 <b>آمار ربات</b>\n${L}\n👥 کاربران: 1,284 (۲۴ ساعت اخیر: 37)\n📝 کل آگهی‌ها: ${412+S.ads.length} | ⭐️ ویژه: ${58+S.ads.filter(x=>x.special).length}\n⏳ در انتظار: ${cnt('pending')} | ✅ فعال: ${96+cnt('approved')}\n\n💰 درآمد خالص آگهی‌ها: <b>${fmt(9840000)}</b>\n💳 مجموع شارژهای موفق: ${fmt(14250000)}\n👛 مجموع موجودی کاربران: ${fmt(2310000+S.balance)}`,[[B]]);break;
+ case'users':screen(`👤 <b>علی رضایی</b> (@ali_pcl)\n🔢 <code>412908765</code>\n📅 1405/04/12\n💰 موجودی: ${fmt(S.balance)}\n✅ آگهی معتبر: ${S.counted}\n🚫 وضعیت: ${S.banned?'مسدود':'فعال'}`,[['➕ ۱۰,۰۰۰ تومان','adm:addbal'],['🚫 مسدود/رفع','adm:ban'],B].map(b=>[b]));break;
+ case'addbal':S.balance+=10000;S.tx.push({amt:10000,t:'🛠 تغییر توسط مدیر'});act('adm:users');break;
+ case'ban':S.banned=!S.banned;act('adm:users');break;
+ case'ads':screen('📋 <b>مدیریت آگهی‌ها</b>',[[`⏳ در انتظار تأیید (${cnt('pending')})`,'adm:al:pending'],['✅ فعال','adm:al:approved'],['⌛️ منقضی','adm:al:expired'],['❌ ردشده','adm:al:rejected'],B].reduce((r,b,i,arr)=>{if(i<4){if(i%2===0)r.push(arr.slice(i,i+2))}else r.push([b]);return r},[]));break;
+ case'al':{const st=p[2],l=S.ads.filter(x=>x.st===st);if(!l.length)return screen('📭 موردی نیست.',[BK('adm:ads')]);screen(STT[st]+' — یکی رو انتخاب کن:',[...pairs(l.map(x=>[`${x.special?'⭐️':'•'} #${x.id} ${x.kind==='player'?'🎮':'🛡'}`,'adm:ad:'+x.id])),BK('adm:ads')[0]]);break}
+ case'ad':{const x=S.ads.find(y=>y.id==p[2]);screen(adHtml(x)+`\n\n📌 ${STT[x.st]}`,[...(x.st==='pending'?[[['✅ تأیید','adm:ok:'+x.id],['❌ رد','adm:no:'+x.id]]]:[]),[['🗑 حذف','adm:del:'+x.id]],BK('adm:ads')]);break}
+ case'ok':{const x=S.ads.find(y=>y.id==p[2]);if(!x||x.st!=='pending')return say('این آگهی در انتظار تأیید نیست.',[BK('adm')]);x.st='approved';x.posted=true;x.exp='1405/07/'+(20+S.cfg['days_'+(x.special?'special':'normal')]);const b0=badgeInfo().cur;S.counted++;const b1=badgeInfo().cur;
+  screen('✅ آگهی تأیید شد و در «'+S.group+'» منتشر شد.',[BK('adm:ads')]);
+  say(`✅ آگهی شماره <b>${x.id}</b> تأیید و منتشر شد.`,[BK()[0]],{role:'user'});
+  if(b1&&b1!==b0)say(`🎉 تبریک! نشان ${b1[0]} <b>${b1[1]}</b> رو دریافت کردی.`,[BK()[0]],{role:'user'});break}
+ case'no':S.expect={hint:'دلیل رد را بنویس',fn:t=>{const x=S.ads.find(y=>y.id==p[2]);x.st='rejected';const price=x.special?S.cfg.price_special:S.cfg.price_normal;S.balance+=price;S.tx.push({amt:price,t:'↩️ بازگشت وجه'});say('❌ رد شد.',[BK('adm:ads')]);say(`❌ آگهی شماره <b>${x.id}</b> رد شد.\n📌 دلیل: ${esc(t)}\n↩️ مبلغ ${fmt(price)} به کیف پولت برگشت.`,[BK()[0]],{role:'user'})}};say('✍️ دلیل رد رو بنویس:',[BK('adm','🔙 انصراف')]);paint();break;
+ case'del':S.ads=S.ads.filter(y=>y.id!=p[2]);screen('🗑 حذف شد.',[BK('adm:ads')]);break;
+ case'tx':screen('💵 <b>۲۰ تراکنش اخیر</b>\n\n'+S.tx.slice().reverse().slice(0,8).map((t,i)=>`${t.amt>0?'➕':'➖'} ${fmt(Math.abs(t.amt))} | ${t.t} | <code>412908765</code> | 1405/07/2${i}`).join('\n'),[[B]]);break;
+ case'set':screen('⚙️ <b>تعرفه و تنظیمات</b>\nیکی رو انتخاب کن:\n\n'+Object.keys(NAMES).map(k=>`• ${NAMES[k]}: <b>${S.cfg[k].toLocaleString('en-US')}</b>`).join('\n'),[...pairs(Object.keys(NAMES).map(k=>[NAMES[k],'adm:s:'+k])),B]);break;
+ case's':{const k=p[2];S.expect={hint:'عدد جدید را بنویس',fn:t=>{const n=parseInt(t.replace(/[^0-9]/g,''));if(!n)return say('⚠️ فقط عدد بفرست.');S.cfg[k]=n;say('✅ ذخیره شد.',[BK('adm:set')])}};screen(`${NAMES[k]}\n\nمقدار فعلی: <code>${S.cfg[k]}</code>\n\nمقدار جدید رو بفرست:`,[BK('adm:set')]);paint();break}
+ case'gifts':screen('🎁 <b>کارت‌های هدیه</b>\n\n'+Object.entries(S.gifts).map(([c,g])=>`<code>${c}</code> — ${fmt(g.amt)} — ${50-g.left}/50 — انقضا: 1405/08/30`).join('\n'),[[['➕ ساخت کد جدید','adm:gnew']],[B]]);break;
+ case'gnew':S.expect={hint:'مثال: 20000 50 30',fn:t=>{const q=t.split(/\s+/);if(q.length<3||q.slice(0,3).some(x=>!/^\d+$/.test(x)))return say('⚠️ قالب اشتباهه. مثال: <code>20000 50 30</code>');const code=(q[3]||'PCL'+Math.random().toString(16).slice(2,8)).toUpperCase();S.gifts[code]={amt:+q[0],left:+q[1]};say(`✅ کد ساخته شد:\n<code>${code}</code>\n💰 ${fmt(+q[0])} | 🔢 ${q[1]} بار`,[BK('adm:gifts')])}};screen('✍️ اطلاعات کد رو با این قالب بفرست:\n\n<code>مبلغ تعداد‌استفاده روز‌اعتبار [کد]</code>\n\nمثال: <code>20000 50 30</code>',[BK('adm:gifts')]);paint();break;
+ case'badges':screen('🏅 <b>نشان‌های افتخار</b>\nبرای ویرایش روی نشان بزن:',[...pairs(S.badges.map((b,i)=>[`${b[0]} ${b[1]} (${b[2]})`,'adm:b:'+i])),[['➕ نشان جدید','adm:b:new']],B]);break;
+ case'b':{const i=p[2];S.expect={hint:'مثال: 🏆 200 اسطوره',fn:t=>{const q=t.split(/\s+/);if(q.length<3||!/^\d+$/.test(q[1]))return say('⚠️ قالب اشتباهه. مثال: 🥉 5 برنزی');const nb=[q[0],q.slice(2).join(' '),+q[1]];i==='new'?S.badges.push(nb):S.badges[i]=nb;S.badges.sort((a,b)=>a[2]-b[2]);say('✅ ذخیره شد.',[BK('adm:badges')])}};screen('✍️ با این قالب بفرست:\n<code>ایموجی تعداد_آگهی نام</code>\nمثال: <code>🏆 200 اسطوره</code>',[BK('adm:badges')]);paint();break}
+ case'pub':S.expect={hint:'نام یا آیدی گروه',fn:t=>{S.group=t;say(`✅ آگهی‌ها در «${esc(t)}» منتشر می‌شن.`,[BK()])}};screen(`📡 <b>گروه/کانال انتشار</b>\nفعلی: <code>${esc(S.group)}</code>\n\nربات رو در گروه یا کانال ادمین کن و آیدی عددی یا @یوزرنیم رو بفرست:`,[BK()]);paint();break;
+ case'bc':S.expect={hint:'متن پیام همگانی',fn:t=>{say('✅ ارسال شد: 1,284 از 1,284',[BK()]);say('📣 '+esc(t),[BK()[0]],{role:'user'})}};screen('📣 پیامی که می‌خوای برای همه کاربران ارسال بشه رو بفرست:',[BK()]);paint();break;
+ }};
+// ---- wiring ----
+function setRole(r){S.role=r;S.tab='bot';S.expect=null;$('#r-user').setAttribute('aria-pressed',r==='user');$('#r-admin').setAttribute('aria-pressed',r==='admin');$('#sub').textContent=r==='admin'?'ربات (دید مدیر)':'ربات';$('#title').textContent='PCL Transfer';if(!chat().length){if(r==='admin'){say('🛠 <b>پنل مدیریت</b>',null);act('adm')}else menu()}else paint();setChip(null)}
+function setChip(id){document.querySelectorAll('#chips button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.j===id))}
+const JUMPS=[
+ ['کاربر','منوی اصلی',()=>act('menu')],['کاربر','ثبت آگهی: انتخاب نوع',()=>act('ad:new')],['کاربر','فرم آگهی بازیکن',()=>{act('s:player:0');S.flow.vals={};S.flow.idx=0;S.flow.vals={name:'امیرحسین کریمی',psn:'Amir_CAM10'};S.flow.idx=2;ask()}],
+ ['کاربر','پیش‌نمایش آگهی تیم',()=>{S.flow={kind:'team',special:1,vals:{...SAMPLE.team},idx:0,mode:'new'};preview()}],['کاربر','آگهی‌های من',()=>act('myl:a')],['کاربر','جزئیات یک آگهی',()=>act('v:1')],
+ ['کاربر','کیف پول',()=>act('wallet')],['کاربر','درگاه پرداخت',()=>{act('pay:100000');act('gate:100000')}],['کاربر','کارت هدیه',()=>{act('gift');handleText('PCL2026')}],
+ ['کاربر','دعوت دوستان',()=>act('invite')],['کاربر','نشان‌های افتخار',()=>act('badges')],['کاربر','مشخصات من',()=>act('profile')],['کاربر','ارتباط با ما',()=>act('support')],
+ ['مدیر','پنل مدیریت',()=>act('adm')],['مدیر','آگهی‌های در انتظار',()=>{ensurePending();act('adm:al:pending')}],['مدیر','آمار',()=>act('adm:stats')],['مدیر','تعرفه‌ها',()=>act('adm:set')],['مدیر','کارت‌های هدیه',()=>act('adm:gifts')],['مدیر','نشان‌ها',()=>act('adm:badges')],
+ ['گروه','گروه انتشار',()=>{ensurePending();S.ads.filter(a=>a.st==='pending').forEach(a=>{a.st='approved';a.posted=true});S.ads.forEach(a=>{if(a.st==='approved')a.posted=true});S.tab='group';paint()}]];
+function ensurePending(){if(!S.ads.some(a=>a.st==='pending')){const ad={id:S.nextId++,kind:'player',special:1,st:'pending',d:{...SAMPLE.player}};S.ads.push(ad);if(!S.chats.admin.length)S.chats.admin.push({from:'bot',html:'🛠 <b>پنل مدیریت</b>'})}}
+function buildChips(){const g={};JUMPS.forEach((j,i)=>(g[j[0]]=g[j[0]]||[]).push([i,j[1]]));$('#chips').innerHTML=Object.entries(g).map(([k,v])=>`<h3>${k==='کاربر'?'نقش کاربر':k==='مدیر'?'نقش مدیر':'گروه'}</h3><div class="chips">${v.map(([i,t])=>`<button data-j="${i}">${t}</button>`).join('')}</div>`).join('')}
+document.addEventListener('click',e=>{
+ const b=e.target.closest('button[data-a]');if(b){act(b.dataset.a);return}
+ const j=e.target.closest('#chips button');if(j){const J=JUMPS[+j.dataset.j];const role=J[0]==='مدیر'?'admin':'user';setRole(role);J[2]();setChip(j.dataset.j);if(J[0]==='گروه'){$('#title').textContent=S.group;$('#sub').textContent='گروه'}}
+});
+$('#r-user').onclick=()=>setRole('user');$('#r-admin').onclick=()=>setRole('admin');
+function handleText(t,silent){if(!silent)say(esc(t),null,{me:true});const e=S.expect;if(e){S.expect=null;e.fn(t)}else say('از دکمه‌های بالا استفاده کن 👆',null)}
+$('#form').onsubmit=e=>{e.preventDefault();const v=$('#txt').value.trim();if(!v)return;$('#txt').value='';if(v==='/start'){S.expect=null;return menu()}if(v==='/admin'){setRole('admin');return}handleText(v)};
+$('#gok').onclick=()=>{$('#gateway').hidden=true;const a=S.pending;S.balance+=a;S.tx.push({amt:a,t:'💳 افزایش موجودی'});say(`✅ پرداخت موفق!\n💰 ${fmt(a)} به کیف پولت اضافه شد.\n🧾 کد پیگیری: <code>${Math.floor(1e9+Math.random()*9e9)}</code>`,[[['💰 کیف پول','wallet'],['🔙 منو','menu']]])};
+$('#gno').onclick=()=>{$('#gateway').hidden=true;say('❌ پرداخت انجام نشد یا لغو شد.',[BK('wallet')])};
+init();buildChips();setRole('user');
+</script>
