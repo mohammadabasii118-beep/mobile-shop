@@ -26,6 +26,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: title, template: `%s | ${siteName}` },
     description,
     keywords: site.metaKeywords || undefined,
+    // eNamad (اینماد) domain-ownership verification; rendered server-side in <head>.
+    other: { enamad: "3332818" },
     openGraph: { type: "website", locale: "fa_IR", siteName, title: siteName, description },
   };
 }
