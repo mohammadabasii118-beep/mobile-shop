@@ -7,6 +7,7 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.types import InlineKeyboardButton as B, InlineKeyboardMarkup
 
 from . import db
+from .messages import T
 
 log = logging.getLogger("pclbot")
 _ok: dict[int, float] = {}  # uid -> time until which a positive check is trusted
@@ -37,7 +38,7 @@ async def missing(bot: Bot, uid: int) -> list[dict]:
 
 
 def prompt(miss: list[dict]) -> tuple[str, InlineKeyboardMarkup]:
-    text = "📢 برای استفاده از ربات اول در کانال‌های زیر عضو شو، بعد روی «✅ عضو شدم» بزن:"
+    text = T("join_required")
     rows = [[B(text=f"📢 {ch['title']}", url=ch["link"])] for ch in miss]
     rows.append([B(text="✅ عضو شدم", callback_data="chk")])
     return text, InlineKeyboardMarkup(inline_keyboard=rows)

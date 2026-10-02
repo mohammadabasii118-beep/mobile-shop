@@ -6,6 +6,7 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.types import BotCommand, BotCommandScopeChat, MenuButtonCommands
 
 from . import admins, db
+from .messages import T
 from .texts import money, render_ad
 
 log = logging.getLogger("pclbot")
@@ -87,14 +88,14 @@ async def check_badge_and_referral(bot: Bot, ad: dict) -> None:
     prev_badge, _ = await db.badge_for(count - 1)
     badge, _ = await db.badge_for(count)
     if badge and (not prev_badge or prev_badge["id"] != badge["id"]):
-        await notify(bot, uid, f"🎉 تبریک! نشان {badge['emoji']} <b>{badge['name']}</b> رو دریافت کردی.")
+        await notify(bot, uid, T("badge_earned", emoji=badge["emoji"], name=badge["name"]))
     user = await db.get_user(uid)
     if user and user["referrer_id"] and not user["ref_rewarded"]:
         reward = await db.get_int("referral_reward")
         if await db.execute("UPDATE users SET ref_rewarded=1 WHERE id=? AND ref_rewarded=0", uid):
             if reward > 0:
                 await db.credit(user["referrer_id"], reward, "referral", f"دعوت کاربر {uid}")
-                await notify(bot, user["referrer_id"], f"🎁 دوستت اولین آگهی معتبرش رو ثبت کرد و <b>{money(reward)}</b> پاداش گرفتی!")
+                await notify(bot, user["referrer_id"], T("referral_reward", amount=money(reward)))
 
 
 async def approve(bot: Bot, ad_id: int) -> str:
@@ -112,7 +113,7 @@ async def approve(bot: Bot, ad_id: int) -> str:
     if not ad["counted"] and not dup:
         await db.execute("UPDATE ads SET counted=1 WHERE id=?", ad_id)
         await check_badge_and_referral(bot, ad)
-    await notify(bot, ad["user_id"], f"✅ آگهی شماره <b>{ad_id}</b> تأیید و منتشر شد.")
+    await notify(bot, ad["user_id"], T("ad_approved", id=ad_id))
     return "✅ تأیید شد." + ("" if ok else " (⚠️ گروه انتشار تنظیم نشده یا ربات دسترسی ندارد)")
 
 
@@ -124,11 +125,11 @@ async def reject(bot: Bot, ad_id: int, reason: str = "") -> str:
     paid = await db.scalar("SELECT -SUM(amount) FROM transactions WHERE note=? AND type='ad'", f"ad:{ad_id}") or 0
     if paid > 0:
         await db.credit(ad["user_id"], paid, "refund", f"ad:{ad_id}")
-    msg = f"❌ آگهی شماره <b>{ad_id}</b> رد شد."
+    msg = T("ad_rejected", id=ad_id)
     if reason:
-        msg += f"\n📌 دلیل: {reason}"
+        msg += "\n" + T("ad_rejected_reason", reason=reason)
     if paid > 0:
-        msg += f"\n↩️ مبلغ {money(paid)} به کیف پولت برگشت."
+        msg += "\n" + T("ad_rejected_refund", amount=money(paid))
     await notify(bot, ad["user_id"], msg)
     return "❌ رد شد."
 
@@ -148,7 +149,7 @@ async def expiry_loop(bot: Bot) -> None:
                 ad = db.ad_row(r)
                 await unpublish(bot, ad)
                 await db.execute("UPDATE ads SET status='expired' WHERE id=?", ad["id"])
-                await notify(bot, ad["user_id"], f"⌛️ آگهی شماره <b>{ad['id']}</b> منقضی شد. از بخش «آگهی‌های ثبت‌شده» می‌تونی تمدیدش کنی.")
+                await notify(bot, ad["user_id"], T("ad_expired", id=ad["id"]))
         except Exception:  # keep the loop alive
             log.exception("expiry loop")
         await asyncio.sleep(600)

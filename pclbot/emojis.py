@@ -1,4 +1,4 @@
-"""Telegram custom (Premium) emoji support.
+"""Telegram custom (Premium) emoji support (the request rewriting itself lives in pclbot/outgoing.py).
 
 How it works
 ------------
@@ -12,11 +12,6 @@ How it works
 """
 import logging
 import re
-
-from aiogram.client.default import Default
-from aiogram.client.session.middlewares.base import BaseRequestMiddleware
-from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import InlineKeyboardMarkup
 
 from . import db
 
@@ -125,6 +120,9 @@ DEFAULT_IDS: dict[str, str] = {
 }
 
 VS16 = "\ufe0f"
+# one emoji character (optionally followed by the variation selector)
+EMOJI_RX = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF\u2300-\u23FF\u25A0-\u25FF\u2190-\u21FF"
+                      "\u2705\u2728\u274C\u274E\u2753-\u2757\u2795-\u2797\u2B50\u2B55]\ufe0f?")
 _ids: dict[str, str] = {}   # base emoji -> custom_emoji_id (DB + defaults)
 _extra: list[str] = []      # emojis added from the panel that are not in REGISTRY
 enabled = True
@@ -233,52 +231,3 @@ def button_icon(text: str) -> tuple[str, str | None]:
         return text, None
     rest = text[m.end():].lstrip()
     return (rest, _ids[base(m.group(0))]) if rest else (text, None)
-
-
-def convert_markup(markup: InlineKeyboardMarkup) -> InlineKeyboardMarkup:
-    rows = []
-    for row in markup.inline_keyboard:
-        new_row = []
-        for b in row:
-            if b.icon_custom_emoji_id is None:
-                label, icon = button_icon(b.text)
-                if icon:
-                    b = b.model_copy(update={"text": label, "icon_custom_emoji_id": icon})
-            new_row.append(b)
-        rows.append(new_row)
-    return InlineKeyboardMarkup(inline_keyboard=rows)
-
-
-class EmojiRequestMiddleware(BaseRequestMiddleware):
-    """Rewrites outgoing requests so every configured emoji becomes a custom emoji."""
-
-    async def __call__(self, make_request, bot, method):
-        new = self._convert(method)
-        if new is None:
-            return await make_request(bot, method)
-        try:
-            return await make_request(bot, new)
-        except TelegramBadRequest as ex:
-            log.warning("custom emoji request failed (%s); retrying with plain emoji", ex)
-            return await make_request(bot, method)
-
-    @staticmethod
-    def _convert(method):
-        if not active() or not hasattr(method, "parse_mode"):
-            return None
-        pm = method.parse_mode
-        if not (isinstance(pm, Default) or pm == "HTML"):
-            return None
-        updates = {}
-        for field in ("text", "caption"):
-            value = getattr(method, field, None)
-            if isinstance(value, str):
-                converted = apply_html(value)
-                if converted != value:
-                    updates[field] = converted
-        markup = getattr(method, "reply_markup", None)
-        if isinstance(markup, InlineKeyboardMarkup):
-            converted = convert_markup(markup)
-            if converted != markup:
-                updates["reply_markup"] = converted
-        return method.model_copy(update=updates) if updates else None

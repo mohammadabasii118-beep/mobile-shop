@@ -8,6 +8,7 @@ from aiohttp import web
 from aiogram import Bot
 
 from . import config, db
+from .messages import T
 from .services import notify
 from .texts import money
 
@@ -83,7 +84,7 @@ async def callback(request: web.Request) -> web.Response:
         return _page(True, "این پرداخت قبلاً ثبت شده است")
     if request.query.get("Status") != "OK":
         await db.execute("UPDATE transactions SET status='failed' WHERE id=? AND status='pending'", tx["id"])
-        await notify(bot, tx["user_id"], "❌ پرداخت انجام نشد یا لغو شد.")
+        await notify(bot, tx["user_id"], T("payment_cancel"))
         return _page(False, "پرداخت ناموفق بود")
     try:
         res = await _post("verify", {"merchant_id": config.ZARINPAL_MERCHANT, "amount": tx["amount"], "authority": authority})
@@ -95,10 +96,10 @@ async def callback(request: web.Request) -> web.Response:
         # Only the request that flips pending->done credits the wallet (callback may be hit twice).
         if await db.execute("UPDATE transactions SET status='done', ref_id=? WHERE id=? AND status='pending'", str(data.get("ref_id", "")), tx["id"]):
             await db.execute("UPDATE users SET balance=balance+? WHERE id=?", tx["amount"], tx["user_id"])
-            await notify(bot, tx["user_id"], f"✅ پرداخت موفق!\n💰 {money(tx['amount'])} به کیف پولت اضافه شد.\n🧾 کد پیگیری: <code>{data.get('ref_id', '')}</code>")
+            await notify(bot, tx["user_id"], T("payment_ok", amount=money(tx["amount"]), ref=data.get("ref_id", "")))
         return _page(True, "پرداخت با موفقیت انجام شد")
     await db.execute("UPDATE transactions SET status='failed' WHERE id=? AND status='pending'", tx["id"])
-    await notify(bot, tx["user_id"], "❌ پرداخت تأیید نشد. اگر مبلغ از حسابت کسر شده، از «ارتباط با ما» پیگیری کن.")
+    await notify(bot, tx["user_id"], T("payment_failed"))
     return _page(False, "پرداخت تأیید نشد")
 
 

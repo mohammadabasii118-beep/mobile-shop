@@ -7,6 +7,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from .. import db, services
+from ..messages import T
 from ..keyboards import back, btn, kb, pairs
 from ..texts import (CHOICE_COLS, CHOICE_MODE, CHOICES, KIND_TITLE, NO_POS, NUMERIC, OPTIONAL, POSITIONS, STATUS_TITLE, fields_of,
                      fingerprint, fmt_date, money, render_ad)
@@ -334,7 +335,7 @@ async def confirm(c: CallbackQuery, state: FSMContext, bot: Bot):
         ]))
     await state.clear()
     await c.answer()
-    await show(c, f"✅ آگهی شماره <b>{ad_id}</b> ثبت شد و بعد از تأیید مدیر منتشر می‌شه.\n💰 {money(price)} از کیفت کسر شد.",
+    await show(c, T("ad_submitted", id=ad_id, price=money(price)),
                kb([[btn("🗄 آگهی‌های من", "myads")], back()]))
     await notify_admins_new(bot, ad_id)
 
@@ -540,5 +541,5 @@ async def save_saved_edit(event: Message | CallbackQuery, state: FSMContext, bot
             await services.unpublish(bot, ad)
         await db.execute("UPDATE ads SET status='pending' WHERE id=?", ad["id"])
         await notify_admins_new(bot, ad["id"], edited=True)
-        text, markup = "✅ ویرایش ثبت شد و برای تأیید مجدد مدیر ارسال شد.", kb([[btn("🗄 آگهی‌های من", "myads")], back()])
+        text, markup = T("ad_edit_submitted"), kb([[btn("🗄 آگهی‌های من", "myads")], back()])
     await reply(event, text, markup)

@@ -5,6 +5,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
 from .. import db, gate
+from ..messages import T
 from ..keyboards import back, btn, kb, main_menu
 from ..texts import fmt_date, money
 from ..utils import is_admin, parse_ref, show
@@ -141,7 +142,7 @@ async def gift_code(m: Message, state: FSMContext):
         await m.answer(err + "\nدوباره امتحان کن یا برگرد.", reply_markup=kb([back()]))
         return
     await state.clear()
-    await m.answer(f"🎉 <b>{money(g['amount'])}</b> به کیف پولت اضافه شد.", reply_markup=kb([[btn("👤 مشخصات من", "profile")], back()]))
+    await m.answer(T("gift_ok", amount=money(g["amount"])), reply_markup=kb([[btn("👤 مشخصات من", "profile")], back()]))
 
 
 # ---- support -----------------------------------------------------------
@@ -187,4 +188,4 @@ async def support_msg(m: Message, state: FSMContext, bot: Bot):
                 await m.copy_to(aid)
         except Exception:
             pass
-    await m.answer("✅ پیامت برای پشتیبانی ارسال شد. به‌زودی جواب می‌گیری.", reply_markup=main_menu(is_admin(u.id)))
+    await m.answer(T("support_sent"), reply_markup=main_menu(is_admin(u.id)))

@@ -6,7 +6,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from . import admins, config, db, emojis, payments, services
+from . import admins, buttons, config, db, emojis, messages, outgoing, payments, services
 from .handlers import admin, ads, user, wallet
 from .utils import UserMiddleware
 
@@ -18,8 +18,10 @@ async def main() -> None:
     await db.init()
     await admins.load()
     await emojis.load()
+    await buttons.load()
+    await messages.load()
     bot = Bot(config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-    bot.session.middleware(emojis.EmojiRequestMiddleware())
+    bot.session.middleware(outgoing.OutgoingMiddleware())
     dp = Dispatcher(storage=MemoryStorage())
     dp.message.outer_middleware(UserMiddleware())
     dp.callback_query.outer_middleware(UserMiddleware())

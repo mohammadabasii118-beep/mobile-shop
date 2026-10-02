@@ -8,9 +8,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-import re
+import html
 
-from .. import admins, db, emojis, gate, services
+from .. import admins, buttons, db, emojis, gate, messages, services
 from ..keyboards import back, btn, kb, pairs
 from ..texts import STATUS_TITLE, TX_TITLE, fmt_date, money, render_ad
 
@@ -55,6 +55,9 @@ class AdminSt(StatesGroup):
     emoji_new = State()
     emoji_set = State()
     emoji_id = State()
+    btn_text = State()
+    btn_emoji = State()
+    msg_text = State()
 
 
 def panel_menu(uid: int):
@@ -64,7 +67,7 @@ def panel_menu(uid: int):
         btn("⚙️ تعرفه و تنظیمات", "adm:set"), btn("🎁 کارت‌های هدیه", "adm:gifts"),
         btn("🏅 نشان‌ها", "adm:badges"), btn("📡 گروه انتشار", "adm:pub"),
         btn("📣 پیام همگانی", "adm:bc"), btn("📢 جوین اجباری", "adm:ch"),
-        btn("✨ ایموجی‌ها", "adm:emo"),
+        btn("✨ ایموجی‌ها", "adm:emo"), btn("🔤 ویرایش دکمه‌ها", "adm:bt"), btn("✉️ ویرایش پیام‌ها", "adm:ms"),
     ]
     if admins.is_super(uid):
         items.append(btn("👮 مدیران", "adm:admins"))
@@ -590,8 +593,6 @@ async def channel_del(c: CallbackQuery, state: FSMContext):
 
 
 # ---- premium / custom emoji --------------------------------------------------------------------------
-EMOJI_RX = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF\u2300-\u23FF\u25A0-\u25FF\u2190-\u21FF"
-                      "\u2705\u2728\u274C\u274E\u2753-\u2757\u2795-\u2797\u2B50\u2B55]\ufe0f?")
 EMO_PAGE = 12
 
 
@@ -704,7 +705,7 @@ async def emoji_add_ask(c: CallbackQuery, state: FSMContext):
 
 @router.message(AdminSt.emoji_new, F.text)
 async def emoji_add_char(m: Message, state: FSMContext):
-    mo = EMOJI_RX.search(m.text)
+    mo = emojis.EMOJI_RX.search(m.text)
     if not mo:
         return await m.answer("😕 ایموجی معمولی پیدا نشد. فقط یک ایموجی بفرست.", reply_markup=kb([[btn("🔙 بازگشت", "adm:emo")]]))
     ch = emojis.base(mo.group(0))
@@ -741,6 +742,261 @@ async def emoji_preview(c: CallbackQuery, bot: Bot):
     await bot.send_message(c.message.chat.id, "👁 <b>پیش‌نمایش با تنظیم فعلی</b>\n\n" + render_ad(ad, {"username": c.from_user.username}))
     await bot.send_message(c.message.chat.id, "👆 منو و دکمه‌ها با آیکون جدید:", reply_markup=main_menu(True))
     await c.answer()
+
+
+# ---- editable buttons -------------------------------------------------------------------------------
+BTN_PAGE = 10
+
+
+def scoped(scope: str) -> list[int]:
+    return [i for i, (_, sc) in enumerate(buttons.REGISTRY) if sc == scope]
+
+
+@router.callback_query(F.data == "adm:bt")
+async def buttons_menu(c: CallbackQuery, state: FSMContext | None = None):
+    if state:
+        await state.clear()
+    n_user, n_admin = len(scoped("user")), len(scoped("admin"))
+    changed = sum(1 for o, _ in buttons.REGISTRY if buttons.effective(o)[0:2] != tuple(buttons.split(o)[::-1]) or buttons.effective(o)[2])
+    await show(c, f"🔤 <b>ویرایش دکمه‌ها</b>\n{L}\nمتن و ایموجی هر دکمه رو می‌تونی عوض کنی. ایموجی می‌تونه پرمیوم باشه و به‌صورت "
+                  f"آیکون کنار متن نمایش داده بشه. تغییرها فوراً اعمال می‌شن.\n\nتغییر داده‌شده: {changed}",
+               kb([[btn(f"🧑 دکمه‌های کاربران ({n_user})", "adm:btl:user:0")], [btn(f"🛠 دکمه‌های مدیریت ({n_admin})", "adm:btl:admin:0")],
+                   [btn("🧹 بازنشانی همه", "adm:btresetall")], [btn("🔙 بازگشت", PANEL)]]))
+    await c.answer()
+
+
+@router.callback_query(F.data.regexp(r"^adm:btl:(user|admin):\d+$"))
+async def buttons_list(c: CallbackQuery, state: FSMContext | None = None):
+    if state:
+        await state.clear()
+    _, _, scope, page = c.data.split(":")
+    idxs = scoped(scope)
+    pages = max(1, (len(idxs) + BTN_PAGE - 1) // BTN_PAGE)
+    page = max(0, min(int(page), pages - 1))
+    chunk = idxs[page * BTN_PAGE:(page + 1) * BTN_PAGE]
+    btns = []
+    for i in chunk:
+        orig = buttons.REGISTRY[i][0]
+        mark = " ✎" if orig in buttons._over else ""
+        btns.append(btn(f"{buttons.label_of(orig)}{mark}"[:30], f"adm:bte:{i}"))
+    nav = []
+    if page > 0:
+        nav.append(btn("◀️ قبلی", f"adm:btl:{scope}:{page - 1}"))
+    nav.append(btn(f"{page + 1}/{pages}", f"adm:btl:{scope}:{page}"))
+    if page < pages - 1:
+        nav.append(btn("بعدی ▶️", f"adm:btl:{scope}:{page + 1}"))
+    await show(c, f"🔤 <b>{'دکمه‌های کاربران' if scope == 'user' else 'دکمه‌های مدیریت'}</b>\nیکی رو انتخاب کن. ✎ یعنی تغییر داده شده.",
+               kb([*pairs(btns), nav, [btn("🔙 بازگشت", "adm:bt")]]))
+    await c.answer()
+
+
+def button_card(i: int) -> tuple[str, object]:
+    orig, scope = buttons.REGISTRY[i]
+    text, emoji, emoji_id = buttons.effective(orig)
+    changed = orig in buttons._over
+    body = (f"🔤 <b>دکمه:</b> {buttons.label_of(orig)}\n{L}\nمتن: {html.escape(text)}\nایموجی: {emoji or '—'}"
+            f"{' (پرمیوم ✅)' if emoji_id else ''}\nاصلی: {html.escape(orig)}")
+    rows = [[btn("✏️ تغییر متن", f"adm:btt:{i}"), btn("😀 تغییر ایموجی", f"adm:btm:{i}")]]
+    if changed:
+        rows.append([btn("🧹 برگرداندن به پیش‌فرض", f"adm:btr:{i}")])
+    rows.append([btn("👁 پیش‌نمایش دکمه", f"adm:btp:{i}")])
+    rows.append([btn("🔙 بازگشت", f"adm:btl:{scope}:{scoped(scope).index(i) // BTN_PAGE}")])
+    return body, kb(rows)
+
+
+@router.callback_query(F.data.regexp(r"^adm:bte:\d+$"))
+async def button_view(c: CallbackQuery, state: FSMContext):
+    await state.clear()
+    body, markup = button_card(int(c.data[8:]))
+    await show(c, body, markup)
+    await c.answer()
+
+
+@router.callback_query(F.data.regexp(r"^adm:btt:\d+$"))
+async def button_text_ask(c: CallbackQuery, state: FSMContext):
+    i = int(c.data[8:])
+    await state.set_state(AdminSt.btn_text)
+    await state.update_data(i=i)
+    await show(c, f"✏️ متن جدید دکمه «{buttons.label_of(buttons.REGISTRY[i][0])}» رو بنویس (حداکثر ۴۰ کاراکتر).\n"
+                  "اگه اولش ایموجی بذاری، ایموجی دکمه هم عوض می‌شه.", kb([[btn("🔙 بازگشت", f"adm:bte:{i}")]]))
+    await c.answer()
+
+
+@router.message(AdminSt.btn_text, F.text)
+async def button_text_save(m: Message, state: FSMContext):
+    i = (await state.get_data())["i"]
+    emoji, text = buttons.split(m.text.strip())
+    if not text or len(text) > 40:
+        return await m.answer("⚠️ متن باید بین ۱ تا ۴۰ کاراکتر باشه.", reply_markup=kb([[btn("🔙 بازگشت", f"adm:bte:{i}")]]))
+    await state.clear()
+    fields = {"text": text}
+    if emoji:
+        fields.update(emoji=emoji, emoji_id=None)
+    await buttons.save(buttons.REGISTRY[i][0], **fields)
+    body, markup = button_card(i)
+    await m.answer("✅ ذخیره شد.\n\n" + body, reply_markup=markup)
+
+
+@router.callback_query(F.data.regexp(r"^adm:btm:\d+$"))
+async def button_emoji_ask(c: CallbackQuery, state: FSMContext):
+    i = int(c.data[8:])
+    await state.set_state(AdminSt.btn_emoji)
+    await state.update_data(i=i)
+    await show(c, f"😀 ایموجی جدید دکمه «{buttons.label_of(buttons.REGISTRY[i][0])}» رو بفرست.\n"
+                  "ایموجی پرمیوم یا استیکر ایموجی = آیکون پرمیوم کنار دکمه. ایموجی معمولی = ایموجی ساده.",
+               kb([[btn("🔙 بازگشت", f"adm:bte:{i}")]]))
+    await c.answer()
+
+
+@router.message(AdminSt.btn_emoji)
+async def button_emoji_save(m: Message, state: FSMContext):
+    i = (await state.get_data())["i"]
+    found = custom_emoji_ids(m)
+    if found:
+        fields = {"emoji": emojis.base(found[0][0]), "emoji_id": found[0][1]}
+    else:
+        mo = emojis.EMOJI_RX.search(m.text or "")
+        if not mo:
+            return await m.answer("😕 ایموجی پیدا نشد. یک ایموجی (یا ایموجی پرمیوم) بفرست.", reply_markup=kb([[btn("🔙 بازگشت", f"adm:bte:{i}")]]))
+        fields = {"emoji": emojis.base(mo.group(0)), "emoji_id": None}
+    await state.clear()
+    await buttons.save(buttons.REGISTRY[i][0], **fields)
+    body, markup = button_card(i)
+    await m.answer("✅ ذخیره شد.\n\n" + body, reply_markup=markup)
+
+
+@router.callback_query(F.data.regexp(r"^adm:btr:\d+$"))
+async def button_reset(c: CallbackQuery, state: FSMContext):
+    i = int(c.data[8:])
+    await buttons.reset(buttons.REGISTRY[i][0])
+    await c.answer("برگشت به پیش‌فرض")
+    body, markup = button_card(i)
+    await show(c, body, markup)
+
+
+@router.callback_query(F.data.regexp(r"^adm:btp:\d+$"))
+async def button_preview(c: CallbackQuery, bot: Bot):
+    from aiogram.types import InlineKeyboardButton
+    orig = buttons.REGISTRY[int(c.data[8:])][0]
+    await bot.send_message(c.message.chat.id, "👆 پیش‌نمایش دکمه (فقط نمایش؛ زدنش کاری نمی‌کنه):",
+                           reply_markup=kb([[InlineKeyboardButton(text=orig, callback_data="noop")]]))
+    await c.answer()
+
+
+@router.callback_query(F.data == "noop")
+async def noop(c: CallbackQuery):
+    await c.answer()
+
+
+@router.callback_query(F.data == "adm:btresetall")
+async def buttons_reset_ask(c: CallbackQuery):
+    await show(c, "🧹 متن و ایموجی همه دکمه‌ها برگرده به پیش‌فرض؟", kb([[btn("✅ بله", "adm:btresetok"), btn("🔙 نه", "adm:bt")]]))
+    await c.answer()
+
+
+@router.callback_query(F.data == "adm:btresetok")
+async def buttons_reset_all(c: CallbackQuery):
+    await buttons.reset()
+    await c.answer("انجام شد")
+    await buttons_menu(c)
+
+
+# ---- editable messages ------------------------------------------------------------------------------
+@router.callback_query(F.data == "adm:ms")
+async def messages_menu(c: CallbackQuery, state: FSMContext | None = None):
+    if state:
+        await state.clear()
+    btns = [btn(f"{label}{' ✎' if messages.is_changed(k) else ''}"[:30], f"adm:mse:{k}") for k, (label, _, _) in messages.DEFAULTS.items()]
+    await show(c, f"✉️ <b>ویرایش پیام‌ها</b>\n{L}\nمتن پیام‌هایی که ربات خودکار برای کاربران می‌فرسته رو از اینجا عوض کن. "
+                  "✎ یعنی تغییر داده شده. متن خوش‌آمد و اطلاعیه از «⚙️ تعرفه و تنظیمات» عوض می‌شن.",
+               kb([*pairs(btns), [btn("🧹 بازنشانی همه", "adm:msresetall")], [btn("🔙 بازگشت", PANEL)]]))
+    await c.answer()
+
+
+def message_card(key: str) -> tuple[str, object]:
+    label, _, ph = messages.DEFAULTS[key]
+    hints = "\n".join(f"• <code>{{{n}}}</code> = {d}" for n, d in ph.items()) or "• (جای‌نگهدار ندارد)"
+    body = f"✉️ <b>{label}</b>\n{L}\n<pre>{html.escape(messages.current(key))}</pre>\nجای‌نگهدارها:\n{hints}"
+    rows = [[btn("✏️ ویرایش متن", f"adm:msw:{key}"), btn("👁 پیش‌نمایش", f"adm:msp:{key}")]]
+    if messages.is_changed(key):
+        rows.append([btn("🧹 برگرداندن به پیش‌فرض", f"adm:msr:{key}")])
+    rows.append([btn("🔙 بازگشت", "adm:ms")])
+    return body, kb(rows)
+
+
+def sample_of(key: str, text: str | None = None) -> str:
+    ph = messages.DEFAULTS[key][2]
+    return messages.render(text or messages.current(key), **{k: messages.SAMPLES.get(k, "x") for k in ph})
+
+
+@router.callback_query(F.data.regexp(r"^adm:mse:\w+$"))
+async def message_view(c: CallbackQuery, state: FSMContext):
+    await state.clear()
+    key = c.data[8:]
+    if key not in messages.DEFAULTS:
+        return await c.answer("پیدا نشد", show_alert=True)
+    body, markup = message_card(key)
+    await show(c, body, markup)
+    await c.answer()
+
+
+@router.callback_query(F.data.regexp(r"^adm:msp:\w+$"))
+async def message_preview(c: CallbackQuery, bot: Bot):
+    key = c.data[8:]
+    await bot.send_message(c.message.chat.id, "👁 <b>پیش‌نمایش</b> (با مقدارهای نمونه):\n\n" + sample_of(key))
+    await c.answer()
+
+
+@router.callback_query(F.data.regexp(r"^adm:msw:\w+$"))
+async def message_edit_ask(c: CallbackQuery, state: FSMContext):
+    key = c.data[8:]
+    await state.set_state(AdminSt.msg_text)
+    await state.update_data(key=key)
+    ph = " ".join(f"{{{n}}}" for n in messages.DEFAULTS[key][2]) or "—"
+    await show(c, f"✍️ متن جدید «{messages.DEFAULTS[key][0]}» رو بفرست.\n\nبرای پررنگ و ایتالیک از خود تلگرام استفاده کن، و ایموجی پرمیوم هم "
+                  f"می‌تونی توی متن بذاری.\nجای‌نگهدارهای مجاز: {ph}", kb([[btn("🔙 بازگشت", f"adm:mse:{key}")]]))
+    await c.answer()
+
+
+@router.message(AdminSt.msg_text, F.text)
+async def message_edit_save(m: Message, state: FSMContext, bot: Bot):
+    key = (await state.get_data())["key"]
+    text = m.html_text
+    if len(text) > 3000:
+        return await m.answer("⚠️ متن خیلی بلنده (حداکثر ۳۰۰۰ کاراکتر).")
+    err = messages.check(key, text)
+    if err:
+        return await m.answer("⚠️ " + err, reply_markup=kb([[btn("🔙 بازگشت", f"adm:mse:{key}")]]))
+    try:  # the preview doubles as a check that Telegram accepts the formatting
+        await bot.send_message(m.chat.id, "👁 <b>پیش‌نمایش:</b>\n\n" + sample_of(key, text))
+    except TelegramAPIError as ex:
+        return await m.answer(f"⚠️ تلگرام این متن رو قبول نکرد: {ex}", reply_markup=kb([[btn("🔙 بازگشت", f"adm:mse:{key}")]]))
+    await state.clear()
+    await messages.save(key, text)
+    body, markup = message_card(key)
+    await m.answer("✅ ذخیره شد و از همین الان اعمال می‌شه.\n\n" + body, reply_markup=markup)
+
+
+@router.callback_query(F.data.regexp(r"^adm:msr:\w+$"))
+async def message_reset(c: CallbackQuery):
+    key = c.data[8:]
+    await messages.reset(key)
+    await c.answer("برگشت به پیش‌فرض")
+    body, markup = message_card(key)
+    await show(c, body, markup)
+
+
+@router.callback_query(F.data == "adm:msresetall")
+async def messages_reset_ask(c: CallbackQuery):
+    await show(c, "🧹 متن همه پیام‌ها برگرده به پیش‌فرض؟", kb([[btn("✅ بله", "adm:msresetok"), btn("🔙 نه", "adm:ms")]]))
+    await c.answer()
+
+
+@router.callback_query(F.data == "adm:msresetok")
+async def messages_reset_all(c: CallbackQuery):
+    await messages.reset()
+    await c.answer("انجام شد")
+    await messages_menu(c)
 
 
 # ---- support replies ---------------------------------------------------
