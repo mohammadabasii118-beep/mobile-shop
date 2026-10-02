@@ -134,7 +134,7 @@ def render_ad(ad: dict, user: dict | None = None, preview: bool = False) -> str:
         )
     if d.get("notes"):
         body += f"📝 <b>توضیحات:</b> {e(d['notes'])}\n"
-    body += f"{line}\n📩 <b>ارتباط:</b> {contact_line(ad, user)}\n\n{AD_FOOTER}"
+    body += f"📩 <b>ارتباط:</b> {contact_line(ad, user)}\n{line}\n{AD_FOOTER}"
     return body
 
 
