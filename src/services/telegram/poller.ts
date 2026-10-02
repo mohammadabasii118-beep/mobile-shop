@@ -22,11 +22,19 @@ function matchesChannel(chat: TgChat, channel: string) {
   return chat.type === "channel" && (String(chat.id) === channel || (chat.username && `@${chat.username}`.toLowerCase() === channel.toLowerCase()));
 }
 
-const PRICE_RE = /(?:قیمت|price)\D{0,6}([\d,٬،.]+)/i;
-function parsePrice(text: string) {
-  const m = PRICE_RE.exec(text.replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))));
-  const n = m ? Number(m[1].replace(/[^\d]/g, "")) : NaN;
-  return Number.isFinite(n) && n > 0 ? n : undefined;
+const PRICE_RE = /(?:قیمت|price)\D{0,6}([\d,٬،.]+)\s*(هزار|میلیون)?/i;
+/** Reads the first "قیمت: …" in Toman. "598 هزار" → 598,000; a bare small number like "598" is assumed to be thousands (usual in Persian shop posts). */
+export function parsePrice(text: string) {
+  const m = PRICE_RE.exec(text.replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))).replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d))));
+  if (!m) return undefined;
+  const raw = m[1].replace(/[,٬،]/g, "");
+  let n = Number(raw);
+  if (!Number.isFinite(n)) n = Number(raw.replace(/\./g, ""));
+  if (!Number.isFinite(n) || n <= 0) return undefined;
+  if (m[2] === "میلیون") n *= 1_000_000;
+  else if (m[2] === "هزار") n *= 1_000;
+  else if (n < 10_000) n *= 1_000;
+  return Math.round(n);
 }
 
 function toPost(m: TgMessage): TelegramPost {

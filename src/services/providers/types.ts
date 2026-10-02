@@ -21,7 +21,7 @@ export interface AIReply {
 }
 
 export interface AIProvider {
-  generateCaption(input: { title: string; price?: number; addHashtags: boolean }): Promise<string>;
+  generateCaption(input: { title: string; price?: number; description?: string; addHashtags: boolean }): Promise<string>;
   reply(input: { text: string; products: Product[]; settings: AISettings }): Promise<AIReply>;
 }
 

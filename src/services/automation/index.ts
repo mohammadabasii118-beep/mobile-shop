@@ -72,7 +72,7 @@ export async function processTelegramPost(tg: TelegramPost) {
   p.step("media", "Media Processed", isVideo ? "Video transcoded to 9:16 / 1080p" : "Image resized to 1080×1080");
   let caption = tg.caption;
   if (o.aiCaption) {
-    caption = await getProviders().ai.generateCaption({ title: tg.title, price: tg.price, addHashtags: o.addHashtags });
+    caption = await getProviders().ai.generateCaption({ title: tg.title, price: tg.price, description: tg.caption, addHashtags: o.addHashtags });
     p.step("caption", "AI Caption Generated", o.addHashtags ? "Persian caption + hashtags" : "Persian caption");
   } else if (o.copyCaption) {
     p.step("caption", "Caption Copied", "Original Telegram caption reused");

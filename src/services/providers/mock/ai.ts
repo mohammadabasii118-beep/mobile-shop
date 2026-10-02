@@ -16,8 +16,11 @@ function matchProducts(text: string, products: Product[]) {
 
 /** Deterministic keyword assistant. Replace with OpenAIProvider implementing the same interface. */
 export class MockAIProvider implements AIProvider {
-  async generateCaption({ title, price, addHashtags }: { title: string; price?: number; addHashtags: boolean }) {
-    const base = `✨ ${title}${price ? `\n💰 قیمت: ${formatToman(price)}` : ""}\n📦 ارسال فوری به سراسر ایران\n📩 برای سفارش دایرکت بدید`;
+  async generateCaption({ title, price, description, addHashtags }: { title: string; price?: number; description?: string; addHashtags: boolean }) {
+    // Keep the useful body of the original Telegram post (models, colours, …) — drop its first line, which is the title.
+    const details = (description ?? "").split("\n").slice(1).join("\n").trim().slice(0, 900);
+    const priceLine = price && !/قیمت|تومان/.test(details) ? `\n💰 قیمت: ${formatToman(price)}` : "";
+    const base = `✨ ${title}${details ? `\n\n${details}` : ""}${priceLine}\n\n📦 ارسال فوری به سراسر ایران\n📩 برای سفارش دایرکت بدید`;
     return addHashtags ? `${base}\n\n#caseline #لوازم_جانبی_موبایل #قاب_موبایل #خرید_آنلاین` : base;
   }
 
