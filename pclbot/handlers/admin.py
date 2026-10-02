@@ -498,6 +498,7 @@ async def admin_add_do(m: Message, state: FSMContext, bot: Bot):
     if admins.is_admin(uid):
         return await m.answer("ℹ️ این کاربر از قبل مدیره.", reply_markup=kb([back("adm:admins")]))
     await admins.add(uid, m.from_user.id)
+    await services.sync_admin_commands(bot, uid, True)
     await services.notify(bot, uid, "🛠 شما به‌عنوان مدیر ربات اضافه شدید. برای ورود به پنل /admin رو بزنید.")
     await m.answer(f"✅ {await display_name(uid)} به مدیران اضافه شد.", reply_markup=kb([back("adm:admins")]))
 
@@ -519,6 +520,7 @@ async def admin_rm_do(c: CallbackQuery, bot: Bot):
     uid = int(c.data[8:])
     if not await admins.remove(uid):
         return await c.answer("مدیر اصلی قابل حذف نیست.", show_alert=True)
+    await services.sync_admin_commands(bot, uid, False)
     await services.notify(bot, uid, "ℹ️ دسترسی مدیریت شما برداشته شد.")
     await c.answer("حذف شد")
     await admins_menu(c, None)

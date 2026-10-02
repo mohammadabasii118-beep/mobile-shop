@@ -3,11 +3,40 @@ import logging
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
+from aiogram.types import BotCommand, BotCommandScopeChat, MenuButtonCommands
 
 from . import admins, db
 from .texts import money, render_ad
 
 log = logging.getLogger("pclbot")
+
+
+USER_COMMANDS = [BotCommand(command="start", description="🏠 شروع و منوی اصلی")]
+ADMIN_COMMANDS = USER_COMMANDS + [BotCommand(command="admin", description="🛠 پنل مدیریت")]
+
+
+async def sync_admin_commands(bot: Bot, uid: int, is_admin: bool) -> None:
+    """Admins get /admin in their command list; everyone else sees only /start."""
+    try:
+        if is_admin:
+            await bot.set_my_commands(ADMIN_COMMANDS, scope=BotCommandScopeChat(chat_id=uid))
+        else:
+            await bot.delete_my_commands(scope=BotCommandScopeChat(chat_id=uid))
+    except TelegramAPIError:
+        pass  # the admin has not started the bot yet; commands are synced on the next restart
+
+
+async def setup_bot(bot: Bot) -> None:
+    """Command list + menu button (the 'Menu' button next to the input box), and the text shown before START."""
+    try:
+        await bot.set_my_commands(USER_COMMANDS)
+        await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
+        await bot.set_my_description("🔮 بزرگ‌ترین بازار نقل‌وانتقالات تیم‌ها و بازیکنان ایرانی پروکلاب.\nثبت آگهی بازیکن آزاد و جذب بازیکن، کیف پول و نشان‌های افتخار.")
+        await bot.set_my_short_description("بازار نقل‌وانتقالات پروکلاب ایران")
+    except TelegramAPIError as ex:
+        log.warning("bot setup failed: %s", ex)
+    for uid in admins.all_ids():
+        await sync_admin_commands(bot, uid, True)
 
 
 async def notify(bot: Bot, uid: int, text: str, **kw) -> None:

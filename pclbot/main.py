@@ -23,6 +23,7 @@ async def main() -> None:
     dp.callback_query.outer_middleware(UserMiddleware())
     # user router first so /start and /admin always win over FSM-state catch-all handlers
     dp.include_routers(user.router, admin.router, wallet.router, ads.router)
+    await services.setup_bot(bot)
     runner = await payments.start_web(bot)
     expiry = asyncio.create_task(services.expiry_loop(bot))
     try:
