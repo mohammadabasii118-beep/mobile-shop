@@ -21,7 +21,7 @@ function create(): Store {
     seed.telegramPosts = loadTelegramState().posts;
     seed.channel = { name: cfg.channel, username: cfg.channel, status: "disconnected", members: 0 };
   }
-  return { ...seed, seq: 1000, telegramLive: { enabled: cfg.live }, readyPosts: instagramMode() === "manual" ? loadTelegramState().ready : [] };
+  return { ...seed, seq: 1000, telegramLive: { enabled: cfg.live }, readyPosts: instagramMode() !== "mock" ? loadTelegramState().ready : [] };
 }
 
 export function getDb(): Store {
