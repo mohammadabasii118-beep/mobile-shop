@@ -18,6 +18,31 @@ from pathlib import Path
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from PIL import Image
 
+def _load_env_file():
+    """The project .env is the single source of truth for IG_* settings.
+    It overrides stale values left in the shell / pm2 environment (e.g. an old IG_DRY_RUN=1)."""
+    path = Path(os.environ.get("IG_ENV_FILE", Path(__file__).resolve().parents[2] / ".env"))
+    if not path.exists():
+        return
+    file_vars = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        key, val = key.strip(), val.strip()
+        if len(val) >= 2 and val[0] == val[-1] and val[0] in "\"'":
+            val = val[1:-1]
+        file_vars[key] = val
+    for key in [k for k in os.environ if k.startswith("IG_") and k != "IG_ENV_FILE"]:
+        os.environ.pop(key, None)  # a variable removed from .env must really be gone
+    for key, val in file_vars.items():
+        if key.startswith("IG_"):
+            os.environ[key] = val
+
+
+_load_env_file()
+
 DRY_RUN = os.environ.get("IG_DRY_RUN") == "1"
 USERNAME = os.environ.get("IG_USERNAME", "")
 PASSWORD = os.environ.get("IG_PASSWORD", "")

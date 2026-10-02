@@ -18,4 +18,6 @@ Run (localhost only):
 ```bash
 .venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8765
 ```
+The sidecar reads `IG_*` settings straight from the project `.env` (override the path with `IG_ENV_FILE`), so stale values left in the shell or pm2 environment cannot change its behaviour — just edit `.env` and restart it.
+
 The session is cached in `.data/ig-session.json` (mode 600) so it does not log in on every post.
