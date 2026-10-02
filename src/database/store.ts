@@ -1,5 +1,7 @@
+import { instagramMode } from "@/config/instagram";
 import { telegramConfig } from "@/config/telegram";
 import { loadTelegramState } from "@/services/telegram/storage";
+import type { ReadyPost } from "@/types";
 import { buildSeed, type SeedData } from "./seed";
 
 /**
@@ -7,7 +9,7 @@ import { buildSeed, type SeedData } from "./seed";
  * To go live, replace `db` with Prisma-backed repositories — services only talk to this object.
  */
 export interface TelegramLiveStatus { enabled: boolean; lastPollAt?: string; error?: string }
-type Store = SeedData & { seq: number; telegramLive: TelegramLiveStatus };
+type Store = SeedData & { seq: number; telegramLive: TelegramLiveStatus; readyPosts: ReadyPost[] };
 
 const g = globalThis as unknown as { __smStore?: Store };
 
@@ -19,7 +21,7 @@ function create(): Store {
     seed.telegramPosts = loadTelegramState().posts;
     seed.channel = { name: cfg.channel, username: cfg.channel, status: "disconnected", members: 0 };
   }
-  return { ...seed, seq: 1000, telegramLive: { enabled: cfg.live } };
+  return { ...seed, seq: 1000, telegramLive: { enabled: cfg.live }, readyPosts: instagramMode() === "manual" ? loadTelegramState().ready : [] };
 }
 
 export function getDb(): Store {

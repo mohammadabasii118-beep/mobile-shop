@@ -95,7 +95,7 @@ async function loop() {
         state.offset = u.update_id + 1;
         await handle(u);
       }
-      if (updates.length) saveTelegramState({ offset: state.offset, posts: db.telegramPosts });
+      if (updates.length) saveTelegramState({ offset: state.offset, posts: db.telegramPosts, ready: db.readyPosts });
       if (Date.now() - lastRefresh > 10 * 60_000 || db.channel.status !== "connected") {
         lastRefresh = Date.now();
         await refreshChannel();

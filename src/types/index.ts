@@ -32,6 +32,16 @@ export interface InstagramPost {
   source: ContentSource;
   telegramPostId?: string;
 }
+export interface ReadyPost {
+  id: string;
+  telegramPostId: string;
+  title: string;
+  caption: string;
+  imageUrl: string;
+  mediaType: "photo" | "video";
+  createdAt: string;
+  status: "ready" | "posted";
+}
 export interface Story {
   id: string;
   imageUrl: string;

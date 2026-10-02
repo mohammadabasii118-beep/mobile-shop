@@ -5,6 +5,8 @@ import { createCustomer } from "@/services/customer";
 import { publishPost, publishStory, replyToComment } from "@/services/instagram";
 import { getProviders } from "@/services/providers";
 import { placeholderImage } from "@/lib/placeholder";
+import { instagramMode } from "@/config/instagram";
+import { saveTelegramState } from "@/services/telegram/storage";
 import type {
   Automation, AutomationKey, Comment, Conversation, PipelineRun, TelegramPost, TelegramToInstagramOptions,
 } from "@/types";
@@ -73,6 +75,20 @@ export async function processTelegramPost(tg: TelegramPost) {
     p.step("caption", "AI Caption Generated", o.addHashtags ? "Persian caption + hashtags" : "Persian caption");
   } else if (o.copyCaption) {
     p.step("caption", "Caption Copied", "Original Telegram caption reused");
+  }
+
+  if (instagramMode() === "manual") {
+    // Semi-automatic Instagram: queue a ready-to-post item instead of calling any Instagram API.
+    db.readyPosts.unshift({ id: nextId("rp"), telegramPostId: tg.id, title: tg.title, caption, imageUrl: tg.imageUrl, mediaType: tg.mediaType, createdAt: new Date().toISOString(), status: "ready" });
+    saveTelegramState({ posts: db.telegramPosts, ready: db.readyPosts });
+    tg.status = "published";
+    p.step("ready", "Ready for Instagram", "Caption and image prepared — post it from your phone");
+    if (o.notifyAdmin) {
+      notify("info", "New post ready for Instagram");
+      p.step("notify", "Admin Notified", "Notification sent");
+    }
+    recordExecution("tg-ig-post", true, `${tg.title} ready for Instagram`);
+    return { run: p.toRun(), telegramPost: tg };
   }
 
   let igPostId: string | undefined;

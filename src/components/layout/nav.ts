@@ -1,4 +1,4 @@
-import { Bot, Camera, ClipboardList, LayoutDashboard, MessageCircle, MessagesSquare, Package, Send, Settings, Users, Workflow, Image as ImageIcon, CircleDot, Radio, FileText, type LucideIcon } from "lucide-react";
+import { Bot, Camera, ClipboardList, LayoutDashboard, MessageCircle, MessagesSquare, Package, Send, Settings, Users, Workflow, Image as ImageIcon, ClipboardCheck, CircleDot, Radio, FileText, type LucideIcon } from "lucide-react";
 
 export interface NavItem { label: string; href: string; icon: LucideIcon }
 export interface NavGroup { title?: string; items: NavItem[] }
@@ -9,6 +9,7 @@ export const NAV: NavGroup[] = [
     title: "Instagram",
     items: [
       { label: "Overview", href: "/instagram", icon: Camera },
+      { label: "Ready to Post", href: "/instagram/ready", icon: ClipboardCheck },
       { label: "Posts", href: "/instagram/posts", icon: ImageIcon },
       { label: "Stories", href: "/instagram/stories", icon: CircleDot },
       { label: "Comments", href: "/instagram/comments", icon: MessageCircle },
