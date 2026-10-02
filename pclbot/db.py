@@ -20,6 +20,7 @@ DEFAULT_SETTINGS = {
     "support_username": "",
     "welcome_text": "👋 به ربات <b>PCL Transfer</b> خوش اومدی!\n\nاینجا می‌تونی آگهی بازیکن آزاد یا جذب بازیکن برای تیم پروکلابت ثبت کنی.",
     "announce_text": "",
+    "premium_emoji": "1",
 }
 
 DEFAULT_BADGES = [
@@ -50,6 +51,7 @@ CREATE TABLE IF NOT EXISTS gift_uses(code TEXT, user_id INTEGER, PRIMARY KEY(cod
 CREATE TABLE IF NOT EXISTS badges(
     id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, emoji TEXT, min_ads INTEGER);
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS custom_emojis(emoji TEXT PRIMARY KEY, emoji_id TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS admins(id INTEGER PRIMARY KEY, added_by INTEGER, added_at INTEGER);
 CREATE TABLE IF NOT EXISTS channels(
     id INTEGER PRIMARY KEY AUTOINCREMENT, chat TEXT UNIQUE, title TEXT, link TEXT);

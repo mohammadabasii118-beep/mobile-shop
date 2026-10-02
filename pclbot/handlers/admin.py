@@ -8,7 +8,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from .. import admins, db, gate, services
+import re
+
+from .. import admins, db, emojis, gate, services
 from ..keyboards import back, btn, kb, pairs
 from ..texts import STATUS_TITLE, TX_TITLE, fmt_date, money, render_ad
 
@@ -50,6 +52,9 @@ class AdminSt(StatesGroup):
     badge = State()
     admin_add = State()
     channel = State()
+    emoji_new = State()
+    emoji_set = State()
+    emoji_id = State()
 
 
 def panel_menu(uid: int):
@@ -59,6 +64,7 @@ def panel_menu(uid: int):
         btn("⚙️ تعرفه و تنظیمات", "adm:set"), btn("🎁 کارت‌های هدیه", "adm:gifts"),
         btn("🏅 نشان‌ها", "adm:badges"), btn("📡 گروه انتشار", "adm:pub"),
         btn("📣 پیام همگانی", "adm:bc"), btn("📢 جوین اجباری", "adm:ch"),
+        btn("✨ ایموجی‌ها", "adm:emo"),
     ]
     if admins.is_super(uid):
         items.append(btn("👮 مدیران", "adm:admins"))
@@ -581,6 +587,160 @@ async def channel_del(c: CallbackQuery, state: FSMContext):
     gate._ok.clear()
     await c.answer("حذف شد")
     await channels_menu(c, state)
+
+
+# ---- premium / custom emoji --------------------------------------------------------------------------
+EMOJI_RX = re.compile("[\U0001F000-\U0001FAFF\u2600-\u27BF\u2B00-\u2BFF\u2300-\u23FF\u25A0-\u25FF\u2190-\u21FF"
+                      "\u2705\u2728\u274C\u274E\u2753-\u2757\u2795-\u2797\u2B50\u2B55]\ufe0f?")
+EMO_PAGE = 12
+
+
+def custom_emoji_ids(m: Message) -> list[tuple[str, str]]:
+    """(fallback emoji, custom_emoji_id) pairs found in a message: custom emoji in the text, or an emoji sticker."""
+    found: list[tuple[str, str]] = []
+    for e in (m.entities or []) + (m.caption_entities or []):
+        if e.type == "custom_emoji" and e.custom_emoji_id:
+            source = m.text or m.caption or ""
+            # offsets are UTF-16 code units
+            raw = source.encode("utf-16-le")
+            found.append((raw[e.offset * 2:(e.offset + e.length) * 2].decode("utf-16-le"), e.custom_emoji_id))
+    if m.sticker and m.sticker.custom_emoji_id:
+        found.append((m.sticker.emoji or "❓", m.sticker.custom_emoji_id))
+    return found
+
+
+@router.callback_query(F.data.regexp(r"^adm:emo(:\d+)?$"))
+async def emoji_menu(c: CallbackQuery, state: FSMContext | None = None):
+    if state:
+        await state.clear()
+    part = c.data.split(":")
+    page = int(part[2]) if len(part) > 2 and part[2].isdigit() else 0
+    slots = emojis.all_slots()
+    pages = (len(slots) + EMO_PAGE - 1) // EMO_PAGE
+    page = max(0, min(page, pages - 1))
+    chunk = slots[page * EMO_PAGE:(page + 1) * EMO_PAGE]
+    btns = [btn(("✅ " if emojis.id_of(e) else "⬜️ ") + f"{e} {label}"[:28], f"adm:emoset:{emojis.base(e)}") for e, label in chunk]
+    nav = []
+    if page > 0:
+        nav.append(btn("◀️ قبلی", f"adm:emo:{page - 1}"))
+    nav.append(btn(f"{page + 1}/{pages}", f"adm:emo:{page}"))
+    if page < pages - 1:
+        nav.append(btn("بعدی ▶️", f"adm:emo:{page + 1}"))
+    text = (f"✨ <b>ایموجی‌های پرمیوم</b>\n{L}\nوضعیت: {'🟢 روشن' if emojis.enabled else '🔴 خاموش'}\n"
+            f"تنظیم‌شده: {emojis.configured_count()} از {len(slots)}\n\n"
+            "روی هر مورد بزن و ایموجی پرمیوم (یا استیکر ایموجی) رو بفرست. همون ایموجی توی همه پیام‌ها، آگهی‌ها و آیکون دکمه‌ها "
+            "عوض می‌شه. تغییرها فوراً اعمال می‌شن.")
+    await show(c, text, kb([
+        [btn("🔴 خاموش کردن" if emojis.enabled else "🟢 روشن کردن", "adm:emotoggle")],
+        [btn("👁 پیش‌نمایش", "adm:emopv"), btn("➕ افزودن ایموجی", "adm:emoadd")],
+        *pairs(btns), nav,
+        [btn("🔎 فقط گرفتن ID", "adm:eid"), btn("🧹 بازنشانی همه", "adm:emoresetall")],
+        [btn("🔙 بازگشت", PANEL)],
+    ]))
+    await c.answer()
+
+
+@router.callback_query(F.data == "adm:emotoggle")
+async def emoji_toggle(c: CallbackQuery):
+    await emojis.set_enabled(not emojis.enabled)
+    await c.answer("روشن شد" if emojis.enabled else "خاموش شد")
+    await emoji_menu(c)
+
+
+@router.callback_query(F.data == "adm:emoresetall")
+async def emoji_reset_all_ask(c: CallbackQuery):
+    await show(c, "🧹 همه ایموجی‌های پرمیوم برگردن به ایموجی معمولی؟",
+               kb([[btn("✅ بله", "adm:emoresetok"), btn("🔙 نه", "adm:emo")]]))
+    await c.answer()
+
+
+@router.callback_query(F.data == "adm:emoresetok")
+async def emoji_reset_all(c: CallbackQuery):
+    await emojis.reset()
+    await c.answer("انجام شد")
+    await emoji_menu(c)
+
+
+@router.callback_query(F.data.startswith("adm:emoset:"))
+async def emoji_slot(c: CallbackQuery, state: FSMContext):
+    ch = c.data[len("adm:emoset:"):]
+    await state.set_state(AdminSt.emoji_set)
+    await state.update_data(ch=ch)
+    cur = emojis.id_of(ch)
+    label = dict(emojis.all_slots()).get(ch, "")
+    rows = [[btn("🧹 برگرداندن به معمولی", f"adm:emoreset:{ch}")]] if cur else []
+    await show(c, f"{ch} <b>{label}</b>\nایموجی فعلی: " + (f"پرمیوم ✅ <code>{cur}</code>" if cur else f"معمولی ({ch})") +
+               "\n\n✍️ ایموجی پرمیوم جدید رو بفرست (یا یک استیکر ایموجی).", kb([*rows, [btn("🔙 بازگشت", "adm:emo")]]))
+    await c.answer()
+
+
+@router.message(AdminSt.emoji_set)
+async def emoji_slot_save(m: Message, state: FSMContext):
+    found = custom_emoji_ids(m)
+    if not found:
+        return await m.answer("😕 ایموجی سفارشی (Custom Emoji) پیدا نشد. یک ایموجی پرمیوم یا استیکر ایموجی بفرست.",
+                              reply_markup=kb([[btn("🔙 بازگشت", "adm:emo")]]))
+    ch = (await state.get_data())["ch"]
+    await state.clear()
+    await emojis.set_id(ch, found[0][1])
+    await m.answer(f"✅ ایموجی {ch} ذخیره شد.\n<code>{found[0][1]}</code>\n\nپیام‌های جدید همین الان با آن ارسال می‌شن.",
+                   reply_markup=kb([[btn("➡️ بقیه موردها", "adm:emo")], [btn("👁 پیش‌نمایش", "adm:emopv")]]))
+
+
+@router.callback_query(F.data.startswith("adm:emoreset:"))
+async def emoji_reset_one(c: CallbackQuery, state: FSMContext):
+    await emojis.reset(c.data[len("adm:emoreset:"):])
+    await c.answer("برگشت به معمولی")
+    await emoji_menu(c, state)
+
+
+@router.callback_query(F.data == "adm:emoadd")
+async def emoji_add_ask(c: CallbackQuery, state: FSMContext):
+    await state.set_state(AdminSt.emoji_new)
+    await show(c, "➕ <b>افزودن ایموجی</b>\n\nمرحله ۱: همون ایموجی <b>معمولی</b> که می‌خوای عوض بشه رو بفرست (مثلاً 🔥).",
+               kb([[btn("🔙 بازگشت", "adm:emo")]]))
+    await c.answer()
+
+
+@router.message(AdminSt.emoji_new, F.text)
+async def emoji_add_char(m: Message, state: FSMContext):
+    mo = EMOJI_RX.search(m.text)
+    if not mo:
+        return await m.answer("😕 ایموجی معمولی پیدا نشد. فقط یک ایموجی بفرست.", reply_markup=kb([[btn("🔙 بازگشت", "adm:emo")]]))
+    ch = emojis.base(mo.group(0))
+    await state.set_state(AdminSt.emoji_set)
+    await state.update_data(ch=ch)
+    await m.answer(f"مرحله ۲: ایموجی پرمیوم جایگزین {ch} رو بفرست (یا استیکر ایموجی).", reply_markup=kb([[btn("🔙 بازگشت", "adm:emo")]]))
+
+
+@router.callback_query(F.data == "adm:eid")
+async def emoji_id_ask(c: CallbackQuery, state: FSMContext):
+    await state.set_state(AdminSt.emoji_id)
+    await show(c, "🔎 یک ایموجی پرمیوم یا استیکر ایموجی بفرست تا فقط شناسه‌اش (custom_emoji_id) رو بگیری. چیزی ذخیره نمی‌شه.",
+               kb([[btn("🔙 بازگشت", "adm:emo")]]))
+    await c.answer()
+
+
+@router.message(AdminSt.emoji_id)
+async def emoji_id_show(m: Message):
+    found = custom_emoji_ids(m)
+    if not found:
+        return await m.answer("😕 ایموجی سفارشی پیدا نشد. یک ایموجی پرمیوم یا استیکر ایموجی بفرست.",
+                              reply_markup=kb([[btn("🔙 بازگشت", "adm:emo")]]))
+    lines = "\n".join(f"{ch} ← <code>{cid}</code>" for ch, cid in found)
+    await m.answer(f"✅ <b>{len(found)} ایموجی پیدا شد</b>\n{L}\n{lines}", reply_markup=kb([[btn("🔎 ایموجی بعدی", "adm:eid")], [btn("🔙 بازگشت", "adm:emo")]]))
+
+
+@router.callback_query(F.data == "adm:emopv")
+async def emoji_preview(c: CallbackQuery, bot: Bot):
+    from ..keyboards import main_menu
+    from ..texts import render_ad
+    ad = {"kind": "player", "special": 1, "user_id": c.from_user.id, "photo": None, "data": {
+        "name": "امیرحسین", "psn": "Amir_CAM10", "pos1": "CAM", "pos2": "CM، ST", "history": "Phoenix FC", "honors": "قهرمان لیگ",
+        "days": "5", "hours": "21-24", "ping": "45", "stream": "بله", "country": "ایران", "party": "بله", "notes": "نمونه"}}
+    await bot.send_message(c.message.chat.id, "👁 <b>پیش‌نمایش با تنظیم فعلی</b>\n\n" + render_ad(ad, {"username": c.from_user.username}))
+    await bot.send_message(c.message.chat.id, "👆 منو و دکمه‌ها با آیکون جدید:", reply_markup=main_menu(True))
+    await c.answer()
 
 
 # ---- support replies ---------------------------------------------------
