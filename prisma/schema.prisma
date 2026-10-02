@@ -1,0 +1,297 @@
+// Social Manager — production data model (PostgreSQL).
+// The DEMO runs on the in-memory store in src/database (same shapes), so no DB is required to try the panel.
+// To go live: set DATABASE_URL, run `npm run db:migrate`, then swap src/database/store.ts for Prisma repositories.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+enum Platform {
+  TELEGRAM
+  INSTAGRAM
+}
+
+enum PostStatus {
+  PUBLISHED
+  SCHEDULED
+  FAILED
+  PROCESSING
+}
+
+enum ContentSource {
+  TELEGRAM
+  MANUAL
+  AI
+}
+
+enum CommentStatus {
+  NEW
+  REPLIED
+  IGNORED
+  RESOLVED
+}
+
+enum MessageSender {
+  CUSTOMER
+  BOT
+  ADMIN
+}
+
+enum CustomerStatus {
+  VIP
+  NEW
+  RETURNING
+}
+
+enum ProductStatus {
+  ACTIVE
+  DRAFT
+  OUT_OF_STOCK
+}
+
+enum AutomationStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum ExecutionStatus {
+  SUCCESS
+  FAILED
+  RUNNING
+}
+
+enum LogLevel {
+  SUCCESS
+  INFO
+  WARNING
+  ERROR
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String
+  role         Role     @default(ADMIN)
+  createdAt    DateTime @default(now())
+
+  socialAccounts SocialAccount[]
+}
+
+/// Generic OAuth/token holder. Tokens MUST be stored encrypted (see src/lib/security).
+model SocialAccount {
+  id             String    @id @default(cuid())
+  userId         String
+  platform       Platform
+  externalId     String?
+  displayName    String
+  accessTokenEnc String?
+  refreshTokenEnc String?
+  expiresAt      DateTime?
+  connected      Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  telegram  TelegramChannel?
+  instagram InstagramAccount?
+
+  @@unique([platform, externalId])
+}
+
+model TelegramChannel {
+  id              String   @id @default(cuid())
+  socialAccountId String   @unique
+  chatId          String?
+  username        String
+  title           String
+  members         Int      @default(0)
+  webhookSecret   String?
+
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+}
+
+model InstagramAccount {
+  id                String   @id @default(cuid())
+  socialAccountId   String   @unique
+  businessAccountId String?
+  username          String
+  followers         Int      @default(0)
+  webhookVerified   Boolean  @default(false)
+
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+}
+
+model Post {
+  id             String        @id @default(cuid())
+  platform       Platform
+  externalId     String?
+  caption        String
+  mediaUrl       String
+  mediaType      String        @default("photo")
+  kind           String        @default("post") // post | reel
+  status         PostStatus    @default(PUBLISHED)
+  source         ContentSource @default(MANUAL)
+  sourcePostId   String? // e.g. the Telegram post an IG post was generated from
+  likes          Int           @default(0)
+  views          Int           @default(0)
+  commentsCount  Int           @default(0)
+  publishedAt    DateTime?
+  scheduledFor   DateTime?
+  createdAt      DateTime      @default(now())
+
+  comments Comment[]
+
+  @@index([platform, status])
+}
+
+model Story {
+  id          String        @id @default(cuid())
+  mediaUrl    String
+  status      PostStatus    @default(PUBLISHED)
+  source      ContentSource @default(MANUAL)
+  views       Int           @default(0)
+  publishedAt DateTime?
+  createdAt   DateTime      @default(now())
+}
+
+model Customer {
+  id          String         @id @default(cuid())
+  name        String
+  username    String         @unique
+  phone       String?
+  status      CustomerStatus @default(NEW)
+  tags        String[]
+  orders      Int            @default(0)
+  totalSpent  Int            @default(0)
+  lastContact DateTime       @default(now())
+  createdAt   DateTime       @default(now())
+
+  conversations Conversation[]
+}
+
+model Conversation {
+  id         String   @id @default(cuid())
+  customerId String
+  unread     Int      @default(0)
+  important  Boolean  @default(false)
+  aiHandled  Boolean  @default(false)
+  lastAt     DateTime @default(now())
+
+  customer Customer        @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  messages DirectMessage[]
+}
+
+model DirectMessage {
+  id             String        @id @default(cuid())
+  conversationId String
+  sender         MessageSender
+  text           String
+  createdAt      DateTime      @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+model Comment {
+  id           String        @id @default(cuid())
+  postId       String
+  username     String
+  text         String
+  status       CommentStatus @default(NEW)
+  aiSuggestion String?
+  reply        String?
+  createdAt    DateTime      @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+}
+
+model Product {
+  id        String        @id @default(cuid())
+  name      String
+  sku       String        @unique
+  category  String
+  price     Int
+  stock     Int           @default(0)
+  status    ProductStatus @default(ACTIVE)
+  imageUrl  String?
+  createdAt DateTime      @default(now())
+}
+
+model Automation {
+  id          String           @id @default(cuid())
+  name        String
+  description String
+  trigger     String
+  steps       Json
+  options     Json?
+  status      AutomationStatus @default(ACTIVE)
+  lastRunAt   DateTime?
+  runs        Int              @default(0)
+  successRate Float            @default(100)
+
+  executions AutomationExecution[]
+}
+
+model AutomationExecution {
+  id           String          @id @default(cuid())
+  automationId String
+  status       ExecutionStatus
+  steps        Json
+  durationMs   Int
+  startedAt    DateTime        @default(now())
+
+  automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@index([automationId, startedAt])
+}
+
+model AISettings {
+  id             String  @id @default("singleton")
+  enabled        Boolean @default(true)
+  tone           String  @default("friendly")
+  language       String  @default("fa")
+  businessName   String
+  businessType   String
+  workingHours   String
+  rules          String[]
+  autoReply      Boolean @default(true)
+  provider       String  @default("mock") // mock | openai | ...
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  type      String
+  level     LogLevel @default(INFO)
+  title     String
+  details   String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  level     LogLevel @default(INFO)
+  title     String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Settings {
+  key   String @id
+  value Json
+}
