@@ -455,4 +455,5 @@ export const fa: Record<string, string> = {
   "Two-factor code (optional)": "کد دومرحله‌ای (اختیاری)",
   "Instagram post failed": "انتشار اینستاگرام ناموفق بود",
   "Instagram account connected": "اکانت اینستاگرام متصل شد",
+  "followers": "دنبال‌کننده",
 };

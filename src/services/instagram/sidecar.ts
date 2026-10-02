@@ -1,7 +1,7 @@
 import { sidecarConfig } from "@/config/instagram";
 import { HttpError } from "@/lib/api";
 
-export interface SidecarStatus { reachable: boolean; dryRun?: boolean; loggedIn?: boolean; username?: string; error?: string | null }
+export interface SidecarStatus { reachable: boolean; dryRun?: boolean; loggedIn?: boolean; username?: string; followers?: number | null; posts?: number | null; error?: string | null }
 
 async function call(path: string, init: RequestInit & { timeoutMs?: number } = {}) {
   const { url, secret } = sidecarConfig();
@@ -24,7 +24,7 @@ async function call(path: string, init: RequestInit & { timeoutMs?: number } = {
 export async function sidecarStatus(): Promise<SidecarStatus> {
   try {
     const d = await call("/status", { timeoutMs: 4000 });
-    return { reachable: true, dryRun: Boolean(d.dryRun), loggedIn: Boolean(d.loggedIn), username: String(d.username ?? ""), error: (d.error as string | null) ?? null };
+    return { reachable: true, dryRun: Boolean(d.dryRun), loggedIn: Boolean(d.loggedIn), username: String(d.username ?? ""), followers: (d.followers as number | null) ?? null, posts: (d.posts as number | null) ?? null, error: (d.error as string | null) ?? null };
   } catch (e) {
     return { reachable: false, error: e instanceof Error ? e.message : "unreachable" };
   }

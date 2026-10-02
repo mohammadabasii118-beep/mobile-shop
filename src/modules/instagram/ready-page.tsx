@@ -37,7 +37,7 @@ async function copyText(text: string) {
 
 interface IgStatus {
   mode: string; dailyLimit: number; autoPublish: boolean;
-  sidecar: { reachable: boolean; dryRun?: boolean; loggedIn?: boolean; username?: string; error?: string | null } | null;
+  sidecar: { reachable: boolean; dryRun?: boolean; loggedIn?: boolean; username?: string; followers?: number | null; posts?: number | null; error?: string | null } | null;
 }
 
 function ReadyCard({ item, canPublish }: { item: ReadyPost; canPublish: boolean }) {
@@ -88,19 +88,20 @@ function ConnectCard({ status }: { status: IgStatus }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState("");
-  const connect = useAction(() => apiFetch("/api/instagram/connect", { method: "POST", json: { code } }));
+  const connect = useAction(() => apiFetch<{ username: string | null; followers: number | null; posts: number | null; dryRun: boolean }>("/api/instagram/connect", { method: "POST", json: { code } }));
+  const { nf } = useFmt();
   const s = status.sidecar;
   const ok = s?.reachable && s.loggedIn;
   return (
     <Card className="mb-5 flex flex-wrap items-center gap-3 p-4">
       <span className={`size-2.5 rounded-full ${ok ? "bg-success" : "bg-warning"}`} />
       <div className="min-w-0 flex-1 text-sm">
-        <p className="font-medium">{!s?.reachable ? t("Instagram service is not running on the server") : ok ? `${t("Instagram connected")}${s.username ? ` · @${s.username}` : ""}${s.dryRun ? ` · ${t("test mode")}` : ""}` : t("Instagram not connected yet")}</p>
+        <p className="font-medium">{!s?.reachable ? t("Instagram service is not running on the server") : ok ? `${t("Instagram connected")}${s.username ? ` · @${s.username}` : ""}${s.followers != null ? ` · ${nf.format(s.followers)} ${t("followers")}` : ""}${s.posts != null ? ` · ${nf.format(s.posts)} ${t("posts")}` : ""}${s.dryRun ? ` · ${t("test mode")}` : ""}` : t("Instagram not connected yet")}</p>
         <p className="flex items-start gap-1.5 text-xs text-muted-foreground"><TriangleAlert className="mt-0.5 size-3 shrink-0 text-warning" />{t("Unofficial method: it violates Instagram's terms and the account can be limited. Posts are sent only when you confirm.")} ({status.dailyLimit}/24h)</p>
       </div>
       {s?.reachable && <Button size="sm" variant={ok ? "outline" : "primary"} onClick={() => setOpen(true)}>{t(ok ? "Reconnect" : "Connect")}</Button>}
       <Dialog open={open} onClose={() => setOpen(false)} title="Connect Instagram" description="Uses the username and password saved in the server .env. If Instagram asks for a code, enter it below.">
-        <form className="grid gap-4" onSubmit={(e) => { e.preventDefault(); connect.mutate(undefined, { onSuccess: () => { toast.success(t("Instagram connected")); setOpen(false); setCode(""); }, onError: (er) => toast.error(t(er.message)) }); }}>
+        <form className="grid gap-4" onSubmit={(e) => { e.preventDefault(); connect.mutate(undefined, { onSuccess: (r) => { toast.success(`${t("Instagram connected")}${r.username ? ` · @${r.username}` : ""}${r.followers != null ? ` · ${nf.format(r.followers)} ${t("followers")}` : ""}`); setOpen(false); setCode(""); }, onError: (er) => toast.error(t(er.message)) }); }}>
           <label className="grid gap-1.5 text-sm"><span className="font-medium">{t("Two-factor code (optional)")}</span><Input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} inputMode="numeric" maxLength={8} dir="ltr" /></label>
           <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setOpen(false)}>{t("Cancel")}</Button><Button type="submit" loading={connect.isPending}>{t("Connect")}</Button></div>
         </form>

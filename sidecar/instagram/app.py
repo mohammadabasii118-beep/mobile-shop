@@ -30,7 +30,7 @@ if len(SECRET) < 16:
 app = FastAPI(title="Instagram sidecar", docs_url=None, redoc_url=None, openapi_url=None)
 _lock = threading.Lock()  # one Instagram operation at a time
 _client = None
-_state = {"logged_in": False, "username": USERNAME, "error": None}
+_state = {"logged_in": False, "username": USERNAME, "error": None, "followers": None, "posts": None}
 
 
 def _auth(secret: str | None):
@@ -46,7 +46,7 @@ def _login(code: str = ""):
     """Log in (or reuse the saved session). Caller must hold _lock."""
     global _client
     if DRY_RUN:
-        _state.update(logged_in=True, error=None)
+        _state.update(logged_in=True, error=None, followers=None, posts=None)
         return
     if not USERNAME or not PASSWORD:
         _err(400, "config", "IG_USERNAME / IG_PASSWORD are not set in the server environment.")
@@ -76,6 +76,11 @@ def _login(code: str = ""):
         _err(502, "login_failed", f"Instagram login failed ({type(e).__name__}).")
     _client = cl
     _state.update(logged_in=True, error=None)
+    try:  # read-only profile check; a failure here must not break the login
+        info = cl.account_info()
+        _state.update(username=info.username or USERNAME, followers=getattr(info, "follower_count", None), posts=getattr(info, "media_count", None))
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _ensure():
@@ -98,7 +103,7 @@ def _to_jpeg(data: bytes) -> Path:
 @app.get("/status")
 def status(x_sidecar_secret: str | None = Header(default=None)):
     _auth(x_sidecar_secret)
-    return {"dryRun": DRY_RUN, "loggedIn": _state["logged_in"], "username": _state["username"], "error": _state["error"]}
+    return {"dryRun": DRY_RUN, "loggedIn": _state["logged_in"], "username": _state["username"], "error": _state["error"], "followers": _state["followers"], "posts": _state["posts"]}
 
 
 @app.post("/login")
@@ -106,7 +111,7 @@ def login(code: str = Form(default=""), x_sidecar_secret: str | None = Header(de
     _auth(x_sidecar_secret)
     with _lock:
         _login(code.strip())
-    return {"ok": True, "username": _state["username"], "dryRun": DRY_RUN}
+    return {"ok": True, "username": _state["username"], "followers": _state["followers"], "posts": _state["posts"], "dryRun": DRY_RUN}
 
 
 def _publish(kind: str, file: UploadFile, caption: str):
