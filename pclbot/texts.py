@@ -7,9 +7,14 @@ PLAYER_FIELDS = [
     ("psn", "🆔 آیدی PSN یا EA ID", "text"),
     ("pos1", "🎯 پست اصلی", "text"),
     ("pos2", "🎯 پست دوم", "text"),
-    ("history", "🏟 سابقه حضور در تیم‌ها", "text"),
+    ("history", "🏟 سوابق بازی", "text"),
     ("honors", "🏆 افتخارات بازیکن", "text"),
+    ("days", "📅 تعداد روزهای فعال در هفته", "text"),
     ("hours", "⏰ ساعات فعالیت", "text"),
+    ("ping", "📶 پینگ (فقط عدد، به میلی‌ثانیه)", "text"),
+    ("stream", "📡 قابلیت استریم", "text"),
+    ("country", "🌍 کشور محل زندگی", "text"),
+    ("party", "🎙 توانایی صحبت در پارتی", "text"),
     ("notes", "📝 توضیحات تکمیلی", "text"),
     ("photo", "🖼 تصویر کارت بازیکن", "photo"),
 ]
@@ -24,6 +29,17 @@ TEAM_FIELDS = [
     ("notes", "📝 توضیحات تکمیلی", "text"),
 ]
 OPTIONAL = {"photo", "logo", "notes"}
+
+# Fields picked with buttons: "single" = exactly one, "multi" = any number
+POSITIONS = ["GK", "CB", "RB/LB", "CDM", "CM", "RM/LM", "CAM", "ST"]
+YES_NO = ["بله", "خیر"]
+CHOICES = {
+    "pos1": POSITIONS, "pos2": POSITIONS, "positions": POSITIONS,
+    "days": [str(i) for i in range(1, 8)], "stream": YES_NO, "party": YES_NO,
+}
+CHOICE_MODE = {"pos1": "single", "pos2": "multi", "positions": "multi", "days": "single", "stream": "single", "party": "single"}
+CHOICE_COLS = {"days": 4}
+NO_POS = "ندارد"
 
 KIND_TITLE = {"player": "🎮 آگهی بازیکن آزاد", "team": "🛡 آگهی جذب بازیکن"}
 STATUS_TITLE = {
@@ -90,10 +106,21 @@ def render_ad(ad: dict, user: dict | None = None, preview: bool = False) -> str:
             f"🆔 <b>آیدی:</b> <code>{e(d.get('psn'))}</code>\n"
             f"🎯 <b>پست اصلی:</b> {e(d.get('pos1'))}\n"
             f"🎯 <b>پست دوم:</b> {e(d.get('pos2'))}\n"
-            f"🏟 <b>سوابق:</b> {e(d.get('history'))}\n"
+            f"🏟 <b>سوابق بازی:</b> {e(d.get('history'))}\n"
             f"🏆 <b>افتخارات:</b> {e(d.get('honors'))}\n"
-            f"⏰ <b>ساعات فعالیت:</b> {e(d.get('hours'))}\n"
         )
+        # fields added later are skipped for older ads that don't have them
+        if d.get("days"):
+            body += f"📅 <b>روزهای فعال در هفته:</b> {e(d['days'])}\n"
+        body += f"⏰ <b>ساعات فعالیت:</b> {e(d.get('hours'))}\n"
+        if d.get("ping"):
+            body += f"📶 <b>پینگ:</b> {e(d['ping'])} ms\n"
+        if d.get("stream"):
+            body += f"📡 <b>استریم:</b> {e(d['stream'])}\n"
+        if d.get("country"):
+            body += f"🌍 <b>کشور:</b> {e(d['country'])}\n"
+        if d.get("party"):
+            body += f"🎙 <b>صحبت در پارتی:</b> {e(d['party'])}\n"
         tags = "#بازیکن_آزاد #PCL"
     else:
         body = (

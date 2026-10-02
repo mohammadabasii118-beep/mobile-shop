@@ -93,10 +93,10 @@ const esc=s=>String(s??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt
 const fmt=n=>n.toLocaleString('en-US')+' تومان';
 const L='━━━━━━━━━━━━━━';
 const FIELDS={
- player:[['name','👤 نام بازیکن'],['psn','🆔 آیدی PSN یا EA ID'],['pos1','🎯 پست اصلی'],['pos2','🎯 پست دوم'],['history','🏟 سابقه حضور در تیم‌ها'],['honors','🏆 افتخارات بازیکن'],['hours','⏰ ساعات فعالیت'],['notes','📝 توضیحات تکمیلی'],['photo','🖼 تصویر کارت بازیکن']],
+ player:[['name','👤 نام بازیکن'],['psn','🆔 آیدی PSN یا EA ID'],['pos1','🎯 پست اصلی'],['pos2','🎯 پست دوم'],['history','🏟 سوابق بازی'],['honors','🏆 افتخارات بازیکن'],['days','📅 تعداد روزهای فعال در هفته'],['hours','⏰ ساعات فعالیت'],['ping','📶 پینگ (فقط عدد، به میلی‌ثانیه)'],['stream','📡 قابلیت استریم'],['country','🌍 کشور محل زندگی'],['party','🎙 توانایی صحبت در پارتی'],['notes','📝 توضیحات تکمیلی'],['photo','🖼 تصویر کارت بازیکن']],
  team:[['team','🛡 نام تیم'],['logo','🖼 لوگوی تیم'],['captain_tg','✈️ آیدی تلگرام کاپیتان'],['positions','🎯 پست‌های موردنیاز'],['count','🔢 تعداد بازیکنان موردنیاز'],['hours','⏰ ساعات فعالیت'],['terms','📋 شرایط جذب'],['notes','📝 توضیحات تکمیلی']]};
 const OPT=['photo','logo','notes'];
-const SAMPLE={player:{name:'امیرحسین کریمی',psn:'Amir_CAM10',pos1:'CAM',pos2:'CM',history:'Phoenix FC، Iron Wolves',honors:'قهرمان لیگ دسته ۲ فصل ۱۴',hours:'۲۱ تا ۲۴',notes:'بازیکن تیمی، میکروفون دارم',photo:'card'},
+const SAMPLE={player:{name:'امیرحسین کریمی',psn:'Amir_CAM10',pos1:'CAM',pos2:'CM، RM/LM',history:'Phoenix FC، Iron Wolves',honors:'قهرمان لیگ دسته ۲ فصل ۱۴',days:'5',hours:'۲۱ تا ۲۴',ping:'45',stream:'بله',country:'ایران',party:'بله',notes:'بازیکن تیمی، میکروفون دارم',photo:'card'},
  team:{team:'Shadow Lions',logo:'card',captain_tg:'@mehdi_sl',positions:'GK، CB',count:'2',hours:'۲۰ تا ۲۴',terms:'حضور منظم در تمرین، آیدی PSN فعال',notes:'تیم در لیگ برتر دسته ۱'}};
 const BADGES=[['🥉','برنزی',5],['🥈','نقره‌ای',15],['🥇','طلایی',30],['💎','الماسی',50],['👑','افسانه‌ای',100]];
 const NAMES={price_normal:'تعرفه ثبت عادی',price_special:'تعرفه ثبت ویژه',renew_normal:'تعرفه تمدید عادی',renew_special:'تعرفه تمدید ویژه',upgrade_price:'تعرفه ارتقا به ویژه',days_normal:'اعتبار عادی (روز)',days_special:'اعتبار ویژه (روز)',referral_reward:'پاداش دعوت'};
@@ -129,7 +129,7 @@ function groupView(){
 }
 function adHtml(a,prev){
  const d=a.d,st=a.special?`<span class="star">⭐️ ویژه</span>\n`:'';
- if(a.kind==='player')return `🎮 <b>بازیکن آزاد</b>\n${st}${L}\n👤 <b>نام:</b> ${esc(d.name)}\n🆔 <b>آیدی:</b> <code>${esc(d.psn)}</code>\n🎯 <b>پست اصلی:</b> ${esc(d.pos1)}\n🎯 <b>پست دوم:</b> ${esc(d.pos2)}\n🏟 <b>سوابق:</b> ${esc(d.history)}\n🏆 <b>افتخارات:</b> ${esc(d.honors)}\n⏰ <b>ساعات فعالیت:</b> ${esc(d.hours)}\n${d.notes?`📝 <b>توضیحات:</b> ${esc(d.notes)}\n`:''}${L}\n📩 <b>ارتباط:</b> @ali_pcl\n\n<span class="tag">#بازیکن_آزاد #PCL</span>\n\n🔮 The Biggest Transfer Market for Iranian Teams &amp; Players.\n👉 Join us: <span class="tag">@PCL_ProClubs</span>`;
+ if(a.kind==='player')return `🎮 <b>بازیکن آزاد</b>\n${st}${L}\n👤 <b>نام:</b> ${esc(d.name)}\n🆔 <b>آیدی:</b> <code>${esc(d.psn)}</code>\n🎯 <b>پست اصلی:</b> ${esc(d.pos1)}\n🎯 <b>پست دوم:</b> ${esc(d.pos2)}\n🏟 <b>سوابق بازی:</b> ${esc(d.history)}\n🏆 <b>افتخارات:</b> ${esc(d.honors)}\n${d.days?`📅 <b>روزهای فعال در هفته:</b> ${esc(d.days)}\n`:''}⏰ <b>ساعات فعالیت:</b> ${esc(d.hours)}\n${d.ping?`📶 <b>پینگ:</b> ${esc(d.ping)} ms\n`:''}${d.stream?`📡 <b>استریم:</b> ${esc(d.stream)}\n`:''}${d.country?`🌍 <b>کشور:</b> ${esc(d.country)}\n`:''}${d.party?`🎙 <b>صحبت در پارتی:</b> ${esc(d.party)}\n`:''}${d.notes?`📝 <b>توضیحات:</b> ${esc(d.notes)}\n`:''}${L}\n📩 <b>ارتباط:</b> @ali_pcl\n\n<span class="tag">#بازیکن_آزاد #PCL</span>\n\n🔮 The Biggest Transfer Market for Iranian Teams &amp; Players.\n👉 Join us: <span class="tag">@PCL_ProClubs</span>`;
  return `🛡 <b>آگهی جذب بازیکن</b>\n${st}${L}\n🏷 <b>تیم:</b> ${esc(d.team)}\n🎯 <b>پست‌های موردنیاز:</b> ${esc(d.positions)}\n🔢 <b>تعداد موردنیاز:</b> ${esc(d.count)}\n⏰ <b>ساعات فعالیت:</b> ${esc(d.hours)}\n📋 <b>شرایط جذب:</b> ${esc(d.terms)}\n${d.notes?`📝 <b>توضیحات:</b> ${esc(d.notes)}\n`:''}${L}\n📩 <b>ارتباط:</b> ${esc(d.captain_tg)}\n\n<span class="tag">#جذب_بازیکن #PCL</span>\n\n🔮 The Biggest Transfer Market for Iranian Teams &amp; Players.\n👉 Join us: <span class="tag">@PCL_ProClubs</span>`}
 const BK=(to='menu',t='🔙 بازگشت')=>[[t,to]];
 const STT={pending:'⏳ در انتظار تأیید',approved:'✅ تأییدشده و منتشرشده',rejected:'❌ ردشده',expired:'⌛️ منقضی‌شده'};
@@ -160,9 +160,9 @@ function act(a){
  k(){const k=p[1];screen(`<b>${k==='player'?'🎮 آگهی بازیکن آزاد':'🛡 آگهی جذب بازیکن'}</b>\n\nنوع انتشار رو انتخاب کن:\n\n📄 عادی: ${fmt(S.cfg.price_normal)} — ${S.cfg.days_normal} روز\n⭐️ ویژه (با نشان مخصوص): ${fmt(S.cfg.price_special)} — ${S.cfg.days_special} روز`,[[['📄 عادی','s:'+k+':0'],['⭐️ ویژه','s:'+k+':1']],BK('ad:new')].map(r=>r))},
  s(){S.flow={kind:p[1],special:+p[2],vals:{},idx:0,mode:'new'};ask()},
  skip(){S.flow.vals[curKey()]=null;adv()},
- pp(){S.flow.vals[curKey()]=p[1];adv()},
- pt(){const f=S.flow;f.sel=f.sel||[];const i=f.sel.indexOf(p[1]);i<0?f.sel.push(p[1]):f.sel.splice(i,1);ask()},
- ptok(){const f=S.flow;if(!(f.sel||[]).length)return;f.vals[curKey()]=f.sel.join('، ');f.sel=[];adv()},
+ pp(){const k=curKey();S.flow.vals[k]=CHOICES[k][+p[1]];adv()},
+ pt(){const f=S.flow,k=curKey(),v=CHOICES[k][+p[1]];if(k==='pos2'&&v===f.vals.pos1)return;f.sel=f.sel||[];const i=f.sel.indexOf(v);i<0?f.sel.push(v):f.sel.splice(i,1);ask()},
+ ptok(){const f=S.flow,k=curKey(),sel=POSK.filter(x=>(f.sel||[]).includes(x));if(!sel.length&&k!=='pos2')return;f.vals[k]=sel.length?sel.join('، '):'ندارد';f.sel=[];adv()},
  prevf(){S.flow.idx=Math.max(0,S.flow.idx-1);ask()},
  sample(){S.flow.vals={...SAMPLE[S.flow.kind]};preview()},
  photo(){S.flow.vals[curKey()]='card';say('',null,{me:true,card:'card'});adv()},
@@ -195,22 +195,25 @@ function act(a){
  (A[p[0]]||(()=>{}))();
 }
 function curKey(){return FIELDS[S.flow.kind][S.flow.idx][0]}
-const POSK=['GK','CB','RB/LB','CDM','CM','RM/LM','CAM','ST'];
+const POSK=['GK','CB','RB/LB','CDM','CM','RM/LM','CAM','ST'],YN=['بله','خیر'];
+const CHOICES={pos1:POSK,pos2:POSK,positions:POSK,days:['1','2','3','4','5','6','7'],stream:YN,party:YN};
+const MULTI={pos2:1,positions:1},COLS={days:4};
 function askPos(f,key,label,tot){
- const multi=key==='positions',sel=f.sel||[];
- const btns=POSK.map(x=>[(multi&&sel.includes(x)?'✅ ':'')+x,(multi?'pt:':'pp:')+x]);
- const rows=btns.reduce((r,b,i,a)=>{if(i%2===0)r.push(a.slice(i,i+2));return r},[]);
- if(key==='pos2')rows.push([['➖ ندارم','pp:ندارد']]);
- if(multi)rows.push([['✔️ تأیید پست‌ها ('+sel.length+')','ptok']]);
+ const multi=!!MULTI[key],sel=f.sel||[],opts=CHOICES[key];
+ const btns=opts.map((x,i)=>[(multi&&sel.includes(x)?'✅ ':'')+x,(multi?'pt:':'pp:')+i]);
+ const n=COLS[key]||2,rows=btns.reduce((r,b,i,a)=>{if(i%n===0)r.push(a.slice(i,i+n));return r},[]);
+ if(multi)rows.push([[sel.length?'✔️ تأیید ('+sel.length+' پست)':(key==='pos2'?'➖ ندارم':'✔️ تأیید'),'ptok']]);
  const nav=[];if(f.mode==='new'&&f.idx>0)nav.push(['◀️ مرحله قبل','prevf']);nav.push(['🔙 لغو','menu']);rows.push(nav);
  rows.push([['⚡ پر کردن نمونه (فقط دمو)','sample']]);
  S.expect=null;
- screen(`<b>${f.kind==='player'?'🎮 آگهی بازیکن آزاد':'🛡 آگهی جذب بازیکن'}</b>${f.mode==='new'?` — مرحله ${f.idx+1} از ${tot}`:''}\n\n${label}\n👇 از دکمه‌ها انتخاب کن${multi?' (می‌تونی چند پست انتخاب کنی)':''}`,rows);paint()}
+ screen(`<b>${f.kind==='player'?'🎮 آگهی بازیکن آزاد':'🛡 آگهی جذب بازیکن'}</b>${f.mode==='new'?` — مرحله ${f.idx+1} از ${tot}`:''}\n\n${label}\n${multi?'👇 هر چند پست که می‌خوای انتخاب کن، بعد «تأیید» رو بزن':'👇 فقط یکی رو انتخاب کن'}`,rows);paint()}
 function ask(){const f=S.flow,[key,label]=FIELDS[f.kind][f.idx],isP=['photo','logo'].includes(key),tot=FIELDS[f.kind].length;
- if(['pos1','pos2','positions'].includes(key))return askPos(f,key,label,tot);
+ if(CHOICES[key])return askPos(f,key,label,tot);
  const rows=[];const r=[];if(OPT.includes(key))r.push(['⏭ رد کردن','skip']);if(isP)r.push(['📸 ارسال عکس نمونه','photo']);if(f.mode==='new'&&f.idx>0)r.push(['◀️ مرحله قبل','prevf']);if(r.length)rows.push(r);
  rows.push([['⚡ پر کردن نمونه (فقط دمو)','sample']]);rows.push(BK('menu','🔙 لغو')); 
- S.expect=isP?null:{hint:'جواب را بنویس و ارسال کن',fn:t=>{S.flow.vals[key]=t;adv()}};
+ const ex={hint:key==='ping'?'فقط عدد بنویس، مثلاً 45':'جواب را بنویس و ارسال کن'};
+ ex.fn=t=>{if(key==='ping'){const n=parseInt(t.replace(/[۰-۹]/g,c=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(c)));if(!/^[0-9۰-۹]+$/.test(t.trim())||n<1||n>999){S.expect=ex;return say('⚠️ فقط یک عدد بین ۱ تا ۹۹۹ بنویس. مثلاً: 45')}t=String(n)}S.flow.vals[key]=t;adv()};
+ S.expect=isP?null:ex;
  screen(`<b>${f.kind==='player'?'🎮 آگهی بازیکن آزاد':'🛡 آگهی جذب بازیکن'}</b>${f.mode==='new'?` — مرحله ${f.idx+1} از ${tot}`:''}\n\n${label}\n${isP?'📸 تصویر رو بفرست':'✍️ بنویس و بفرست'}${OPT.includes(key)?'\n(اختیاری)':''}`,rows);paint()}
 function adv(){const f=S.flow;if(f.mode==='new'){if(f.idx+1<FIELDS[f.kind].length){f.idx++;ask()}else preview()}else{f.mode='new';preview()}}
 function preview(){const f=S.flow;S.expect=null;const price=f.special?S.cfg.price_special:S.cfg.price_normal,days=f.special?S.cfg.days_special:S.cfg.days_normal;

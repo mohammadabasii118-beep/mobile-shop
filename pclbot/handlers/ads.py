@@ -8,7 +8,8 @@ from aiogram.types import CallbackQuery, Message
 
 from .. import db, services
 from ..keyboards import back, btn, kb, pairs
-from ..texts import KIND_TITLE, OPTIONAL, STATUS_TITLE, fields_of, fingerprint, fmt_date, money, render_ad
+from ..texts import (CHOICE_COLS, CHOICE_MODE, CHOICES, KIND_TITLE, NO_POS, OPTIONAL, POSITIONS, STATUS_TITLE, fields_of,
+                     fingerprint, fmt_date, money, render_ad)
 from ..utils import is_admin, show
 
 router = Router()
@@ -44,11 +45,15 @@ async def send_ad(bot: Bot, chat_id: int, ad: dict, markup, user: dict | None = 
 async def ask(event: CallbackQuery | Message, state: FSMContext) -> None:
     data = await state.get_data()
     key, label, kind = fields_of(data["kind"])[data["idx"]]
-    hint = "📸 تصویر رو بفرست" if kind == "photo" else "✍️ بنویس و بفرست"
     total = len(fields_of(data["kind"]))
     head = f"<b>{KIND_TITLE[data['kind']]}</b>"
     if data["mode"] == "new":
         head += f" — مرحله {data['idx'] + 1} از {total}"
+    if key in CHOICE_MODE:
+        return await ask_position(event, state, data, key, label, head)
+    hint = "📸 تصویر رو بفرست" if kind == "photo" else "✍️ بنویس و بفرست"
+    if key == "ping":
+        hint = "✍️ فقط عدد بنویس، مثلاً 45"
     text = f"{head}\n\n{label}\n{hint}" + ("\n(اختیاری)" if key in OPTIONAL else "")
     row = []
     if key in OPTIONAL:
@@ -58,6 +63,37 @@ async def ask(event: CallbackQuery | Message, state: FSMContext) -> None:
     rows = [row] if row else []
     rows.append(back(data.get("back", "menu"), "🔙 لغو"))
     await reply(event, text, kb(rows))
+
+
+def split_positions(value: str | None) -> list[str]:
+    return [x.strip() for x in (value or "").split("،") if x.strip() in POSITIONS]
+
+
+async def ask_position(event, state: FSMContext, data: dict, key: str, label: str, head: str) -> None:
+    multi = CHOICE_MODE[key] == "multi"
+    options = CHOICES[key]
+    sel: list[str] = []
+    if multi:
+        # (re)load the selection when entering the step, so editing starts from the saved value
+        if data.get("sel_key") != key:
+            await state.update_data(sel=split_positions(data["vals"].get(key)), sel_key=key)
+            data = await state.get_data()
+        sel = data["sel"]
+    btns = [btn(("✅ " if p in sel else "") + p, f"ad:{'pt' if multi else 'pp'}:{i}") for i, p in enumerate(options)]
+    rows = pairs(btns, CHOICE_COLS.get(key, 2))
+    if multi:
+        if sel:
+            ok = f"✔️ تأیید ({len(sel)} پست)"
+        else:
+            ok = "➖ ندارم" if key == "pos2" else "✔️ تأیید"
+        rows.append([btn(ok, "ad:ptok")])
+    nav = []
+    if data["mode"] == "new" and data["idx"] > 0:
+        nav.append(btn("◀️ مرحله قبل", "ad:prevf"))
+    nav.append(btn("🔙 لغو", data.get("back", "menu")))
+    rows.append(nav)
+    hint = "👇 فقط یکی رو انتخاب کن" if not multi else "👇 هر چند پست که می‌خوای انتخاب کن، بعد «تأیید» رو بزن"
+    await reply(event, f"{head}\n\n{label}\n{hint}", kb(rows))
 
 
 async def show_preview(event: CallbackQuery | Message, state: FSMContext, bot: Bot) -> None:
@@ -154,10 +190,61 @@ async def skip_field(c: CallbackQuery, state: FSMContext, bot: Bot):
     await advance(c, state, bot)
 
 
+def current_key(data: dict) -> str:
+    return fields_of(data["kind"])[data["idx"]][0]
+
+
+@router.callback_query(AdForm.fill, F.data.startswith("ad:pp:"))
+async def pick_single(c: CallbackQuery, state: FSMContext, bot: Bot):
+    data = await state.get_data()
+    key = current_key(data)
+    if CHOICE_MODE.get(key) != "single":
+        return await c.answer()
+    vals = data["vals"]
+    vals[key] = CHOICES[key][int(c.data[6:])]
+    await state.update_data(vals=vals)
+    await c.answer()
+    await advance(c, state, bot)
+
+
+@router.callback_query(AdForm.fill, F.data.startswith("ad:pt:"))
+async def toggle_position(c: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    key = current_key(data)
+    if CHOICE_MODE.get(key) != "multi":
+        return await c.answer()
+    pos = CHOICES[key][int(c.data[6:])]
+    sel = data.get("sel", [])
+    if key == "pos2" and pos == data["vals"].get("pos1"):
+        return await c.answer("این رو به‌عنوان پست اصلی انتخاب کردی.", show_alert=True)
+    sel = [x for x in sel if x != pos] if pos in sel else sel + [pos]
+    await state.update_data(sel=sel, sel_key=key)
+    await c.answer()
+    await ask(c, state)
+
+
+@router.callback_query(AdForm.fill, F.data == "ad:ptok")
+async def confirm_positions(c: CallbackQuery, state: FSMContext, bot: Bot):
+    data = await state.get_data()
+    key = current_key(data)
+    if CHOICE_MODE.get(key) != "multi":
+        return await c.answer()
+    sel = [p for p in POSITIONS if p in data.get("sel", [])]
+    if not sel and key != "pos2":
+        return await c.answer("حداقل یک پست انتخاب کن.", show_alert=True)
+    vals = data["vals"]
+    vals[key] = "، ".join(sel) if sel else NO_POS
+    await state.update_data(vals=vals, sel=[], sel_key=None)
+    await c.answer()
+    await advance(c, state, bot)
+
+
 @router.message(AdForm.fill)
 async def got_value(m: Message, state: FSMContext, bot: Bot):
     data = await state.get_data()
     key, label, kind = fields_of(data["kind"])[data["idx"]]
+    if key in CHOICE_MODE:
+        return await m.answer("👇 از دکمه‌های بالا انتخاب کن.")
     if kind == "photo":
         if not m.photo:
             return await m.answer("📸 لطفاً یک عکس بفرست (یا رد کن).")
@@ -169,6 +256,11 @@ async def got_value(m: Message, state: FSMContext, bot: Bot):
         limit = 500 if key == "notes" else 200
         if len(value) > limit:
             return await m.answer(f"⚠️ حداکثر {limit} کاراکتر مجازه. کوتاه‌ترش کن.")
+        if key == "ping":
+            value = value.translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789"))
+            if not value.isdigit() or not 1 <= int(value) <= 999:
+                return await m.answer("⚠️ فقط یک عدد بین ۱ تا ۹۹۹ بنویس. مثلاً: 45")
+            value = str(int(value))
         if key == "captain_tg" and not TG_RE.match(value):
             return await m.answer("⚠️ آیدی تلگرام معتبر نیست. مثل: @captain_pcl")
     vals = data["vals"]
