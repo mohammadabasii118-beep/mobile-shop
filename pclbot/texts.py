@@ -16,7 +16,6 @@ PLAYER_FIELDS = [
 TEAM_FIELDS = [
     ("team", "🛡 نام تیم", "text"),
     ("logo", "🖼 لوگوی تیم", "photo"),
-    ("captain", "👑 نام کاپیتان", "text"),
     ("captain_tg", "✈️ آیدی تلگرام کاپیتان", "text"),
     ("positions", "🎯 پست‌های موردنیاز", "text"),
     ("count", "🔢 تعداد بازیکنان موردنیاز", "text"),
@@ -98,9 +97,8 @@ def render_ad(ad: dict, user: dict | None = None, preview: bool = False) -> str:
         tags = "#بازیکن_آزاد #PCL"
     else:
         body = (
-            f"🛡 <b>جذب بازیکن</b>\n{star}{line}\n"
+            f"🛡 <b>آگهی جذب بازیکن</b>\n{star}{line}\n"
             f"🏷 <b>تیم:</b> {e(d.get('team'))}\n"
-            f"👑 <b>کاپیتان:</b> {e(d.get('captain'))}\n"
             f"🎯 <b>پست‌های موردنیاز:</b> {e(d.get('positions'))}\n"
             f"🔢 <b>تعداد موردنیاز:</b> {e(d.get('count'))}\n"
             f"⏰ <b>ساعات فعالیت:</b> {e(d.get('hours'))}\n"
