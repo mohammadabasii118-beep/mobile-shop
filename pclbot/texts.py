@@ -9,14 +9,14 @@ PLAYER_FIELDS = [
     ("pos2", "🎯 پست دوم", "text"),
     ("history", "🏟 سوابق بازی", "text"),
     ("honors", "🏆 افتخارات بازیکن", "text"),
-    ("days", "📅 تعداد روزهای فعال در هفته", "text"),
+    ("days", "📅 تعداد روزهای فعال در هفته (عدد ۱ تا ۷)", "text"),
     ("hours", "⏰ ساعات فعالیت", "text"),
     ("ping", "📶 پینگ (فقط عدد، به میلی‌ثانیه)", "text"),
     ("stream", "📡 قابلیت استریم", "text"),
     ("country", "🌍 کشور محل زندگی", "text"),
     ("party", "🎙 توانایی صحبت در پارتی", "text"),
-    ("notes", "📝 توضیحات تکمیلی", "text"),
     ("photo", "🖼 تصویر کارت بازیکن", "photo"),
+    ("notes", "📝 توضیحات تکمیلی", "text"),  # always the last question
 ]
 TEAM_FIELDS = [
     ("team", "🛡 نام تیم", "text"),
@@ -35,10 +35,12 @@ POSITIONS = ["GK", "CB", "RB/LB", "CDM", "CM", "RM/LM", "CAM", "ST"]
 YES_NO = ["بله", "خیر"]
 CHOICES = {
     "pos1": POSITIONS, "pos2": POSITIONS, "positions": POSITIONS,
-    "days": [str(i) for i in range(1, 8)], "stream": YES_NO, "party": YES_NO,
+    "stream": YES_NO, "party": YES_NO,
 }
-CHOICE_MODE = {"pos1": "single", "pos2": "multi", "positions": "multi", "days": "single", "stream": "single", "party": "single"}
-CHOICE_COLS = {"days": 4}
+CHOICE_MODE = {"pos1": "single", "pos2": "multi", "positions": "multi", "stream": "single", "party": "single"}
+CHOICE_COLS: dict[str, int] = {}
+# Digits-only questions: key -> (min, max, example)
+NUMERIC = {"days": (1, 7, "5"), "ping": (1, 999, "45")}
 NO_POS = "ندارد"
 
 KIND_TITLE = {"player": "🎮 آگهی بازیکن آزاد", "team": "🛡 آگهی جذب بازیکن"}

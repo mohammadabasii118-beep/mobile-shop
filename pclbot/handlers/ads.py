@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery, Message
 
 from .. import db, services
 from ..keyboards import back, btn, kb, pairs
-from ..texts import (CHOICE_COLS, CHOICE_MODE, CHOICES, KIND_TITLE, NO_POS, OPTIONAL, POSITIONS, STATUS_TITLE, fields_of,
+from ..texts import (CHOICE_COLS, CHOICE_MODE, CHOICES, KIND_TITLE, NO_POS, NUMERIC, OPTIONAL, POSITIONS, STATUS_TITLE, fields_of,
                      fingerprint, fmt_date, money, render_ad)
 from ..utils import is_admin, show
 
@@ -52,8 +52,8 @@ async def ask(event: CallbackQuery | Message, state: FSMContext) -> None:
     if key in CHOICE_MODE:
         return await ask_position(event, state, data, key, label, head)
     hint = "📸 تصویر رو بفرست" if kind == "photo" else "✍️ بنویس و بفرست"
-    if key == "ping":
-        hint = "✍️ فقط عدد بنویس، مثلاً 45"
+    if key in NUMERIC:
+        hint = f"✍️ فقط عدد بنویس، مثلاً {NUMERIC[key][2]}"
     text = f"{head}\n\n{label}\n{hint}" + ("\n(اختیاری)" if key in OPTIONAL else "")
     row = []
     if key in OPTIONAL:
@@ -256,10 +256,11 @@ async def got_value(m: Message, state: FSMContext, bot: Bot):
         limit = 500 if key == "notes" else 200
         if len(value) > limit:
             return await m.answer(f"⚠️ حداکثر {limit} کاراکتر مجازه. کوتاه‌ترش کن.")
-        if key == "ping":
+        if key in NUMERIC:
+            lo, hi, example = NUMERIC[key]
             value = value.translate(str.maketrans("۰۱۲۳۴۵۶۷۸۹٠١٢٣٤٥٦٧٨٩", "01234567890123456789"))
-            if not value.isdigit() or not 1 <= int(value) <= 999:
-                return await m.answer("⚠️ فقط یک عدد بین ۱ تا ۹۹۹ بنویس. مثلاً: 45")
+            if not value.isdigit() or not lo <= int(value) <= hi:
+                return await m.answer(f"⚠️ فقط یک عدد بین {lo} تا {hi} بنویس. مثلاً: {example}")
             value = str(int(value))
         if key == "captain_tg" and not TG_RE.match(value):
             return await m.answer("⚠️ آیدی تلگرام معتبر نیست. مثل: @captain_pcl")
