@@ -160,6 +160,9 @@ function act(a){
  k(){const k=p[1];screen(`<b>${k==='player'?'🎮 آگهی بازیکن آزاد':'🛡 آگهی جذب بازیکن'}</b>\n\nنوع انتشار رو انتخاب کن:\n\n📄 عادی: ${fmt(S.cfg.price_normal)} — ${S.cfg.days_normal} روز\n⭐️ ویژه (با نشان مخصوص): ${fmt(S.cfg.price_special)} — ${S.cfg.days_special} روز`,[[['📄 عادی','s:'+k+':0'],['⭐️ ویژه','s:'+k+':1']],BK('ad:new')].map(r=>r))},
  s(){S.flow={kind:p[1],special:+p[2],vals:{},idx:0,mode:'new'};ask()},
  skip(){S.flow.vals[curKey()]=null;adv()},
+ pp(){S.flow.vals[curKey()]=p[1];adv()},
+ pt(){const f=S.flow;f.sel=f.sel||[];const i=f.sel.indexOf(p[1]);i<0?f.sel.push(p[1]):f.sel.splice(i,1);ask()},
+ ptok(){const f=S.flow;if(!(f.sel||[]).length)return;f.vals[curKey()]=f.sel.join('، ');f.sel=[];adv()},
  prevf(){S.flow.idx=Math.max(0,S.flow.idx-1);ask()},
  sample(){S.flow.vals={...SAMPLE[S.flow.kind]};preview()},
  photo(){S.flow.vals[curKey()]='card';say('',null,{me:true,card:'card'});adv()},
@@ -192,7 +195,19 @@ function act(a){
  (A[p[0]]||(()=>{}))();
 }
 function curKey(){return FIELDS[S.flow.kind][S.flow.idx][0]}
+const POSK=['GK','CB','RB/LB','CDM','CM','RM/LM','CAM','ST'];
+function askPos(f,key,label,tot){
+ const multi=key==='positions',sel=f.sel||[];
+ const btns=POSK.map(x=>[(multi&&sel.includes(x)?'✅ ':'')+x,(multi?'pt:':'pp:')+x]);
+ const rows=btns.reduce((r,b,i,a)=>{if(i%2===0)r.push(a.slice(i,i+2));return r},[]);
+ if(key==='pos2')rows.push([['➖ ندارم','pp:ندارد']]);
+ if(multi)rows.push([['✔️ تأیید پست‌ها ('+sel.length+')','ptok']]);
+ const nav=[];if(f.mode==='new'&&f.idx>0)nav.push(['◀️ مرحله قبل','prevf']);nav.push(['🔙 لغو','menu']);rows.push(nav);
+ rows.push([['⚡ پر کردن نمونه (فقط دمو)','sample']]);
+ S.expect=null;
+ screen(`<b>${f.kind==='player'?'🎮 آگهی بازیکن آزاد':'🛡 آگهی جذب بازیکن'}</b>${f.mode==='new'?` — مرحله ${f.idx+1} از ${tot}`:''}\n\n${label}\n👇 از دکمه‌ها انتخاب کن${multi?' (می‌تونی چند پست انتخاب کنی)':''}`,rows);paint()}
 function ask(){const f=S.flow,[key,label]=FIELDS[f.kind][f.idx],isP=['photo','logo'].includes(key),tot=FIELDS[f.kind].length;
+ if(['pos1','pos2','positions'].includes(key))return askPos(f,key,label,tot);
  const rows=[];const r=[];if(OPT.includes(key))r.push(['⏭ رد کردن','skip']);if(isP)r.push(['📸 ارسال عکس نمونه','photo']);if(f.mode==='new'&&f.idx>0)r.push(['◀️ مرحله قبل','prevf']);if(r.length)rows.push(r);
  rows.push([['⚡ پر کردن نمونه (فقط دمو)','sample']]);rows.push(BK('menu','🔙 لغو')); 
  S.expect=isP?null:{hint:'جواب را بنویس و ارسال کن',fn:t=>{S.flow.vals[key]=t;adv()}};
