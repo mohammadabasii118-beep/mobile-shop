@@ -123,7 +123,6 @@ def render_ad(ad: dict, user: dict | None = None, preview: bool = False) -> str:
             body += f"🌍 <b>کشور:</b> {e(d['country'])}\n"
         if d.get("party"):
             body += f"🎙 <b>صحبت در پارتی:</b> {e(d['party'])}\n"
-        tags = "#بازیکن_آزاد #PCL"
     else:
         body = (
             f"🛡 <b>آگهی جذب بازیکن</b>\n{star}{line}\n"
@@ -133,10 +132,9 @@ def render_ad(ad: dict, user: dict | None = None, preview: bool = False) -> str:
             f"⏰ <b>ساعات فعالیت:</b> {e(d.get('hours'))}\n"
             f"📋 <b>شرایط جذب:</b> {e(d.get('terms'))}\n"
         )
-        tags = "#جذب_بازیکن #PCL"
     if d.get("notes"):
         body += f"📝 <b>توضیحات:</b> {e(d['notes'])}\n"
-    body += f"{line}\n📩 <b>ارتباط:</b> {contact_line(ad, user)}\n\n{AD_FOOTER}\n\n{tags}"
+    body += f"{line}\n📩 <b>ارتباط:</b> {contact_line(ad, user)}\n\n{AD_FOOTER}"
     return body
 
 
