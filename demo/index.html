@@ -137,7 +137,7 @@ const SAMPLE={player:{name:'امیرحسین کریمی',psn:'Amir_CAM10',pos1:'
 const BADGES=[['🥉','برنزی',5],['🥈','نقره‌ای',15],['🥇','طلایی',30],['💎','الماسی',50],['👑','افسانه‌ای',100]];
 const NAMES={price_normal:'تعرفه ثبت عادی',price_special:'تعرفه ثبت ویژه',renew_normal:'تعرفه تمدید عادی',renew_special:'تعرفه تمدید ویژه',upgrade_price:'تعرفه ارتقا به ویژه',days_normal:'اعتبار عادی (روز)',days_special:'اعتبار ویژه (روز)',referral_reward:'پاداش دعوت'};
 let S;
-function init(){S={emoOn:true,emoIds:{},channels:[{t:'ProClubs Transfer',l:'t.me/ProClubs_Transfer'}],admins:[{n:'شما',s:1},{n:'رضا محمدی (412556120)',s:0}],role:'user',tab:'bot',balance:30000,counted:4,nextId:3,expect:null,flow:null,group:'گروه نقل‌وانتقالات PCL',
+function init(){S={emoOn:true,emoIds:{},emoExtra:[],lbl:{},channels:[{t:'ProClubs Transfer',l:'t.me/ProClubs_Transfer'}],admins:[{n:'شما',s:1},{n:'رضا محمدی (412556120)',s:0}],role:'user',tab:'bot',balance:30000,counted:4,nextId:3,expect:null,flow:null,group:'گروه نقل‌وانتقالات PCL',
  cfg:{price_normal:20000,price_special:50000,renew_normal:15000,renew_special:40000,upgrade_price:30000,days_normal:7,days_special:14,referral_reward:10000},
  tx:[{amt:50000,t:'💳 افزایش موجودی'},{amt:-20000,t:'📝 ثبت آگهی'}],gifts:{PCL2026:{amt:20000,left:50}},used:[],invited:3,done:2,
  badges:BADGES.map(b=>[...b]),
@@ -153,33 +153,39 @@ function paint(){
  $('#form').hidden=fresh;$('#startbar').hidden=!fresh;$('#cmds').hidden=true;$('#replykb').hidden=!(S.replykb&&!fresh);
  if(fresh){el.innerHTML=`<div class="intro"><div class="ava">PCL</div><b>PCL TransferMarket</b><p>🔮 بزرگ‌ترین بازار نقل‌وانتقالات تیم‌ها و بازیکنان ایرانی پروکلاب.\nثبت آگهی بازیکن آزاد و جذب بازیکن، کیف پول و نشان‌های افتخار.</p></div>`;$('#hint').textContent='';return}
  if(S.tab==='group'){el.innerHTML='';groupView();return}
- el.innerHTML=chat().map((m,i)=>`<div class="msg ${m.from}"><div class="bub">${m.card?cardHtml(m.card):''}${m.html}</div>${m.kb?kbHtml(m.kb,m.live,i):''}</div>`).join('');
+ el.innerHTML=chat().map((m,i)=>`<div class="msg ${m.from}"><div class="bub">${m.card?cardHtml(m.card):''}${applyPE(m.html)}</div>${m.kb?kbHtml(m.kb,m.live,i):''}</div>`).join('');
  el.scrollTop=el.scrollHeight;
  $('#hint').textContent=S.expect?S.expect.hint:'';
  $('#txt').placeholder=S.expect?'بنویس و ارسال کن...':'پیام...';
 }
 function cardHtml(t){return `<div class="card"><b>${t==='card'?'CAM  87':t}</b><span>PCL PLAYER CARD</span></div>`}
 const norm=kb=>kb.map(r=>typeof r[0]==='string'?[r]:r);
-function kbHtml(kb,live){return `<div class="kb ${live?'':'dead'}">`+norm(kb).map(row=>row.map(b=>`<button class="${row.length===1?'wide':''}" data-a="${esc(b[1])}">${b[0]}</button>`).join('')).join('')+'</div>'}
+function kbHtml(kb,live){return `<div class="kb ${live?'':'dead'}">`+norm(kb).map(row=>row.map(b=>`<button class="${row.length===1?'wide':''}" data-a="${esc(b[1])}">${btnPE(b[0])}</button>`).join('')).join('')+'</div>'}
 function groupView(){
  const el=$('#chat');$('#hint').textContent='';
  const posts=S.ads.filter(a=>a.posted);
- el.innerHTML=`<div class="msg bot"><div class="bub">📌 ${esc(S.group)}\nآگهی‌های تأییدشده این‌جا به‌صورت خودکار منتشر می‌شن.</div></div>`+(posts.length?posts.map(a=>`<div class="msg bot"><div class="bub">${a.d.photo||a.d.logo?cardHtml('card'):''}${adHtml(a)}</div></div>`).join(''):'<div class="msg bot"><div class="bub">هنوز آگهی‌ای منتشر نشده. از نقش «مدیر» یک آگهی را تأیید کن.</div></div>');
+ el.innerHTML=`<div class="msg bot"><div class="bub">📌 ${esc(S.group)}\nآگهی‌های تأییدشده این‌جا به‌صورت خودکار منتشر می‌شن.</div></div>`+(posts.length?posts.map(a=>`<div class="msg bot"><div class="bub">${a.d.photo||a.d.logo?cardHtml('card'):''}${applyPE(adHtml(a))}</div></div>`).join(''):'<div class="msg bot"><div class="bub">هنوز آگهی‌ای منتشر نشده. از نقش «مدیر» یک آگهی را تأیید کن.</div></div>');
 }
-const EMO=[['PLAYER','بازیکنان آزاد','🎮'],['TEAM','جذب بازیکن','🛡'],['SPECIAL','آگهی ویژه','⭐️'],['GAMING_ID','آیدی گیمینگ','🆔'],['POSITION','پست‌ها','🎯'],['HISTORY','سوابق بازی','🏟'],['HONORS','افتخارات','🏆'],['DAYS','روزهای فعال','📅'],['HOURS','ساعات فعالیت','⏰'],['PING','پینگ','📶'],['STREAM','استریم','📡'],['COUNTRY','کشور','🌍'],['PARTY','پارتی','🎙'],['NOTES','توضیحات','📝'],['CONTACT','ارتباط','📩'],['FOOTER_TOP','فوتر (خط ۱)','🔮'],['FOOTER_JOIN','فوتر (خط ۲)','👉'],['TEAM_NAME','نام تیم','🏷'],['COUNT','تعداد','🔢'],['TERMS','شرایط جذب','📋']];
+const REG=[["✅", "تأیید"], ["⚠", "هشدار"], ["💰", "پول / موجودی"], ["✍", "نوشتن"], ["❌", "لغو / رد"], ["⭐", "آگهی ویژه"], ["🔙", "بازگشت"], ["🗑", "حذف"], ["⏳", "در انتظار / مدت"], ["👤", "کاربر"], ["📝", "ثبت آگهی / توضیحات"], ["💳", "پرداخت"], ["🎁", "هدیه"], ["✏", "ویرایش"], ["🎯", "پست"], ["👥", "دعوت دوستان"], ["📢", "اعلان / کانال"], ["➕", "افزودن"], ["🛡", "جذب بازیکن"], ["🛠", "مدیریت"], ["🏅", "نشان افتخار"], ["🔢", "تعداد"], ["🎮", "بازیکن آزاد"], ["🔁", "تمدید"], ["🗄", "آگهی‌های ثبت‌شده"], ["📅", "روزهای فعال"], ["⏰", "ساعات فعالیت"], ["📡", "استریم"], ["📋", "فهرست / شرایط"], ["⌛", "منقضی"], ["↩", "بازگشت وجه / پاسخ"], ["📭", "خالی"], ["➖", "کاهش / ندارم"], ["😕", "خطا"], ["🆔", "آیدی گیمینگ"], ["🏆", "افتخارات"], ["🖼", "تصویر"], ["📌", "وضعیت"], ["🥉", "نشان برنزی"], ["☎", "ارتباط با ما"], ["📊", "آمار"], ["💬", "پیام"], ["🔒", "مدیر اصلی"], ["👇", "اشاره پایین"], ["🏟", "سوابق بازی"], ["📶", "پینگ"], ["🌍", "کشور"], ["🎙", "پارتی"], ["🔮", "فوتر (خط ۱)"], ["📩", "ارتباط"], ["🎉", "تبریک"], ["👋", "خوش‌آمد"], ["⛔", "مسدود"], ["📜", "تراکنش‌ها"], ["🕒", "زمان"], ["💵", "تراکنش مالی"], ["⚙", "تنظیمات"], ["📣", "پیام همگانی"], ["👮", "مدیران"], ["🚫", "مسدودسازی"], ["📸", "ارسال عکس"], ["◀", "مرحله قبل"], ["✔", "تأیید انتخاب"], ["📄", "آگهی عادی"], ["✈", "تلگرام"], ["👉", "فوتر (خط ۲)"], ["🏷", "نام تیم"], ["🏠", "منوی اصلی"], ["🧾", "کد پیگیری"], ["🥈", "نشان نقره‌ای"], ["🥇", "نشان طلایی"], ["💎", "نشان الماسی"], ["👑", "نشان افسانه‌ای"], ["⬆", "ارتقا"], ["👛", "کیف پول"], ["⏭", "رد کردن"], ["👆", "اشاره بالا"], ["▶", "ادامه"], ["🆕", "آگهی جدید"], ["🟢", "روشن"], ["🔴", "خاموش"], ["❗", "توجه"], ["🏁", "پایان"], ["🙍", "نام"], ["🔗", "لینک"], ["👨", "پشتیبان"], ["💻", "پشتیبان"], ["📨", "پیام پشتیبانی"]];
 const emoId=ch=>{let h=0;for(const c of ch)h=(h*131+c.codePointAt(0))%900000000;return '5368'+String(324170000+h).padStart(9,'0')+'2286'};
 const noVS=x=>x.replace(/\uFE0F/g,'');
-const PE_SET=['🎮','🛡','🆔','🎯','🏟','🏆','📅','⏰','📶','📡','🌍','🎙','📝','📩','🔮','👉','🏷','📋','🔢','⭐️'];
-function peify(h,only){return h.replace(new RegExp(PE_SET.map(x=>x.replace('️','\\uFE0F?')).join('|'),'gu'),m=>only&&!only.has(noVS(m))?m:`<span class="pe" title="Premium emoji (custom_emoji_id)">${m}</span>`)}
-function adHtml(a,prev,force){const h=adHtmlBase(a,prev);if(force===true)return peify(h);if(force===false)return h;if(!S.emoOn)return h;const only=new Set(EMO.filter(x=>S.emoIds[x[0]]).map(x=>noVS(x[2])));return only.size?peify(h,only):h}
+const pe=(m,t)=>`<span class="pe" title="Premium emoji (custom_emoji_id)">${m}</span>`;
+function emoRx(keys){return keys.length?new RegExp('(?:'+keys.sort((a,b)=>b.length-a.length).join('|')+')\\uFE0F?','gu'):null}
+function peify(h,only){const keys=(only?[...only]:REG.map(x=>x[0]));const rx=emoRx(keys);if(!rx)return h;return h.split(/(<[^>]*>)/).map((p,i)=>i%2||!p?p:p.replace(rx,m=>pe(m))).join('')}
+function applyPE(h){if(!S.emoOn)return h;const ks=Object.keys(S.emoIds);return ks.length?peify(h,new Set(ks)):h}
+function btnPE(label){if(!S.emoOn)return label;for(const k of Object.keys(S.emoIds)){if(label.startsWith(k)){const rest=label.slice(k.length).replace(/^\uFE0F/,'').trimStart();return rest?pe(k)+' '+rest:label}}return label}
+function adHtml(a,prev,force){const h=adHtmlBase(a,prev);return force===true?peify(h):h}
 function adHtmlBase(a,prev){
  const d=a.d,st=a.special?`<span class="star">⭐️ ویژه</span>\n`:'';
  if(a.kind==='player')return `🎮 <b>آگهی بازیکنان آزاد</b>\n${st}${L}\n👤 <b>نام:</b> ${esc(d.name)}\n🆔 <b>آیدی گیمینگ:</b> <code>${esc(d.psn)}</code>\n🎯 <b>پست اصلی:</b> ${esc(d.pos1)}\n🎯 <b>پست دوم:</b> ${esc(d.pos2)}\n🏟 <b>سوابق بازی:</b> ${esc(d.history)}\n🏆 <b>افتخارات:</b> ${esc(d.honors)}\n${d.days?`📅 <b>روزهای فعال در هفته:</b> ${esc(d.days)}\n`:''}⏰ <b>ساعات فعالیت:</b> ${esc(d.hours)}\n${d.ping?`📶 <b>پینگ:</b> ${esc(d.ping)} ms\n`:''}${d.stream?`📡 <b>استریم:</b> ${esc(d.stream)}\n`:''}${d.country?`🌍 <b>کشور:</b> ${esc(d.country)}\n`:''}${d.party?`🎙 <b>صحبت در پارتی:</b> ${esc(d.party)}\n`:''}${d.notes?`📝 <b>توضیحات:</b> ${esc(d.notes)}\n`:''}📩 <b>ارتباط:</b> @ali_pcl\n${L}\n🔮 The Biggest Transfer Market for Iranian Teams &amp; Players.\n👉 Join us: <span class="tag">@ProClubs_Transfer</span>`;
  return `🛡 <b>آگهی جذب بازیکن</b>\n${st}${L}\n🏷 <b>تیم:</b> ${esc(d.team)}\n🎯 <b>پست‌های موردنیاز:</b> ${esc(d.positions)}\n🔢 <b>تعداد موردنیاز:</b> ${esc(d.count)}\n⏰ <b>ساعات فعالیت:</b> ${esc(d.hours)}\n📋 <b>شرایط جذب:</b> ${esc(d.terms)}\n${d.notes?`📝 <b>توضیحات:</b> ${esc(d.notes)}\n`:''}📩 <b>ارتباط:</b> ${esc(d.captain_tg)}\n${L}\n🔮 The Biggest Transfer Market for Iranian Teams &amp; Players.\n👉 Join us: <span class="tag">@ProClubs_Transfer</span>`}
-const BK=(to='menu',t='🔙 بازگشت')=>[[t,to]];
+const LBL=[['ad:new','📝','ثبت آگهی جدید'],['myads','🗄','آگهی‌های ثبت‌شده'],['support','☎️','ارتباط با ما'],['wallet','💰','افزایش موجودی'],['profile','👤','مشخصات من'],['gift','🎁','کارت هدیه'],['invite','👥','دعوت دوستان'],['badges','🏅','نشان‌های افتخار'],['back','🔙','بازگشت'],['ok','✅','تأیید و ارسال'],['edit','✏️','ویرایش']];
+function lbl(k){const d=LBL.find(x=>x[0]===k),o=S.lbl[k]||{},e=o.e??d[1],t=o.t??d[2];return (o.pid?pe(e):e)+' '+t}
+const lblChanged=k=>!!S.lbl[k];
+const BK=(to='menu',t)=>[[t||lbl('back'),to]];
 const STT={pending:'⏳ در انتظار تأیید',approved:'✅ تأییدشده و منتشرشده',rejected:'❌ ردشده',expired:'⌛️ منقضی‌شده'};
 function menu(){
- const kb=[['📝 ثبت آگهی جدید','ad:new'],['🗄 آگهی‌های ثبت‌شده','myads'],['☎️ ارتباط با ما','support'],['💰 افزایش موجودی','wallet'],['👤 مشخصات من','profile'],['🎁 کارت هدیه','gift'],['👥 دعوت دوستان','invite'],['🏅 نشان‌های افتخار','badges']];
+ const kb=LBL.slice(0,8).map(x=>[lbl(x[0]),x[0]]);
  const rows=[];for(let i=0;i<kb.length;i+=2)rows.push(kb.slice(i,i+2));
  if(S.role==='admin')rows.push([['🛠 پنل مدیریت','adm']]);
  screen('👋 به ربات <b>PCL Transfer</b> خوش اومدی!\n\nاینجا می‌تونی آگهی بازیکن آزاد یا جذب بازیکن برای تیم پروکلابت ثبت کنی.',rows)}
@@ -236,7 +242,7 @@ function act(a){
  up(){screen(`⭐️ ارتقای آگهی #${p[1]} به ویژه\n💰 هزینه: <b>${fmt(S.cfg.upgrade_price)}</b>\nآگهی با نشان ویژه منتشر می‌شه.`,[['✅ پرداخت از کیف پول','upok:'+p[1]],BK('v:'+p[1])[0]].map(b=>[b]))},
  upok(){const a=S.ads.find(x=>x.id==p[1]);if(S.balance<S.cfg.upgrade_price)return screen('💰 موجودی کافی نیست.',[['💳 افزایش موجودی','wallet'],BK('v:'+a.id)[0]].map(b=>[b]));S.balance-=S.cfg.upgrade_price;S.tx.push({amt:-S.cfg.upgrade_price,t:'⭐ ارتقا به ویژه'});a.special=1;screen('⭐️ آگهی به حالت ویژه ارتقا پیدا کرد.',[BK('v:'+a.id)])},
  // ----- admin -----
- adm(){screen('🛠 <b>پنل مدیریت</b>',[['📊 آمار','adm:stats'],['👥 کاربران','adm:users'],['📋 آگهی‌ها','adm:ads'],['💵 تراکنش‌ها','adm:tx'],['⚙️ تعرفه و تنظیمات','adm:set'],['🎁 کارت‌های هدیه','adm:gifts'],['🏅 نشان‌ها','adm:badges'],['📡 گروه انتشار','adm:pub'],['📣 پیام همگانی','adm:bc'],['✨ ایموجی‌ها','adm:emo'],['📢 جوین اجباری','adm:ch'],['👮 مدیران','adm:admins'],['🔙 منوی اصلی','menu']].reduce((r,b,i,arr)=>{if(i%2===0)r.push(arr.slice(i,i+2));return r},[]))}};
+ adm(){screen('🛠 <b>پنل مدیریت</b>',[['📊 آمار','adm:stats'],['👥 کاربران','adm:users'],['📋 آگهی‌ها','adm:ads'],['💵 تراکنش‌ها','adm:tx'],['⚙️ تعرفه و تنظیمات','adm:set'],['🎁 کارت‌های هدیه','adm:gifts'],['🏅 نشان‌ها','adm:badges'],['📡 گروه انتشار','adm:pub'],['📣 پیام همگانی','adm:bc'],['✨ ایموجی‌ها','adm:emo'],['🔤 ویرایش دکمه‌ها','adm:btn'],['📢 جوین اجباری','adm:ch'],['👮 مدیران','adm:admins'],['🔙 منوی اصلی','menu']].reduce((r,b,i,arr)=>{if(i%2===0)r.push(arr.slice(i,i+2));return r},[]))}};
  (A[p[0]]||(()=>{}))();
 }
 function curKey(){return FIELDS[S.flow.kind][S.flow.idx][0]}
@@ -263,7 +269,7 @@ function ask(){const f=S.flow,[key,label]=FIELDS[f.kind][f.idx],isP=['photo','lo
 function adv(){const f=S.flow;if(f.mode==='new'){if(f.idx+1<FIELDS[f.kind].length){f.idx++;ask()}else preview()}else{f.mode='new';preview()}}
 function preview(){const f=S.flow;S.expect=null;const price=f.special?S.cfg.price_special:S.cfg.price_normal,days=f.special?S.cfg.days_special:S.cfg.days_normal;
  const ad={kind:f.kind,special:f.special,d:f.vals};say(adHtml(ad),null,{card:f.vals.photo||f.vals.logo?'card':null});
- say(`👆 پیش‌نمایش آگهی\n💰 هزینه: <b>${fmt(price)}</b> | ⏳ اعتبار: ${days} روز\nاگه همه‌چی درسته تأیید کن:`,[[['✅ تأیید و ارسال','ok'],['✏️ ویرایش','edit']],BK('menu','❌ لغو')].map(r=>Array.isArray(r[0])?r:[r]))}
+ say(`👆 پیش‌نمایش آگهی\n💰 هزینه: <b>${fmt(price)}</b> | ⏳ اعتبار: ${days} روز\nاگه همه‌چی درسته تأیید کن:`,[[[lbl('ok'),'ok'],[lbl('edit'),'edit']],BK('menu','❌ لغو')].map(r=>Array.isArray(r[0])?r:[r]))}
 // ----- admin sub-screens (dispatch by prefix adm:*) -----
 const orig=act;
 act=function(a){const p=a.split(':');if(p[0]!=='adm'||!p[1])return orig(a);S.expect=null;
@@ -297,17 +303,31 @@ act=function(a){const p=a.split(':');if(p[0]!=='adm'||!p[1])return orig(a);S.exp
  case'admins':screen('👮 <b>مدیران ربات</b>\n'+L+'\n'+S.admins.map(a=>(a.s?'🔒 ':'👤 ')+a.n+(a.s?' — مدیر اصلی':'')).join('\n')+'\n\n🔒 مدیران اصلی از فایل تنظیمات خوانده می‌شن و از اینجا حذف نمی‌شن.',[[['➕ افزودن مدیر','adm:aadd']],...pairs(S.admins.map((a,i)=>a.s?null:['🗑 '+a.n,'adm:arm:'+i]).filter(Boolean)),B]);break;
  case'aadd':S.expect={hint:'آیدی عددی یا @یوزرنیم',fn:t=>{S.admins.push({n:'مدیر جدید ('+esc(t.trim())+')',s:0});say('✅ به مدیران اضافه شد.',[BK('adm:admins')])}};screen('✍️ آیدی عددی مدیر جدید رو بفرست.\n(یا @یوزرنیم، به شرطی که قبلاً ربات رو استارت کرده باشه)',[BK('adm:admins')]);paint();break;
  case'arm':S.admins.splice(+p[2],1);act('adm:admins');break;
- case'emo':{const n=EMO.filter(x=>S.emoIds[x[0]]).length;
-  screen(`✨ <b>ایموجی‌های پرمیوم</b>\n${L}\nوضعیت: ${S.emoOn?'🟢 روشن':'🔴 خاموش'}\nتنظیم‌شده: ${n} از ${EMO.length}\n\nروی هر مورد بزن و ایموجی پرمیوم رو بفرست. موردهای تنظیم‌نشده با ایموجی معمولی نمایش داده می‌شن و هر تغییری همین الان اعمال می‌شه.`,
-   [[[S.emoOn?'🔴 خاموش کردن':'🟢 روشن کردن','adm:emotoggle']],[['👁 پیش‌نمایش آگهی','adm:emopv'],['🔎 فقط گرفتن ID','adm:eid']],...pairs(EMO.map(x=>[(S.emoIds[x[0]]?'✅ ':'⬜️ ')+x[2]+' '+x[1],'adm:emoslot:'+x[0]])),[['🧹 بازنشانی همه','adm:emoresetall']],B]);break}
+ case'emo':{const sl=REG.concat(S.emoExtra.map(e=>[e,'افزوده‌شده'])),pages=Math.ceil(sl.length/12),pg=Math.max(0,Math.min(+(p[2]||0),pages-1)),chunk=sl.slice(pg*12,pg*12+12),n=sl.filter(x=>S.emoIds[noVS(x[0])]).length;
+  const nav=[];if(pg>0)nav.push(['◀️ قبلی','adm:emo:'+(pg-1)]);nav.push([`${pg+1}/${pages}`,'adm:emo:'+pg]);if(pg<pages-1)nav.push(['بعدی ▶️','adm:emo:'+(pg+1)]);
+  screen(`✨ <b>ایموجی‌های پرمیوم</b>\n${L}\nوضعیت: ${S.emoOn?'🟢 روشن':'🔴 خاموش'}\nتنظیم‌شده: ${n} از ${sl.length}\n\nروی هر مورد بزن و ایموجی پرمیوم (یا استیکر ایموجی) رو بفرست. همون ایموجی توی همه پیام‌ها، آگهی‌ها و آیکون دکمه‌ها عوض می‌شه. تغییرها فوراً اعمال می‌شن.`,
+   [[[S.emoOn?'🔴 خاموش کردن':'🟢 روشن کردن','adm:emotoggle']],[['👁 پیش‌نمایش','adm:emopv'],['➕ افزودن ایموجی','adm:emoadd']],...pairs(chunk.map(x=>[(S.emoIds[noVS(x[0])]?'✅ ':'⬜️ ')+(x[0]+' '+x[1]).slice(0,28),'adm:emoset:'+noVS(x[0])])),nav,[['🔎 فقط گرفتن ID','adm:eid'],['🧹 بازنشانی همه','adm:emoresetall']],B]);break}
  case'emotoggle':S.emoOn=!S.emoOn;act('adm:emo');break;
  case'emoresetall':S.emoIds={};act('adm:emo');break;
  case'emoreset':delete S.emoIds[p[2]];act('adm:emo');break;
- case'emopv':{const ad={kind:'player',special:1,d:{...SAMPLE.player}};say('👁 <b>پیش‌نمایش با تنظیم فعلی</b>\n'+adHtml(ad),[BK('adm:emo')],{card:'card'});break}
- case'emoslot':{const x=EMO.find(e=>e[0]===p[2]),id=S.emoIds[x[0]];
-  S.expect={hint:'ایموجی پرمیوم یا استیکر ایموجی بفرست (در دمو: هر ایموجی)',fn:t=>{const m=t.match(/\p{Extended_Pictographic}\uFE0F?/u);if(!m){S.expect=null;return say('😕 ایموجی سفارشی پیدا نشد. یک ایموجی پرمیوم یا استیکر ایموجی بفرست.',[BK('adm:emoslot:'+x[0])])}
-   S.emoIds[x[0]]=emoId(m[0]);say(`✅ ایموجی «${x[1]}» ذخیره شد.\n<code>${S.emoIds[x[0]]}</code>\n\nپیام‌های جدید همین الان با آن ارسال می‌شن.`,[[['➡️ بقیه موردها','adm:emo']],[['👁 پیش‌نمایش','adm:emopv']]])}};
-  screen(`${x[2]} <b>${x[1]}</b>\nایموجی فعلی: ${id?'پرمیوم ✅ <code>'+id+'</code>':'معمولی ('+x[2]+')'}\n\n✍️ ایموجی پرمیوم جدید رو بفرست (یا استیکر ایموجی).`,[...(id?[[['🧹 برگرداندن به معمولی','adm:emoreset:'+x[0]]]]:[]),BK('adm:emo')]);paint();break}
+ case'emopv':{const ad={kind:'player',special:1,d:{...SAMPLE.player}};say('👁 <b>پیش‌نمایش با تنظیم فعلی</b>\n'+adHtml(ad),null,{card:'card'});say('👆 منو و دکمه‌ها با آیکون جدید:',[...LBL.slice(0,8).map((x,i)=>[lbl(x[0]),x[0]]).reduce((r,b,i,a)=>{if(i%2===0)r.push(a.slice(i,i+2));return r},[]),BK('adm:emo')]);break}
+ case'emoadd':S.expect={hint:'یک ایموجی معمولی بفرست، مثلاً 🔥',fn:t=>{const m=t.match(/\p{Extended_Pictographic}️?/u);if(!m){return say('😕 ایموجی معمولی پیدا نشد. فقط یک ایموجی بفرست.',[BK('adm:emo')])}
+   const ch=noVS(m[0]);if(!REG.some(x=>noVS(x[0])===ch)&&!S.emoExtra.includes(ch))S.emoExtra.push(ch);act('adm:emoset:'+ch)}};
+  screen('➕ <b>افزودن ایموجی</b>\n\nمرحله ۱: همون ایموجی <b>معمولی</b> که می‌خوای عوض بشه رو بفرست (مثلاً 🔥).',[BK('adm:emo')]);paint();break;
+ case'emoset':{const ch=p[2],x=REG.concat(S.emoExtra.map(e=>[e,'افزوده‌شده'])).find(e=>noVS(e[0])===ch)||[ch,''],id=S.emoIds[ch];
+  S.expect={hint:'ایموجی پرمیوم یا استیکر ایموجی بفرست (در دمو: هر ایموجی)',fn:t=>{const m=t.match(/\p{Extended_Pictographic}️?/u);if(!m){S.expect=null;return say('😕 ایموجی سفارشی (Custom Emoji) پیدا نشد. یک ایموجی پرمیوم یا استیکر ایموجی بفرست.',[BK('adm:emoset:'+ch)])}
+   S.emoIds[ch]=emoId(m[0]);say(`✅ ایموجی ${ch} ذخیره شد.\n<code>${S.emoIds[ch]}</code>\n\nپیام‌های جدید همین الان با آن ارسال می‌شن.`,[[['➡️ بقیه موردها','adm:emo']],[['👁 پیش‌نمایش','adm:emopv']]])}};
+  screen(`${ch} <b>${x[1]}</b>\nایموجی فعلی: ${id?'پرمیوم ✅ <code>'+id+'</code>':'معمولی ('+ch+')'}\n\n✍️ ایموجی پرمیوم جدید رو بفرست (یا یک استیکر ایموجی).`,[...(id?[[['🧹 برگرداندن به معمولی','adm:emoreset:'+ch]]]:[]),BK('adm:emo')]);paint();break}
+ // ---- button editor ----
+ case'btn':screen(`🔤 <b>ویرایش دکمه‌ها</b>\n${L}\nمتن و ایموجی هر دکمه رو از اینجا عوض کن. ✎ یعنی تغییر داده شده. تغییرها همین الان توی ربات اعمال می‌شن.`,[...pairs(LBL.map(x=>[lbl(x[0])+(lblChanged(x[0])?' ✎':''),'adm:bte:'+x[0]])),[['🧹 بازنشانی همه','adm:btresetall']],B]);break;
+ case'btresetall':S.lbl={};act('adm:btn');break;
+ case'bte':{const k=p[2];screen(`🔤 <b>دکمه:</b> ${lbl(k)}\n\nمتن و ایموجی این دکمه رو می‌تونی جدا عوض کنی. ایموجی می‌تونه پرمیوم باشه و به‌صورت آیکون کنار متن دکمه نمایش داده می‌شه.`,[[['✏️ تغییر متن','adm:btt:'+k],['😀 تغییر ایموجی','adm:btm:'+k]],...(lblChanged(k)?[[['🧹 برگرداندن به پیش‌فرض','adm:btr:'+k]]]:[]),[['👁 پیش‌نمایش منو','adm:btpv']],BK('adm:btn')]);break}
+ case'btt':{const k=p[2];S.expect={hint:'متن جدید دکمه رو بنویس',fn:t=>{const v=t.trim().slice(0,40);if(!v)return;S.lbl[k]={...(S.lbl[k]||{}),t:v};say('✅ متن دکمه ذخیره شد.',[[['👁 پیش‌نمایش منو','adm:btpv']],BK('adm:btn')])}};screen(`✏️ متن جدید برای دکمه «${lbl(k)}» رو بنویس (بدون ایموجی، حداکثر ۴۰ کاراکتر):`,[BK('adm:bte:'+k)]);paint();break}
+ case'btm':{const k=p[2];S.expect={hint:'ایموجی جدید رو بفرست (پرمیوم یا معمولی)',fn:t=>{const m=t.match(/\p{Extended_Pictographic}️?/u);if(!m)return say('😕 ایموجی پیدا نشد.',[BK('adm:bte:'+k)]);S.lbl[k]={...(S.lbl[k]||{}),e:m[0],pid:false};say('✅ ایموجی دکمه ذخیره شد.',[[['👁 پیش‌نمایش منو','adm:btpv']],BK('adm:btn')])}};screen(`😀 ایموجی جدید برای دکمه «${lbl(k)}» رو بفرست.\nاگه ایموجی پرمیوم یا استیکر ایموجی بفرستی، به‌صورت آیکون پرمیوم نمایش داده می‌شه.\n\n(نمونه سریع دمو:)`,[[['🔥 معمولی','adm:btmn:'+k],['💎 پرمیوم','adm:btmp:'+k]],BK('adm:bte:'+k)]);paint();break}
+ case'btmn':S.lbl[p[2]]={...(S.lbl[p[2]]||{}),e:'🔥',pid:false};act('adm:bte:'+p[2]);break;
+ case'btmp':S.lbl[p[2]]={...(S.lbl[p[2]]||{}),e:'💎',pid:true};act('adm:bte:'+p[2]);break;
+ case'btr':delete S.lbl[p[2]];act('adm:bte:'+p[2]);break;
+ case'btpv':say('👆 منوی اصلی با تنظیم فعلی:',[...LBL.slice(0,8).map(x=>[lbl(x[0]),x[0]]).reduce((r,b,i,a)=>{if(i%2===0)r.push(a.slice(i,i+2));return r},[]),BK('adm:btn')]);break;
  case'eid':S.expect={hint:'در ربات واقعی: ایموجی پرمیوم یا استیکر ایموجی بفرست. در دمو: هر ایموجی بنویس',fn:t=>{
    const list=[...new Set(t.match(/\p{Extended_Pictographic}\uFE0F?/gu)||[])];
    if(!list.length){S.expect=null;return say('😕 ایموجی سفارشی (Custom Emoji) توی پیامت پیدا نشد. یک ایموجی پرمیوم یا استیکر ایموجی بفرست.',[BK('adm:eid')])}
@@ -327,12 +347,12 @@ const JUMPS=[
  ['کاربر','کیف پول',()=>act('wallet')],['کاربر','درگاه پرداخت',()=>{act('pay:100000');act('gate:100000')}],['کاربر','کارت هدیه',()=>{act('gift');handleText('PCL2026')}],
  ['کاربر','دعوت دوستان',()=>act('invite')],['کاربر','نشان‌های افتخار',()=>act('badges')],['کاربر','مشخصات من',()=>act('profile')],['کاربر','ارتباط با ما',()=>act('support')],['کاربر','جوین اجباری',()=>screen('📢 برای استفاده از ربات اول در کانال‌های زیر عضو شو، بعد روی «✅ عضو شدم» بزن:',[[['📢 ProClubs Transfer','menu']],[['✅ عضو شدم','menu']]])],
  ['مدیر','پنل مدیریت',()=>act('adm')],['مدیر','آگهی‌های در انتظار',()=>{ensurePending();act('adm:al:pending')}],['مدیر','آمار',()=>act('adm:stats')],['مدیر','تعرفه‌ها',()=>act('adm:set')],['مدیر','کارت‌های هدیه',()=>act('adm:gifts')],['مدیر','نشان‌ها',()=>act('adm:badges')],['مدیر','جوین اجباری',()=>act('adm:ch')],['مدیر','مدیران',()=>act('adm:admins')],
- ['ایموجی پرمیوم','قبل و بعد از تبدیل',()=>{S.fresh=false;const ad={kind:'player',special:1,d:{...SAMPLE.player}};S.chats.user=[];say('<span class="tag2 before">قبل — ایموجی معمولی</span>\n'+adHtml(ad,null,false),null,{card:'card'});say('<span class="tag2 after">بعد — ایموجی پرمیوم</span>\n'+adHtml(ad,null,true),null,{card:'card'})},'user'],['ایموجی پرمیوم','بخش ایموجی‌ها (مدیر)',()=>{['TEAM','HONORS','FOOTER_TOP','FOOTER_JOIN','SPECIAL'].forEach(k=>S.emoIds[k]=emoId(EMO.find(e=>e[0]===k)[2]));act('adm:emo')},'admin'],['ایموجی پرمیوم','ابزار گرفتن ID (مدیر)',()=>act('adm:eid'),'admin'],['ایموجی پرمیوم','آگهی تیم با ایموجی پرمیوم',()=>{EMO.forEach(x=>S.emoIds[x[0]]=emoId(x[2]));S.flow={kind:'team',special:1,vals:{...SAMPLE.team},idx:0,mode:'new'};S.chats.user=[];preview()},'user'],['گروه','گروه انتشار',()=>{ensurePending();S.ads.filter(a=>a.st==='pending').forEach(a=>{a.st='approved';a.posted=true});S.ads.forEach(a=>{if(a.st==='approved')a.posted=true});S.tab='group';paint()}]];
+ ['ایموجی پرمیوم','قبل و بعد از تبدیل',()=>{S.fresh=false;const ad={kind:'player',special:1,d:{...SAMPLE.player}};S.chats.user=[];say('<span class="tag2 before">قبل — ایموجی معمولی</span>\n'+adHtml(ad,null,false),null,{card:'card'});say('<span class="tag2 after">بعد — ایموجی پرمیوم</span>\n'+adHtml(ad,null,true),null,{card:'card'})},'user'],['ایموجی پرمیوم','بخش ایموجی‌ها (مدیر)',()=>{['🛡','🏆','🔮','👉','⭐','✅','🔙'].forEach(k=>S.emoIds[k]=emoId(k));act('adm:emo')},'admin'],['ایموجی پرمیوم','ویرایش دکمه‌ها (مدیر)',()=>{S.lbl={wallet:{t:'شارژ کیف پول',e:'💎',pid:true}};act('adm:btn')},'admin'],['ایموجی پرمیوم','منوی کاربر با ایموجی پرمیوم',()=>{REG.forEach(x=>S.emoIds[noVS(x[0])]=emoId(x[0]));act('menu')},'user'],['ایموجی پرمیوم','ابزار گرفتن ID (مدیر)',()=>act('adm:eid'),'admin'],['ایموجی پرمیوم','آگهی تیم با ایموجی پرمیوم',()=>{REG.forEach(x=>S.emoIds[noVS(x[0])]=emoId(x[0]));S.flow={kind:'team',special:1,vals:{...SAMPLE.team},idx:0,mode:'new'};S.chats.user=[];preview()},'user'],['گروه','گروه انتشار',()=>{ensurePending();S.ads.filter(a=>a.st==='pending').forEach(a=>{a.st='approved';a.posted=true});S.ads.forEach(a=>{if(a.st==='approved')a.posted=true});S.tab='group';paint()}]];
 function ensurePending(){if(!S.ads.some(a=>a.st==='pending')){const ad={id:S.nextId++,kind:'player',special:1,st:'pending',d:{...SAMPLE.player}};S.ads.push(ad);if(!S.chats.admin.length)S.chats.admin.push({from:'bot',html:'🛠 <b>پنل مدیریت</b>'})}}
 function buildChips(){const g={};JUMPS.forEach((j,i)=>(g[j[0]]=g[j[0]]||[]).push([i,j[1]]));$('#chips').innerHTML=Object.entries(g).map(([k,v])=>`<h3>${k==='کاربر'?'نقش کاربر':k==='مدیر'?'نقش مدیر':k==='گروه'?'گروه':'ایموجی پرمیوم (پیشنهاد)'}</h3><div class="chips">${v.map(([i,t])=>`<button data-j="${i}">${t}</button>`).join('')}</div>`).join('')}
 document.addEventListener('click',e=>{
  const b=e.target.closest('button[data-a]');if(b){act(b.dataset.a);return}
- const j=e.target.closest('#chips button');if(j){const J=JUMPS[+j.dataset.j];const role=J[3]||(J[0]==='مدیر'?'admin':'user');S.emoIds={};setRole(role);J[2]();setChip(j.dataset.j);if(J[0]==='گروه'){$('#title').textContent=S.group;$('#sub').textContent='گروه'}}
+ const j=e.target.closest('#chips button');if(j){const J=JUMPS[+j.dataset.j];const role=J[3]||(J[0]==='مدیر'?'admin':'user');S.emoIds={};S.lbl={};S.emoExtra=[];setRole(role);J[2]();setChip(j.dataset.j);if(J[0]==='گروه'){$('#title').textContent=S.group;$('#sub').textContent='گروه'}}
 });
 function openCmds(){const box=$('#cmds');const items=[['/start','🏠 شروع و منوی اصلی']];if(S.role==='admin')items.push(['/admin','🛠 پنل مدیریت']);
  box.innerHTML=items.map(i=>`<button type="button" data-cmd="${i[0]}"><code>${i[0]}</code><span>${i[1]}</span></button>`).join('');box.hidden=false;$('#menubtn').setAttribute('aria-expanded','true')}
