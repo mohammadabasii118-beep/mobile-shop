@@ -18,6 +18,12 @@ TELEGRAM_CHANNEL=@yourchannel
 ```
 The bot must be an **admin** of the channel. The panel then reads new channel posts via long polling (no public HTTPS needed), shows the real channel name/members, and runs the Telegram → Instagram workflow for each new post. Instagram and AI are still simulated. Telegram does not give bots the channel's older history — only posts made after connecting appear. Received posts are kept in `.data/telegram.json` across restarts.
 
+## Instagram without the Meta API
+Three modes (`INSTAGRAM_MODE` in `.env`):
+- `mock` (default): demo only.
+- `manual`: every Telegram post becomes a **Ready to Post** card (AI caption + image download + copy button); you post it in the Instagram app.
+- `unofficial`: same, plus a **Publish to Instagram** button that posts to *your own* account through a local Python sidecar (`sidecar/instagram`, instagrapi). **This violates Instagram's Terms of Use and the account can be challenged, limited or banned.** Safeguards: off by default, every post needs a confirmation click, daily limit (`IG_DAILY_LIMIT`), credentials only in the server `.env`, sidecar listens on localhost with a shared secret. Test the whole flow first with `IG_DRY_RUN=1`. See `sidecar/instagram/README.md`.
+
 ## Languages (Persian / English)
 The panel is bilingual with full RTL support. Use the **EN / فا** button in the top bar (or on the login page); the choice is stored in a cookie (default: Persian).
 Translations live in `src/i18n/fa.ts` — English text is the key, so adding a string means wrapping it in `t("...")`; a missing translation falls back to English. Numbers, dates and "x minutes ago" are localized (Persian digits in `fa`).

@@ -41,6 +41,8 @@ export interface ReadyPost {
   mediaType: "photo" | "video";
   createdAt: string;
   status: "ready" | "posted";
+  publishedAt?: string;
+  instagramPostId?: string;
 }
 export interface Story {
   id: string;

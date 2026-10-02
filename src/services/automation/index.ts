@@ -5,7 +5,8 @@ import { createCustomer } from "@/services/customer";
 import { publishPost, publishStory, replyToComment } from "@/services/instagram";
 import { getProviders } from "@/services/providers";
 import { placeholderImage } from "@/lib/placeholder";
-import { instagramMode } from "@/config/instagram";
+import { instagramMode, sidecarConfig } from "@/config/instagram";
+import { publishReadyPost } from "@/services/instagram/publish-ready";
 import { saveTelegramState } from "@/services/telegram/storage";
 import type {
   Automation, AutomationKey, Comment, Conversation, PipelineRun, TelegramPost, TelegramToInstagramOptions,
@@ -77,7 +78,7 @@ export async function processTelegramPost(tg: TelegramPost) {
     p.step("caption", "Caption Copied", "Original Telegram caption reused");
   }
 
-  if (instagramMode() === "manual") {
+  if (instagramMode() !== "mock") {
     // Semi-automatic Instagram: queue a ready-to-post item instead of calling any Instagram API.
     db.readyPosts.unshift({ id: nextId("rp"), telegramPostId: tg.id, title: tg.title, caption, imageUrl: tg.imageUrl, mediaType: tg.mediaType, createdAt: new Date().toISOString(), status: "ready" });
     saveTelegramState({ posts: db.telegramPosts, ready: db.readyPosts });
@@ -86,6 +87,18 @@ export async function processTelegramPost(tg: TelegramPost) {
     if (o.notifyAdmin) {
       notify("info", "New post ready for Instagram");
       p.step("notify", "Admin Notified", "Notification sent");
+    }
+    const queued = db.readyPosts[0];
+    if (instagramMode() === "unofficial" && sidecarConfig().autoPublish) {
+      try {
+        const kinds: ("photo" | "story")[] = [];
+        if (postOn) kinds.push("photo");
+        if (storyOn) kinds.push("story");
+        await publishReadyPost(queued.id, kinds.length ? kinds : ["photo"]);
+        p.step("ig-post", "Instagram Post Created", `Post ${queued.instagramPostId ?? ""}`);
+      } catch (e) {
+        p.step("ig-post", "Instagram Post Failed", e instanceof Error ? e.message : "Unknown error", "error");
+      }
     }
     recordExecution("tg-ig-post", true, `${tg.title} ready for Instagram`);
     return { run: p.toRun(), telegramPost: tg };
