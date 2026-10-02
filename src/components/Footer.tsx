@@ -4,7 +4,7 @@ import { Logo } from './Navbar';
 
 const cols = [
   { t: 'فروشگاه', l: [['قاب گوشی', '/category/cases'], ['محافظ صفحه', '/category/screen-protectors'], ['شارژر', '/category/chargers'], ['کابل', '/category/cables'], ['لوازم جانبی', '/category/accessories']] },
-  { t: 'پشتیبانی', l: [['تماس با ما', '/contact'], ['سوالات متداول', '/faq'], ['راهنمای خرید', '/faq'], ['شرایط ارسال', '/shipping'], ['شرایط بازگشت', '/returns'], ['قوانین و مقررات', '/about']] },
+  { t: 'پشتیبانی', l: [['تماس با ما', '/contact'], ['سوالات متداول', '/faq'], ['راهنمای خرید', '/faq'], ['شرایط ارسال', '/shipping'], ['شرایط بازگشت', '/returns'], ['قوانین و مقررات', '/about'], ['پنل مدیریت', '/admin']] },
 ];
 
 export function Footer() {
