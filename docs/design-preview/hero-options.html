@@ -1,0 +1,492 @@
+<title>مدل‌های هیرو CaseLine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;800&family=Lalezar&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&display=swap">
+<style>
+/* Layout: tool bar, one hero frame that swaps between five hero models, and a spec card under the frame. */
+:root {
+  --bg: #F2F5F4; --surface: #FFFFFF; --surface2: #E7EEEC; --line: #D3DDDA;
+  --fg: #0E1B1E; --muted: #55666A; --brand: #0E5A5F; --accent: #8F6220;
+  --btn-bg: #0E5A5F; --btn-fg: #FFFFFF; --cta-gold: #D9B36A; --cta-gold-fg: #241A08;
+  --hero-a: #0A3F43; --hero-b: #05191C; --hero-fg: #F1F7F6; --hero-muted: #9DBBB8;
+  --glow: #1FA99B;
+  --font-body: "Vazirmatn", Tahoma, "Segoe UI", sans-serif;
+  --font-display: "Lalezar", "Vazirmatn", Tahoma, sans-serif;
+  --font-latin: "Bricolage Grotesque", "Vazirmatn", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #071214; --surface: #0E1E21; --surface2: #15282C; --line: #22383C;
+    --fg: #E8F1F0; --muted: #92A9AB; --brand: #35C7B6; --accent: #D9B36A;
+    --btn-bg: #35C7B6; --btn-fg: #04201D; --hero-a: #0F4A4E; --hero-b: #030C0E; --glow: #35C7B6;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #071214; --surface: #0E1E21; --surface2: #15282C; --line: #22383C;
+  --fg: #E8F1F0; --muted: #92A9AB; --brand: #35C7B6; --accent: #D9B36A;
+  --btn-bg: #35C7B6; --btn-fg: #04201D; --hero-a: #0F4A4E; --hero-b: #030C0E; --glow: #35C7B6;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.75; padding-inline: 16px; padding-block: 0 56px; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+svg.i { width: 1.2em; height: 1.2em; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+.tools { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 50; margin-inline: -16px; padding: 10px 16px; background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.tools .ttl { font-weight: 800; margin-inline-end: auto; }
+.seg { display: inline-flex; background: var(--surface2); border-radius: 999px; padding: 3px; gap: 2px; flex-wrap: wrap; }
+.seg button { border: 0; background: transparent; padding: 4px 14px; border-radius: 999px; font-size: 13px; min-height: 34px; }
+.seg button[aria-selected="true"], .seg button[aria-pressed="true"] { background: var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,.2); font-weight: 700; }
+.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; background: var(--surface2); padding: 4px 12px; border-radius: 999px; min-height: 38px; }
+.chk input { accent-color: var(--brand); width: 16px; height: 16px; }
+
+.stage { display: flex; justify-content: center; margin-top: 18px; }
+.frame { container: fr / inline-size; width: 100%; max-width: 1240px; transition: max-width .35s ease; }
+.frame.is-mobile { max-width: 390px; }
+.frame.is-mobile .hv { border-radius: 30px; box-shadow: 0 0 0 8px var(--surface2); }
+
+.hv { display: none; position: relative; border-radius: 32px; overflow: hidden; color: var(--hero-fg); background: radial-gradient(120% 90% at 78% 40%, var(--hero-a), var(--hero-b) 70%); min-height: 540px; isolation: isolate; }
+.hv.on { display: grid; }
+.hv canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: pan-y; cursor: grab; }
+
+.eyebrow { display: inline-flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--cta-gold); letter-spacing: .04em; font-weight: 700; }
+.eyebrow::before { content: ""; width: 26px; height: 1.5px; background: currentColor; }
+.hv h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(2rem, 6cqi, 4.4rem); line-height: 1.3; margin: 12px 0; text-wrap: balance; }
+.hv h1 em { font-style: normal; color: var(--cta-gold); }
+.hv p.lead { color: var(--hero-muted); max-width: 30em; margin: 0 0 22px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 0 22px; border-radius: 999px; border: 1.5px solid transparent; font-weight: 700; font-size: 14px; background: var(--btn-bg); color: var(--btn-fg); transition: transform .2s; }
+.btn:hover { transform: translateY(-2px); }
+.btn.gold { background: var(--cta-gold); color: var(--cta-gold-fg); }
+.btn.ghost { background: transparent; color: var(--hero-fg); border-color: rgba(241,247,246,.4); }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; }
+.tag { position: absolute; top: 14px; inset-inline-end: 14px; z-index: 6; font-size: 11px; color: var(--hero-muted); background: rgba(0,0,0,.3); padding: 2px 10px; border-radius: 999px; }
+.glow { position: absolute; z-index: -1; background: radial-gradient(closest-side, color-mix(in srgb, var(--glow) 40%, transparent), transparent 70%); filter: blur(8px); }
+
+/* ---- V1 / V2: split with 3D canvas ---- */
+.split { grid-template-columns: 1.05fr 1fr; align-items: center; }
+.split .txt { padding: clamp(26px, 5cqi, 62px); padding-inline-end: 0; position: relative; z-index: 2; }
+.split .vis { position: relative; min-height: 480px; height: 100%; }
+.sw { position: absolute; bottom: 16px; inset-inline: 0; display: flex; justify-content: center; gap: 10px; z-index: 4; }
+.sw button { width: 30px; height: 30px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); padding: 0; box-shadow: inset 0 0 0 2px rgba(0,0,0,.25); }
+.sw button[aria-pressed="true"] { border-color: var(--cta-gold); transform: scale(1.15); }
+.fb { position: absolute; inset: 0; display: none; place-items: center; }
+.fb svg { height: 86%; max-height: 440px; filter: drop-shadow(0 30px 30px rgba(0,0,0,.45)); }
+@media (prefers-reduced-motion: no-preference) { .fb svg { animation: floaty 6s ease-in-out infinite; } }
+@keyframes floaty { 50% { transform: translateY(-10px) rotate(-1.5deg); } }
+.vis.light canvas { display: none; }
+.vis.light .fb { display: grid; }
+.orb-lbl { position: absolute; bottom: 62px; inset-inline: 0; text-align: center; z-index: 4; pointer-events: none; }
+.orb-lbl b { display: block; font-family: var(--font-display); font-weight: 400; font-size: 1.5rem; }
+.orb-lbl span { font-size: 12.5px; color: var(--hero-muted); }
+.arr { position: absolute; top: 50%; z-index: 5; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22); display: grid; place-items: center; transform: translateY(-50%); }
+.arr.n { inset-inline-start: 8px; } .arr.p { inset-inline-end: 8px; }
+
+/* ---- V3: CSS depth stack ---- */
+.depth { grid-template-columns: 1fr 1.1fr; align-items: center; }
+.depth .scene { position: relative; height: 520px; perspective: 1100px; display: grid; place-items: center; }
+.depth .layer { position: absolute; transform-style: preserve-3d; transition: transform .25s ease-out; will-change: transform; }
+.depth .layer svg { height: 100%; display: block; filter: drop-shadow(0 28px 26px rgba(0,0,0,.45)); }
+.depth .l1 { height: 78%; transform: translate3d(calc(var(--mx, 0) * -26px - 140px), calc(var(--my, 0) * -12px - 10px), -140px) rotateY(calc(var(--mx, 0) * -10deg + 22deg)) rotateZ(-8deg); opacity: .55; filter: blur(1.2px); }
+.depth .l2 { height: 82%; transform: translate3d(calc(var(--mx, 0) * -18px + 150px), calc(var(--my, 0) * -10px + 14px), -70px) rotateY(calc(var(--mx, 0) * -8deg - 20deg)) rotateZ(7deg); opacity: .8; }
+.depth .l3 { height: 92%; transform: translate3d(calc(var(--mx, 0) * 22px), calc(var(--my, 0) * 14px), 40px) rotateY(calc(var(--mx, 0) * 14deg)) rotateX(calc(var(--my, 0) * -8deg)); }
+.depth .ring { position: absolute; width: 360px; height: 360px; border-radius: 50%; border: 1px solid rgba(217,179,106,.4); transform: translateZ(-200px); }
+.depth .ring.r2 { width: 520px; height: 520px; border-color: rgba(120,220,208,.25); }
+@media (prefers-reduced-motion: no-preference) { .depth.auto .scene { animation: sway 8s ease-in-out infinite; } }
+@keyframes sway { 0%, 100% { --mx: -.5; } 50% { --mx: .5; } }
+.depth .chip { position: absolute; z-index: 3; background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.18); backdrop-filter: blur(8px); border-radius: 14px; padding: 6px 12px; font-size: 12px; display: inline-flex; gap: 6px; align-items: center; transform: translateZ(90px); }
+
+/* ---- V4: line draw ---- */
+.draw { grid-template-columns: 1fr 1fr; align-items: center; }
+.draw .art { position: relative; height: 540px; display: grid; place-items: center; }
+.draw svg.big { height: 500px; width: auto; max-width: 100%; overflow: visible; }
+.draw .st { fill: none; stroke: var(--cta-gold); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1500; stroke-dashoffset: 1500; }
+.draw .st.t { stroke: rgba(120,220,208,.7); stroke-width: 1.1; }
+.draw .fill { fill: url(#dg); opacity: 0; }
+.draw .ln { fill: none; stroke: var(--cta-gold); stroke-width: 3; stroke-linecap: round; stroke-dasharray: 600; stroke-dashoffset: 600; }
+.draw.play .st { animation: dr 9s ease-in-out infinite; }
+.draw.play .st.t { animation-delay: .4s; }
+.draw.play .fill { animation: fl 9s ease-in-out infinite; }
+.draw.play .ln { animation: lnn 9s ease-in-out infinite; }
+@keyframes dr { 0% { stroke-dashoffset: 1500; } 40%, 82% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -1500; } }
+@keyframes fl { 0%, 35% { opacity: 0; } 55%, 82% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes lnn { 0%, 45% { stroke-dashoffset: 600; } 62%, 82% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -600; } }
+@media (prefers-reduced-motion: reduce) { .draw .st { stroke-dashoffset: 0; } .draw .fill { opacity: 1; } .draw .ln { stroke-dashoffset: 0; } }
+.draw .pp { position: absolute; bottom: 14px; inset-inline-start: 14px; z-index: 5; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); border-radius: 999px; padding: 2px 14px; min-height: 34px; font-size: 12.5px; }
+.draw .word { display: block; font: 800 clamp(1rem, 2.2cqi, 1.3rem)/1.6 var(--font-latin); letter-spacing: .3em; color: var(--hero-muted); margin-top: 18px; direction: ltr; text-align: start; }
+
+/* ---- V5: campaign slider ---- */
+.slider { padding: 0; min-height: 0; }
+.slider .track { display: flex; transition: transform .7s cubic-bezier(.65, 0, .25, 1); }
+.slide { flex: 0 0 100%; min-height: 540px; display: grid; grid-template-columns: 1.1fr 1fr; align-items: center; padding: clamp(24px, 5cqi, 60px); gap: 20px; position: relative; overflow: hidden; }
+.slide .art { height: 420px; display: grid; place-items: center; position: relative; }
+.slide .art svg { height: 100%; filter: drop-shadow(0 26px 24px rgba(0,0,0,.4)); transition: transform .8s; }
+.slide.cur .art svg { transform: rotate(-6deg) translateY(-6px); }
+.slide .badge { display: inline-block; background: var(--cta-gold); color: var(--cta-gold-fg); font-weight: 800; border-radius: 999px; padding: 0 14px; font-size: 13px; margin-bottom: 8px; }
+.s1 { background: radial-gradient(110% 90% at 75% 40%, #0F4A4E, #05191C 72%); }
+.s2 { background: radial-gradient(110% 90% at 75% 40%, #5a3d10, #1c1204 72%); }
+.s3 { background: radial-gradient(110% 90% at 75% 40%, #3f2a3b, #140b13 72%); }
+.slider .ctl { position: absolute; bottom: 18px; inset-inline: 0; z-index: 6; display: flex; justify-content: center; align-items: center; gap: 10px; }
+.slider .dots { display: flex; gap: 6px; }
+.slider .dots button { width: 34px; height: 5px; border: 0; padding: 0; border-radius: 3px; background: rgba(255,255,255,.25); overflow: hidden; position: relative; }
+.slider .dots button::after { content: ""; position: absolute; inset: 0; background: var(--cta-gold); transform: scaleX(0); transform-origin: right; }
+.slider .dots button[aria-current="true"]::after { transform: scaleX(1); }
+.slider.ap .dots button[aria-current="true"]::after { animation: prog 5s linear forwards; }
+@keyframes prog { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+@container fr (max-width: 760px) {
+  .hv { min-height: 0; }
+  .split, .depth, .draw { grid-template-columns: 1fr; }
+  .split .txt, .draw .txt, .depth .txt { padding: 28px 22px 6px; text-align: center; }
+  .hv p.lead { margin-inline: auto; }
+  .cta { justify-content: center; }
+  .split .vis { min-height: 340px; height: 340px; }
+  .depth .scene { height: 360px; }
+  .depth .chip { display: none; }
+  .draw .art { height: 380px; }
+  .draw svg.big { height: 340px; }
+  .draw .word { text-align: center; }
+  .slide { grid-template-columns: 1fr; text-align: center; padding: 28px 22px 64px; min-height: 0; }
+  .slide .art { height: 250px; order: -1; }
+  .slide p.lead { margin-inline: auto; }
+  .slide .cta { justify-content: center; }
+}
+
+/* ---- info card ---- */
+.info { max-width: 1240px; margin: 18px auto 0; background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: clamp(16px, 3vw, 26px); display: none; }
+.info.on { display: block; }
+.info h2 { font-family: var(--font-display); font-weight: 400; font-size: 1.6rem; margin: 0 0 4px; }
+.info > p { color: var(--muted); margin: 0 0 14px; max-width: 54em; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.facts > div { background: var(--surface2); border-radius: 16px; padding: 12px 14px; min-width: 0; }
+.facts small { display: block; color: var(--muted); font-size: 12px; font-weight: 700; }
+.facts span { font-size: 13.5px; }
+.rec { max-width: 1240px; margin: 18px auto 0; border: 1.5px solid var(--accent); border-radius: 22px; padding: 16px 20px; background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.rec b { color: var(--accent); }
+.rec p { margin: 4px 0 0; }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M19 12H5m5-5-5 5 5 5"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5.5c0 4.3 2.9 7.6 7 9.5 4.1-1.9 7-5.2 7-9.5V6l-7-3Z"/><path d="m9 12 2.2 2.2L15.5 10"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="m13 3-7 10h5l-1 8 7-10h-5l1-8Z"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-chevl" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+  </defs>
+</svg>
+
+<div class="tools">
+  <div class="ttl">مدل‌های هیرو CaseLine</div>
+  <div class="seg" id="varSeg" role="tablist" aria-label="مدل هیرو">
+    <button role="tab" aria-selected="true" data-v="v1">۱ · استودیو سه‌بعدی</button>
+    <button role="tab" aria-selected="false" data-v="v2">۲ · چرخ‌فلک سه‌بعدی</button>
+    <button role="tab" aria-selected="false" data-v="v3">۳ · عمق سبک</button>
+    <button role="tab" aria-selected="false" data-v="v4">۴ · موشن خطی</button>
+    <button role="tab" aria-selected="false" data-v="v5">۵ · اسلایدر کمپین</button>
+  </div>
+  <div class="seg" id="devSeg"><button aria-pressed="true" data-dev="desk">دسکتاپ</button><button aria-pressed="false" data-dev="mob">موبایل</button></div>
+  <div class="seg" id="thSeg"><button aria-pressed="true" data-th="auto">خودکار</button><button aria-pressed="false" data-th="light">روشن</button><button aria-pressed="false" data-th="dark">تیره</button></div>
+  <label class="chk" for="lightChk"><input type="checkbox" id="lightChk">حالت سبک</label>
+</div>
+
+<div class="stage"><div class="frame" id="frame">
+
+  <!-- V1 STUDIO -->
+  <section class="hv split on" id="v1" aria-label="هیرو استودیو سه‌بعدی">
+    <div class="txt">
+      <span class="eyebrow">کالکشن جدید</span>
+      <h1>هر قاب، یک <em>خط</em> از سبک توست</h1>
+      <p class="lead">قاب، کاور و اکسسوری موبایل با طراحی اختصاصی و ارسال سریع به سراسر کشور.</p>
+      <div class="cta"><a class="btn gold" href="#">خرید قاب‌ها <svg class="i"><use href="#i-arrow"/></svg></a><a class="btn ghost" href="#">مشاهده کالکشن</a></div>
+    </div>
+    <div class="vis" id="vis1"><div class="glow" style="inset:12% 8%"></div><canvas id="c1" aria-label="مدل سه‌بعدی قاب"></canvas><div class="fb" id="fb1"></div><div class="sw" id="sw1" role="group" aria-label="رنگ قاب"></div></div>
+    <span class="tag" id="tag1">سه‌بعدی</span>
+  </section>
+
+  <!-- V2 ORBIT -->
+  <section class="hv split" id="v2" aria-label="هیرو چرخ‌فلک سه‌بعدی">
+    <div class="txt">
+      <span class="eyebrow">کالکشن زمستان</span>
+      <h1>پنج رنگ، <em>یک</em> قاب</h1>
+      <p class="lead">قاب‌ها را بچرخانید و رنگ دلخواه را انتخاب کنید. هر قاب به صفحه‌ی همان محصول می‌رود.</p>
+      <div class="cta"><a class="btn gold" href="#" id="orbBuy">خرید این رنگ <svg class="i"><use href="#i-arrow"/></svg></a><a class="btn ghost" href="#">همه‌ی رنگ‌ها</a></div>
+    </div>
+    <div class="vis" id="vis2"><div class="glow" style="inset:10% 4%"></div><canvas id="c2" aria-label="چرخ‌فلک سه‌بعدی قاب‌ها"></canvas><div class="fb" id="fb2"></div>
+      <button class="arr p" id="orbPrev" aria-label="قبلی"><svg class="i"><use href="#i-chev"/></svg></button><button class="arr n" id="orbNext" aria-label="بعدی"><svg class="i"><use href="#i-chevl"/></svg></button>
+      <div class="orb-lbl"><b id="orbName">نفتی</b><span id="orbSub">قاب سیلیکونی مگ‌سیف</span></div></div>
+    <span class="tag" id="tag2">سه‌بعدی</span>
+  </section>
+
+  <!-- V3 DEPTH -->
+  <section class="hv depth auto" id="v3" aria-label="هیرو عمق سبک">
+    <div class="txt" style="padding:clamp(26px,5cqi,62px);padding-inline-end:0">
+      <span class="eyebrow">سبک و سریع</span>
+      <h1>عمق دارد، <em>سنگین</em> نیست</h1>
+      <p class="lead">سه لایه‌ی تصویر با پارالاکس ملایم. بدون WebGL، روی هر گوشی روان است.</p>
+      <div class="cta"><a class="btn gold" href="#">خرید قاب‌ها</a><a class="btn ghost" href="#">مشاهده کالکشن</a></div>
+    </div>
+    <div class="scene" id="scene3"><div class="ring"></div><div class="ring r2"></div>
+      <div class="layer l1" id="d1"></div><div class="layer l2" id="d2"></div><div class="layer l3" id="d3"></div>
+      <span class="chip" style="top:12%;inset-inline-start:6%"><svg class="i"><use href="#i-shield"/></svg>ضد ضربه</span>
+      <span class="chip" style="bottom:14%;inset-inline-end:4%"><svg class="i"><use href="#i-bolt"/></svg>سازگار با شارژ بی‌سیم</span>
+    </div>
+    <span class="tag">بدون WebGL</span>
+  </section>
+
+  <!-- V4 DRAW -->
+  <section class="hv draw play" id="v4" aria-label="هیرو موشن خطی">
+    <div class="txt" style="padding:clamp(26px,5cqi,62px);padding-inline-end:0">
+      <span class="eyebrow">CaseLine</span>
+      <h1>خطی که <em>قاب</em> را می‌سازد</h1>
+      <p class="lead">یک موشن‌گرافیک ترسیمی برای معرفی برند. در پنل می‌توانید آن را با ویدئوی خودتان عوض کنید.</p>
+      <div class="cta"><a class="btn gold" href="#">خرید قاب‌ها</a><a class="btn ghost" href="#">درباره‌ی ما</a></div>
+      <span class="word" aria-hidden="true">CASE · LINE · STYLE</span>
+    </div>
+    <div class="art">
+      <svg class="big" viewBox="0 0 300 560" aria-hidden="true">
+        <defs><linearGradient id="dg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1b8d93"/><stop offset=".6" stop-color="#0E5A5F"/><stop offset="1" stop-color="#062c30"/></linearGradient></defs>
+        <rect class="fill" x="40" y="20" width="220" height="500" rx="52"/>
+        <rect class="st" x="40" y="20" width="220" height="500" rx="52"/>
+        <rect class="st t" x="56" y="36" width="188" height="468" rx="40"/>
+        <rect class="st" x="62" y="48" width="86" height="90" rx="24"/>
+        <circle class="st t" cx="88" cy="74" r="15"/><circle class="st t" cx="124" cy="74" r="15"/><circle class="st t" cx="106" cy="112" r="15"/>
+        <path class="ln" d="M10 380 C 90 372 190 318 310 330"/>
+      </svg>
+      <button class="pp" id="drawBtn" aria-pressed="true">توقف انیمیشن</button>
+    </div>
+    <span class="tag">SVG · کم‌حجم</span>
+  </section>
+
+  <!-- V5 SLIDER -->
+  <section class="hv slider ap" id="v5" aria-roledescription="carousel" aria-label="اسلایدر کمپین‌ها">
+    <div class="track" id="track">
+      <article class="slide s1 cur"><div><span class="badge">محصول جدید</span><h1>مگ‌سیف؛ قاب‌هایی که به شارژر می‌چسبند</h1><p class="lead">کالکشن جدید با مغناطیس قوی و لبه‌ی مقاوم.</p><div class="cta"><a class="btn gold" href="#">مشاهده کالکشن</a></div></div><div class="art" data-art="#0E5A5F|lines"></div></article>
+      <article class="slide s2"><div><span class="badge">۲۴ ساعته</span><h1>تخفیف ویژه‌ی اکسسوری</h1><p class="lead">تا پایان امشب روی قاب‌های منتخب. تایمر از پنل تنظیم می‌شود.</p><div class="cta"><a class="btn gold" href="#">خرید با تخفیف</a></div></div><div class="art" data-art="#B98D43|plain"></div></article>
+      <article class="slide s3"><div><span class="badge">کمپین مناسبتی</span><h1>هدیه‌ی شب یلدا</h1><p class="lead">طرح‌های مخصوص شب‌های بلند. شروع و پایان کمپین از پنل زمان‌بندی می‌شود.</p><div class="cta"><a class="btn gold" href="#">مشاهده پیشنهادها</a></div></div><div class="art" data-art="#8c4b78|dots"></div></article>
+    </div>
+    <div class="ctl"><button class="arr" style="position:static;transform:none" id="sPrev" aria-label="قبلی"><svg class="i"><use href="#i-chev"/></svg></button><div class="dots" id="sDots"></div><button class="arr" style="position:static;transform:none" id="sNext" aria-label="بعدی"><svg class="i"><use href="#i-chevl"/></svg></button></div>
+    <span class="tag">بنر مدیریت‌شونده</span>
+  </section>
+
+</div></div>
+
+<!-- spec cards -->
+<div class="info on" id="i-v1"><h2>۱ · استودیو سه‌بعدی</h2><p>یک قاب با نور و بازتاب واقعی. با ماوس یا انگشت می‌چرخد و با دکمه‌های رنگ، رنگ قاب عوض می‌شود. چشمگیرترین مدل برای اولین برخورد با برند.</p>
+  <div class="facts"><div><small>سرعت</small><span>Three.js حدود ۶۰۰ کیلوبایت، فقط وقتی هیرو دیده شود بارگذاری می‌شود</span></div><div><small>موبایل / دستگاه ضعیف</small><span>تصویر ثابت قاب با شناوری ملایم؛ با کاهش حرکت ثابت می‌ماند</span></div><div><small>قابل کنترل از پنل</small><span>سه‌بعدی/تصویر، رنگ‌های قاب، تیتر، متن و دکمه‌ها، تصویر جایگزین</span></div></div></div>
+<div class="info" id="i-v2"><h2>۲ · چرخ‌فلک سه‌بعدی</h2><p>پنج قاب روی یک حلقه می‌چرخند. مناسب نمایش رنگ‌ها یا چند محصول منتخب؛ هر قاب می‌تواند به یک محصول واقعی لینک شود.</p>
+  <div class="facts"><div><small>سرعت</small><span>مثل مدل ۱، اما صحنه کمی سنگین‌تر (۵ قاب)</span></div><div><small>موبایل / دستگاه ضعیف</small><span>اسلایدر ساده‌ی تصویری با همان پنج محصول</span></div><div><small>قابل کنترل از پنل</small><span>انتخاب ۳ تا ۷ محصول از دیتابیس، ترتیب، چرخش خودکار، متن و دکمه‌ها</span></div></div></div>
+<div class="info" id="i-v3"><h2>۳ · عمق سبک</h2><p>سه لایه‌ی تصویر با پارالاکس به حرکت ماوس. حس عمق دارد ولی WebGL ندارد، پس روی هر گوشی روان است. گزینه‌ی امن برای موبایل.</p>
+  <div class="facts"><div><small>سرعت</small><span>فقط CSS، بدون کتابخانه؛ سبک‌ترین مدل</span></div><div><small>موبایل</small><span>حرکت ملایم خودکار به‌جای ماوس؛ با کاهش حرکت ثابت</span></div><div><small>قابل کنترل از پنل</small><span>سه تصویر شفاف (PNG/WebP) قاب‌ها، متن‌ها و دکمه‌ها</span></div></div></div>
+<div class="info" id="i-v4"><h2>۴ · موشن خطی</h2><p>خط برند قاب را ترسیم می‌کند و بعد پر می‌شود. شبیه موشن‌گرافیک معرفی برند است و بهترین حس لوکس و مینیمال را دارد.</p>
+  <div class="facts"><div><small>سرعت</small><span>SVG کم‌حجم؛ بدون کتابخانه</span></div><div><small>موبایل</small><span>همان انیمیشن (سبک است)؛ با کاهش حرکت تصویر کامل ثابت</span></div><div><small>قابل کنترل از پنل</small><span>جایگزینی با ویدئوی MP4/WebM یا انیمیشن آپلودی، تصویر جایگزین، خاموش‌کردن</span></div></div></div>
+<div class="info" id="i-v5"><h2>۵ · اسلایدر کمپین</h2><p>چند بنر پشت‌سرهم برای محصول جدید، تخفیف و مناسبت‌ها. کاربردی‌ترین مدل برای فروش و دقیقاً همان «مدیریت بنر» پنل.</p>
+  <div class="facts"><div><small>سرعت</small><span>سبک؛ هر اسلاید یک تصویر</span></div><div><small>موبایل</small><span>تصویر جدا برای موبایل، چیدمان تک‌ستونی، سوایپ</span></div><div><small>قابل کنترل از پنل</small><span>افزودن/حذف بنر، تصویر موبایل و دسکتاپ، متن و لینک دکمه، ترتیب، زمان‌بندی شروع و پایان، فعال/غیرفعال</span></div></div></div>
+
+<div class="rec"><b>پیشنهاد من:</b>
+  <p>مدل ۱ (استودیو سه‌بعدی) برای دسکتاپ، با مدل ۳ (عمق سبک) به‌عنوان جایگزین خودکار موبایل و دستگاه ضعیف، و مدل ۵ (اسلایدر کمپین) بلافاصله زیر آن برای تخفیف و مناسبت‌ها. مدیر اصلی از پنل می‌تواند هر مدل را به‌عنوان هیرو انتخاب کند.</p></div>
+
+<script>
+(function () {
+  var root = document.documentElement; root.lang = "fa"; root.dir = "rtl";
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+  var frame = $("#frame");
+
+  function shade(hex, amt) {
+    var n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+    var f = function (c) { return Math.max(0, Math.min(255, Math.round(amt < 0 ? c * (1 + amt) : c + (255 - c) * amt))); };
+    return "#" + [f(r), f(g), f(b)].map(function (c) { return c.toString(16).padStart(2, "0"); }).join("");
+  }
+  var uid = 0;
+  function caseSVG(color, pattern, attrs) {
+    var id = "c" + (++uid), hi = shade(color, .28), lo = shade(color, -.32), pat = "";
+    if (pattern === "lines") pat = '<g stroke="#fff" stroke-opacity=".16" stroke-width="1.4">' + Array.apply(null, Array(16)).map(function (_, i) { return '<path d="M' + (-20 + i * 18) + ' 420 L' + (100 + i * 18) + ' 20"/>'; }).join("") + "</g>";
+    if (pattern === "dots") pat = '<g fill="#fff" fill-opacity=".2">' + Array.apply(null, Array(60)).map(function (_, i) { return '<circle cx="' + (30 + (i % 6) * 28 + ((Math.floor(i / 6) % 2) * 14)) + '" cy="' + (150 + Math.floor(i / 6) * 26) + '" r="3"/>'; }).join("") + "</g>";
+    return '<svg viewBox="-10 -6 220 420" ' + (attrs || "") + ' aria-hidden="true"><defs><linearGradient id="' + id + 'g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + hi + '"/><stop offset=".55" stop-color="' + color + '"/><stop offset="1" stop-color="' + lo + '"/></linearGradient><clipPath id="' + id + 'c"><rect width="200" height="400" rx="40"/></clipPath><radialGradient id="' + id + 'r" cx=".3" cy=".1" r=".8"><stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>' +
+      '<rect width="200" height="400" rx="40" fill="url(#' + id + 'g)"/><g clip-path="url(#' + id + 'c)">' + pat + '<path d="M-4 268 C 60 262 130 236 204 244" fill="none" stroke="#D9B36A" stroke-width="2" stroke-linecap="round" stroke-opacity=".9"/><rect width="200" height="400" fill="url(#' + id + 'r)"/></g>' +
+      '<rect x="1.2" y="1.2" width="197.6" height="397.6" rx="39" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="2"/>' +
+      '<rect x="16" y="16" width="86" height="90" rx="24" fill="' + shade(color, -.5) + '" fill-opacity=".55" stroke="#fff" stroke-opacity=".2"/>' +
+      [[40, 42], [76, 42], [58, 80]].map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="15" fill="#0b0f11" stroke="#8b979a" stroke-width="3"/><circle cx="' + p[0] + '" cy="' + p[1] + '" r="6" fill="#26343a"/>'; }).join("") +
+      '<text x="100" y="352" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="19" fill="#fff" fill-opacity=".78">CaseLine</text></svg>';
+  }
+
+  /* ---- tool bar ---- */
+  var current = "v1";
+  $$("#varSeg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      $$("#varSeg button").forEach(function (x) { x.setAttribute("aria-selected", x === b); });
+      current = b.dataset.v;
+      $$(".hv").forEach(function (h) { h.classList.toggle("on", h.id === current); });
+      $$(".info").forEach(function (h) { h.classList.toggle("on", h.id === "i-" + current); });
+      activate();
+    });
+  });
+  function seg(id, key, fn) { $$("#" + id + " button").forEach(function (b) { b.addEventListener("click", function () { $$("#" + id + " button").forEach(function (x) { x.setAttribute("aria-pressed", x === b); }); fn(b.dataset[key]); }); }); }
+  seg("devSeg", "dev", function (v) { frame.classList.toggle("is-mobile", v === "mob"); setTimeout(activate, 420); });
+  seg("thSeg", "th", function (v) { v === "auto" ? root.removeAttribute("data-theme") : root.setAttribute("data-theme", v); });
+  $("#lightChk").addEventListener("change", activate);
+
+  /* ---- static art ---- */
+  var COLS = ["#0E5A5F", "#1D262B", "#B98D43", "#8DB5A6", "#5B3B55"];
+  var NAMES = [["نفتی", "قاب سیلیکونی مگ‌سیف"], ["مرکب", "قاب چرمی"], ["عسلی", "قاب مگ‌سیف"], ["مریم‌گلی", "قاب طرح‌دار"], ["آلویی", "قاب شفاف ضد ضربه"]];
+  $("#fb1").innerHTML = caseSVG(COLS[0], "plain");
+  $("#fb2").innerHTML = COLS.slice(0, 3).map(function (c, i) { return caseSVG(c, i === 1 ? "lines" : "plain", 'style="height:' + (i === 1 ? 84 : 66) + '%;margin-inline:-18px;opacity:' + (i === 1 ? 1 : .8) + '"'); }).join("");
+  $("#fb2").style.cssText = "";
+  $("#d1").innerHTML = caseSVG("#8DB5A6", "dots");
+  $("#d2").innerHTML = caseSVG("#B98D43", "lines");
+  $("#d3").innerHTML = caseSVG("#0E5A5F", "plain");
+  $$(".slide .art").forEach(function (a) { var p = a.dataset.art.split("|"); a.innerHTML = caseSVG(p[0], p[1]); });
+
+  /* swatches for V1 */
+  var sw1 = $("#sw1"), color1 = COLS[0];
+  sw1.innerHTML = COLS.map(function (c, i) { return '<button aria-label="' + NAMES[i][0] + '" aria-pressed="' + (i === 0) + '" style="background:' + c + '" data-c="' + c + '"></button>'; }).join("");
+  sw1.addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    $$("button", sw1).forEach(function (x) { x.setAttribute("aria-pressed", x === b); });
+    color1 = b.dataset.c; $("#fb1").innerHTML = caseSVG(color1, "plain"); if (S.v1) S.v1.setColor(color1);
+  });
+
+  /* ---- V3 parallax ---- */
+  var scene3 = $("#scene3"), v3 = $("#v3");
+  if (window.matchMedia("(hover: hover) and (pointer: fine)").matches && !reduce.matches) {
+    v3.classList.remove("auto");
+    scene3.addEventListener("pointermove", function (e) { var r = scene3.getBoundingClientRect(); scene3.style.setProperty("--mx", ((e.clientX - r.left) / r.width - .5).toFixed(2)); scene3.style.setProperty("--my", ((e.clientY - r.top) / r.height - .5).toFixed(2)); });
+    scene3.addEventListener("pointerleave", function () { scene3.style.setProperty("--mx", 0); scene3.style.setProperty("--my", 0); });
+  }
+  if (typeof CSS !== "undefined" && CSS.registerProperty) { try { CSS.registerProperty({ name: "--mx", syntax: "<number>", inherits: true, initialValue: "0" }); } catch (e) {} }
+
+  /* ---- V4 play/pause ---- */
+  $("#drawBtn").addEventListener("click", function () { var s = $("#v4"), on = s.classList.toggle("play"); this.setAttribute("aria-pressed", on); this.textContent = on ? "توقف انیمیشن" : "پخش انیمیشن"; });
+  if (reduce.matches) { $("#v4").classList.remove("play"); $("#drawBtn").textContent = "پخش انیمیشن"; }
+
+  /* ---- V5 slider ---- */
+  var slides = $$(".slide"), idx = 0, timer = null, track = $("#track"), v5 = $("#v5");
+  var dots = $("#sDots"); dots.innerHTML = slides.map(function (_, i) { return '<button aria-label="اسلاید ' + (i + 1) + '"></button>'; }).join("");
+  function go(i) {
+    idx = (i + slides.length) % slides.length;
+    track.style.transform = "translateX(" + (idx * 100) + "%)";
+    slides.forEach(function (s, k) { s.classList.toggle("cur", k === idx); });
+    $$("button", dots).forEach(function (b, k) { b.removeAttribute("aria-current"); });
+    v5.classList.remove("ap"); void v5.offsetWidth; if (!reduce.matches && current === "v5") v5.classList.add("ap");
+    $$("button", dots)[idx].setAttribute("aria-current", "true");
+    clearTimeout(timer); if (!reduce.matches && current === "v5") timer = setTimeout(function () { go(idx + 1); }, 5000);
+  }
+  $$("button", dots).forEach(function (b, k) { b.addEventListener("click", function () { go(k); }); });
+  $("#sNext").addEventListener("click", function () { go(idx + 1); });
+  $("#sPrev").addEventListener("click", function () { go(idx - 1); });
+  var sx = null; v5.addEventListener("pointerdown", function (e) { sx = e.clientX; });
+  v5.addEventListener("pointerup", function (e) { if (sx === null) return; var d = e.clientX - sx; sx = null; if (Math.abs(d) > 50) go(idx + (d > 0 ? 1 : -1)); });
+  v5.addEventListener("mouseenter", function () { clearTimeout(timer); v5.classList.remove("ap"); });
+  v5.addEventListener("mouseleave", function () { go(idx); });
+  go(0);
+
+  /* ---- three.js ---- */
+  var S = { v1: null, v2: null }, loading = false, T = null;
+  function weak() { var m = navigator.deviceMemory || 4, c = navigator.hardwareConcurrency || 4, n = navigator.connection; return m <= 2 || c <= 2 || !!(n && (n.saveData || /2g/.test(n.effectiveType || ""))); }
+  function gl() { try { var c = document.createElement("canvas"); return !!(window.WebGLRenderingContext && (c.getContext("webgl") || c.getContext("experimental-webgl"))); } catch (e) { return false; } }
+  function mode3d() { var why = $("#lightChk").checked ? "حالت سبک" : reduce.matches ? "کاهش حرکت" : frame.clientWidth < 760 ? "موبایل" : weak() ? "دستگاه ضعیف" : !gl() ? "بدون WebGL" : ""; return why; }
+  function activate() {
+    ["v1", "v2"].forEach(function (k) { if (S[k]) S[k].stop(); });
+    clearTimeout(timer); v5.classList.remove("ap");
+    if (current === "v5") go(idx);
+    if (current === "v1" || current === "v2") {
+      var n = current === "v1" ? "1" : "2", vis = $("#vis" + n), why = mode3d();
+      if (why) { vis.classList.add("light"); $("#tag" + n).textContent = "تصویر جایگزین · " + why; return; }
+      vis.classList.remove("light"); $("#tag" + n).textContent = "سه‌بعدی";
+      if (T) { S[current] = S[current] || build(current); S[current].start(); }
+      else load(activate);
+    }
+  }
+  function load(cb) {
+    if (loading) return; loading = true;
+    var s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+    s.onload = function () { T = window.THREE; loading = false; cb(); };
+    s.onerror = function () { loading = false; ["1", "2"].forEach(function (n) { $("#vis" + n).classList.add("light"); $("#tag" + n).textContent = "تصویر جایگزین"; }); };
+    document.head.appendChild(s);
+  }
+  function rr(w, h, r) { var s = new T.Shape(), x = -w / 2, y = -h / 2; s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h); s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return s; }
+  function lin(hex) { return new T.Color(hex).convertSRGBToLinear(); }
+  function phone(color) {
+    var W = 1.62, H = 3.3, D = .2, bev = .07, g = new T.Group();
+    var geo = new T.ExtrudeGeometry(rr(W, H, .34), { depth: D, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 8, curveSegments: 28 }); geo.translate(0, 0, -D / 2);
+    var mat = new T.MeshPhysicalMaterial({ color: lin(color), roughness: .42, metalness: .05, clearcoat: 1, clearcoatRoughness: .28, envMapIntensity: .5 });
+    g.add(new T.Mesh(geo, mat)); var top = D / 2 + bev;
+    var isl = new T.Mesh(new T.ExtrudeGeometry(rr(.86, .9, .24), { depth: .05, bevelEnabled: true, bevelThickness: .02, bevelSize: .02, bevelSegments: 4, curveSegments: 16 }), new T.MeshPhysicalMaterial({ color: 0x0b1113, roughness: .25, metalness: .55, clearcoat: .6 }));
+    isl.position.set(-.34, 1.16, top); g.add(isl);
+    var ringM = new T.MeshStandardMaterial({ color: 0x9aa7aa, metalness: 1, roughness: .25 }), glassM = new T.MeshPhysicalMaterial({ color: 0x030507, roughness: .05, metalness: .2, clearcoat: 1 });
+    [[-.56, 1.36], [-.12, 1.36], [-.34, .96]].forEach(function (p) {
+      var ring = new T.Mesh(new T.TorusGeometry(.17, .035, 16, 40), ringM); ring.position.set(p[0], p[1], top + .09); g.add(ring);
+      var gl2 = new T.Mesh(new T.CylinderGeometry(.155, .155, .05, 32), glassM); gl2.rotation.x = Math.PI / 2; gl2.position.set(p[0], p[1], top + .09); g.add(gl2);
+    });
+    var cv = document.createElement("canvas"); cv.width = 512; cv.height = 1024; var x = cv.getContext("2d");
+    x.strokeStyle = "rgba(217,179,106,.95)"; x.lineWidth = 5; x.lineCap = "round"; x.beginPath(); x.moveTo(-10, 700); x.bezierCurveTo(150, 690, 340, 610, 530, 622); x.stroke();
+    x.fillStyle = "rgba(255,255,255,.82)"; x.font = "800 62px 'Bricolage Grotesque', system-ui, sans-serif"; x.textAlign = "center"; x.fillText("CaseLine", 256, 860);
+    var tex = new T.CanvasTexture(cv); tex.encoding = T.sRGBEncoding; tex.anisotropy = 4;
+    var dec = new T.Mesh(new T.PlaneGeometry(W, H), new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })); dec.position.z = top + .004; g.add(dec);
+    g.userData.mat = mat; return g;
+  }
+  function stage(canvas, vis, cam) {
+    var r = new T.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
+    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75)); r.outputEncoding = T.sRGBEncoding; r.toneMapping = T.ACESFilmicToneMapping; r.toneMappingExposure = .82;
+    var sc = new T.Scene(), camera = new T.PerspectiveCamera(28, 1, .1, 60); camera.position.set(0, cam.y || 0, cam.z); camera.lookAt(0, 0, 0);
+    var env = new T.Scene(); env.add(new T.Mesh(new T.SphereGeometry(20, 24, 16), new T.MeshBasicMaterial({ color: 0x06191b, side: T.BackSide })));
+    [[0xffffff, 6, 3, -8, .9, 8, 3], [0x35c7b6, -10, 1, 2, 1, 6, 8], [0xd9b36a, 9, -3, 4, 1, 4, 6], [0xffffff, 0, 10, 0, 1, 10, 4]].forEach(function (b) { var m = new T.Mesh(new T.PlaneGeometry(b[5], b[6]), new T.MeshBasicMaterial({ color: b[0], side: T.DoubleSide })); m.position.set(b[1], b[2], b[3]); m.lookAt(0, 0, 0); m.scale.setScalar(b[4]); env.add(m); });
+    var pm = new T.PMREMGenerator(r); sc.environment = pm.fromScene(env, .04).texture; pm.dispose();
+    sc.add(new T.HemisphereLight(0xcfeeea, 0x06191b, .3));
+    var key = new T.DirectionalLight(0xffffff, .8); key.position.set(3, 4, 6); sc.add(key);
+    var rim = new T.PointLight(0x35c7b6, 22, 14); rim.position.set(-4, 1, -2); sc.add(rim);
+    var warm = new T.PointLight(0xd9b36a, 16, 12); warm.position.set(4, -2, 3); sc.add(warm);
+    function size() { var w = vis.clientWidth, h = vis.clientHeight; if (!w || !h) return; r.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+    new ResizeObserver(size).observe(vis); size();
+    return { r: r, sc: sc, camera: camera, size: size };
+  }
+  function build(which) {
+    return which === "v1" ? buildV1() : buildV2();
+  }
+  function buildV1() {
+    var canvas = $("#c1"), vis = $("#vis1"), st = stage(canvas, vis, { z: 8.2 }), g = phone(color1), ptr = { x: 0, y: 0 }, cur = { x: 0, y: 0 }, spin = 0, drag = null, run = false, t0 = performance.now(), target = lin(color1);
+    st.sc.add(g);
+    vis.addEventListener("pointermove", function (e) { var b = vis.getBoundingClientRect(); ptr.x = (e.clientX - b.left) / b.width - .5; ptr.y = (e.clientY - b.top) / b.height - .5; if (drag) { drag.ry += (e.clientX - drag.x) * .01; drag.x = e.clientX; } });
+    canvas.addEventListener("pointerdown", function (e) { drag = { x: e.clientX, ry: 0 }; canvas.setPointerCapture(e.pointerId); });
+    window.addEventListener("pointerup", function () { if (drag) { spin += drag.ry; drag = null; } });
+    vis.addEventListener("pointerleave", function () { ptr.x = 0; ptr.y = 0; });
+    function frame1() {
+      if (!run) return; var t = (performance.now() - t0) / 1000;
+      cur.x += (ptr.x - cur.x) * .06; cur.y += (ptr.y - cur.y) * .06;
+      g.rotation.y = Math.sin(t * .55) * .42 + cur.x * .7 + spin + (drag ? drag.ry : 0); g.rotation.x = cur.y * .35 - .04; g.rotation.z = Math.sin(t * .4) * .03 - .09; g.position.y = Math.sin(t * .9) * .07;
+      g.userData.mat.color.lerp(target, .12); st.camera.position.z = vis.clientWidth / vis.clientHeight < .9 ? 9.4 : 8.2;
+      st.r.render(st.sc, st.camera); requestAnimationFrame(frame1);
+    }
+    g.rotation.set(-.04, .3, -.09); g.userData.mat.color.copy(target); st.r.render(st.sc, st.camera);
+    return { start: function () { if (!run) { run = true; frame1(); } }, stop: function () { run = false; }, setColor: function (c) { target = lin(c); if (!run) { g.userData.mat.color.copy(target); st.r.render(st.sc, st.camera); } } };
+  }
+  function buildV2() {
+    var canvas = $("#c2"), vis = $("#vis2"), st = stage(canvas, vis, { z: 12, y: 1 }), N = 5, step = Math.PI * 2 / N, R = 2.5, items = [], angle = 0, tgt = 0, run = false, drag = null, lastAuto = performance.now(), front = -1;
+    for (var i = 0; i < N; i++) { var g = phone(COLS[i]); st.sc.add(g); items.push(g); }
+    function label(k) { $("#orbName").textContent = NAMES[k][0]; $("#orbSub").textContent = NAMES[k][1]; }
+    function snap(dir) { tgt = Math.round(tgt / step + dir) * step; lastAuto = performance.now(); }
+    $("#orbNext").onclick = function () { snap(-1); }; $("#orbPrev").onclick = function () { snap(1); };
+    canvas.addEventListener("pointerdown", function (e) { drag = { x: e.clientX, base: tgt }; canvas.setPointerCapture(e.pointerId); });
+    canvas.addEventListener("pointermove", function (e) { if (drag) { tgt = drag.base + (e.clientX - drag.x) * .008; lastAuto = performance.now(); } });
+    window.addEventListener("pointerup", function () { if (drag) { drag = null; tgt = Math.round(tgt / step) * step; } });
+    function place() {
+      items.forEach(function (g, i) { var a = angle + i * step, c = Math.cos(a), s = Math.sin(a); g.position.set(s * R, 0, c * R - R); g.rotation.y = a * .45; var sc = .62 + .38 * (c + 1) / 2; g.scale.setScalar(sc); });
+      var k = ((Math.round(-angle / step) % N) + N) % N; if (k !== front) { front = k; label(k); }
+    }
+    function loop() {
+      if (!run) return; var now = performance.now();
+      if (!drag && !reduce.matches && now - lastAuto > 4500) { snap(-1); }
+      angle += (tgt - angle) * .08; place(); st.r.render(st.sc, st.camera); requestAnimationFrame(loop);
+    }
+    place(); st.r.render(st.sc, st.camera);
+    return { start: function () { if (!run) { run = true; lastAuto = performance.now(); loop(); } }, stop: function () { run = false; } };
+  }
+  document.addEventListener("visibilitychange", function () { if (document.hidden) { ["v1", "v2"].forEach(function (k) { if (S[k]) S[k].stop(); }); } else activate(); });
+  window.addEventListener("resize", activate);
+  activate();
+})();
+</script>
