@@ -4,7 +4,7 @@ from html import escape
 # (key, label, kind) kind: text | photo ; optional keys listed separately
 PLAYER_FIELDS = [
     ("name", "👤 نام بازیکن", "text"),
-    ("psn", "🆔 آیدی PSN یا EA ID", "text"),
+    ("psn", "🆔 آیدی گیمینگ (PSN یا EA ID)", "text"),
     ("pos1", "🎯 پست اصلی", "text"),
     ("pos2", "🎯 پست دوم", "text"),
     ("history", "🏟 سوابق بازی", "text"),
@@ -43,7 +43,7 @@ CHOICE_COLS: dict[str, int] = {}
 NUMERIC = {"days": (1, 7, "5"), "ping": (1, 999, "45")}
 NO_POS = "ندارد"
 
-KIND_TITLE = {"player": "🎮 آگهی بازیکن آزاد", "team": "🛡 آگهی جذب بازیکن"}
+KIND_TITLE = {"player": "🎮 آگهی بازیکنان آزاد", "team": "🛡 آگهی جذب بازیکن"}
 STATUS_TITLE = {
     "pending": "⏳ در انتظار تأیید",
     "approved": "✅ تأییدشده و منتشرشده",
@@ -103,9 +103,9 @@ def render_ad(ad: dict, user: dict | None = None, preview: bool = False) -> str:
     line = "━━━━━━━━━━━━━━"
     if ad["kind"] == "player":
         body = (
-            f"🎮 <b>بازیکن آزاد</b>\n{star}{line}\n"
+            f"🎮 <b>آگهی بازیکنان آزاد</b>\n{star}{line}\n"
             f"👤 <b>نام:</b> {e(d.get('name'))}\n"
-            f"🆔 <b>آیدی:</b> <code>{e(d.get('psn'))}</code>\n"
+            f"🆔 <b>آیدی گیمینگ:</b> <code>{e(d.get('psn'))}</code>\n"
             f"🎯 <b>پست اصلی:</b> {e(d.get('pos1'))}\n"
             f"🎯 <b>پست دوم:</b> {e(d.get('pos2'))}\n"
             f"🏟 <b>سوابق بازی:</b> {e(d.get('history'))}\n"
@@ -136,7 +136,7 @@ def render_ad(ad: dict, user: dict | None = None, preview: bool = False) -> str:
         tags = "#جذب_بازیکن #PCL"
     if d.get("notes"):
         body += f"📝 <b>توضیحات:</b> {e(d['notes'])}\n"
-    body += f"{line}\n📩 <b>ارتباط:</b> {contact_line(ad, user)}\n\n{tags}\n\n{AD_FOOTER}"
+    body += f"{line}\n📩 <b>ارتباط:</b> {contact_line(ad, user)}\n\n{AD_FOOTER}\n\n{tags}"
     return body
 
 
