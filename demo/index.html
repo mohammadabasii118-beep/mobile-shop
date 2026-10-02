@@ -52,6 +52,18 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .input{display:flex;gap:8px;padding:8px;background:var(--panel);border-top:1px solid var(--line)}
 .input input{flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:18px;padding:8px 14px;font-family:inherit;font-size:.85rem}
 .input button{border:0;background:var(--accent);color:#06121e;border-radius:50%;width:38px;height:38px;font-size:1rem}
+.phone{position:relative}
+.input{direction:ltr}.input input{direction:rtl;text-align:right}
+.input .menubtn{width:auto;border-radius:18px;padding:0 12px;height:38px;font-size:.78rem;background:var(--kb);color:var(--kbtxt);display:flex;align-items:center;gap:6px;flex:none}
+.cmds{position:absolute;left:8px;bottom:58px;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.35);min-width:230px;overflow:hidden;z-index:3;direction:rtl}
+.cmds button{display:flex;width:100%;gap:10px;align-items:center;justify-content:flex-start;background:transparent;border:0;color:var(--ink);padding:11px 14px;font-size:.84rem;text-align:right}
+.cmds button:hover{background:var(--chat)}.cmds code{font-family:ui-monospace,Menlo,monospace;color:var(--accent);direction:ltr}
+.startbar{background:var(--panel);border-top:1px solid var(--line);padding:10px}
+.startbar button{width:100%;border:0;border-radius:10px;padding:12px;background:var(--accent);color:#06121e;font-weight:700;font-size:.95rem;letter-spacing:.08em}
+.intro{margin:auto;max-width:300px;text-align:center;background:var(--bubble);border-radius:16px;padding:18px 16px;display:flex;flex-direction:column;gap:6px;align-items:center}
+.intro .ava{width:64px;height:64px;font-size:1.1rem}.intro b{font-size:1rem}.intro p{margin:0;font-size:.82rem;line-height:1.8;color:var(--mute);white-space:pre-wrap}
+.replykb{background:var(--panel);border-top:1px solid var(--line);padding:6px}
+.replykb button{width:100%;border:0;border-radius:8px;padding:11px;background:var(--kb);color:var(--kbtxt);font-size:.88rem}
 .hint{font-size:.72rem;color:var(--mute);padding:0 12px 6px;background:var(--panel)}
 .rail{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;position:sticky;top:16px;min-width:0}
 .rail h2{margin:0;font-size:.9rem}
@@ -77,7 +89,10 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
       <div class="seg" role="group" aria-label="نقش"><button id="r-user" aria-pressed="true">👤 کاربر</button><button id="r-admin" aria-pressed="false">🛠 مدیر</button></div></div>
     <div class="chat" id="chat" aria-live="polite"></div>
     <div class="hint" id="hint"></div>
-    <form class="input" id="form"><input id="txt" autocomplete="off" placeholder="پیام..."><button aria-label="ارسال">➤</button></form>
+    <div class="replykb" id="replykb" hidden><button type="button" data-a="menu">🏠 منوی اصلی</button></div>
+    <form class="input" id="form"><button type="button" class="menubtn" id="menubtn" aria-label="Menu" aria-expanded="false">☰ Menu</button><input id="txt" autocomplete="off" placeholder="پیام..."><button aria-label="ارسال">➤</button></form>
+    <div class="startbar" id="startbar" hidden><button type="button" id="startbtn">START</button></div>
+    <div class="cmds" id="cmds" hidden></div>
   </div></div>
   <aside class="rail">
     <h2>پرش سریع به قابلیت‌ها</h2>
@@ -113,6 +128,9 @@ function say(html,kb,o={}){const c=S.chats[o.role||S.role];c.forEach(m=>m.live=f
 function screen(html,kb){const c=chat(),l=c[c.length-1];if(l&&l.live&&l.from==='bot'){l.html=html;l.kb=kb;l.card=null;paint()}else say(html,kb)}
 function paint(){
  const el=$('#chat');
+ const fresh=S.fresh&&S.role==='user'&&S.tab==='bot';
+ $('#form').hidden=fresh;$('#startbar').hidden=!fresh;$('#cmds').hidden=true;$('#replykb').hidden=!(S.replykb&&!fresh);
+ if(fresh){el.innerHTML=`<div class="intro"><div class="ava">PCL</div><b>PCL TransferMarket</b><p>🔮 بزرگ‌ترین بازار نقل‌وانتقالات تیم‌ها و بازیکنان ایرانی پروکلاب.\nثبت آگهی بازیکن آزاد و جذب بازیکن، کیف پول و نشان‌های افتخار.</p></div>`;$('#hint').textContent='';return}
  if(S.tab==='group'){el.innerHTML='';groupView();return}
  el.innerHTML=chat().map((m,i)=>`<div class="msg ${m.from}"><div class="bub">${m.card?cardHtml(m.card):''}${m.html}</div>${m.kb?kbHtml(m.kb,m.live,i):''}</div>`).join('');
  el.scrollTop=el.scrollHeight;
@@ -255,10 +273,10 @@ act=function(a){const p=a.split(':');if(p[0]!=='adm'||!p[1])return orig(a);S.exp
  case'bc':S.expect={hint:'متن پیام همگانی',fn:t=>{say('✅ ارسال شد: 1,284 از 1,284',[BK()]);say('📣 '+esc(t),[BK()[0]],{role:'user'})}};screen('📣 پیامی که می‌خوای برای همه کاربران ارسال بشه رو بفرست:',[BK()]);paint();break;
  }};
 // ---- wiring ----
-function setRole(r){S.role=r;S.tab='bot';S.expect=null;$('#r-user').setAttribute('aria-pressed',r==='user');$('#r-admin').setAttribute('aria-pressed',r==='admin');$('#sub').textContent=r==='admin'?'ربات (دید مدیر)':'ربات';$('#title').textContent='PCL Transfer';if(!chat().length){if(r==='admin'){say('🛠 <b>پنل مدیریت</b>',null);act('adm')}else menu()}else paint();setChip(null)}
+function setRole(r){S.role=r;S.fresh=false;S.tab='bot';S.expect=null;$('#r-user').setAttribute('aria-pressed',r==='user');$('#r-admin').setAttribute('aria-pressed',r==='admin');$('#sub').textContent=r==='admin'?'ربات (دید مدیر)':'ربات';$('#title').textContent='PCL Transfer';if(!chat().length){if(r==='admin'){say('🛠 <b>پنل مدیریت</b>',null);act('adm')}else menu()}else paint();setChip(null)}
 function setChip(id){document.querySelectorAll('#chips button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.j===id))}
 const JUMPS=[
- ['کاربر','منوی اصلی',()=>act('menu')],['کاربر','ثبت آگهی: انتخاب نوع',()=>act('ad:new')],['کاربر','فرم آگهی بازیکن',()=>{act('s:player:0');S.flow.vals={};S.flow.idx=0;S.flow.vals={name:'امیرحسین کریمی',psn:'Amir_CAM10'};S.flow.idx=2;ask()}],
+ ['کاربر','منوی اصلی',()=>act('menu')],['کاربر','ورود کاربر تازه (START)',()=>{S.chats.user=[];S.fresh=true;S.replykb=false;paint()}],['کاربر','دکمه Menu و دستورها',()=>{S.fresh=false;S.replykb=false;act('menu');setTimeout(openCmds,0)}],['کاربر','گزینه: دکمه ثابت منو',()=>{S.fresh=false;S.replykb=true;act('menu')}],['کاربر','ثبت آگهی: انتخاب نوع',()=>act('ad:new')],['کاربر','فرم آگهی بازیکن',()=>{act('s:player:0');S.flow.vals={};S.flow.idx=0;S.flow.vals={name:'امیرحسین کریمی',psn:'Amir_CAM10'};S.flow.idx=2;ask()}],
  ['کاربر','پیش‌نمایش آگهی تیم',()=>{S.flow={kind:'team',special:1,vals:{...SAMPLE.team},idx:0,mode:'new'};preview()}],['کاربر','آگهی‌های من',()=>act('myl:a')],['کاربر','جزئیات یک آگهی',()=>act('v:1')],
  ['کاربر','کیف پول',()=>act('wallet')],['کاربر','درگاه پرداخت',()=>{act('pay:100000');act('gate:100000')}],['کاربر','کارت هدیه',()=>{act('gift');handleText('PCL2026')}],
  ['کاربر','دعوت دوستان',()=>act('invite')],['کاربر','نشان‌های افتخار',()=>act('badges')],['کاربر','مشخصات من',()=>act('profile')],['کاربر','ارتباط با ما',()=>act('support')],['کاربر','جوین اجباری',()=>screen('📢 برای استفاده از ربات اول در کانال‌های زیر عضو شو، بعد روی «✅ عضو شدم» بزن:',[[['📢 PCL ProClubs','menu']],[['✅ عضو شدم','menu']]])],
@@ -270,6 +288,12 @@ document.addEventListener('click',e=>{
  const b=e.target.closest('button[data-a]');if(b){act(b.dataset.a);return}
  const j=e.target.closest('#chips button');if(j){const J=JUMPS[+j.dataset.j];const role=J[0]==='مدیر'?'admin':'user';setRole(role);J[2]();setChip(j.dataset.j);if(J[0]==='گروه'){$('#title').textContent=S.group;$('#sub').textContent='گروه'}}
 });
+function openCmds(){const box=$('#cmds');const items=[['/start','🏠 شروع و منوی اصلی']];if(S.role==='admin')items.push(['/admin','🛠 پنل مدیریت']);
+ box.innerHTML=items.map(i=>`<button type="button" data-cmd="${i[0]}"><code>${i[0]}</code><span>${i[1]}</span></button>`).join('');box.hidden=false;$('#menubtn').setAttribute('aria-expanded','true')}
+$('#menubtn').onclick=e=>{e.stopPropagation();const box=$('#cmds');if(box.hidden)openCmds();else{box.hidden=true;$('#menubtn').setAttribute('aria-expanded','false')}};
+document.addEventListener('click',e=>{const c=e.target.closest('[data-cmd]');if(c){const cmd=c.dataset.cmd;$('#cmds').hidden=true;S.expect=null;if(cmd==='/admin'){setRole('admin');return}S.fresh=false;S.flow=null;menu();return}
+ if(!e.target.closest('#cmds')&&!e.target.closest('#menubtn'))$('#cmds').hidden=true});
+$('#startbtn').onclick=()=>{S.fresh=false;menu()};
 $('#r-user').onclick=()=>setRole('user');$('#r-admin').onclick=()=>setRole('admin');
 function handleText(t,silent){if(!silent)say(esc(t),null,{me:true});const e=S.expect;if(e){S.expect=null;e.fn(t)}else say('از دکمه‌های بالا استفاده کن 👆',null)}
 $('#form').onsubmit=e=>{e.preventDefault();const v=$('#txt').value.trim();if(!v)return;$('#txt').value='';if(v==='/start'){S.expect=null;return menu()}if(v==='/admin'){setRole('admin');return}handleText(v)};
