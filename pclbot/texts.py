@@ -59,13 +59,18 @@ TX_TITLE = {
     "referral": "👥 پاداش دعوت",
     "refund": "↩️ بازگشت وجه",
     "admin": "🛠 تغییر توسط مدیر",
+    "free_ad": "🎁 استفاده از آگهی رایگان",
+    "free_ad_refund": "🎁 بازگشت آگهی رایگان",
+    "free_ad_grant": "🎁 جایزه نشان (آگهی رایگان)",
 }
 
 
 AD_FOOTER = (
-    "🔮 The Biggest Transfer Market for Iranian Teams &amp; Players.\n"
-    "👉 Join us: @ProClubs_Transfer"
+    "<b>🔮 The Biggest Transfer Market for Iranian Teams &amp; Players!</b>\n"
+    "<b>👉 Join us: @ProClubs_Transfer!</b>"
 )
+# label of the URL button under every published ad (links to the bot)
+AD_BUTTON = "برای درج آگهیت کلیک کن"
 
 
 def fields_of(kind: str) -> list[tuple[str, str, str]]:

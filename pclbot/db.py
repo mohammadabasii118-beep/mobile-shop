@@ -23,19 +23,20 @@ DEFAULT_SETTINGS = {
     "premium_emoji": "1",
 }
 
+# (name, emoji, ads needed, free ads awarded when the badge is earned)
 DEFAULT_BADGES = [
-    ("برنزی", "🥉", 5),
-    ("نقره‌ای", "🥈", 15),
-    ("طلایی", "🥇", 30),
-    ("الماسی", "💎", 50),
-    ("افسانه‌ای", "👑", 100),
+    ("برنزی", "🥉", 5, 1),
+    ("نقره‌ای", "🥈", 15, 3),
+    ("طلایی", "🥇", 30, 5),
+    ("الماسی", "💎", 50, 10),
+    ("افسانه‌ای", "👑", 100, 15),
 ]
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users(
     id INTEGER PRIMARY KEY, name TEXT, username TEXT, joined_at INTEGER,
     balance INTEGER DEFAULT 0, referrer_id INTEGER, ref_rewarded INTEGER DEFAULT 0,
-    banned INTEGER DEFAULT 0);
+    banned INTEGER DEFAULT 0, free_ads INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS ads(
     id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, kind TEXT, data TEXT,
     photo TEXT, status TEXT, special INTEGER DEFAULT 0, created_at INTEGER,
@@ -49,7 +50,7 @@ CREATE TABLE IF NOT EXISTS gift_codes(
     expires_at INTEGER);
 CREATE TABLE IF NOT EXISTS gift_uses(code TEXT, user_id INTEGER, PRIMARY KEY(code, user_id));
 CREATE TABLE IF NOT EXISTS badges(
-    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, emoji TEXT, min_ads INTEGER);
+    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, emoji TEXT, min_ads INTEGER, free_ads INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS button_labels(orig TEXT PRIMARY KEY, text TEXT, emoji TEXT, emoji_id TEXT);
 CREATE TABLE IF NOT EXISTS message_texts(key TEXT PRIMARY KEY, text TEXT NOT NULL);
@@ -77,8 +78,25 @@ async def init() -> None:
         await _db.execute("INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)", (k, v))
     async with _db.execute("SELECT COUNT(*) FROM badges") as cur:
         if (await cur.fetchone())[0] == 0:
-            await _db.executemany("INSERT INTO badges(name,emoji,min_ads) VALUES(?,?,?)", DEFAULT_BADGES)
+            await _db.executemany("INSERT INTO badges(name,emoji,min_ads,free_ads) VALUES(?,?,?,?)", DEFAULT_BADGES)
+    await _migrate()
     await _db.commit()
+
+
+async def _migrate() -> None:
+    """Add columns introduced after the first release to databases that already exist."""
+    async def columns(table: str) -> set[str]:
+        async with _db.execute(f"PRAGMA table_info({table})") as cur:
+            return {r["name"] for r in await cur.fetchall()}
+
+    if "free_ads" not in await columns("users"):
+        await _db.execute("ALTER TABLE users ADD COLUMN free_ads INTEGER DEFAULT 0")
+    if "free_ads" not in await columns("badges"):
+        await _db.execute("ALTER TABLE badges ADD COLUMN free_ads INTEGER")  # NULL = not set yet
+    # existing default badges get their reward once; badges edited by the admin later are never touched again
+    for name, _, _, reward in DEFAULT_BADGES:
+        await _db.execute("UPDATE badges SET free_ads=? WHERE name=? AND free_ads IS NULL", (reward, name))
+    await _db.execute("UPDATE badges SET free_ads=0 WHERE free_ads IS NULL")
 
 
 async def close() -> None:

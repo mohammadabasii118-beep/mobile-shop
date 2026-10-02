@@ -101,7 +101,8 @@ async def show_preview(event: CallbackQuery | Message, state: FSMContext, bot: B
     data = await state.get_data()
     uid = event.from_user.id
     ad = draft_ad(data, uid)
-    price = await db.get_int("price_special" if ad["special"] else "price_normal")
+    pay, use_free = await services.ad_quote(uid, ad["special"])
+    cost = (("🎁 با یک آگهی رایگان" + (f" + {money(pay)}" if pay else "")) if use_free else money(pay))
     days = await db.get_int("days_special" if ad["special"] else "days_normal")
     markup = kb([
         [btn("✅ تأیید و ارسال", "ad:ok"), btn("✏️ ویرایش", "ad:edit")],
@@ -116,7 +117,7 @@ async def show_preview(event: CallbackQuery | Message, state: FSMContext, bot: B
     await send_ad(bot, chat, ad, None, await db.get_user(uid))
     await bot.send_message(
         chat,
-        f"👆 پیش‌نمایش آگهی\n💰 هزینه: <b>{money(price)}</b> | ⏳ اعتبار: {days} روز\nاگه همه‌چی درسته تأیید کن:",
+        f"👆 پیش‌نمایش آگهی\n💰 هزینه: <b>{cost}</b> | ⏳ اعتبار: {days} روز\nاگه همه‌چی درسته تأیید کن:",
         reply_markup=markup,
     )
 
@@ -322,12 +323,19 @@ async def confirm(c: CallbackQuery, state: FSMContext, bot: Bot):
         "INSERT INTO ads(user_id,kind,data,photo,status,special,created_at,fingerprint) VALUES(?,?,?,?,?,?,?,?)",
         uid, draft["kind"], json.dumps(draft["data"], ensure_ascii=False), draft["photo"], "pending", draft["special"], db.now(), fp,
     )
-    if not await db.charge(uid, price, "ad", f"ad:{ad_id}"):
+    pay, use_free = await services.ad_quote(uid, draft["special"])
+    if use_free and not await db.execute("UPDATE users SET free_ads=free_ads-1 WHERE id=? AND free_ads>0", uid):
+        pay, use_free = price, False                      # the free ad was spent meanwhile
+    if use_free:
+        await db.add_tx(uid, 0, "free_ad", f"ad:{ad_id}")
+    if pay > 0 and not await db.charge(uid, pay, "ad", f"ad:{ad_id}"):
+        if use_free:                                        # undo: nothing was paid, so the free ad goes back
+            await services.refund_ad(ad_id, uid)
         await db.execute("DELETE FROM ads WHERE id=?", ad_id)
         bal = (await db.get_user(uid))["balance"]
-        short = price - bal
+        short = pay - bal
         await c.answer()
-        return await show(c, f"💰 موجودی کافی نیست.\nهزینه: {money(price)}\nموجودی تو: {money(bal)}\n\n"
+        return await show(c, f"💰 موجودی کافی نیست.\nهزینه: {money(pay)}\nموجودی تو: {money(bal)}\n\n"
                              "بعد از شارژ، همین پیام رو باز کن و «ادامه ثبت آگهی» رو بزن؛ اطلاعاتت حفظ می‌شه.", kb([
             [btn(f"💳 شارژ {money(short)}", f"wallet:pay:{short}")],
             [btn("▶️ ادامه ثبت آگهی", "ad:resume")],
@@ -335,8 +343,12 @@ async def confirm(c: CallbackQuery, state: FSMContext, bot: Bot):
         ]))
     await state.clear()
     await c.answer()
-    await show(c, T("ad_submitted", id=ad_id, price=money(price)),
-               kb([[btn("🗄 آگهی‌های من", "myads")], back()]))
+    left = (await db.get_user(uid))["free_ads"] or 0
+    if use_free and pay == 0:
+        done = T("ad_submitted_free", id=ad_id, left=left)
+    else:
+        done = T("ad_submitted", id=ad_id, price=money(pay)) + ("\n" + T("ad_free_used_line", left=left) if use_free else "")
+    await show(c, done, kb([[btn("🗄 آگهی‌های من", "myads")], back()]))
     await notify_admins_new(bot, ad_id)
 
 
@@ -422,7 +434,7 @@ async def view_ad(c: CallbackQuery, state: FSMContext):
 async def delete_ask(c: CallbackQuery):
     ad = await owned(c, int(c.data[7:]))
     if ad:
-        note = "\n↩️ چون هنوز تأیید نشده، هزینه به کیفت برمی‌گرده." if ad["status"] == "pending" else ""
+        note = "\n↩️ چون هنوز تأیید نشده، هزینه (یا آگهی رایگانت) برمی‌گرده." if ad["status"] == "pending" else ""
         await show(c, f"🗑 آگهی #{ad['id']} حذف بشه؟{note}", kb([[btn("✅ بله، حذف کن", f"ad:delok:{ad['id']}"), btn("🔙 نه", f"ad:v:{ad['id']}")]]))
         await c.answer()
 
@@ -433,9 +445,7 @@ async def delete_do(c: CallbackQuery, bot: Bot):
     if not ad:
         return
     if ad["status"] == "pending":
-        paid = await db.scalar("SELECT -SUM(amount) FROM transactions WHERE note=? AND type='ad'", f"ad:{ad['id']}") or 0
-        if paid > 0:
-            await db.credit(ad["user_id"], paid, "refund", f"ad:{ad['id']}")
+        await services.refund_ad(ad["id"], ad["user_id"])
     await services.delete_ad(bot, ad["id"])
     await show(c, "🗑 آگهی حذف شد.", kb([back("myads")]))
     await c.answer()

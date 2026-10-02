@@ -55,6 +55,7 @@ REGISTRY: list[tuple[str, str]] = [
     ('🏅 نشان\u200cهای افتخار', 'user'),
     ('🛠 پنل مدیریت', 'user'),
     ('💳 پرداخت آنلاین', 'user'),
+    ('برای درج آگهیت کلیک کن', 'user'),
     ('✅ عضو شدم', 'user'),
     ('📊 آمار', 'admin'),
     ('👥 کاربران', 'admin'),
@@ -97,6 +98,7 @@ REGISTRY: list[tuple[str, str]] = [
     ('🧹 برگرداندن به پیش\u200cفرض', 'admin'),
     ('👁 پیش\u200cنمایش دکمه', 'admin'),
     ('✏️ ویرایش متن', 'admin'),
+    ('🎁 تغییر جایزه', 'admin'),
 ]
 
 _over: dict[str, dict] = {}  # original label -> {"text": str|None, "emoji": str|None, "emoji_id": str|None}

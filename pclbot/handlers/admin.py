@@ -56,6 +56,7 @@ class AdminSt(StatesGroup):
     emoji_set = State()
     emoji_id = State()
     btn_text = State()
+    badge_reward = State()
     btn_emoji = State()
     msg_text = State()
 
@@ -370,8 +371,8 @@ async def gift_create(m: Message, state: FSMContext):
 async def badges_menu(c: CallbackQuery, state: FSMContext):
     await state.clear()
     rows = await db.fetchall("SELECT * FROM badges ORDER BY min_ads")
-    btns = [btn(f"{r['emoji']} {r['name']} ({r['min_ads']})", f"adm:b:{r['id']}") for r in rows]
-    await show(c, "🏅 <b>نشان‌های افتخار</b>\nبرای ویرایش یا حذف روی نشان بزن:",
+    btns = [btn(f"{r['emoji']} {r['name']} ({r['min_ads']}) 🎁{r['free_ads'] or 0}", f"adm:b:{r['id']}") for r in rows]
+    await show(c, "🏅 <b>نشان‌های افتخار</b>\nبرای ویرایش یا حذف روی نشان بزن. عدد بعد از 🎁 تعداد آگهی رایگانی است که با گرفتن نشان به کاربر می‌رسه.",
                kb(pairs(btns) + [[btn("➕ نشان جدید", "adm:bnew")], back(PANEL)]))
     await c.answer()
 
@@ -389,9 +390,29 @@ async def badge_view(c: CallbackQuery):
     b = await db.fetchone("SELECT * FROM badges WHERE id=?", int(c.data[6:]))
     if not b:
         return await c.answer("پیدا نشد", show_alert=True)
-    await show(c, f"{b['emoji']} <b>{b['name']}</b>\nتعداد آگهی موردنیاز: {b['min_ads']}", kb([
-        [btn("✏️ ویرایش", f"adm:be:{b['id']}"), btn("🗑 حذف", f"adm:bd:{b['id']}")], back("adm:badges")]))
+    await show(c, f"{b['emoji']} <b>{b['name']}</b>\nتعداد آگهی موردنیاز: {b['min_ads']}\n🎁 جایزه: {b['free_ads'] or 0} آگهی رایگان", kb([
+        [btn("✏️ ویرایش", f"adm:be:{b['id']}"), btn("🗑 حذف", f"adm:bd:{b['id']}")],
+        [btn("🎁 تغییر جایزه", f"adm:bg:{b['id']}")], back("adm:badges")]))
     await c.answer()
+
+
+@router.callback_query(F.data.startswith("adm:bg:"))
+async def badge_reward_ask(c: CallbackQuery, state: FSMContext):
+    await state.set_state(AdminSt.badge_reward)
+    await state.update_data(bid=int(c.data[7:]))
+    await show(c, "🎁 تعداد آگهی رایگانی که با گرفتن این نشان به کاربر داده بشه رو بفرست (عدد ۰ تا ۱۰۰؛ ۰ یعنی بدون جایزه):",
+               kb([back("adm:badges")]))
+    await c.answer()
+
+
+@router.message(AdminSt.badge_reward, F.text)
+async def badge_reward_save(m: Message, state: FSMContext):
+    if not m.text.strip().isdigit() or int(m.text.strip()) > 100:
+        return await m.answer("⚠️ یه عدد بین ۰ تا ۱۰۰ بفرست.")
+    bid = (await state.get_data())["bid"]
+    await state.clear()
+    await db.execute("UPDATE badges SET free_ads=? WHERE id=?", int(m.text.strip()), bid)
+    await m.answer("✅ ذخیره شد. این جایزه فقط برای کاربرانی که از این به بعد نشان رو می‌گیرن اعمال می‌شه.", reply_markup=kb([back("adm:badges")]))
 
 
 @router.callback_query(F.data.startswith("adm:be:"))
@@ -419,7 +440,7 @@ async def badge_save(m: Message, state: FSMContext):
     if bid:
         await db.execute("UPDATE badges SET name=?, emoji=?, min_ads=? WHERE id=?", name, emoji, n, bid)
     else:
-        await db.execute("INSERT INTO badges(name,emoji,min_ads) VALUES(?,?,?)", name, emoji, n)
+        await db.execute("INSERT INTO badges(name,emoji,min_ads,free_ads) VALUES(?,?,?,0)", name, emoji, n)
     await state.clear()
     await m.answer("✅ ذخیره شد.", reply_markup=kb([back("adm:badges")]))
 

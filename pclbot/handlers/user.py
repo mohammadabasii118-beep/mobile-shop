@@ -64,7 +64,7 @@ async def profile(c: CallbackQuery):
     text = (
         "👤 <b>مشخصات من</b>\n━━━━━━━━━━━━━━\n"
         f"🙍 نام: {u['name']}\n🆔 آیدی تلگرام: {uname}\n🔢 شناسه: <code>{u['id']}</code>\n"
-        f"📅 عضویت: {fmt_date(u['joined_at'])}\n💰 موجودی: <b>{money(u['balance'])}</b>\n"
+        f"📅 عضویت: {fmt_date(u['joined_at'])}\n💰 موجودی: <b>{money(u['balance'])}</b>\n🎁 آگهی رایگان: <b>{u['free_ads'] or 0}</b>\n"
         f"📝 آگهی‌های ثبت‌شده: {total}\n✅ آگهی‌های معتبر: {count}\n"
         f"👥 دعوت‌های موفق: {invited}\n🏅 نشان فعلی: {badge}\n🎯 تا نشان بعدی: {left}"
     )
@@ -80,7 +80,8 @@ async def badges(c: CallbackQuery):
     lines = []
     for b in await db.fetchall("SELECT * FROM badges ORDER BY min_ads"):
         mark = "✅" if count >= b["min_ads"] else "🔒"
-        lines.append(f"{mark} {b['emoji']} <b>{b['name']}</b> — ثبت {b['min_ads']} آگهی معتبر")
+        gift = f" — 🎁 {b['free_ads']} آگهی رایگان" if b["free_ads"] else ""
+        lines.append(f"{mark} {b['emoji']} <b>{b['name']}</b> — ثبت {b['min_ads']} آگهی معتبر{gift}")
     text = (
         "🏅 <b>نشان‌های افتخار</b>\n━━━━━━━━━━━━━━\n" + "\n".join(lines) +
         f"\n\n📊 آگهی‌های معتبر تو: <b>{count}</b>\n"

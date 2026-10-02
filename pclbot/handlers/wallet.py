@@ -76,7 +76,8 @@ async def history(c: CallbackQuery):
         for r in rows:
             sign = "➕" if r["amount"] > 0 else "➖"
             pend = " ⏳" if r["status"] == "pending" else ""
-            lines.append(f"{sign} {money(abs(r['amount']))} — {TX_TITLE.get(r['type'], r['type'])}{pend}\n   🕒 {fmt_date(r['created_at'])}")
+            what = f"{sign} {money(abs(r['amount']))} — " if r["amount"] else ""
+            lines.append(f"{what}{TX_TITLE.get(r['type'], r['type'])}{pend}\n   🕒 {fmt_date(r['created_at'])}")
         text = "📜 <b>۱۵ تراکنش اخیر</b>\n\n" + "\n".join(lines)
     await show(c, text, kb([back("wallet")]))
     await c.answer()
