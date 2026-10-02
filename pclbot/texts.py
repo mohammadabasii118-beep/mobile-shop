@@ -64,7 +64,7 @@ TX_TITLE = {
 
 AD_FOOTER = (
     "🔮 The Biggest Transfer Market for Iranian Teams &amp; Players.\n"
-    "👉 Join us: @PCL_ProClubs"
+    "👉 Join us: @ProClubs_Transfer"
 )
 
 

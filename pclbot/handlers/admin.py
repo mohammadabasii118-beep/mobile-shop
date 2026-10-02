@@ -543,7 +543,7 @@ async def channels_menu(c: CallbackQuery, state: FSMContext):
 async def channel_add_ask(c: CallbackQuery, state: FSMContext):
     await state.set_state(AdminSt.channel)
     await show(c, "✍️ یکی از این قالب‌ها رو بفرست:\n\n"
-                  "• کانال عمومی: <code>@PCL_ProClubs</code>\n"
+                  "• کانال عمومی: <code>@ProClubs_Transfer</code>\n"
                   "• کانال خصوصی: <code>-1001234567890 https://t.me/+لینک_دعوت</code>",
                kb([back("adm:ch")]))
     await c.answer()
