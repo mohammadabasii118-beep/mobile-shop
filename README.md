@@ -10,6 +10,10 @@ Professional web admin panel for managing and automating a store's **Telegram** 
 ## Tech stack
 Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 · React Query · Zod · Recharts · Lucide · next-themes · Sonner · Prisma + PostgreSQL (schema).
 
+## Languages (Persian / English)
+The panel is bilingual with full RTL support. Use the **EN / فا** button in the top bar (or on the login page); the choice is stored in a cookie (default: Persian).
+Translations live in `src/i18n/fa.ts` — English text is the key, so adding a string means wrapping it in `t("...")`; a missing translation falls back to English. Numbers, dates and "x minutes ago" are localized (Persian digits in `fa`).
+
 ## Quick start (demo)
 ```bash
 npm install

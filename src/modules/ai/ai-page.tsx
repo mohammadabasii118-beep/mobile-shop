@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { apiFetch, useAction, useAiSettings } from "@/hooks/api";
 import { cn } from "@/lib/cn";
+import { useT } from "@/i18n/provider";
 import type { AISettings, AiTone } from "@/types";
 
 const TONES: { value: AiTone; label: string }[] = [
@@ -22,6 +23,7 @@ const TONES: { value: AiTone; label: string }[] = [
 
 function SettingsForm({ initial }: { initial: AISettings }) {
   const [s, setS] = useState(initial);
+  const t = useT();
   const save = useAction(() => apiFetch("/api/ai/settings", { method: "PUT", json: s }));
   const set = <K extends keyof AISettings>(k: K, v: AISettings[K]) => setS((p) => ({ ...p, [k]: v }));
   return (
@@ -29,14 +31,14 @@ function SettingsForm({ initial }: { initial: AISettings }) {
       <Card>
         <CardHeader title="AI Customer Assistant" description="Replies to comments and direct messages on your behalf." action={<StatusBadge status={s.enabled ? "active" : "paused"} />} />
         <div className="space-y-5 p-5 pt-2">
-          <div className="flex items-center justify-between"><span className="text-sm font-medium">Assistant enabled</span><Switch checked={s.enabled} onChange={(v) => set("enabled", v)} label="Assistant enabled" /></div>
-          <div className="flex items-center justify-between"><span className="text-sm font-medium">Send replies automatically</span><Switch checked={s.autoReply} onChange={(v) => set("autoReply", v)} label="Auto reply" /></div>
+          <div className="flex items-center justify-between"><span className="text-sm font-medium">{t("Assistant enabled")}</span><Switch checked={s.enabled} onChange={(v) => set("enabled", v)} label="Assistant enabled" /></div>
+          <div className="flex items-center justify-between"><span className="text-sm font-medium">{t("Send replies automatically")}</span><Switch checked={s.autoReply} onChange={(v) => set("autoReply", v)} label="Auto reply" /></div>
           <div>
-            <p className="mb-2 text-sm font-medium">AI Tone</p>
+            <p className="mb-2 text-sm font-medium">{t("AI Tone")}</p>
             <div className="flex flex-wrap gap-2">
-              {TONES.map((t) => {
-                const on = s.tones.includes(t.value);
-                return <button key={t.value} aria-pressed={on} onClick={() => set("tones", on ? s.tones.filter((x) => x !== t.value) : [...s.tones, t.value])} className={cn("rounded-full border px-3.5 py-1.5 text-sm transition", on ? "border-primary bg-accent font-medium text-primary" : "text-muted-foreground hover:bg-muted")}>{t.label}</button>;
+              {TONES.map((tn) => {
+                const on = s.tones.includes(tn.value);
+                return <button key={tn.value} aria-pressed={on} onClick={() => set("tones", on ? s.tones.filter((x) => x !== tn.value) : [...s.tones, tn.value])} className={cn("rounded-full border px-3.5 py-1.5 text-sm transition", on ? "border-primary bg-accent font-medium text-primary" : "text-muted-foreground hover:bg-muted")}>{t(tn.label)}</button>;
               })}
             </div>
           </div>
@@ -50,17 +52,17 @@ function SettingsForm({ initial }: { initial: AISettings }) {
           <Field label="Working hours"><Input value={s.workingHours} onChange={(e) => set("workingHours", e.target.value)} /></Field>
         </div>
         <div className="space-y-2 p-5 pt-0">
-          <p className="text-sm font-medium">Response rules</p>
+          <p className="text-sm font-medium">{t("Response rules")}</p>
           {s.rules.map((r, i) => (
             <div key={i} className="flex gap-2">
-              <Input value={r} onChange={(e) => set("rules", s.rules.map((x, j) => (j === i ? e.target.value : x)))} aria-label={`Rule ${i + 1}`} />
-              <Button variant="ghost" size="icon" aria-label="Remove rule" onClick={() => set("rules", s.rules.filter((_, j) => j !== i))}><Trash2 className="size-4" /></Button>
+              <Input value={r} onChange={(e) => set("rules", s.rules.map((x, j) => (j === i ? e.target.value : x)))} aria-label={`${t("Rule")} ${i + 1}`} />
+              <Button variant="ghost" size="icon" aria-label={t("Remove rule")} onClick={() => set("rules", s.rules.filter((_, j) => j !== i))}><Trash2 className="size-4" /></Button>
             </div>
           ))}
-          <Button variant="outline" size="sm" onClick={() => set("rules", [...s.rules, ""])}><Plus className="size-4" />Add rule</Button>
+          <Button variant="outline" size="sm" onClick={() => set("rules", [...s.rules, ""])}><Plus className="size-4" />{t("Add rule")}</Button>
         </div>
       </Card>
-      <Button size="lg" loading={save.isPending} onClick={() => save.mutate(undefined, { onSuccess: () => toast.success("AI settings saved"), onError: (e) => toast.error(e.message) })}><Save className="size-4" />Save AI Settings</Button>
+      <Button size="lg" loading={save.isPending} onClick={() => save.mutate(undefined, { onSuccess: () => toast.success(t("AI settings saved")), onError: (e) => toast.error(e.message) })}><Save className="size-4" />{t("Save AI Settings")}</Button>
     </div>
   );
 }
@@ -68,6 +70,7 @@ function SettingsForm({ initial }: { initial: AISettings }) {
 interface Turn { role: "user" | "ai"; text: string; confident?: boolean }
 
 function TestChat() {
+  const t = useT();
   const [turns, setTurns] = useState<Turn[]>([{ role: "ai", text: "سلام 🌹 من دستیار هوشمند فروشگاه هستم. هر سوالی دارید بپرسید." }]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -89,19 +92,19 @@ function TestChat() {
 
   return (
     <Card className="flex h-[640px] flex-col lg:sticky lg:top-24">
-      <CardHeader title="Test Chat" description="Mock AI provider — swap for OpenAI later." action={<Badge tone="primary">Mock</Badge>} />
+      <CardHeader title="Test Chat" description="Mock AI provider — swap for OpenAI later." action={<Badge tone="primary">{t("Mock")}</Badge>} />
       <div className="flex-1 space-y-3 overflow-y-auto bg-muted/30 p-4">
-        {turns.map((t, i) => (
-          <div key={i} className={cn("flex gap-2", t.role === "user" ? "justify-end" : "justify-start")}>
-            {t.role === "ai" && <span className="mt-1 rounded-full bg-primary p-1.5 text-primary-foreground"><Bot className="size-3.5" /></span>}
-            <div className={cn("animate-step-in max-w-[80%] rounded-2xl px-4 py-2 text-sm", t.role === "user" ? "bg-foreground text-background" : "border bg-card")}>
-              <p dir="auto">{t.text}</p>
-              {t.confident === false && <p className="mt-1 flex items-center gap-1 text-[11px] text-warning"><TriangleAlert className="size-3" />Low confidence — would escalate to admin</p>}
+        {turns.map((turn, i) => (
+          <div key={i} className={cn("flex gap-2", turn.role === "user" ? "justify-end" : "justify-start")}>
+            {turn.role === "ai" && <span className="mt-1 rounded-full bg-primary p-1.5 text-primary-foreground"><Bot className="size-3.5" /></span>}
+            <div className={cn("animate-step-in max-w-[80%] rounded-2xl px-4 py-2 text-sm", turn.role === "user" ? "bg-foreground text-background" : "border bg-card")}>
+              <p dir="auto">{turn.text}</p>
+              {turn.confident === false && <p className="mt-1 flex items-center gap-1 text-[11px] text-warning"><TriangleAlert className="size-3" />{t("Low confidence — would escalate to admin")}</p>}
             </div>
-            {t.role === "user" && <Avatar name="You" size={28} className="mt-1" />}
+            {turn.role === "user" && <Avatar name="You" size={28} className="mt-1" />}
           </div>
         ))}
-        {busy && <p className="text-xs text-muted-foreground">AI is typing…</p>}
+        {busy && <p className="text-xs text-muted-foreground">{t("AI is typing…")}</p>}
         <div ref={end} />
       </div>
       <div className="flex flex-wrap gap-1.5 border-t px-4 pt-3">
@@ -110,8 +113,8 @@ function TestChat() {
         ))}
       </div>
       <form onSubmit={send} className="flex gap-2 p-4 pt-3">
-        <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Message the AI…" aria-label="Test message" />
-        <Button type="submit" disabled={!text.trim() || busy} aria-label="Send"><Send className="size-4" /></Button>
+        <Input value={text} onChange={(e) => setText(e.target.value)} placeholder={t("Message the AI…")} aria-label={t("Test message")} />
+        <Button type="submit" disabled={!text.trim() || busy} aria-label={t("Send")}><Send className="size-4" /></Button>
       </form>
     </Card>
   );

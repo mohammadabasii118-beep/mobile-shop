@@ -15,7 +15,7 @@ export function Dropdown({ trigger, children, align = "right", className }: { tr
     <div ref={ref} className="relative">
       <div onClick={() => setOpen((o) => !o)}>{trigger}</div>
       {open && (
-        <div className={cn("animate-step-in absolute z-40 mt-2 min-w-56 rounded-xl border bg-card p-1.5 shadow-lg", align === "right" ? "right-0" : "left-0", className)}>
+        <div className={cn("animate-step-in absolute z-40 mt-2 min-w-56 rounded-xl border bg-card p-1.5 shadow-lg", align === "right" ? "end-0" : "start-0", className)}>
           {children(() => setOpen(false))}
         </div>
       )}
@@ -25,7 +25,7 @@ export function Dropdown({ trigger, children, align = "right", className }: { tr
 
 export function MenuItem({ icon, children, onClick }: { icon?: ReactNode; children: ReactNode; onClick?: () => void }) {
   return (
-    <button onClick={onClick} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm hover:bg-muted">
+    <button onClick={onClick} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-start text-sm hover:bg-muted">
       {icon}{children}
     </button>
   );

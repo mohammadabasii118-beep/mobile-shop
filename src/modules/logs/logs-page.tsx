@@ -9,21 +9,27 @@ import { PageHeader } from "@/components/shared/page-header";
 import { ListSkeleton } from "@/components/shared/query-state";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { useLogs } from "@/hooks/api";
-import { formatDateTime } from "@/utils/format";
+import { useFmt } from "@/hooks/use-fmt";
+import { useT } from "@/i18n/provider";
 import type { ActivityLog } from "@/types";
 
 type Filter = "all" | ActivityLog["status"];
 
-const columns: Column<ActivityLog>[] = [
-  { key: "title", label: "Event", primary: true, cell: (l) => l.title },
-  { key: "time", label: "Timestamp", cell: (l) => <span className="whitespace-nowrap">{formatDateTime(l.at)}</span> },
+function useColumns(): Column<ActivityLog>[] {
+  const { dateTime } = useFmt();
+  const t = useT();
+  return [
+  { key: "title", label: "Event", primary: true, cell: (l) => t(l.title) },
+  { key: "time", label: "Timestamp", cell: (l) => <span className="whitespace-nowrap">{dateTime(l.at)}</span> },
   { key: "type", label: "Type", cell: (l) => <code className="text-xs">{l.type}</code> },
   { key: "status", label: "Status", cell: (l) => <StatusBadge status={l.status} /> },
   { key: "details", label: "Details", cell: (l) => <span dir="auto" className="text-muted-foreground">{l.details}</span> },
-];
+  ];
+}
 
 export function LogsPage() {
   const { data, isLoading } = useLogs();
+  const columns = useColumns();
   const [filter, setFilter] = useState<Filter>("all");
   const all = data ?? [];
   const rows = filter === "all" ? all : all.filter((l) => l.status === filter);

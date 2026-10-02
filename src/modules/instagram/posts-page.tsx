@@ -9,12 +9,15 @@ import { PageHeader } from "@/components/shared/page-header";
 import { GridSkeleton } from "@/components/shared/query-state";
 import { SourceBadge, StatusBadge } from "@/components/shared/status-badge";
 import { usePosts } from "@/hooks/api";
-import { formatDateTime, nf } from "@/utils/format";
+import { useFmt } from "@/hooks/use-fmt";
+import { useT } from "@/i18n/provider";
 
 type Filter = "all" | "published" | "scheduled" | "failed";
 
 export function PostsPage() {
   const { data, isLoading } = usePosts();
+  const { nf, dateTime } = useFmt();
+  const t = useT();
   const [filter, setFilter] = useState<Filter>("all");
   const posts = data ?? [];
   const count = (s: Filter) => (s === "all" ? posts.length : posts.filter((p) => p.status === s).length);
@@ -32,15 +35,15 @@ export function PostsPage() {
               <div className="relative aspect-square">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={p.imageUrl} alt="" className="size-full object-cover" />
-                <div className="absolute top-3 left-3 flex gap-1.5"><StatusBadge status={p.status} />{p.kind === "reel" && <Badge tone="primary"><Play className="size-3" />Reel</Badge>}</div>
+                <div className="absolute top-3 start-3 flex gap-1.5"><StatusBadge status={p.status} />{p.kind === "reel" && <Badge tone="primary"><Play className="size-3" />{t("Reel")}</Badge>}</div>
               </div>
               <div className="space-y-3 p-4">
                 <p dir="auto" className="line-clamp-2 min-h-10 text-sm">{p.caption}</p>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span className="flex items-center gap-3"><span className="flex items-center gap-1"><Heart className="size-3.5" />{nf.format(p.likes)}</span><span className="flex items-center gap-1"><MessageCircle className="size-3.5" />{p.comments}</span></span>
-                  <span>{formatDateTime(p.date)}</span>
+                  <span className="flex items-center gap-3"><span className="flex items-center gap-1"><Heart className="size-3.5" />{nf.format(p.likes)}</span><span className="flex items-center gap-1"><MessageCircle className="size-3.5" />{nf.format(p.comments)}</span></span>
+                  <span>{dateTime(p.date)}</span>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">Source <SourceBadge source={p.source} /></div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">{t("Source")} <SourceBadge source={p.source} /></div>
               </div>
             </Card>
           ))}

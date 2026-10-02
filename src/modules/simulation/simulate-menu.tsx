@@ -2,6 +2,7 @@
 import { Bot, FlaskConical, MessageCircle, MessagesSquare, Send, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dropdown, MenuItem } from "@/components/ui/dropdown";
+import { useT } from "@/i18n/provider";
 import { useSimulation, type SimKind } from "./simulation-provider";
 
 const ITEMS: { kind: SimKind; label: string; icon: typeof Send }[] = [
@@ -13,16 +14,17 @@ const ITEMS: { kind: SimKind; label: string; icon: typeof Send }[] = [
 
 export function SimulateMenu() {
   const { simulate, busy } = useSimulation();
+  const t = useT();
   return (
-    <Dropdown trigger={<Button variant="outline" size="sm" disabled={busy}><FlaskConical className="size-4" /><span className="hidden sm:inline">Simulate</span></Button>}>
+    <Dropdown trigger={<Button variant="outline" size="sm" disabled={busy}><FlaskConical className="size-4" /><span className="hidden sm:inline">{t("Simulate")}</span></Button>}>
       {(close) => (
         <>
-          <p className="px-3 py-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">Demo events</p>
+          <p className="px-3 py-1.5 text-[11px] font-medium tracking-wide text-muted-foreground uppercase">{t("Demo events")}</p>
           {ITEMS.map(({ kind, label, icon: Icon }) => (
-            <MenuItem key={kind} icon={<Icon className="size-4 text-muted-foreground" />} onClick={() => { close(); simulate(kind); }}>{label}</MenuItem>
+            <MenuItem key={kind} icon={<Icon className="size-4 text-muted-foreground" />} onClick={() => { close(); simulate(kind); }}>{t(label)}</MenuItem>
           ))}
           <div className="my-1 border-t" />
-          <MenuItem icon={<Bot className="size-4 text-primary" />} onClick={() => { close(); simulate("full"); }}>🚀 Run Full Demo</MenuItem>
+          <MenuItem icon={<Bot className="size-4 text-primary" />} onClick={() => { close(); simulate("full"); }}>🚀 {t("Run Full Demo")}</MenuItem>
         </>
       )}
     </Dropdown>

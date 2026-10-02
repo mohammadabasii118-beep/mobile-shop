@@ -1,5 +1,6 @@
 import { forwardRef, type InputHTMLAttributes, type TextareaHTMLAttributes, type SelectHTMLAttributes } from "react";
 import { cn } from "@/lib/cn";
+import { useT } from "@/i18n/provider";
 
 const base = "w-full rounded-lg border bg-card px-3 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:opacity-60";
 
@@ -14,11 +15,12 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
 });
 
 export function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+  const t = useT();
   return (
     <label className="grid gap-1.5 text-sm">
-      <span className="font-medium">{label}</span>
+      <span className="font-medium">{t(label)}</span>
       {children}
-      {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
+      {hint && <span className="text-xs text-muted-foreground">{t(hint)}</span>}
     </label>
   );
 }

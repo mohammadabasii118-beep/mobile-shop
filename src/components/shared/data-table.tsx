@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { useT } from "@/i18n/provider";
 
 export interface Column<T> {
   key: string;
@@ -12,6 +13,7 @@ export interface Column<T> {
 
 /** Table on md+, stacked cards on mobile — one column definition for both. */
 export function DataTable<T>({ columns, rows, rowKey, onRowClick }: { columns: Column<T>[]; rows: T[]; rowKey: (r: T) => string; onRowClick?: (r: T) => void }) {
+  const t = useT();
   const primary = columns.find((c) => c.primary) ?? columns[0];
   const rest = columns.filter((c) => c !== primary);
   return (
@@ -19,8 +21,8 @@ export function DataTable<T>({ columns, rows, rowKey, onRowClick }: { columns: C
       <div className="hidden overflow-x-auto md:block">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b text-left text-xs text-muted-foreground">
-              {columns.map((c) => <th key={c.key} className={cn("px-5 py-3 font-medium whitespace-nowrap", c.className)}>{c.label}</th>)}
+            <tr className="border-b text-start text-xs text-muted-foreground">
+              {columns.map((c) => <th key={c.key} className={cn("px-5 py-3 font-medium whitespace-nowrap", c.className)}>{t(c.label)}</th>)}
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -38,7 +40,7 @@ export function DataTable<T>({ columns, rows, rowKey, onRowClick }: { columns: C
             <div className="font-medium">{primary.cell(r)}</div>
             <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
               {rest.map((c) => (
-                <div key={c.key}><dt className="text-muted-foreground">{c.label}</dt><dd className="mt-0.5 text-sm">{c.cell(r)}</dd></div>
+                <div key={c.key}><dt className="text-muted-foreground">{t(c.label)}</dt><dd className="mt-0.5 text-sm">{c.cell(r)}</dd></div>
               ))}
             </dl>
           </li>

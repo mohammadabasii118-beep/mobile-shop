@@ -12,13 +12,16 @@ import { PageHeader } from "@/components/shared/page-header";
 import { ListSkeleton } from "@/components/shared/query-state";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { apiFetch, useAction, useComments, usePosts } from "@/hooks/api";
-import { timeAgo } from "@/utils/format";
+import { useFmt } from "@/hooks/use-fmt";
+import { useT } from "@/i18n/provider";
 import type { Comment } from "@/types";
 
 type Filter = "all" | Comment["status"];
 
 function CommentCard({ c, postImage }: { c: Comment; postImage?: string }) {
   const [replying, setReplying] = useState(false);
+  const { timeAgo } = useFmt();
+  const t = useT();
   const [text, setText] = useState(c.aiSuggestion);
   const act = useAction((body: object) => apiFetch(`/api/comments/${c.id}`, { method: "PATCH", json: body }));
   const run = (body: object, msg: string) => act.mutate(body, { onSuccess: () => { toast.success(msg); setReplying(false); }, onError: (e) => toast.error(e.message) });
@@ -29,26 +32,26 @@ function CommentCard({ c, postImage }: { c: Comment; postImage?: string }) {
         <Avatar name={c.username} />
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium">@{c.username}</span><StatusBadge status={c.status} /><span className="text-xs text-muted-foreground">{timeAgo(c.createdAt)}</span>
+            <span className="font-medium"><bdi>@{c.username}</bdi></span><StatusBadge status={c.status} /><span className="text-xs text-muted-foreground">{timeAgo(c.createdAt)}</span>
           </div>
           <p dir="auto" className="text-sm">{c.text}</p>
-          {postImage && <div className="flex items-center gap-2 text-xs text-muted-foreground">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={postImage} alt="" className="size-6 rounded object-cover" />on post {c.postId}</div>}
-          {c.reply && <div dir="auto" className="rounded-lg bg-success/10 p-3 text-sm"><span className="mb-1 block text-xs font-medium text-success">Replied</span>{c.reply}</div>}
+          {postImage && <div className="flex items-center gap-2 text-xs text-muted-foreground">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={postImage} alt="" className="size-6 rounded object-cover" />{t("on post")} {c.postId}</div>}
+          {c.reply && <div dir="auto" className="rounded-lg bg-success/10 p-3 text-sm"><span className="mb-1 block text-xs font-medium text-success">{t("Replied")}</span>{c.reply}</div>}
           {open && !replying && (
             <div dir="auto" className="rounded-lg border border-dashed border-primary/40 bg-accent p-3 text-sm">
-              <span className="mb-1 flex items-center gap-1.5 text-xs font-medium text-primary"><Sparkles className="size-3.5" />AI Suggestion</span>{c.aiSuggestion}
+              <span className="mb-1 flex items-center gap-1.5 text-xs font-medium text-primary"><Sparkles className="size-3.5" />{t("AI Suggestion")}</span>{c.aiSuggestion}
             </div>
           )}
           {replying && (
             <div className="space-y-2"><Textarea value={text} onChange={(e) => setText(e.target.value)} />
-              <div className="flex gap-2"><Button size="sm" loading={act.isPending} disabled={!text.trim()} onClick={() => run({ action: "reply", text }, "Reply sent")}>Send reply</Button><Button size="sm" variant="ghost" onClick={() => setReplying(false)}>Cancel</Button></div></div>
+              <div className="flex gap-2"><Button size="sm" loading={act.isPending} disabled={!text.trim()} onClick={() => run({ action: "reply", text }, t("Reply sent"))}>{t("Send reply")}</Button><Button size="sm" variant="ghost" onClick={() => setReplying(false)}>{t("Cancel")}</Button></div></div>
           )}
           {open && !replying && (
             <div className="flex flex-wrap gap-2 pt-1">
-              <Button size="sm" variant="outline" onClick={() => { setText(""); setReplying(true); }}><Reply className="size-3.5" />Reply</Button>
-              <Button size="sm" loading={act.isPending} onClick={() => run({ action: "reply", text: c.aiSuggestion }, "AI reply sent")}><Bot className="size-3.5" />AI Reply</Button>
-              <Button size="sm" variant="ghost" onClick={() => run({ action: "ignore" }, "Comment ignored")}><X className="size-3.5" />Ignore</Button>
-              <Button size="sm" variant="success" onClick={() => run({ action: "resolve" }, "Marked as resolved")}><Check className="size-3.5" />Mark as Resolved</Button>
+              <Button size="sm" variant="outline" onClick={() => { setText(""); setReplying(true); }}><Reply className="size-3.5" />{t("Reply")}</Button>
+              <Button size="sm" loading={act.isPending} onClick={() => run({ action: "reply", text: c.aiSuggestion }, t("AI reply sent"))}><Bot className="size-3.5" />{t("AI Reply")}</Button>
+              <Button size="sm" variant="ghost" onClick={() => run({ action: "ignore" }, t("Comment ignored"))}><X className="size-3.5" />{t("Ignore")}</Button>
+              <Button size="sm" variant="success" onClick={() => run({ action: "resolve" }, t("Marked as resolved"))}><Check className="size-3.5" />{t("Mark as Resolved")}</Button>
             </div>
           )}
         </div>

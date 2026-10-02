@@ -103,17 +103,17 @@ export function buildSeed() {
   };
 
   const automations: Automation[] = [
-    { id: "a1", key: "tg-ig-post", name: "Telegram → Instagram Post", description: "هر پست جدید کانال Telegram را دریافت کرده و طبق تنظیمات در Instagram منتشر می‌کند.", trigger: "New Telegram post", action: "Publish Instagram post", status: "active", lastRun: ago(88), successRate: 96, runs: 128,
+    { id: "a1", key: "tg-ig-post", name: "Telegram → Instagram Post", description: "Receives every new Telegram channel post and publishes it to Instagram according to your settings.", trigger: "New Telegram post", action: "Publish Instagram post", status: "active", lastRun: ago(88), successRate: 96, runs: 128,
       steps: [{ kind: "trigger", label: "New Telegram Post", detail: "@caseline channel" }, { kind: "condition", label: "Post contains media", detail: "photo or video" }, { kind: "action", label: "Generate Caption", detail: "AI caption + hashtags" }, { kind: "action", label: "Publish Instagram Post" }, { kind: "action", label: "Publish Instagram Story" }, { kind: "action", label: "Notify Admin" }] },
-    { id: "a2", key: "tg-ig-story", name: "Telegram → Instagram Story", description: "پست‌های Telegram را به صورت Story منتشر می‌کند.", trigger: "New Telegram post", action: "Publish Instagram story", status: "active", lastRun: ago(88), successRate: 98, runs: 121,
+    { id: "a2", key: "tg-ig-story", name: "Telegram → Instagram Story", description: "Publishes Telegram posts as Instagram Stories.", trigger: "New Telegram post", action: "Publish Instagram story", status: "active", lastRun: ago(88), successRate: 98, runs: 121,
       steps: [{ kind: "trigger", label: "New Telegram Post" }, { kind: "condition", label: "Post contains media" }, { kind: "action", label: "Resize for 9:16" }, { kind: "action", label: "Publish Instagram Story" }] },
-    { id: "a3", key: "comment-ai", name: "New Comment → AI Reply", description: "به کامنت‌های جدید به صورت خودکار پاسخ می‌دهد.", trigger: "New Instagram comment", action: "AI reply", status: "active", lastRun: ago(12), successRate: 91, runs: 342,
+    { id: "a3", key: "comment-ai", name: "New Comment → AI Reply", description: "Automatically replies to new comments.", trigger: "New Instagram comment", action: "AI reply", status: "active", lastRun: ago(12), successRate: 91, runs: 342,
       steps: [{ kind: "trigger", label: "New Instagram Comment" }, { kind: "condition", label: "Not spam" }, { kind: "action", label: "AI analyzes comment" }, { kind: "action", label: "Generate reply" }, { kind: "action", label: "Send reply" }] },
-    { id: "a4", key: "dm-ai", name: "New DM → AI Reply", description: "به پیام‌های دایرکت مشتری‌ها با اطلاعات فروشگاه پاسخ می‌دهد.", trigger: "New Instagram DM", action: "AI reply", status: "active", lastRun: ago(7), successRate: 89, runs: 517,
+    { id: "a4", key: "dm-ai", name: "New DM → AI Reply", description: "Replies to customer DMs using your store information.", trigger: "New Instagram DM", action: "AI reply", status: "active", lastRun: ago(7), successRate: 89, runs: 517,
       steps: [{ kind: "trigger", label: "New Instagram DM" }, { kind: "condition", label: "AI enabled" }, { kind: "action", label: "Read product catalog" }, { kind: "action", label: "Generate reply" }, { kind: "action", label: "Send DM" }] },
-    { id: "a5", key: "keyword-dm", name: "Keyword Comment → DM", description: "وقتی کامنت شامل «قیمت» بود، قیمت را در دایرکت می‌فرستد.", trigger: "Comment contains keyword", action: "Send DM", status: "paused", lastRun: ago(60 * 30), successRate: 94, runs: 63,
+    { id: "a5", key: "keyword-dm", name: "Keyword Comment → DM", description: "When a comment contains “price”, sends the price by DM.", trigger: "Comment contains keyword", action: "Send DM", status: "paused", lastRun: ago(60 * 30), successRate: 94, runs: 63,
       steps: [{ kind: "trigger", label: "New Instagram Comment" }, { kind: "condition", label: "Contains «قیمت»" }, { kind: "action", label: "Send Direct Message" }] },
-    { id: "a6", key: "new-customer", name: "New Customer → Notify Admin", description: "با اولین پیام مشتری جدید، به ادمین اطلاع می‌دهد.", trigger: "New customer", action: "Notify admin", status: "active", lastRun: ago(60 * 3), successRate: 100, runs: 41,
+    { id: "a6", key: "new-customer", name: "New Customer → Notify Admin", description: "Notifies the admin when a new customer sends a first message.", trigger: "New customer", action: "Notify admin", status: "active", lastRun: ago(60 * 3), successRate: 100, runs: 41,
       steps: [{ kind: "trigger", label: "New Customer" }, { kind: "action", label: "Create customer profile" }, { kind: "action", label: "Notify Admin" }] },
   ];
 

@@ -1,6 +1,7 @@
 import { AlertTriangle, CheckCircle2, Circle, Loader2, XCircle } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { formatTime } from "@/utils/format";
+import { useFmt } from "@/hooks/use-fmt";
+import { useT } from "@/i18n/provider";
 import type { PipelineStep } from "@/types";
 
 const ICON = {
@@ -13,6 +14,8 @@ const ICON = {
 
 /** Visual vertical timeline. `visible` lets the caller reveal steps progressively for the animation. */
 export function PipelineTimeline({ steps, visible = steps.length, running }: { steps: PipelineStep[]; visible?: number; running?: boolean }) {
+  const { time } = useFmt();
+  const t = useT();
   const shown = steps.slice(0, visible);
   return (
     <ol className="space-y-0">
@@ -25,15 +28,15 @@ export function PipelineTimeline({ steps, visible = steps.length, running }: { s
               {!last && <div className="my-1 w-px flex-1 bg-border" />}
             </div>
             <div className="pb-4">
-              <p className="text-sm leading-5 font-medium">{s.label}</p>
+              <p className="text-sm leading-5 font-medium">{t(s.label)}</p>
               {s.detail && <p dir="auto" className="mt-0.5 max-w-sm text-xs text-muted-foreground">{s.detail}</p>}
-              <p className="mt-0.5 text-[11px] text-muted-foreground/70">{formatTime(s.at)}</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground/70">{time(s.at)}</p>
             </div>
           </li>
         );
       })}
       {running && (
-        <li className="flex gap-3">{ICON.running}<p className="text-sm text-muted-foreground">Processing…</p></li>
+        <li className="flex gap-3">{ICON.running}<p className="text-sm text-muted-foreground">{t("Processing…")}</p></li>
       )}
     </ol>
   );

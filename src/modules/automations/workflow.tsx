@@ -1,6 +1,7 @@
 import { ArrowDown, Filter, Play, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
+import { useT } from "@/i18n/provider";
 import type { AutomationStep } from "@/types";
 
 const STYLE = {
@@ -10,6 +11,7 @@ const STYLE = {
 };
 
 export function Workflow({ steps }: { steps: AutomationStep[] }) {
+  const t = useT();
   return (
     <div className="mx-auto flex max-w-md flex-col items-center">
       {steps.map((s, i) => {
@@ -20,9 +22,9 @@ export function Workflow({ steps }: { steps: AutomationStep[] }) {
               <div className="flex items-center gap-3">
                 <span className="rounded-lg bg-card p-2 shadow-sm"><st.icon className="size-4" /></span>
                 <div className="min-w-0 flex-1">
-                  <Badge tone={st.tone} className="mb-1">{st.label}</Badge>
-                  <p className="text-sm font-medium">{s.label}</p>
-                  {s.detail && <p dir="auto" className="text-xs text-muted-foreground">{s.detail}</p>}
+                  <Badge tone={st.tone} className="mb-1">{t(st.label)}</Badge>
+                  <p className="text-sm font-medium">{t(s.label)}</p>
+                  {s.detail && <p dir="auto" className="text-xs text-muted-foreground">{t(s.detail)}</p>}
                 </div>
               </div>
             </div>

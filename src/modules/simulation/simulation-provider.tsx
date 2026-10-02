@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { PipelineTimeline, ProgressBar } from "@/components/shared/pipeline-timeline";
 import { apiFetch } from "@/hooks/api";
+import { useT } from "@/i18n/provider";
 import type { PipelineRun } from "@/types";
 
 export type SimKind = "telegram" | "comment" | "message" | "customer" | "full";
@@ -33,6 +34,7 @@ export const useSimulation = () => {
 
 export function SimulationProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [run, setRun] = useState<PipelineRun | null>(null);
@@ -43,9 +45,9 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   const stop = () => { if (timer.current) clearInterval(timer.current); };
   useEffect(() => stop, []);
 
-  const start = useCallback(async (t: string, url: string, json?: unknown) => {
+  const start = useCallback(async (heading: string, url: string, json?: unknown) => {
     stop();
-    setTitle(t); setRun(null); setVisible(0); setError(null); setOpen(true);
+    setTitle(heading); setRun(null); setVisible(0); setError(null); setOpen(true);
     try {
       const result = await apiFetch<PipelineRun>(url, { method: "POST", json });
       setRun(result);
@@ -56,7 +58,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
         if (i >= result.steps.length) {
           stop();
           qc.invalidateQueries();
-          toast[result.ok ? "success" : "warning"](result.ok ? "Completed successfully" : "Completed with warnings");
+          toast[result.ok ? "success" : "warning"](t(result.ok ? "Completed successfully" : "Completed with warnings"));
         }
       }, STEP_MS);
       setVisible(1);
@@ -64,7 +66,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [qc]);
+  }, [qc, t]);
 
   const busy = open && !error && (!run || visible < run.steps.length);
   const done = run && visible >= run.steps.length;
@@ -73,7 +75,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   return (
     <SimCtx.Provider value={{
       simulate: (k) => start(TITLES[k], ENDPOINTS[k]),
-      runAutomation: (id, name) => start(`Run: ${name}`, "/api/demo/automation/run", { id }),
+      runAutomation: (id, name) => start(`${t("Run")}: ${name}`, "/api/demo/automation/run", { id }),
       busy,
     }}>
       {children}
@@ -87,13 +89,13 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
             {done && (
               <div className={`animate-step-in mt-2 flex items-center gap-2 rounded-lg p-3 text-sm font-medium ${hasWarn ? "bg-warning/12 text-warning" : "bg-success/12 text-success"}`}>
                 {hasWarn ? <AlertTriangle className="size-4" /> : <CheckCircle2 className="size-4" />}
-                {hasWarn ? "Finished — some steps need attention" : "✓ Published Successfully"}
+                {hasWarn ? t("Finished — some steps need attention") : `✓ ${t("Published Successfully")}`}
               </div>
             )}
           </>
         )}
         <div className="mt-5 flex justify-end">
-          <Button variant="outline" onClick={() => { stop(); if (run) qc.invalidateQueries(); setOpen(false); }}>{done ? "Close" : "Skip animation"}</Button>
+          <Button variant="outline" onClick={() => { stop(); if (run) qc.invalidateQueries(); setOpen(false); }}>{t(done ? "Close" : "Skip animation")}</Button>
         </div>
       </Dialog>
     </SimCtx.Provider>
