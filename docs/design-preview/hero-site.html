@@ -1,0 +1,481 @@
+<title>هیروهای سایت کیس‌لاین</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;800;900&display=swap">
+<style>
+/* Layout: preview tool bar, then a copy of the live site's chrome (pill header, 980px column, cream / ink surfaces) holding five hero concepts. */
+:root {
+  --bg: #f6f5f2; --surface: #ffffff; --surface2: #eceae4; --border: #dfdcd3;
+  --fg: #14161d; --muted: #666b77; --primary: #3b5bdb; --primary-fg: #ffffff;
+  --primary-text: color-mix(in srgb, var(--primary) 88%, #000);
+  --hot: #e5484d; --gold: #c9973b;
+  --shadow: 0 18px 40px -24px rgba(20, 22, 29, .35);
+  --font: "Vazirmatn", Tahoma, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1016; --surface: #171a22; --surface2: #1f232d; --border: #2a2f3b;
+    --fg: #eef0f5; --muted: #9aa1b0; --primary-text: color-mix(in srgb, var(--primary) 60%, #fff);
+    --shadow: 0 18px 40px -24px rgba(0, 0, 0, .8); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1016; --surface: #171a22; --surface2: #1f232d; --border: #2a2f3b;
+  --fg: #eef0f5; --muted: #9aa1b0; --primary-text: color-mix(in srgb, var(--primary) 60%, #fff);
+  --shadow: 0 18px 40px -24px rgba(0, 0, 0, .8); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 15px; line-height: 1.75; padding-inline: 16px; padding-block: 0 56px; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--primary-text); outline-offset: 2px; border-radius: 8px; }
+svg.i { width: 1.25em; height: 1.25em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* preview tools */
+.tools { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 60; margin-inline: -16px; padding: 10px 16px; background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.tools .ttl { font-weight: 900; margin-inline-end: auto; }
+.seg { display: inline-flex; background: var(--surface2); border-radius: 999px; padding: 3px; gap: 2px; flex-wrap: wrap; }
+.seg button { border: 0; background: transparent; padding: 4px 14px; border-radius: 999px; font-size: 13px; min-height: 36px; }
+.seg button[aria-selected="true"], .seg button[aria-pressed="true"] { background: var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,.18); font-weight: 800; }
+.chk { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; background: var(--surface2); padding: 4px 12px; border-radius: 999px; min-height: 44px; }
+.chk input[type="checkbox"] { accent-color: var(--primary); width: 18px; height: 18px; }
+.chk input[type="color"] { width: 32px; height: 28px; border: 0; padding: 0; background: none; border-radius: 6px; }
+
+/* frame = live site chrome */
+.stage { display: flex; justify-content: center; margin-top: 18px; }
+.frame { container: fr / inline-size; width: 100%; max-width: 1040px; transition: max-width .35s ease; }
+.frame.is-mobile { max-width: 390px; }
+.site { background: var(--bg); border: 1px solid var(--border); border-radius: 28px; padding-bottom: 28px; }
+.frame.is-mobile .site { border-radius: 34px; box-shadow: 0 0 0 8px var(--surface2); }
+.col { width: 100%; max-width: 980px; margin-inline: auto; padding-inline: clamp(14px, 3cqi, 28px); }
+.hdr { padding-block: 14px 10px; }
+.pill { display: flex; align-items: center; gap: 10px; min-height: 56px; background: color-mix(in srgb, var(--surface) 80%, transparent); backdrop-filter: blur(14px); border: 1px solid var(--border); border-radius: 999px; padding-inline: 18px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+.logo { display: inline-flex; align-items: center; gap: 6px; font-weight: 900; font-size: 24px; letter-spacing: -.02em; color: var(--primary-text); direction: ltr; }
+.logo b { color: var(--fg); font-weight: 900; }
+.logo svg { width: 24px; height: 24px; }
+.nav { display: flex; gap: 4px; margin-inline-start: 18px; font-size: 14px; font-weight: 500; }
+.nav a { padding: 6px 14px; border-radius: 999px; }
+.nav a:first-child { background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--primary-text); }
+.ibs { margin-inline-start: auto; display: flex; gap: 4px; }
+.ib { width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--surface); display: grid; place-items: center; box-shadow: 0 1px 3px rgba(0,0,0,.08); position: relative; }
+.ib .n { position: absolute; top: 4px; inset-inline-end: 2px; min-width: 17px; height: 17px; border-radius: 9px; background: var(--hot); color: #fff; font-size: 10px; font-weight: 800; display: grid; place-items: center; }
+@container fr (max-width: 640px) { .nav { display: none; } .pill { padding-inline: 12px; } }
+
+/* hero base */
+.hv { display: none; margin-top: 14px; position: relative; isolation: isolate; border-radius: 32px; }
+.hv.on { display: block; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 32px; overflow: hidden; position: relative; }
+.mesh { position: absolute; inset: 0; z-index: -1; background:
+  radial-gradient(60% 80% at 85% 20%, color-mix(in srgb, var(--primary) 28%, transparent), transparent 70%),
+  radial-gradient(50% 70% at 10% 90%, color-mix(in srgb, var(--gold) 22%, transparent), transparent 70%); }
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 800; color: var(--primary-text); background: color-mix(in srgb, var(--primary) 12%, transparent); border-radius: 999px; padding: 2px 14px; }
+.hv h1 { font-weight: 900; font-size: clamp(1.9rem, 6.2cqi, 3.6rem); line-height: 1.35; margin: 12px 0; text-wrap: balance; letter-spacing: -.01em; }
+.hv h1 em { font-style: normal; color: var(--primary-text); }
+.lead { color: var(--muted); max-width: 30em; margin: 0 0 20px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 24px; border-radius: 999px; border: 1.5px solid transparent; font-weight: 800; font-size: 14px; background: var(--primary); color: var(--primary-fg); transition: transform .2s; }
+.btn:hover { transform: translateY(-2px); }
+.btn.line { background: transparent; color: var(--fg); border-color: var(--border); }
+.cta { display: flex; gap: 10px; flex-wrap: wrap; }
+.tag { position: absolute; top: 14px; inset-inline-end: 16px; z-index: 6; font-size: 11px; color: var(--muted); background: var(--surface2); padding: 1px 10px; border-radius: 999px; }
+.circle-btn { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--border); }
+@keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: no-preference) {
+  .hv.on .stag > * { animation: rise .6s cubic-bezier(.2, .7, .2, 1) both; }
+  .hv.on .stag > :nth-child(2) { animation-delay: .07s; } .hv.on .stag > :nth-child(3) { animation-delay: .14s; } .hv.on .stag > :nth-child(4) { animation-delay: .21s; }
+}
+
+/* A: studio 3D */
+.a-grid { display: grid; grid-template-columns: 1fr 1fr; align-items: center; min-height: 520px; }
+.a-txt { padding: clamp(24px, 5cqi, 56px); }
+.a-vis { position: relative; min-height: 460px; height: 100%; }
+.a-vis canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: pan-y; cursor: grab; }
+.fb { position: absolute; inset: 0; display: none; place-items: center; }
+.fb svg { height: 84%; max-height: 430px; filter: drop-shadow(0 26px 24px rgba(0,0,0,.28)); }
+@media (prefers-reduced-motion: no-preference) { .fb svg { animation: floaty 6s ease-in-out infinite; } }
+@keyframes floaty { 50% { transform: translateY(-10px) rotate(-1.5deg); } }
+.light .canvas3d { display: none; } .light .fb { display: grid; }
+.sw { position: absolute; bottom: 10px; inset-inline: 0; display: flex; justify-content: center; gap: 2px; z-index: 4; align-items: center; }
+.sw button { width: 44px; height: 44px; border: 0; padding: 0; background: none; position: relative; border-radius: 50%; }
+.sw button.c::after { content: ""; position: absolute; inset: 8px; border-radius: 50%; background: var(--c); border: 2px solid var(--border); transition: transform .2s; }
+.sw button.c[aria-pressed="true"]::after { border-color: var(--fg); transform: scale(1.12); }
+
+/* B: configurator */
+.b-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; padding: clamp(20px, 4cqi, 44px); }
+.step { margin: 14px 0 0; }
+.step small { display: block; color: var(--muted); font-weight: 700; margin-bottom: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1.5px solid var(--border); background: var(--surface); font-weight: 700; font-size: 13.5px; display: inline-flex; align-items: center; gap: 8px; }
+.chip[aria-pressed="true"] { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, var(--surface)); color: var(--primary-text); }
+.chip .dot { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--border); }
+.b-stage { position: relative; height: 480px; perspective: 1000px; display: grid; place-items: center; }
+.b-stage .ph { height: 92%; transform: rotateY(calc(var(--mx, 0) * 18deg)) rotateX(calc(var(--my, 0) * -10deg)); transition: transform .2s ease-out; transform-style: preserve-3d; }
+.b-stage .ph svg { height: 100%; filter: drop-shadow(0 30px 24px rgba(0,0,0,.28)); }
+.b-stage .ph.swap svg { animation: swapin .5s cubic-bezier(.2, .7, .2, 1); }
+@keyframes swapin { from { opacity: 0; transform: translateY(12px) scale(.96); } to { opacity: 1; transform: none; } }
+.b-stage .halo { position: absolute; width: 360px; height: 360px; border-radius: 50%; background: color-mix(in srgb, var(--pc, var(--primary)) 30%, transparent); filter: blur(50px); z-index: -1; transition: background .4s; }
+.b-info { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 13.5px; }
+.b-info b { font-size: 1.1rem; font-weight: 900; }
+
+/* C: scroll story */
+.hv.story { overflow: visible; }
+.c-wrap { height: 280vh; position: relative; }
+.c-pin { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 112px); height: min(560px, calc(100vh - 130px)); border-radius: 32px; overflow: hidden; display: grid; grid-template-columns: 1fr 1fr; align-items: center; }
+.c-cap { padding: clamp(22px, 4cqi, 48px); position: relative; min-height: 220px; }
+.c-cap .cap { position: absolute; inset-inline: clamp(22px, 4cqi, 48px); top: 50%; transform: translateY(-40%); opacity: 0; transition: opacity .4s, transform .4s; }
+.c-cap .cap.on { opacity: 1; transform: translateY(-50%); }
+.c-cap h2 { font-size: clamp(1.6rem, 4.6cqi, 2.6rem); font-weight: 900; line-height: 1.4; margin: 10px 0; }
+.c-prog { position: absolute; bottom: 18px; inset-inline: clamp(22px, 4cqi, 48px); display: flex; gap: 6px; }
+.c-prog i { height: 4px; flex: 1; border-radius: 2px; background: var(--border); position: relative; overflow: hidden; }
+.c-prog i::after { content: ""; position: absolute; inset: 0; background: var(--primary); transform-origin: right; transform: scaleX(var(--p, 0)); }
+.c-vis { position: relative; height: 100%; min-height: 380px; }
+.c-hint { text-align: center; color: var(--muted); font-size: 13px; margin-top: 10px; }
+@container fr (max-width: 760px) { .c-pin { grid-template-columns: 1fr; grid-template-rows: 46% 54%; top: calc(env(safe-area-inset-top, 0px) + 84px); } .c-vis { order: -1; min-height: 0; } .c-cap { min-height: 0; } }
+
+/* D: floating field */
+.d-field { position: relative; height: 560px; overflow: hidden; perspective: 900px; }
+.d-field .ly { position: absolute; transition: transform .25s ease-out; will-change: transform; }
+.d-field .ly svg { height: 100%; display: block; filter: drop-shadow(0 22px 20px rgba(0,0,0,.25)); }
+@media (prefers-reduced-motion: no-preference) { .d-field .ly svg { animation: drift var(--t, 7s) ease-in-out infinite; animation-delay: var(--dl, 0s); } }
+@keyframes drift { 50% { transform: translateY(-14px) rotate(2deg); } }
+.d-center { position: absolute; inset: 0; z-index: 5; display: grid; place-items: center; text-align: center; padding: 24px; pointer-events: none; }
+.d-center > div { pointer-events: auto; background: color-mix(in srgb, var(--surface) 72%, transparent); backdrop-filter: blur(16px); border: 1px solid var(--border); border-radius: 32px; padding: clamp(20px, 4cqi, 40px); max-width: 560px; }
+.d-center .cta { justify-content: center; }
+.d-center .lead { margin-inline: auto; }
+
+/* E: bento */
+.e-grid { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: minmax(150px, auto); gap: 12px; }
+.tile { border-radius: 28px; border: 1px solid var(--border); background: var(--surface); padding: clamp(16px, 2.6cqi, 26px); position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; transition: transform .25s, box-shadow .25s; }
+.tile:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
+.tile h3 { margin: 0; font-weight: 900; font-size: 1.1rem; line-height: 1.5; }
+.tile p { margin: 0; color: var(--muted); font-size: 13px; }
+.t-main { grid-column: span 2; grid-row: span 2; background: linear-gradient(150deg, var(--primary), color-mix(in srgb, var(--primary) 55%, #000)); color: var(--primary-fg); border: 0; justify-content: center; }
+.t-main h1 { font-weight: 900; font-size: clamp(1.8rem, 5.4cqi, 3.1rem); line-height: 1.35; margin: 8px 0; text-wrap: balance; }
+.t-main .lead { color: color-mix(in srgb, var(--primary-fg) 78%, transparent); }
+.t-main .btn { background: #fff; color: #14161d; }
+.t-main .btn.line { background: transparent; color: #fff; border-color: rgba(255,255,255,.45); }
+.t-main .eyebrow { background: rgba(255,255,255,.18); color: #fff; }
+.t-main h1 em { color: #ffe08a; }
+.tile .eyebrow { align-self: flex-start; }
+.t-case { grid-row: span 2; justify-content: center; align-items: center; background: radial-gradient(80% 60% at 50% 35%, color-mix(in srgb, var(--primary) 16%, var(--surface2)), var(--surface2)); }
+.t-case svg { height: 88%; transform: perspective(700px) rotateY(calc(var(--mx, 0) * 16deg)) rotateX(calc(var(--my, 0) * -9deg)); transition: transform .2s ease-out; filter: drop-shadow(0 22px 18px rgba(0,0,0,.28)); }
+.t-case .lbl { position: absolute; bottom: 14px; inset-inline: 14px; background: color-mix(in srgb, var(--surface) 85%, transparent); backdrop-filter: blur(8px); border-radius: 18px; padding: 8px 14px; font-size: 13px; font-weight: 800; display: flex; justify-content: space-between; }
+.t-deal { background: #14161d; color: #fff; border: 0; }
+.t-deal p { color: #b6bac6; }
+.cd { display: flex; gap: 6px; direction: ltr; font-weight: 900; font-variant-numeric: tabular-nums; font-size: 1.5rem; }
+.cd span { background: rgba(255,255,255,.1); border-radius: 12px; padding: 0 8px; min-width: 44px; text-align: center; }
+.t-find { justify-content: center; }
+.find { display: flex; align-items: center; gap: 8px; background: var(--surface2); border-radius: 999px; padding-inline: 14px; min-height: 48px; margin-top: 6px; }
+.find input { all: unset; flex: 1; min-width: 0; font-size: 14px; }
+.find input::placeholder { color: var(--muted); }
+.t-cats { grid-column: span 2; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 8px; }
+@container fr (max-width: 760px) { .e-grid { grid-template-columns: repeat(2, 1fr); } .t-main { grid-column: span 2; grid-row: auto; } .t-case { grid-row: span 2; min-height: 280px; } .t-cats { grid-column: span 2; } }
+
+@container fr (max-width: 760px) {
+  .a-grid, .b-grid { grid-template-columns: 1fr; min-height: 0; }
+  .a-txt { text-align: center; padding-bottom: 6px; } .a-txt .lead { margin-inline: auto; } .a-txt .cta { justify-content: center; }
+  .a-vis { min-height: 340px; height: 340px; }
+  .b-stage { height: 360px; }
+  .d-field { height: 600px; }
+}
+
+/* info */
+.info { max-width: 1040px; margin: 18px auto 0; background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: clamp(16px, 3vw, 26px); display: none; }
+.info.on { display: block; }
+.info h2 { margin: 0 0 4px; font-weight: 900; font-size: 1.25rem; }
+.info > p { color: var(--muted); margin: 0 0 12px; max-width: 54em; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.facts > div { background: var(--surface2); border-radius: 16px; padding: 10px 14px; min-width: 0; }
+.facts small { display: block; color: var(--muted); font-size: 12px; font-weight: 800; }
+.facts span { font-size: 13.5px; }
+.note { max-width: 1040px; margin: 14px auto 0; font-size: 13px; color: var(--muted); background: var(--surface); border: 1px dashed var(--border); border-radius: 16px; padding: 10px 14px; }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="phone" viewBox="0 0 24 24"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></symbol>
+    <symbol id="search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol>
+    <symbol id="user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+    <symbol id="bag" viewBox="0 0 24 24"><path d="M16 10a4 4 0 0 1-8 0"/><path d="M3.1 6h17.8"/><path d="M3.4 5.5a2 2 0 0 0-.4 1.2V20a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6.7a2 2 0 0 0-.4-1.2l-2-2.7A2 2 0 0 0 17 2H7a2 2 0 0 0-1.6.8z"/></symbol>
+    <symbol id="arrow" viewBox="0 0 24 24"><path d="M19 12H5m5-5-5 5 5 5"/></symbol>
+    <symbol id="chev" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="chevl" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+    <symbol id="shield" viewBox="0 0 24 24"><path d="M12 3 5 6v5.5c0 4.3 2.9 7.6 7 9.5 4.1-1.9 7-5.2 7-9.5V6l-7-3Z"/><path d="m9 12 2.2 2.2L15.5 10"/></symbol>
+    <symbol id="bolt" viewBox="0 0 24 24"><path d="m13 3-7 10h5l-1 8 7-10h-5l1-8Z"/></symbol>
+    <symbol id="magnet" viewBox="0 0 24 24"><path d="m6 15-4-4 6.8-6.8a2.1 2.1 0 0 1 3 3L5 14m16-3-4-4m4 4-6.8 6.8a2.1 2.1 0 0 1-3-3M11 7l4 4"/></symbol>
+  </defs>
+</svg>
+
+<div class="tools">
+  <div class="ttl">هیروهای سایت کیس‌لاین</div>
+  <div class="seg" id="varSeg" role="tablist" aria-label="مدل هیرو">
+    <button role="tab" aria-selected="true" data-v="a">الف · استودیو ۳بعدی</button>
+    <button role="tab" aria-selected="false" data-v="b">ب · انتخاب مدل گوشی</button>
+    <button role="tab" aria-selected="false" data-v="c">ج · داستان اسکرول ۳بعدی</button>
+    <button role="tab" aria-selected="false" data-v="d">د · قاب‌های شناور</button>
+    <button role="tab" aria-selected="false" data-v="e">ه · بنتو</button>
+  </div>
+  <div class="seg" id="devSeg"><button aria-pressed="true" data-dev="desk">دسکتاپ</button><button aria-pressed="false" data-dev="mob">موبایل</button></div>
+  <div class="seg" id="thSeg"><button aria-pressed="true" data-th="auto">خودکار</button><button aria-pressed="false" data-th="light">روشن</button><button aria-pressed="false" data-th="dark">تیره</button></div>
+  <label class="chk" for="primaryPick">رنگ اصلی سایت <input type="color" id="primaryPick" value="#3b5bdb"></label>
+  <label class="chk" for="lightChk"><input type="checkbox" id="lightChk">حالت سبک</label>
+</div>
+
+<div class="note">رنگ اصلی (primary) سایت واقعی را از اینجا نمی‌بینم، پس یک رنگ موقت گذاشتم. با «رنگ اصلی سایت» بالای صفحه همان رنگ را انتخاب کنید تا همه‌ی هیروها با آن دیده شوند. محصولات، رنگ‌ها و متن‌ها نمونه‌اند.</div>
+
+<div class="stage"><div class="frame" id="frame"><div class="site">
+  <div class="col"><header class="hdr"><div class="pill">
+    <a class="logo" href="#" aria-label="Caseline"><svg class="i"><use href="#phone"/></svg><span>Case<b>line</b></span></a>
+    <nav class="nav" aria-label="منوی اصلی"><a href="#">دسته‌بندی‌ها</a><a href="#">فروشگاه</a><a href="#">وبلاگ</a><a href="#">پشتیبانی</a></nav>
+    <div class="ibs"><button class="ib" aria-label="جستجو"><svg class="i"><use href="#search"/></svg></button><button class="ib" aria-label="حساب کاربری"><svg class="i"><use href="#user"/></svg></button><button class="ib" aria-label="سبد خرید"><svg class="i"><use href="#bag"/></svg><span class="n">۲</span></button></div>
+  </div></header></div>
+
+  <div class="col">
+
+  <!-- A -->
+  <section class="hv on card" id="va" aria-label="هیرو استودیو سه‌بعدی"><div class="mesh"></div><span class="tag" id="tagA">سه‌بعدی</span>
+    <div class="a-grid">
+      <div class="a-txt stag"><span class="eyebrow">کالکشن جدید</span><h1>قابی که <em>به گوشی‌ات</em> می‌خورد</h1><p class="lead">قاب، گلس و اکسسوری با تضمین سازگاری با مدل گوشی شما.</p><div class="cta"><a class="btn" href="#">مشاهده فروشگاه <svg class="i"><use href="#arrow"/></svg></a><a class="btn line" href="#">قاب آیفون</a></div></div>
+      <div class="a-vis" id="visA"><canvas class="canvas3d" id="cA" tabindex="0" role="img" aria-label="مدل سه‌بعدی قاب؛ با کلیدهای چپ و راست بچرخانید"></canvas><div class="fb" id="fbA"></div><div class="sw" id="swA" role="group" aria-label="رنگ قاب"></div></div>
+    </div>
+  </section>
+
+  <!-- B -->
+  <section class="hv card" id="vb" aria-label="هیرو انتخاب مدل گوشی"><div class="mesh"></div><span class="tag">SVG · سبک</span>
+    <div class="b-grid">
+      <div class="stag"><span class="eyebrow">سازگاری تضمینی</span><h1>اول <em>مدل گوشی</em> را انتخاب کن</h1><p class="lead">فقط قاب‌هایی را ببین که دقیقاً روی گوشی تو می‌نشینند.</p>
+        <div class="step"><small>۱ · گوشی شما</small><div class="chips" id="bModels" role="group" aria-label="مدل گوشی"></div></div>
+        <div class="step"><small>۲ · رنگ قاب</small><div class="chips" id="bColors" role="group" aria-label="رنگ قاب"></div></div>
+        <div class="b-info"><span>از <b id="bPrice">۴۸۹٬۰۰۰</b> تومان</span><a class="btn" href="#" id="bGo">مشاهده قاب‌های <span id="bName">آیفون ۱۵ پرو</span> <svg class="i"><use href="#arrow"/></svg></a></div>
+      </div>
+      <div class="b-stage" id="bStage"><div class="halo" id="bHalo"></div><div class="ph" id="bPh"></div></div>
+    </div>
+  </section>
+
+  <!-- C -->
+  <section class="hv story" id="vc" aria-label="هیرو داستان اسکرول">
+    <div class="c-wrap" id="cWrap"><div class="c-pin card"><div class="mesh"></div><span class="tag" id="tagC">سه‌بعدی با اسکرول</span>
+      <div class="c-cap" id="cCap">
+        <div class="cap on"><span class="eyebrow">۱ · محافظت</span><h2>لبه‌های برجسته، <em style="font-style:normal;color:var(--primary-text)">ضد ضربه</em></h2><p class="lead">لبه‌ی بالاآمده از صفحه و پشت گوشی در برابر افتادن محافظت می‌کند.</p></div>
+        <div class="cap"><span class="eyebrow">۲ · دوربین</span><h2>دوربین <em style="font-style:normal;color:var(--primary-text)">امن</em> می‌ماند</h2><p class="lead">برجستگی دور لنزها از خط‌وخش جلوگیری می‌کند.</p></div>
+        <div class="cap"><span class="eyebrow">۳ · شارژ</span><h2>سازگار با <em style="font-style:normal;color:var(--primary-text)">شارژ بی‌سیم</em></h2><p class="lead">بدون برداشتن قاب شارژ کنید. نسخه‌ی مگ‌سیف هم داریم.</p><div class="cta"><a class="btn" href="#">مشاهده فروشگاه</a></div></div>
+        <div class="c-prog" id="cProg"><i></i><i></i><i></i></div>
+      </div>
+      <div class="c-vis" id="visC"><canvas class="canvas3d" id="cC" role="img" aria-label="مدل سه‌بعدی قاب که با اسکرول می‌چرخد"></canvas><div class="fb" id="fbC"></div></div>
+    </div></div>
+    <p class="c-hint">برای دیدن این هیرو صفحه را آرام به پایین بکشید ↓</p>
+  </section>
+
+  <!-- D -->
+  <section class="hv card" id="vd" aria-label="هیرو قاب‌های شناور"><div class="mesh"></div><span class="tag">CSS · سبک</span>
+    <div class="d-field" id="dField">
+      <div class="d-center"><div class="stag"><span class="eyebrow">رنگ‌ها را ببین</span><h1>هر رنگ، <em>یک حال</em></h1><p class="lead">بیش از ۳۰ رنگ و طرح برای مدل‌های محبوب.</p><div class="cta"><a class="btn" href="#">همه‌ی قاب‌ها</a><a class="btn line" href="#">پرفروش‌ها</a></div></div></div>
+    </div>
+  </section>
+
+  <!-- E -->
+  <section class="hv" id="ve" aria-label="هیرو بنتو"><div class="e-grid" id="eGrid">
+    <article class="tile t-main stag"><span class="eyebrow">فروشگاه لوازم جانبی موبایل</span><h1>قاب مناسب گوشی‌ات را <em style="font-style:normal">در ۱۰ ثانیه</em> پیدا کن</h1><p class="lead">قاب، گلس، شارژر و کابل با تضمین سازگاری.</p><div class="cta"><a class="btn" href="#">مشاهده فروشگاه</a><a class="btn line" href="#">پیگیری سفارش</a></div></article>
+    <article class="tile t-case" id="eCase"><div id="eSvg" style="height:100%;display:grid;place-items:center"></div><div class="lbl"><span>قاب مگ‌سیف</span><span>جدید</span></div></article>
+    <article class="tile t-deal"><h3>تخفیف ۲۴ ساعته</h3><p>اکسسوری‌های منتخب</p><div class="cd" id="eCd" aria-label="زمان باقی‌مانده"><span>۰۰</span><span>۰۰</span><span>۰۰</span></div></article>
+    <article class="tile t-find"><h3>گوشی‌ات چیست؟</h3><label class="find" for="eIn"><svg class="i"><use href="#search"/></svg><input id="eIn" placeholder="مثلاً گلکسی S24" list="eList"><datalist id="eList"><option value="آیفون ۱۵ پرو"><option value="گلکسی S24"><option value="شیائومی ۱۴"><option value="آیفون ۱۴"></datalist></label></article>
+    <article class="tile t-cats"><a class="chip" href="#">قاب و کاور</a><a class="chip" href="#">گلس</a><a class="chip" href="#">شارژر</a><a class="chip" href="#">ایرپاد</a><a class="chip" href="#">اپل واچ</a><a class="chip" href="#">هولدر</a></article>
+    <article class="tile"><svg class="i" style="width:28px;height:28px;color:var(--primary-text)"><use href="#shield"/></svg><h3>ضمانت اصالت کالا</h3><p>کالای اصل و سالم</p></article>
+  </div></section>
+
+  </div>
+</div></div></div>
+
+<div class="info on" id="i-a"><h2>الف · استودیو سه‌بعدی</h2><p>قاب سه‌بعدی واقعی با بازتاب نور، با ماوس، لمس یا کلیدهای جهت می‌چرخد. زمینه و دکمه‌ها با زبان سایت (کرم/سیاه‌آبی، دکمه‌ی گرد) یکی است.</p><div class="facts"><div><small>سرعت</small><span>Three.js، فقط وقتی دیده شود لود می‌شود</span></div><div><small>موبایل / ضعیف / کاهش حرکت</small><span>تصویر قاب با شناوری ملایم</span></div><div><small>پنل</small><span>سه‌بعدی/تصویر، رنگ‌ها، متن و دکمه‌ها</span></div></div></div>
+<div class="info" id="i-b"><h2>ب · انتخاب مدل گوشی</h2><p>مخصوص همین فروشگاه: اول مدل گوشی و رنگ را انتخاب می‌کنید، قاب با چیدمان دوربین همان برند تغییر می‌کند و دکمه به صفحه‌ی قاب‌های سازگار می‌رود. به قابلیت «گوشی من» سایت وصل می‌شود.</p><div class="facts"><div><small>سرعت</small><span>فقط SVG و CSS؛ سبک‌ترین مدل تعاملی</span></div><div><small>موبایل</small><span>تک‌ستونه، دکمه‌های ۴۴ پیکسلی</span></div><div><small>پنل</small><span>فهرست مدل‌ها از دیتابیس، تصویر قاب هر مدل، قیمت شروع</span></div></div></div>
+<div class="info" id="i-c"><h2>ج · داستان اسکرول سه‌بعدی</h2><p>قاب هنگام اسکرول می‌چرخد و سه ویژگی را یکی‌یکی نشان می‌دهد (محافظت، دوربین، شارژ). تأثیرگذار برای معرفی کالکشن.</p><div class="facts"><div><small>سرعت</small><span>مثل الف؛ رندر فقط هنگام دیده‌شدن</span></div><div><small>موبایل / کاهش حرکت</small><span>سه کارت ویژگی با تصویر ثابت</span></div><div><small>پنل</small><span>سه ویژگی (عنوان، متن، دکمه) و محصول نمایشی</span></div></div></div>
+<div class="info" id="i-d"><h2>د · قاب‌های شناور</h2><p>چند قاب در عمق‌های مختلف با پارالاکس و محو شدن عمق میدان. حس هنری و رنگارنگ، بدون WebGL.</p><div class="facts"><div><small>سرعت</small><span>فقط CSS</span></div><div><small>موبایل</small><span>قاب‌های کمتر و حرکت ملایم</span></div><div><small>پنل</small><span>انتخاب تصاویر قاب‌ها (PNG شفاف)، متن‌ها</span></div></div></div>
+<div class="info" id="i-e"><h2>ه · بنتو</h2><p>یک شبکه‌ی کاشی‌مانند: پیام اصلی، قاب با ایفکت کج‌شدن، تخفیف با شمارنده، جست‌وجوی مدل گوشی و دسته‌ها. بیشترین اطلاعات در کمترین فضا و بیشترین شباهت به فروشگاه‌های مدرن.</p><div class="facts"><div><small>سرعت</small><span>CSS؛ سبک</span></div><div><small>موبایل</small><span>دو ستون</span></div><div><small>پنل</small><span>ترتیب و محتوای هر کاشی از صفحه‌ساز</span></div></div></div>
+
+<script>
+(function () {
+  var root = document.documentElement; root.lang = "fa"; root.dir = "rtl";
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+  var frame = $("#frame");
+  var fa = function (n) { return String(n).replace(/\d/g, function (d) { return "۰۱۲۳۴۵۶۷۸۹"[d]; }); };
+  var money = function (n) { return n.toLocaleString("fa-IR"); };
+
+  function shade(hex, amt) {
+    var n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+    var f = function (c) { return Math.max(0, Math.min(255, Math.round(amt < 0 ? c * (1 + amt) : c + (255 - c) * amt))); };
+    return "#" + [f(r), f(g), f(b)].map(function (c) { return c.toString(16).padStart(2, "0"); }).join("");
+  }
+  var uid = 0;
+  /* product art: three camera layouts so the phone model really changes the case */
+  function phoneSVG(color, model, pattern) {
+    var id = "p" + (++uid), hi = shade(color, .28), lo = shade(color, -.32), pat = "", cam = "";
+    var lens = function (x, y, r) { return '<circle cx="' + x + '" cy="' + y + '" r="' + r + '" fill="#0b0f11" stroke="#8b979a" stroke-width="3"/><circle cx="' + x + '" cy="' + y + '" r="' + r * .4 + '" fill="#26343a"/>'; };
+    if (model === "samsung") cam = lens(38, 40, 15) + lens(38, 86, 15) + lens(38, 132, 15) + '<circle cx="74" cy="46" r="5" fill="#dfe3e6"/>';
+    else if (model === "xiaomi") cam = '<circle cx="78" cy="78" r="58" fill="' + shade(color, -.55) + '" stroke="#fff" stroke-opacity=".25" stroke-width="3"/>' + lens(54, 56, 17) + lens(100, 56, 17) + lens(78, 104, 17) + '<circle cx="118" cy="104" r="5" fill="#dfe3e6"/>';
+    else cam = '<rect x="16" y="16" width="86" height="90" rx="24" fill="' + shade(color, -.5) + '" fill-opacity=".6" stroke="#fff" stroke-opacity=".22"/>' + lens(40, 42, 15) + lens(76, 42, 15) + lens(58, 80, 15);
+    if (pattern === "lines") pat = '<g stroke="#fff" stroke-opacity=".15" stroke-width="1.4">' + Array.apply(null, Array(16)).map(function (_, i) { return '<path d="M' + (-20 + i * 18) + ' 420 L' + (100 + i * 18) + ' 20"/>'; }).join("") + "</g>";
+    if (pattern === "dots") pat = '<g fill="#fff" fill-opacity=".2">' + Array.apply(null, Array(60)).map(function (_, i) { return '<circle cx="' + (30 + (i % 6) * 28 + ((Math.floor(i / 6) % 2) * 14)) + '" cy="' + (170 + Math.floor(i / 6) * 26) + '" r="3"/>'; }).join("") + "</g>";
+    return '<svg viewBox="-10 -6 220 420" aria-hidden="true"><defs><linearGradient id="' + id + 'g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="' + hi + '"/><stop offset=".55" stop-color="' + color + '"/><stop offset="1" stop-color="' + lo + '"/></linearGradient><clipPath id="' + id + 'c"><rect width="200" height="400" rx="40"/></clipPath><radialGradient id="' + id + 'r" cx=".3" cy=".1" r=".8"><stop offset="0" stop-color="#fff" stop-opacity=".4"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>' +
+      '<rect width="200" height="400" rx="40" fill="url(#' + id + 'g)"/><g clip-path="url(#' + id + 'c)">' + pat + '<path d="M-4 268 C 60 262 130 236 204 244" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-opacity=".7"/><rect width="200" height="400" fill="url(#' + id + 'r)"/></g>' +
+      '<rect x="1.2" y="1.2" width="197.6" height="397.6" rx="39" fill="none" stroke="#fff" stroke-opacity=".3" stroke-width="2"/>' + cam +
+      '<text x="100" y="352" text-anchor="middle" font-family="Vazirmatn, sans-serif" font-weight="900" font-size="20" fill="#fff" fill-opacity=".8" direction="ltr">Caseline</text></svg>';
+  }
+
+  var COLS = [["#2b2f3a", "مرکب"], ["#3b5bdb", "آبی"], ["#d9b38c", "شنی"], ["#7fb89b", "سبز"], ["#d96b8b", "صورتی"]];
+  var MODELS = [["iphone", "آیفون ۱۵ پرو", 489000], ["samsung", "گلکسی S24", 359000], ["xiaomi", "شیائومی ۱۴", 275000]];
+
+  /* ---- tool bar ---- */
+  var current = "a";
+  $$("#varSeg button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      $$("#varSeg button").forEach(function (x) { x.setAttribute("aria-selected", x === b); });
+      current = b.dataset.v;
+      $$(".hv").forEach(function (h) { h.classList.toggle("on", h.id === "v" + current); });
+      $$(".info").forEach(function (h) { h.classList.toggle("on", h.id === "i-" + current); });
+      window.scrollTo({ top: 0 }); activate();
+    });
+  });
+  function seg(id, key, fn) { $$("#" + id + " button").forEach(function (b) { b.addEventListener("click", function () { $$("#" + id + " button").forEach(function (x) { x.setAttribute("aria-pressed", x === b); }); fn(b.dataset[key]); }); }); }
+  seg("devSeg", "dev", function (v) { frame.classList.toggle("is-mobile", v === "mob"); setTimeout(activate, 420); });
+  seg("thSeg", "th", function (v) { v === "auto" ? root.removeAttribute("data-theme") : root.setAttribute("data-theme", v); });
+  $("#primaryPick").addEventListener("input", function (e) { root.style.setProperty("--primary", e.target.value); });
+  $("#lightChk").addEventListener("change", activate);
+
+  /* ---- A fallback + swatches ---- */
+  var colA = COLS[1][0];
+  function fbA() { $("#fbA").innerHTML = phoneSVG(colA, "iphone", "plain"); $("#fbC").innerHTML = phoneSVG(colA, "iphone", "plain"); }
+  fbA();
+  var swA = $("#swA");
+  swA.innerHTML = '<button id="aL" aria-label="چرخش به چپ" class="circle-btn" style="margin-inline:4px"><svg class="i"><use href="#chevl"/></svg></button>' + COLS.map(function (c, i) { return '<button class="c" aria-label="' + c[1] + '" aria-pressed="' + (i === 1) + '" style="--c:' + c[0] + '" data-c="' + c[0] + '"></button>'; }).join("") + '<button id="aR" aria-label="چرخش به راست" class="circle-btn" style="margin-inline:4px"><svg class="i"><use href="#chev"/></svg></button>';
+  swA.addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    if (b.id === "aL") { if (S.a) S.a.rotate(-1); return; } if (b.id === "aR") { if (S.a) S.a.rotate(1); return; }
+    $$("button.c", swA).forEach(function (x) { x.setAttribute("aria-pressed", x === b); });
+    colA = b.dataset.c; fbA(); if (S.a) S.a.setColor(colA); if (S.c) S.c.setColor(colA);
+  });
+
+  /* ---- B configurator ---- */
+  var bm = 0, bc = 1, bPh = $("#bPh"), bStage = $("#bStage");
+  function bRender(anim) {
+    var m = MODELS[bm], c = COLS[bc];
+    bPh.innerHTML = phoneSVG(c[0], m[0], bc === 1 ? "lines" : "plain");
+    if (anim) { bPh.classList.remove("swap"); void bPh.offsetWidth; bPh.classList.add("swap"); }
+    $("#bHalo").style.setProperty("--pc", c[0]); $("#bHalo").style.background = "color-mix(in srgb," + c[0] + " 32%, transparent)";
+    $("#bName").textContent = m[1]; $("#bPrice").textContent = money(m[2]);
+    $$("#bModels button").forEach(function (b, i) { b.setAttribute("aria-pressed", i === bm); });
+    $$("#bColors button").forEach(function (b, i) { b.setAttribute("aria-pressed", i === bc); });
+  }
+  $("#bModels").innerHTML = MODELS.map(function (m, i) { return '<button class="chip" data-i="' + i + '" aria-pressed="false">' + m[1] + "</button>"; }).join("");
+  $("#bColors").innerHTML = COLS.map(function (c, i) { return '<button class="chip" data-i="' + i + '" aria-pressed="false"><span class="dot" style="background:' + c[0] + '"></span>' + c[1] + "</button>"; }).join("");
+  $("#bModels").addEventListener("click", function (e) { var b = e.target.closest("button"); if (b) { bm = +b.dataset.i; bRender(true); } });
+  $("#bColors").addEventListener("click", function (e) { var b = e.target.closest("button"); if (b) { bc = +b.dataset.i; bRender(true); } });
+  bRender(false);
+  function tilt(el, target) { if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches || reduce.matches) return; el.addEventListener("pointermove", function (e) { var r = el.getBoundingClientRect(); target.style.setProperty("--mx", ((e.clientX - r.left) / r.width - .5).toFixed(2)); target.style.setProperty("--my", ((e.clientY - r.top) / r.height - .5).toFixed(2)); }); el.addEventListener("pointerleave", function () { target.style.setProperty("--mx", 0); target.style.setProperty("--my", 0); }); }
+  tilt(bStage, bStage);
+
+  /* ---- D floating field ---- */
+  var DL = [[160, 12, 16, "#2b2f3a", "iphone", -10, 1, .5, 8, "lines"], [190, 4, 62, "#3b5bdb", "samsung", 8, 1, 1, 6, "plain"], [150, 22, 8, "#d9b38c", "xiaomi", 14, 0.8, 1.4, 9, "plain"], [210, 78, 10, "#d96b8b", "iphone", -6, 1, .8, 7, "dots"], [130, 70, 60, "#7fb89b", "samsung", 12, .8, 1.8, 10, "plain"], [240, 40, 40, "#14161d", "iphone", 0, 1.1, .3, 8, "lines"], [120, 90, 36, "#3b5bdb", "xiaomi", -14, .6, 2.2, 11, "plain"], [110, 2, 36, "#d96b8b", "iphone", 10, .6, 2, 9, "plain"]];
+  var dF = $("#dField");
+  DL.forEach(function (l, i) { var d = document.createElement("div"); d.className = "ly"; d.dataset.k = l[6] * 40 + (i % 3) * 8; d.style.cssText = "height:" + l[0] + "px;inset-inline-start:" + l[1] + "%;top:" + l[2] + "%;--dl:-" + l[7] + "s;--t:" + l[8] + "s;transform:rotate(" + l[5] + "deg);" + (l[6] < 1 ? "filter:blur(" + (1 - l[6]) * 5 + "px);" : "") + (i > 5 ? "" : ""); d.setAttribute("data-m", i > 5 ? "x" : ""); d.innerHTML = phoneSVG(l[3], l[4], l[9]); dF.insertBefore(d, dF.firstChild); });
+  tilt(dF, dF); (function () { if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches || reduce.matches) return; dF.addEventListener("pointermove", function (e) { var r = dF.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5; $$(".ly", dF).forEach(function (l) { var k = +l.dataset.k; l.style.translate = (-x * k) + "px " + (-y * k * .6) + "px"; }); }); })();
+  $$(".ly[data-m='x']", dF).forEach(function (l) { l.classList.add("hm"); });
+  var st = document.createElement("style"); st.textContent = "@container fr (max-width: 760px) { .d-field .ly.hm { display: none; } }"; document.head.appendChild(st);
+
+  /* ---- E bento ---- */
+  $("#eSvg").innerHTML = phoneSVG("#3b5bdb", "iphone", "lines");
+  tilt($("#eCase"), $("#eCase"));
+  function tick() { var d = new Date(), end = new Date(d); end.setHours(24, 0, 0, 0); var s = Math.max(0, Math.floor((end - d) / 1000)), p = function (n) { return fa(String(n).padStart(2, "0")); }; var sp = $$("#eCd span"); sp[0].textContent = p(Math.floor(s / 3600)); sp[1].textContent = p(Math.floor(s % 3600 / 60)); sp[2].textContent = p(s % 60); }
+  tick(); setInterval(tick, 1000);
+
+  /* ---- C scroll story ---- */
+  var caps = $$("#cCap .cap"), progs = $$("#cProg i"), wrap = $("#cWrap"), cp = 0;
+  function cProgress() { var r = wrap.getBoundingClientRect(), total = wrap.offsetHeight - window.innerHeight * .55; cp = Math.max(0, Math.min(1, -(r.top - 112) / Math.max(1, total))); var k = Math.min(2, Math.floor(cp * 3)); caps.forEach(function (c, i) { c.classList.toggle("on", i === k); }); progs.forEach(function (p, i) { p.style.setProperty("--p", Math.max(0, Math.min(1, cp * 3 - i))); }); }
+  window.addEventListener("scroll", function () { if (current === "c") cProgress(); }, { passive: true });
+
+  /* ---- three.js ---- */
+  var S = { a: null, c: null }, T = null, loading = false;
+  function weak() { var m = navigator.deviceMemory || 4, c = navigator.hardwareConcurrency || 4, n = navigator.connection; return m <= 2 || c <= 2 || !!(n && (n.saveData || /2g/.test(n.effectiveType || ""))); }
+  function gl() { try { var c = document.createElement("canvas"); return !!(window.WebGLRenderingContext && (c.getContext("webgl") || c.getContext("experimental-webgl"))); } catch (e) { return false; } }
+  function why() { return $("#lightChk").checked ? "حالت سبک" : reduce.matches ? "کاهش حرکت" : frame.clientWidth < 760 ? "موبایل" : weak() ? "دستگاه ضعیف" : !gl() ? "بدون WebGL" : ""; }
+  function activate() {
+    ["a", "c"].forEach(function (k) { if (S[k]) S[k].stop(); });
+    if (current === "c") cProgress();
+    if (current === "a" || current === "c") {
+      var vis = $(current === "a" ? "#visA" : "#visC"), tag = $(current === "a" ? "#tagA" : "#tagC"), w = why();
+      if (w) { vis.classList.add("light"); tag.textContent = "تصویر جایگزین · " + w; return; }
+      vis.classList.remove("light"); tag.textContent = current === "a" ? "سه‌بعدی" : "سه‌بعدی با اسکرول";
+      if (T) { S[current] = S[current] || (current === "a" ? buildA() : buildC()); S[current].start(); } else load(activate);
+    }
+  }
+  function load(cb) {
+    if (loading) return; loading = true;
+    var s = document.createElement("script"); s.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+    s.onload = function () { T = window.THREE; loading = false; cb(); };
+    s.onerror = function () { loading = false; $("#visA").classList.add("light"); $("#visC").classList.add("light"); };
+    document.head.appendChild(s);
+  }
+  function rr(w, h, r) { var s = new T.Shape(), x = -w / 2, y = -h / 2; s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + h - r); s.quadraticCurveTo(x + w, y + h, x + w - r, y + h); s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return s; }
+  function lin(hex) { return new T.Color(hex).convertSRGBToLinear(); }
+  function phone(color) {
+    var W = 1.62, H = 3.3, D = .2, bev = .07, g = new T.Group();
+    var geo = new T.ExtrudeGeometry(rr(W, H, .34), { depth: D, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 8, curveSegments: 28 }); geo.translate(0, 0, -D / 2);
+    var mat = new T.MeshPhysicalMaterial({ color: lin(color), roughness: .4, metalness: .05, clearcoat: 1, clearcoatRoughness: .25, envMapIntensity: .6 });
+    g.add(new T.Mesh(geo, mat)); var top = D / 2 + bev;
+    var isl = new T.Mesh(new T.ExtrudeGeometry(rr(.86, .9, .24), { depth: .05, bevelEnabled: true, bevelThickness: .02, bevelSize: .02, bevelSegments: 4, curveSegments: 16 }), new T.MeshPhysicalMaterial({ color: 0x0b1113, roughness: .25, metalness: .55, clearcoat: .6 }));
+    isl.position.set(-.34, 1.16, top); g.add(isl);
+    var ringM = new T.MeshStandardMaterial({ color: 0x9aa7aa, metalness: 1, roughness: .25 }), glassM = new T.MeshPhysicalMaterial({ color: 0x030507, roughness: .05, metalness: .2, clearcoat: 1 });
+    [[-.56, 1.36], [-.12, 1.36], [-.34, .96]].forEach(function (p) {
+      var ring = new T.Mesh(new T.TorusGeometry(.17, .035, 16, 40), ringM); ring.position.set(p[0], p[1], top + .09); g.add(ring);
+      var gl2 = new T.Mesh(new T.CylinderGeometry(.155, .155, .05, 32), glassM); gl2.rotation.x = Math.PI / 2; gl2.position.set(p[0], p[1], top + .09); g.add(gl2);
+    });
+    var cv = document.createElement("canvas"); cv.width = 512; cv.height = 1024; var x = cv.getContext("2d");
+    x.strokeStyle = "rgba(255,255,255,.75)"; x.lineWidth = 5; x.lineCap = "round"; x.beginPath(); x.moveTo(-10, 700); x.bezierCurveTo(150, 690, 340, 610, 530, 622); x.stroke();
+    x.fillStyle = "rgba(255,255,255,.85)"; x.font = "900 66px Vazirmatn, system-ui, sans-serif"; x.textAlign = "center"; x.fillText("Caseline", 256, 860);
+    var tex = new T.CanvasTexture(cv); tex.encoding = T.sRGBEncoding; tex.anisotropy = 4;
+    var dec = new T.Mesh(new T.PlaneGeometry(W, H), new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false })); dec.position.z = top + .004; g.add(dec);
+    g.userData.mat = mat; return g;
+  }
+  function stage(canvas, vis, z) {
+    var r = new T.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
+    r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75)); r.outputEncoding = T.sRGBEncoding; r.toneMapping = T.ACESFilmicToneMapping; r.toneMappingExposure = .95;
+    var sc = new T.Scene(), camera = new T.PerspectiveCamera(28, 1, .1, 60); camera.position.set(0, 0, z);
+    var env = new T.Scene(); env.add(new T.Mesh(new T.SphereGeometry(20, 24, 16), new T.MeshBasicMaterial({ color: 0x9aa3b5, side: T.BackSide })));
+    [[0xffffff, 6, 3, -8, 8, 3], [0xdfe7ff, -10, 1, 2, 6, 8], [0xffe9c4, 9, -3, 4, 4, 6], [0xffffff, 0, 10, 0, 10, 4]].forEach(function (b) { var m = new T.Mesh(new T.PlaneGeometry(b[4], b[5]), new T.MeshBasicMaterial({ color: b[0], side: T.DoubleSide })); m.position.set(b[1], b[2], b[3]); m.lookAt(0, 0, 0); env.add(m); });
+    var pm = new T.PMREMGenerator(r); sc.environment = pm.fromScene(env, .04).texture; pm.dispose();
+    sc.add(new T.HemisphereLight(0xffffff, 0x8890a0, .45)); var key = new T.DirectionalLight(0xffffff, .9); key.position.set(3, 4, 6); sc.add(key);
+    function size() { var w = vis.clientWidth, h = vis.clientHeight; if (!w || !h) return; r.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+    new ResizeObserver(size).observe(vis); size(); return { r: r, sc: sc, camera: camera };
+  }
+  function buildA() {
+    var canvas = $("#cA"), vis = $("#visA"), st = stage(canvas, vis, 8.2), g = phone(colA), ptr = { x: 0, y: 0 }, cur = { x: 0, y: 0 }, spin = 0, drag = null, run = false, t0 = performance.now(), target = lin(colA);
+    st.sc.add(g);
+    vis.addEventListener("pointermove", function (e) { var b = vis.getBoundingClientRect(); ptr.x = (e.clientX - b.left) / b.width - .5; ptr.y = (e.clientY - b.top) / b.height - .5; if (drag) { drag.ry += (e.clientX - drag.x) * .01; drag.x = e.clientX; } });
+    canvas.addEventListener("pointerdown", function (e) { drag = { x: e.clientX, ry: 0 }; canvas.setPointerCapture(e.pointerId); });
+    window.addEventListener("pointerup", function () { if (drag) { spin += drag.ry; drag = null; } });
+    vis.addEventListener("pointerleave", function () { ptr.x = 0; ptr.y = 0; });
+    canvas.addEventListener("keydown", function (e) { if (e.key === "ArrowLeft") { spin -= .35; e.preventDefault(); } if (e.key === "ArrowRight") { spin += .35; e.preventDefault(); } });
+    function fr() { if (!run) return; var t = (performance.now() - t0) / 1000; cur.x += (ptr.x - cur.x) * .06; cur.y += (ptr.y - cur.y) * .06; g.rotation.y = Math.sin(t * .55) * .4 + cur.x * .7 + spin + (drag ? drag.ry : 0); g.rotation.x = cur.y * .35 - .04; g.rotation.z = Math.sin(t * .4) * .03 - .09; g.position.y = Math.sin(t * .9) * .07; g.userData.mat.color.lerp(target, .12); st.r.render(st.sc, st.camera); requestAnimationFrame(fr); }
+    g.rotation.set(-.04, .3, -.09); g.userData.mat.color.copy(target); st.r.render(st.sc, st.camera);
+    return { start: function () { if (!run) { run = true; fr(); } }, stop: function () { run = false; }, rotate: function (d) { spin += d * .5; if (!run) { g.rotation.y = .3 + spin; st.r.render(st.sc, st.camera); } }, setColor: function (c) { target = lin(c); if (!run) { g.userData.mat.color.copy(target); st.r.render(st.sc, st.camera); } } };
+  }
+  function buildC() {
+    var canvas = $("#cC"), vis = $("#visC"), st = stage(canvas, vis, 8.4), g = phone(colA), run = false, target = lin(colA), cy = 0, cx = 0, cz = 8.4, cs = 1;
+    g.userData.mat.color.copy(target); st.sc.add(g);
+    var views = [[0, 0, 8.4, 0], [-.35, 1.0, 4.4, -.35], [.5, 0, 8.4, 2.4]]; /* camera targets per step: [yawOffset, y, z, ...] */
+    function fr() {
+      if (!run) return; var p = cp, k = Math.min(2, p * 3), i = Math.floor(k), f = k - i, v1 = views[i], v2 = views[Math.min(2, i + 1)], e = f * f * (3 - 2 * f);
+      var yaw = p * Math.PI * 2.2, ty = v1[1] + (v2[1] - v1[1]) * e, tz = v1[2] + (v2[2] - v1[2]) * e;
+      cy += (yaw - cy) * .1; cx += (ty - cx) * .1; cz += (tz - cz) * .1;
+      g.rotation.y = cy; g.rotation.x = -.05; g.rotation.z = -.07; g.position.y = -cx * .55; st.camera.position.z = cz; st.camera.position.y = 0;
+      g.userData.mat.color.lerp(target, .12); st.r.render(st.sc, st.camera); requestAnimationFrame(fr);
+    }
+    g.rotation.set(-.05, 0, -.07); st.r.render(st.sc, st.camera);
+    return { start: function () { if (!run) { run = true; fr(); } }, stop: function () { run = false; }, setColor: function (c) { target = lin(c); } };
+  }
+  var obs = new IntersectionObserver(function () { activate(); }, { threshold: .05 }); obs.observe($("#visA")); obs.observe($("#visC"));
+  document.addEventListener("visibilitychange", function () { if (document.hidden) { ["a", "c"].forEach(function (k) { if (S[k]) S[k].stop(); }); } else activate(); });
+  window.addEventListener("resize", activate);
+  activate();
+})();
+</script>
