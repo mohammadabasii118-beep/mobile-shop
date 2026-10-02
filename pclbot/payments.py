@@ -1,4 +1,6 @@
+import json
 import logging
+import re
 from html import escape
 
 import aiohttp
@@ -38,7 +40,8 @@ async def create_payment(uid: int, amount: int) -> str | None:
         log.error("zarinpal rejected: %s", res)
         return None
     await db.add_tx(uid, amount, "topup", "زرین‌پال", status="pending", authority=data["authority"])
-    return config.ZARINPAL_STARTPAY_URL.rstrip("/") + "/" + data["authority"]
+    base = config.ZARINPAL_PAY_PAGE_URL or config.ZARINPAL_STARTPAY_URL
+    return base.rstrip("/") + "/" + data["authority"]
 
 
 def _page(ok: bool, text: str) -> web.Response:
@@ -49,6 +52,25 @@ def _page(ok: bool, text: str) -> web.Response:
             f'<h2 style="color:{color}">{"✅" if ok else "❌"} {escape(text)}</h2>'
             f'<p>برای ادامه به ربات تلگرام برگردید.</p></body></html>')
     return web.Response(text=html, content_type="text/html")
+
+
+AUTHORITY_RE = re.compile(r"^[A-Za-z0-9]{30,40}$")
+
+
+async def pay_redirect(request: web.Request) -> web.Response:
+    """Hop through our own domain so the gateway sees it (not Telegram) as the referrer."""
+    authority = request.match_info["authority"]
+    if not AUTHORITY_RE.match(authority):
+        raise web.HTTPNotFound()
+    target = config.ZARINPAL_STARTPAY_URL.rstrip("/") + "/" + authority
+    html = (f'<!doctype html><html lang="fa" dir="rtl"><meta charset="utf-8">'
+            f'<meta name="viewport" content="width=device-width,initial-scale=1">'
+            f'<meta http-equiv="refresh" content="0;url={escape(target)}">'
+            f'<body style="font-family:sans-serif;text-align:center;padding:48px 16px">'
+            f'<p>در حال انتقال به درگاه پرداخت...</p>'
+            f'<p><a href="{escape(target)}">اگر منتقل نشدید اینجا بزنید</a></p>'
+            f'<script>location.href={json.dumps(target)}</script></body></html>')
+    return web.Response(text=html, content_type="text/html", headers={"Referrer-Policy": "origin"})
 
 
 async def callback(request: web.Request) -> web.Response:
@@ -84,6 +106,7 @@ async def start_web(bot: Bot) -> web.AppRunner:
     app = web.Application()
     app["bot"] = bot
     app.router.add_get("/zarinpal/callback", callback)
+    app.router.add_get("/pay/{authority}", pay_redirect)
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, config.WEB_HOST, config.WEB_PORT).start()
