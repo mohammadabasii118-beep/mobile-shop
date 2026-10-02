@@ -4,7 +4,7 @@ import logging
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 
-from . import config, db
+from . import admins, db
 from .texts import money, render_ad
 
 log = logging.getLogger("pclbot")
@@ -18,7 +18,7 @@ async def notify(bot: Bot, uid: int, text: str, **kw) -> None:
 
 
 async def notify_admins(bot: Bot, text: str, **kw) -> None:
-    for aid in config.ADMIN_IDS:
+    for aid in admins.all_ids():
         await notify(bot, aid, text, **kw)
 
 

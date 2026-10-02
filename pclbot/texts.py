@@ -45,6 +45,12 @@ TX_TITLE = {
 }
 
 
+AD_FOOTER = (
+    "🔮 The Biggest Transfer Market for Iranian Teams &amp; Players.\n"
+    "👉 Join us: @PCL_ProClubs"
+)
+
+
 def fields_of(kind: str) -> list[tuple[str, str, str]]:
     return PLAYER_FIELDS if kind == "player" else TEAM_FIELDS
 
@@ -103,7 +109,7 @@ def render_ad(ad: dict, user: dict | None = None, preview: bool = False) -> str:
         tags = "#جذب_بازیکن #PCL"
     if d.get("notes"):
         body += f"📝 <b>توضیحات:</b> {e(d['notes'])}\n"
-    body += f"{line}\n📩 <b>ارتباط:</b> {contact_line(ad, user)}\n\n{tags}"
+    body += f"{line}\n📩 <b>ارتباط:</b> {contact_line(ad, user)}\n\n{tags}\n\n{AD_FOOTER}"
     return body
 
 

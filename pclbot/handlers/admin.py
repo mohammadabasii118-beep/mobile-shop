@@ -8,9 +8,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from .. import db, services
+from .. import admins, db, gate, services
 from ..keyboards import back, btn, kb, pairs
 from ..texts import STATUS_TITLE, TX_TITLE, fmt_date, money, render_ad
+
+L = "━━━━━━━━━━━━━━"
 from ..utils import is_admin, show
 
 router = Router()
@@ -46,29 +48,33 @@ class AdminSt(StatesGroup):
     balance = State()
     gift = State()
     badge = State()
+    admin_add = State()
+    channel = State()
 
 
-def panel_menu():
+def panel_menu(uid: int):
     items = [
         btn("📊 آمار", "adm:stats"), btn("👥 کاربران", "adm:users"),
         btn("📋 آگهی‌ها", "adm:ads"), btn("💵 تراکنش‌ها", "adm:tx"),
         btn("⚙️ تعرفه و تنظیمات", "adm:set"), btn("🎁 کارت‌های هدیه", "adm:gifts"),
         btn("🏅 نشان‌ها", "adm:badges"), btn("📡 گروه انتشار", "adm:pub"),
-        btn("📣 پیام همگانی", "adm:bc"),
+        btn("📣 پیام همگانی", "adm:bc"), btn("📢 جوین اجباری", "adm:ch"),
     ]
+    if admins.is_super(uid):
+        items.append(btn("👮 مدیران", "adm:admins"))
     return kb(pairs(items) + [back("menu", "🔙 منوی اصلی")])
 
 
 @router.message(Command("admin"))
 async def admin_cmd(m: Message, state: FSMContext):
     await state.clear()
-    await m.answer("🛠 <b>پنل مدیریت</b>", reply_markup=panel_menu())
+    await m.answer("🛠 <b>پنل مدیریت</b>", reply_markup=panel_menu(m.from_user.id))
 
 
 @router.callback_query(F.data == PANEL)
 async def panel(c: CallbackQuery, state: FSMContext):
     await state.clear()
-    await show(c, "🛠 <b>پنل مدیریت</b>", panel_menu())
+    await show(c, "🛠 <b>پنل مدیریت</b>", panel_menu(c.from_user.id))
     await c.answer()
 
 
@@ -431,6 +437,148 @@ async def bc_send(m: Message, state: FSMContext):
             pass
         await asyncio.sleep(0.05)  # stay under Telegram's broadcast rate limit
     await status.edit_text(f"✅ ارسال شد: {ok} از {len(ids)}", reply_markup=kb([back(PANEL)]))
+
+
+# ---- admins (super admins only) ---------------------------------------
+async def display_name(uid: int) -> str:
+    u = await db.get_user(uid)
+    return f"{u['name']} ({uid})" if u else str(uid)
+
+
+async def need_super(c: CallbackQuery) -> bool:
+    if admins.is_super(c.from_user.id):
+        return True
+    await c.answer("فقط مدیر اصلی به این بخش دسترسی دارد.", show_alert=True)
+    return False
+
+
+@router.callback_query(F.data == "adm:admins")
+async def admins_menu(c: CallbackQuery, state: FSMContext | None):
+    if not await need_super(c):
+        return
+    if state:
+        await state.clear()
+    lines, btns = [], []
+    for uid in admins.all_ids():
+        name = await display_name(uid)
+        if admins.is_super(uid):
+            lines.append(f"🔒 {name} — مدیر اصلی")
+        else:
+            lines.append(f"👤 {name}")
+            btns.append(btn(f"🗑 {name}"[:40], f"adm:arm:{uid}"))
+    await show(c, "👮 <b>مدیران ربات</b>\n" + L + "\n" + "\n".join(lines) +
+               "\n\n🔒 مدیران اصلی از فایل تنظیمات خوانده می‌شن و از اینجا حذف نمی‌شن.",
+               kb([[btn("➕ افزودن مدیر", "adm:aadd")], *pairs(btns), [btn("🔙 بازگشت", PANEL)]]))
+    await c.answer()
+
+
+@router.callback_query(F.data == "adm:aadd")
+async def admin_add_ask(c: CallbackQuery, state: FSMContext):
+    if not await need_super(c):
+        return
+    await state.set_state(AdminSt.admin_add)
+    await show(c, "✍️ آیدی عددی مدیر جدید رو بفرست.\n(یا @یوزرنیم، به شرطی که قبلاً ربات رو استارت کرده باشه)",
+               kb([back("adm:admins")]))
+    await c.answer()
+
+
+@router.message(AdminSt.admin_add, F.text)
+async def admin_add_do(m: Message, state: FSMContext, bot: Bot):
+    if not admins.is_super(m.from_user.id):
+        return
+    q = m.text.strip().lstrip("@")
+    uid = int(q) if q.lstrip("-").isdigit() else None
+    if uid is None:
+        row = await db.fetchone("SELECT id FROM users WHERE username=?", q)
+        uid = row["id"] if row else None
+    if not uid or uid <= 0:
+        return await m.answer("😕 کاربری پیدا نشد. آیدی عددی بفرست یا از کاربر بخواه ربات رو استارت کنه.",
+                              reply_markup=kb([back("adm:admins")]))
+    await state.clear()
+    if admins.is_admin(uid):
+        return await m.answer("ℹ️ این کاربر از قبل مدیره.", reply_markup=kb([back("adm:admins")]))
+    await admins.add(uid, m.from_user.id)
+    await services.notify(bot, uid, "🛠 شما به‌عنوان مدیر ربات اضافه شدید. برای ورود به پنل /admin رو بزنید.")
+    await m.answer(f"✅ {await display_name(uid)} به مدیران اضافه شد.", reply_markup=kb([back("adm:admins")]))
+
+
+@router.callback_query(F.data.startswith("adm:arm:"))
+async def admin_rm_ask(c: CallbackQuery):
+    if not await need_super(c):
+        return
+    uid = int(c.data[8:])
+    await show(c, f"🗑 {await display_name(uid)} از مدیران حذف بشه؟",
+               kb([[btn("✅ بله، حذف کن", f"adm:ard:{uid}"), btn("🔙 نه", "adm:admins")]]))
+    await c.answer()
+
+
+@router.callback_query(F.data.startswith("adm:ard:"))
+async def admin_rm_do(c: CallbackQuery, bot: Bot):
+    if not await need_super(c):
+        return
+    uid = int(c.data[8:])
+    if not await admins.remove(uid):
+        return await c.answer("مدیر اصلی قابل حذف نیست.", show_alert=True)
+    await services.notify(bot, uid, "ℹ️ دسترسی مدیریت شما برداشته شد.")
+    await c.answer("حذف شد")
+    await admins_menu(c, None)
+
+
+# ---- forced join channels ----------------------------------------------
+@router.callback_query(F.data == "adm:ch")
+async def channels_menu(c: CallbackQuery, state: FSMContext):
+    await state.clear()
+    rows = await db.fetchall("SELECT * FROM channels ORDER BY id")
+    lines = [f"📢 {r['title']} — {r['link']}" for r in rows]
+    btns = [btn(f"🗑 {r['title']}"[:40], f"adm:chd:{r['id']}") for r in rows]
+    await show(c, "📢 <b>جوین اجباری</b>\n" + L + "\n" + ("\n".join(lines) or "هیچ کانالی تنظیم نشده؛ ربات بدون عضویت اجباری کار می‌کنه.") +
+               "\n\nربات باید در کانال یا گروه <b>ادمین</b> باشه تا بتونه عضویت رو چک کنه. مدیران از این شرط معافن.",
+               kb([[btn("➕ افزودن کانال", "adm:chadd")], *pairs(btns), [btn("🔙 بازگشت", PANEL)]]))
+    await c.answer()
+
+
+@router.callback_query(F.data == "adm:chadd")
+async def channel_add_ask(c: CallbackQuery, state: FSMContext):
+    await state.set_state(AdminSt.channel)
+    await show(c, "✍️ یکی از این قالب‌ها رو بفرست:\n\n"
+                  "• کانال عمومی: <code>@PCL_ProClubs</code>\n"
+                  "• کانال خصوصی: <code>-1001234567890 https://t.me/+لینک_دعوت</code>",
+               kb([back("adm:ch")]))
+    await c.answer()
+
+
+@router.message(AdminSt.channel, F.text)
+async def channel_add_do(m: Message, state: FSMContext, bot: Bot):
+    parts = m.text.split()
+    ref = parts[0]
+    try:
+        chat = await bot.get_chat(int(ref) if ref.lstrip("-").isdigit() else ref)
+        me = await bot.get_chat_member(chat.id, bot.id)
+    except TelegramAPIError as ex:
+        return await m.answer(f"⚠️ کانال پیدا نشد یا ربات داخلش نیست: {ex}", reply_markup=kb([back("adm:ch")]))
+    if me.status not in ("administrator", "creator"):
+        return await m.answer("⚠️ اول ربات رو در این کانال ادمین کن، بعد دوباره بفرست.", reply_markup=kb([back("adm:ch")]))
+    link = parts[1] if len(parts) > 1 else (f"https://t.me/{chat.username}" if chat.username else None)
+    if not link:
+        try:
+            link = await bot.export_chat_invite_link(chat.id)
+        except TelegramAPIError:
+            return await m.answer("⚠️ این کانال خصوصیه؛ لینک دعوتش رو بعد از آیدی بفرست.", reply_markup=kb([back("adm:ch")]))
+    if not link.startswith("https://"):
+        return await m.answer("⚠️ لینک باید با https:// شروع بشه.", reply_markup=kb([back("adm:ch")]))
+    if await db.fetchone("SELECT 1 FROM channels WHERE chat=?", str(chat.id)):
+        return await m.answer("ℹ️ این کانال قبلاً اضافه شده.", reply_markup=kb([back("adm:ch")]))
+    await db.execute("INSERT INTO channels(chat,title,link) VALUES(?,?,?)", str(chat.id), chat.title or ref, link)
+    await state.clear()
+    await m.answer(f"✅ «{chat.title}» به جوین اجباری اضافه شد.", reply_markup=kb([back("adm:ch")]))
+
+
+@router.callback_query(F.data.startswith("adm:chd:"))
+async def channel_del(c: CallbackQuery, state: FSMContext):
+    await db.execute("DELETE FROM channels WHERE id=?", int(c.data[8:]))
+    gate._ok.clear()
+    await c.answer("حذف شد")
+    await channels_menu(c, state)
 
 
 # ---- support replies ---------------------------------------------------

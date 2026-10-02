@@ -6,7 +6,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from . import config, db, payments, services
+from . import admins, config, db, payments, services
 from .handlers import admin, ads, user, wallet
 from .utils import UserMiddleware
 
@@ -16,6 +16,7 @@ async def main() -> None:
     if not config.BOT_TOKEN:
         raise SystemExit("BOT_TOKEN تنظیم نشده است (فایل .env را ببینید).")
     await db.init()
+    await admins.load()
     bot = Bot(config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher(storage=MemoryStorage())
     dp.message.outer_middleware(UserMiddleware())

@@ -247,12 +247,12 @@ async def confirm(c: CallbackQuery, state: FSMContext, bot: Bot):
 
 
 async def notify_admins_new(bot: Bot, ad_id: int, edited: bool = False) -> None:
-    from ..config import ADMIN_IDS
+    from .. import admins
     ad = await db.get_ad(ad_id)
     user = await db.get_user(ad["user_id"])
     markup = kb([[btn("✅ تأیید", f"adm:ok:{ad_id}"), btn("❌ رد", f"adm:no:{ad_id}")],
                  [btn("✏️ ویرایش", f"ad:ed:{ad_id}"), btn("🗑 حذف", f"adm:del:{ad_id}")]])
-    for aid in ADMIN_IDS:
+    for aid in admins.all_ids():
         try:
             await bot.send_message(aid, f"{'✏️ ویرایش آگهی' if edited else '🆕 آگهی جدید'} #{ad_id} از {user['name']} (<code>{user['id']}</code>)")
             await send_ad(bot, aid, ad, markup, user)

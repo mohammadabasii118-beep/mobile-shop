@@ -1,13 +1,13 @@
 from aiogram import Bot, F, Router
-from aiogram.filters import CommandObject, CommandStart
+from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from .. import db
+from .. import db, gate
 from ..keyboards import back, btn, kb, main_menu
 from ..texts import fmt_date, money
-from ..utils import is_admin, show
+from ..utils import is_admin, parse_ref, show
 
 router = Router()
 
@@ -27,13 +27,19 @@ async def menu_text() -> str:
 
 
 @router.message(CommandStart())
-async def start(m: Message, command: CommandObject, state: FSMContext):
+async def start(m: Message, state: FSMContext):
     await state.clear()
-    ref = None
-    if command.args and command.args.startswith("ref_") and command.args[4:].isdigit():
-        ref = int(command.args[4:])
-    _, new = await db.ensure_user(m.from_user.id, m.from_user.full_name, m.from_user.username, ref)
+    await db.ensure_user(m.from_user.id, m.from_user.full_name, m.from_user.username, parse_ref(m.text))
     await m.answer(await menu_text(), reply_markup=main_menu(is_admin(m.from_user.id)))
+
+
+@router.callback_query(F.data == "chk")
+async def check_join(c: CallbackQuery, bot: Bot):
+    gate.invalidate(c.from_user.id)
+    if not is_admin(c.from_user.id) and await gate.missing(bot, c.from_user.id):
+        return await c.answer("هنوز عضو همه کانال‌ها نشدی ❗️", show_alert=True)
+    await c.answer("✅ تأیید شد")
+    await show(c, await menu_text(), main_menu(is_admin(c.from_user.id)))
 
 
 @router.callback_query(F.data == "menu")
@@ -171,8 +177,8 @@ async def support_msg(m: Message, state: FSMContext, bot: Bot):
     uname = f"@{u.username}" if u.username else "—"
     head = f"📨 <b>پیام پشتیبانی</b> — {cat}\n👤 {u.full_name} | {uname} | <code>{u.id}</code>\n━━━━━━━━━━━━━━\n"
     markup = kb([[btn("↩️ پاسخ", f"reply:{u.id}")]])
-    from ..config import ADMIN_IDS
-    for aid in ADMIN_IDS:
+    from .. import admins
+    for aid in admins.all_ids():
         try:
             if m.text:
                 await bot.send_message(aid, head + m.html_text, reply_markup=markup)
