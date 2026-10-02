@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../../db/client';
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import { audit } from '../admin/audit';
+import { getVpnProvider } from '../../providers/vpn';
 
 const F = {
   name: z.string().trim().min(1).max(80),
@@ -41,21 +42,34 @@ export async function getProduct(id: string) {
   return p;
 }
 
+/**
+ * The inbound must exist (and be enabled) on the real panel — a typo here is what makes every paid order fail provisioning.
+ * If the panel itself is unreachable we do not block the admin (provisioning retries/alerts cover that case).
+ */
+export async function assertInbound(id: number) {
+  let info;
+  try { info = await getVpnProvider().getInbound(id); } catch { return; }
+  if (!info) throw new ValidationError(`inbound شماره ${id} در پنل X-UI پیدا نشد. شماره را از لیست inboundهای پنل بردارید.`);
+  if (!info.enable) throw new ValidationError(`inbound شماره ${id} در پنل غیرفعال است. اول آن را در پنل فعال کنید.`);
+}
+
 async function assertCategory(id: string) {
   if (!(await prisma.category.findUnique({ where: { id }, select: { id: true } }))) throw new ValidationError('دسته‌بندی انتخاب‌شده وجود ندارد');
 }
 
-export async function createProduct(actor: string, input: ProductInput) {
+export async function createProduct(actor: string, input: ProductInput, opts: { verifyInbound?: boolean } = {}) {
   const data = productInput.parse(input);
+  if (opts.verifyInbound !== false) await assertInbound(data.xuiInboundId);
   if (data.categoryId) await assertCategory(data.categoryId);
   const p = await prisma.product.create({ data });
   await audit({ actor, action: 'product.create', target: 'Product', targetId: p.id, metadata: data });
   return p;
 }
 
-export async function updateProduct(actor: string, id: string, patch: Partial<ProductInput>) {
+export async function updateProduct(actor: string, id: string, patch: Partial<ProductInput>, opts: { verifyInbound?: boolean } = {}) {
   const before = await getProduct(id);
   const data = productPatch.parse(patch);
+  if (data.xuiInboundId !== undefined && data.xuiInboundId !== before.xuiInboundId && opts.verifyInbound !== false) await assertInbound(data.xuiInboundId);
   if (data.categoryId) await assertCategory(data.categoryId);
   const p = await prisma.product.update({ where: { id }, data });
   await audit({
@@ -144,6 +158,7 @@ export async function createProductsBulk(actor: string, text: string, defaults: 
   const out = [...errors];
   items.forEach((p, n) => { if (seen.has(key(p as any))) out.push(`محصول ${n + 1} («${p.name}»): تکراری است`); seen.add(key(p as any)); });
   if (out.length) throw new ValidationError(`هیچ محصولی ثبت نشد:\n${out.slice(0, 10).join('\n')}${out.length > 10 ? `\n… و ${out.length - 10} خطای دیگر` : ''}`);
+  for (const id of new Set(items.map((p) => p.xuiInboundId))) await assertInbound(id);
   const top = (await prisma.product.aggregate({ _max: { sortOrder: true } }))._max.sortOrder ?? 0;
   const { ensureCategoryPath } = await import('../categories/service');
   const catIds = new Map<string, string>();

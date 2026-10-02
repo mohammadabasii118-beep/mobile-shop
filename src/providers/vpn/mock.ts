@@ -8,7 +8,7 @@ export class MockVpnProvider implements VpnProvider {
   clients = new Map<string, MockClient>();
   failNext = 0;
   createCalls = 0;
-  inbounds = new Map<number, { enable: boolean; protocol: string }>([[1, { enable: true, protocol: 'vless' }]]);
+  inbounds = new Map<number, { enable: boolean; protocol: string }>([1, 2, 23, 25].map((id) => [id, { enable: true, protocol: 'vless' }] as [number, { enable: boolean; protocol: string }]));
 
   private maybeFail() {
     if (this.failNext > 0) { this.failNext--; throw new ProviderError('mock: panel unavailable', true); }

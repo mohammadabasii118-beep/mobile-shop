@@ -25,7 +25,7 @@ export function setup() {
 let tg = 1000;
 export const makeUser = (id = ++tg) => upsertUser({ id, username: `u${id}`, first_name: 'T' });
 export const makeProduct = (over: Partial<Parameters<typeof createProduct>[1]> = {}) =>
-  createProduct('test', { name: '50GB / 30d', durationDays: 30, trafficGB: 50, price: 250000, xuiInboundId: 1, protocol: 'VLESS', ...over });
+  createProduct('test', { name: '50GB / 30d', durationDays: 30, trafficGB: 50, price: 250000, xuiInboundId: 1, protocol: 'VLESS', ...over }, { verifyInbound: false });
 
 export async function makeOrder(userId: string, productId: string, extra: Partial<Parameters<typeof createOrder>[0]> = {}) {
   return (await createOrder({ userId, productId, paymentMethod: 'CARD_TO_CARD', ...extra })).order;
