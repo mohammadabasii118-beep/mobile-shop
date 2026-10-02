@@ -165,7 +165,7 @@ export interface AppSettings {
   notifyPush: boolean;
   twoFactor: boolean;
   instagram: { account: string; businessAccountId: string; accessToken: string; webhook: "verified" | "pending" };
-  telegram: { botToken: string; channel: string; webhook: "verified" | "pending" };
+  telegram: { botToken: string; channel: string; webhook: "verified" | "pending" | "polling"; live: boolean };
 }
 
 export type StepStatus = "pending" | "running" | "success" | "warning" | "error";

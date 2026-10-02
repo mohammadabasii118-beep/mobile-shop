@@ -50,21 +50,13 @@ const SAMPLE_PRODUCTS = [
 ];
 
 /* ---------- Telegram → Instagram ---------- */
-export async function simulateTelegramPost(opts: { forFullDemo?: boolean } = {}) {
+/** Runs the Telegram → Instagram workflow for a post that is already stored (used by both the simulator and the live poller). */
+export async function processTelegramPost(tg: TelegramPost) {
   const db = getDb();
   const o = db.options;
   const p = new Pipeline("Telegram → Instagram", "automation.telegram");
-  const sample = pick(SAMPLE_PRODUCTS);
-  const isVideo = Math.random() < 0.25;
-
-  const tg: TelegramPost = {
-    id: nextId("tg"), title: sample.title, price: sample.price, mediaType: isVideo ? "video" : "photo",
-    caption: `${sample.title} — قیمت: ${new Intl.NumberFormat("en-US").format(sample.price)} تومان`,
-    imageUrl: placeholderImage(sample.emoji, db.seq, sample.title.slice(0, 16)), date: new Date().toISOString(), views: 0, status: "processing",
-  };
-  db.telegramPosts.unshift(tg);
-  db.channel.members += 1;
-  p.step("received", "Telegram Post Received", `${db.channel.username} · ${sample.title}`);
+  const isVideo = tg.mediaType === "video";
+  p.step("received", "Telegram Post Received", `${db.channel.username} · ${tg.title}`);
 
   const postOn = isActive("tg-ig-post") && o.publishPost;
   const storyOn = isActive("tg-ig-story") && o.publishStory;
@@ -77,7 +69,7 @@ export async function simulateTelegramPost(opts: { forFullDemo?: boolean } = {})
   p.step("media", "Media Processed", isVideo ? "Video transcoded to 9:16 / 1080p" : "Image resized to 1080×1080");
   let caption = tg.caption;
   if (o.aiCaption) {
-    caption = await getProviders().ai.generateCaption({ title: sample.title, price: sample.price, addHashtags: o.addHashtags });
+    caption = await getProviders().ai.generateCaption({ title: tg.title, price: tg.price, addHashtags: o.addHashtags });
     p.step("caption", "AI Caption Generated", o.addHashtags ? "Persian caption + hashtags" : "Persian caption");
   } else if (o.copyCaption) {
     p.step("caption", "Caption Copied", "Original Telegram caption reused");
@@ -91,7 +83,7 @@ export async function simulateTelegramPost(opts: { forFullDemo?: boolean } = {})
     p.step("ig-post", kind === "reel" ? "Instagram Reel Created" : "Instagram Post Created", `Post ${post.id}`);
   }
   if (storyOn) {
-    const story = await publishStory({ imageUrl: tg.imageUrl, label: sample.title.slice(0, 18), source: "telegram" });
+    const story = await publishStory({ imageUrl: tg.imageUrl, label: tg.title.slice(0, 18), source: "telegram" });
     p.step("ig-story", "Instagram Story Created", `Story ${story.id}`);
   }
   tg.status = "published";
@@ -99,9 +91,22 @@ export async function simulateTelegramPost(opts: { forFullDemo?: boolean } = {})
     notify("success", "Instagram post published");
     p.step("notify", "Admin Notified", "Notification sent");
   }
-  recordExecution("tg-ig-post", true, `${sample.title} published`);
-  if (storyOn) recordExecution("tg-ig-story", true, `${sample.title} story published`);
+  recordExecution("tg-ig-post", true, `${tg.title} published`);
+  if (storyOn) recordExecution("tg-ig-story", true, `${tg.title} story published`);
   return { run: p.toRun(), telegramPost: tg, instagramPostId: igPostId };
+}
+
+export async function simulateTelegramPost(_opts: { forFullDemo?: boolean } = {}) {
+  const db = getDb();
+  const sample = pick(SAMPLE_PRODUCTS);
+  const tg: TelegramPost = {
+    id: nextId("tg"), title: sample.title, price: sample.price, mediaType: Math.random() < 0.25 ? "video" : "photo",
+    caption: `${sample.title} — قیمت: ${new Intl.NumberFormat("en-US").format(sample.price)} تومان`,
+    imageUrl: placeholderImage(sample.emoji, db.seq, sample.title.slice(0, 16)), date: new Date().toISOString(), views: 0, status: "processing",
+  };
+  db.telegramPosts.unshift(tg);
+  db.channel.members += 1;
+  return processTelegramPost(tg);
 }
 
 /* ---------- Comments ---------- */

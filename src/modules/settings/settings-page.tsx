@@ -77,7 +77,7 @@ export function SettingsPage() {
           )}
           {tab === "telegram" && (
             <>
-              <CardHeader title="Telegram connection" action={<DemoNote />} />
+              <CardHeader title="Telegram connection" action={data.telegram.live ? <Badge tone="success">LIVE</Badge> : <DemoNote />} />
               <div className="grid gap-4 p-5 pt-2 sm:grid-cols-2">
                 <Readonly label="Channel" value={data.telegram.channel} />
                 <Readonly label="Bot token (masked)" value={data.telegram.botToken} />

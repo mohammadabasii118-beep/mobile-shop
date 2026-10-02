@@ -4,15 +4,34 @@ import { Eye, FileText, Radio, Send, Users, Video } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/shared/empty-state";
 import { PageHeader } from "@/components/shared/page-header";
 import { GridSkeleton } from "@/components/shared/query-state";
 import { StatCard } from "@/components/shared/stat-card";
 import { StatusBadge } from "@/components/shared/status-badge";
-import { useTelegram } from "@/hooks/api";
+import { useTelegram, type TelegramLive } from "@/hooks/api";
 import { useSimulation } from "@/modules/simulation/simulation-provider";
 import { useFmt } from "@/hooks/use-fmt";
 import { useT } from "@/i18n/provider";
 import type { TelegramChannelInfo, TelegramPost } from "@/types";
+
+function LiveStatus({ live }: { live: TelegramLive }) {
+  const t = useT();
+  const { timeAgo } = useFmt();
+  if (!live.enabled) return null;
+  return (
+    <Card className={`flex items-start gap-3 p-4 ${live.error ? "border-danger/40 bg-danger/5" : ""}`}>
+      <span className={`mt-1 size-2.5 shrink-0 rounded-full ${live.error ? "bg-danger" : "bg-success"}`} />
+      <div className="text-sm">
+        <p className="font-medium">{live.error ? t("Telegram connection problem") : t("Telegram is LIVE")}</p>
+        <p dir="auto" className="text-xs text-muted-foreground">
+          {live.error ?? (live.lastPollAt ? `${t("Last check")}: ${timeAgo(live.lastPollAt)}` : t("Connecting…"))}
+        </p>
+        {live.error && <p className="mt-1 text-xs text-muted-foreground">{t("Make sure the bot is an admin of the channel and the token is correct.")}</p>}
+      </div>
+    </Card>
+  );
+}
 
 function ChannelCard({ channel }: { channel: TelegramChannelInfo }) {
   const { nf } = useFmt();
@@ -60,6 +79,7 @@ export function TelegramOverviewPage() {
       <PageHeader title="Telegram Overview" description="Channel status and latest content." actions={<Button onClick={() => simulate("telegram")} disabled={busy}><Send className="size-4" />{t("Simulate New Telegram Post")}</Button>} />
       {!data ? <GridSkeleton count={3} className="h-40" /> : (
         <div className="space-y-6">
+          <LiveStatus live={data.live} />
           <ChannelCard channel={data.channel} />
           <div className="grid gap-4 sm:grid-cols-3">
             <StatCard label="Members" value={data.channel.members} icon={Users} tone="bg-info/12 text-info" />
@@ -84,16 +104,17 @@ export function TelegramChannelPage() {
       <PageHeader title="Telegram Channel" description="Connection details (demo values)." />
       {!data ? <GridSkeleton count={1} className="h-40" /> : (
         <div className="space-y-6">
+          <LiveStatus live={data.live} />
           <ChannelCard channel={data.channel} />
           <Card>
             <CardHeader title="Channel details" />
             <dl className="grid gap-4 p-5 pt-2 sm:grid-cols-2">
-              {[["Channel name", data.channel.name], ["Username", data.channel.username], ["Status", "Connected"], ["Bot permissions", "Read posts · Post as admin"], ["Webhook", "Verified (mock)"], ["Source", "Mock Telegram provider"]].map(([k, v]) => (
+              {[["Channel name", data.channel.name], ["Username", data.channel.username], ["Status", "Connected"], ["Bot permissions", "Read posts · Post as admin"], ["Webhook", data.live.enabled ? "Live (polling)" : "Verified (mock)"], ["Source", data.live.enabled ? "Telegram Bot API (live)" : "Mock Telegram provider"]].map(([k, v]) => (
                 <div key={k}><dt className="text-xs text-muted-foreground">{t(k)}</dt><dd className="mt-0.5 text-sm font-medium">{t(v)}</dd></div>
               ))}
             </dl>
           </Card>
-          <p className="flex items-center gap-2 text-xs text-muted-foreground"><Radio className="size-3.5" />{t("Real channel linking arrives in the integration phase.")}</p>
+          {!data.live.enabled && <p className="flex items-center gap-2 text-xs text-muted-foreground"><Radio className="size-3.5" />{t("Real channel linking arrives in the integration phase.")}</p>}
         </div>
       )}
     </div>
@@ -107,7 +128,12 @@ export function TelegramPostsPage() {
   return (
     <div>
       <PageHeader title="Telegram Posts" description="Posts received from your channel." actions={<Button onClick={() => simulate("telegram")} disabled={busy}><Send className="size-4" />{t("Simulate New Telegram Post")}</Button>} />
-      {!data ? <GridSkeleton /> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{data.posts.map((p) => <TelegramPostCard key={p.id} p={p} />)}</div>}
+      {!data ? <GridSkeleton /> : (
+        <div className="space-y-4">
+          <LiveStatus live={data.live} />
+          {data.posts.length === 0 ? <Card><EmptyState icon={FileText} title="No posts yet" description="New channel posts appear here automatically. Telegram does not share older history with bots." /></Card> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{data.posts.map((p) => <TelegramPostCard key={p.id} p={p} />)}</div>}
+        </div>
+      )}
     </div>
   );
 }

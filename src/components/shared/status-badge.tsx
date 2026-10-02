@@ -7,7 +7,7 @@ const MAP: Record<string, { tone: Tone; label?: string }> = {
   scheduled: { tone: "info" }, new: { tone: "info" }, info: { tone: "info" }, processing: { tone: "info" },
   paused: { tone: "neutral" }, ignored: { tone: "neutral" }, draft: { tone: "neutral" },
   failed: { tone: "danger" }, error: { tone: "danger" }, out_of_stock: { tone: "danger", label: "Out of stock" }, disconnected: { tone: "danger" },
-  warning: { tone: "warning" }, pending: { tone: "warning" },
+  warning: { tone: "warning" }, pending: { tone: "warning" }, polling: { tone: "success", label: "Live (polling)" },
 };
 
 export function StatusBadge({ status }: { status: string }) {

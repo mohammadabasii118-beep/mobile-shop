@@ -164,7 +164,7 @@ export function buildSeed() {
   const settings: AppSettings = {
     appName: "Social Manager", demoMode: true, language: "fa", timezone: "Asia/Tehran", notifyEmail: true, notifyPush: false, twoFactor: false,
     instagram: { account: "@caseline.official", businessAccountId: "17841400000000000", accessToken: "DEMO_FAKE_TOKEN_EAAG1234567890abcdef", webhook: "verified" },
-    telegram: { botToken: "0000000000:DEMO_FAKE_TOKEN_aBcDeFgHiJkLmNoPqRsTuV", channel: "@caseline", webhook: "verified" },
+    telegram: { botToken: "0000000000:DEMO_FAKE_TOKEN_aBcDeFgHiJkLmNoPqRsTuV", channel: "@caseline", webhook: "verified", live: false },
   };
 
   return {

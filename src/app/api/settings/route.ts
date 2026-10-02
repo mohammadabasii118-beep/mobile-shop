@@ -1,15 +1,19 @@
 import { z } from "zod";
 import { getDb } from "@/database/store";
 import { api, parseBody } from "@/lib/api";
+import { telegramConfig } from "@/config/telegram";
 import { maskSecret } from "@/lib/security/secrets";
 
 function view() {
   const s = getDb().settings;
+  const tg = telegramConfig();
   // Tokens never leave the server in full.
   return {
     ...s,
     instagram: { ...s.instagram, accessToken: maskSecret(s.instagram.accessToken) },
-    telegram: { ...s.telegram, botToken: maskSecret(s.telegram.botToken) },
+    telegram: tg.live
+      ? { botToken: maskSecret(tg.token), channel: tg.channel, webhook: "polling" as const, live: true }
+      : { ...s.telegram, botToken: maskSecret(s.telegram.botToken), live: false },
   };
 }
 

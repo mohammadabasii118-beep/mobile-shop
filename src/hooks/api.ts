@@ -37,7 +37,8 @@ export const useComments = () => get<Comment[]>("comments", "/api/comments");
 export const useConversations = () => get<ConversationView[]>("messages", "/api/messages");
 export const useCustomers = () => get<Customer[]>("customers", "/api/customers");
 export const useProducts = () => get<Product[]>("products", "/api/products");
-export const useTelegram = () => get<{ channel: TelegramChannelInfo; posts: TelegramPost[] }>("telegram", "/api/telegram");
+export interface TelegramLive { enabled: boolean; lastPollAt?: string; error?: string }
+export const useTelegram = () => get<{ channel: TelegramChannelInfo; posts: TelegramPost[]; live: TelegramLive }>("telegram", "/api/telegram", 10000);
 export const useAutomations = () => get<{ automations: Automation[]; options: TelegramToInstagramOptions }>("automations", "/api/automations");
 export const useAutomation = (id: string) =>
   useQuery({ queryKey: ["automation", id], queryFn: () => apiFetch<{ automation: Automation; executions: AutomationExecution[] }>(`/api/automations/${id}`) });
