@@ -6,7 +6,7 @@ export default function ServicesSection() {
     <section className="relative bg-white rounded-t-[40px] sm:rounded-t-[50px] md:rounded-t-[60px] px-5 sm:px-8 md:px-10 py-20 sm:py-24 md:py-32" style={{ background: '#FFFFFF' }}>
       <FadeIn>
         <h2 className="font-black uppercase text-center mb-16 sm:mb-20 md:mb-28" style={{ color: '#0C0C0C', fontSize: 'clamp(3rem, 12vw, 160px)' }}>
-          Categories
+          دسته‌بندی‌ها
         </h2>
       </FadeIn>
       <div className="max-w-5xl mx-auto">
@@ -17,7 +17,7 @@ export default function ServicesSection() {
               style={{ borderTop: i === 0 ? 'none' : '1px solid rgba(12, 12, 12, 0.15)' }}
             >
               <span className="font-black leading-none" style={{ color: '#0C0C0C', fontSize: 'clamp(3rem, 10vw, 140px)' }}>
-                {String(i + 1).padStart(2, '0')}
+                {(i + 1).toLocaleString('fa-IR', { minimumIntegerDigits: 2 })}
               </span>
               <div className="flex flex-col gap-2 sm:gap-3 pt-1">
                 <h3 className="font-medium uppercase" style={{ color: '#0C0C0C', fontSize: 'clamp(1rem, 2.2vw, 2.1rem)' }}>

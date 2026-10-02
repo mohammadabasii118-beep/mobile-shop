@@ -24,7 +24,7 @@ function Card({ product, index, total, progress }: { product: Product; index: nu
           <div className="flex items-center justify-between gap-4 mb-4 sm:mb-6">
             <div className="flex items-center gap-4 sm:gap-8 min-w-0">
               <span className="hero-heading font-black leading-none" style={{ fontSize: 'clamp(3rem, 10vw, 140px)' }}>
-                {String(index + 1).padStart(2, '0')}
+                {(index + 1).toLocaleString('fa-IR', { minimumIntegerDigits: 2 })}
               </span>
               <div className="min-w-0">
                 <p className="text-[#D7E2EA] font-light uppercase tracking-wider" style={{ fontSize: 'clamp(0.7rem, 1.2vw, 1rem)', opacity: 0.6 }}>
@@ -36,7 +36,7 @@ function Card({ product, index, total, progress }: { product: Product; index: nu
               </div>
             </div>
             <div className="hidden sm:block">
-              <LiveProjectButton label="Buy Now" />
+              <LiveProjectButton label="خرید" />
             </div>
           </div>
           <div className="flex gap-3 sm:gap-4">
@@ -60,7 +60,7 @@ export default function ProjectsSection() {
     <section id="products" className="relative z-10 -mt-10 sm:-mt-12 md:-mt-14 rounded-t-[40px] sm:rounded-t-[50px] md:rounded-t-[60px] px-5 sm:px-8 md:px-10 pt-20 sm:pt-24 md:pt-32 pb-20" style={{ background: '#0C0C0C' }}>
       <FadeIn>
         <h2 className="hero-heading font-black uppercase leading-none tracking-tight text-center mb-16 sm:mb-20 md:mb-28" style={{ fontSize: 'clamp(3rem, 12vw, 160px)' }}>
-          Products
+          محصولات
         </h2>
       </FadeIn>
       <div ref={ref} id="contact">

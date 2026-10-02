@@ -4,9 +4,14 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body, #root { background: #0C0C0C; font-family: 'Kanit', sans-serif; }
+html, body, #root { background: #0C0C0C; font-family: 'Kanit', 'Vazirmatn', sans-serif; }
+
+/* Persian letters must stay joined: no letter-spacing */
+* { letter-spacing: 0 !important; }
 
 .hero-heading {
+  padding: 0.12em 0 0.22em; /* room for Persian ascenders/descenders */
+  display: block;
   background: linear-gradient(180deg, #646973 0%, #BBCCD7 100%);
   -webkit-background-clip: text;
   background-clip: text;

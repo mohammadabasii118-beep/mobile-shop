@@ -1,4 +1,4 @@
-export default function ContactButton({ label = 'Contact Me' }: { label?: string }) {
+export default function ContactButton({ label = 'تماس با من' }: { label?: string }) {
   return (
     <button
       className="rounded-full text-white font-medium uppercase tracking-widest px-8 py-3 sm:px-10 sm:py-3.5 md:px-12 md:py-4 text-xs sm:text-sm md:text-base cursor-pointer border-0 hover:opacity-90 transition-opacity duration-200"

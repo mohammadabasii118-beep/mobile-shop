@@ -3,17 +3,18 @@ import FadeIn from '../components/FadeIn';
 import Magnet from '../components/Magnet';
 import ContactButton from '../components/ContactButton';
 
-const links = ['Shop', 'Categories', 'Products', 'Contact'];
+const ids = ['shop', 'categories', 'products', 'contact'];
+const links = ['فروشگاه', 'دسته‌بندی‌ها', 'محصولات', 'تماس'];
 
 export default function HeroSection() {
   return (
     <section className="relative h-screen flex flex-col" style={{ background: '#0C0C0C', overflowX: 'clip' }}>
       <FadeIn delay={0} y={-20}>
         <nav className="flex justify-between px-6 md:px-10 pt-6 md:pt-8">
-          {links.map((l) => (
+          {links.map((l, i) => (
             <a
               key={l}
-              href={`#${l.toLowerCase()}`}
+              href={`#${ids[i]}`}
               className="text-[#D7E2EA] font-medium uppercase tracking-wider text-sm md:text-lg lg:text-[1.4rem] hover:opacity-70 transition-opacity duration-200"
             >
               {l}
@@ -25,7 +26,7 @@ export default function HeroSection() {
       <div className="overflow-hidden">
         <FadeIn delay={0.15} y={40}>
           <h1 className="hero-heading font-black uppercase tracking-tight leading-none whitespace-nowrap w-full text-center text-[12vw] sm:text-[13vw] md:text-[14vw] lg:text-[15vw] mt-6 sm:mt-4 md:-mt-5">
-            Jack&apos;s Gear
+            جک شاپ
           </h1>
         </FadeIn>
       </div>
@@ -36,11 +37,11 @@ export default function HeroSection() {
             className="text-[#D7E2EA] font-light uppercase tracking-wide leading-snug max-w-[160px] sm:max-w-[220px] md:max-w-[260px]"
             style={{ fontSize: 'clamp(0.75rem, 1.4vw, 1.5rem)' }}
           >
-            cases, chargers, power banks, glass &amp; pendants for every phone
+            قاب، شارژر، پاوربانک، گلس و آویز برای هر گوشی
           </p>
         </FadeIn>
         <FadeIn delay={0.5} y={20}>
-          <ContactButton label="Shop Now" />
+          <ContactButton label="همین حالا بخر" />
         </FadeIn>
       </div>
 

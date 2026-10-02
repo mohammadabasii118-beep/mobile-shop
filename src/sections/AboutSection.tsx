@@ -31,16 +31,16 @@ export default function AboutSection() {
         <div className="flex flex-col items-center gap-10 sm:gap-14 md:gap-16">
           <FadeIn delay={0} y={40}>
             <h2 className="hero-heading font-black uppercase leading-none tracking-tight text-center" style={{ fontSize: 'clamp(3rem, 12vw, 160px)' }}>
-              About us
+              درباره ما
             </h2>
           </FadeIn>
           <AnimatedText
-            text="At Jack's Gear we sell premium accessories for your phone: tough cases, fast chargers, power banks, tempered glass and stylish pendants. Every product is tested for quality and priced fairly, with fast delivery and easy returns. Let's keep your phone protected, powered and looking great!"
+            text="در جک شاپ بهترین لوازم جانبی موبایل را عرضه می‌کنیم: قاب‌های مقاوم، شارژرهای فست، پاوربانک، گلس محافظ و آویزهای شیک. همه محصولات از نظر کیفیت تست می‌شوند و با قیمت منصفانه، ارسال سریع و ضمانت بازگشت کالا به دست شما می‌رسند. بیایید گوشی شما را محافظت‌شده، پرانرژی و جذاب نگه داریم!"
             className="text-[#D7E2EA] font-medium text-center leading-relaxed max-w-[560px]"
             style={{ fontSize: 'clamp(1rem, 2vw, 1.35rem)' }}
           />
         </div>
-        <ContactButton label="Contact Us" />
+        <ContactButton label="تماس با ما" />
       </div>
     </section>
   );
