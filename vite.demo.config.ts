@@ -7,6 +7,6 @@ import path from 'path';
 export default defineConfig({
   plugins: [react(), viteSingleFile()],
   resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
-  define: { 'import.meta.env.VITE_DEMO': '"1"' },
+  define: { 'import.meta.env.VITE_DEMO': '"1"', 'import.meta.env.VITE_START': JSON.stringify(process.env.DEMO_START || '/') },
   build: { outDir: 'dist-demo', chunkSizeWarningLimit: 4000 },
 });
