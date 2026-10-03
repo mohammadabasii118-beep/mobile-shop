@@ -26,7 +26,7 @@ def now() -> int:
 
 def require_admin(uid: int) -> None:
     if not admins.is_admin(uid):
-        raise OncError("Admins only.")
+        raise OncError("فقط ادمین‌ها دسترسی دارند.")
 
 
 # ----------------------------------------------------------------- settings / audit
@@ -63,7 +63,7 @@ def parse_date(s: str) -> str:
     try:
         return datetime.strptime(s, "%Y-%m-%d").strftime("%Y-%m-%d")
     except ValueError:
-        raise OncError("Date format must be YYYY/MM/DD, e.g. 2026/10/10") from None
+        raise OncError("فرمت تاریخ باید YYYY/MM/DD باشد، مثلاً 2026/10/10") from None
 
 
 def parse_time(s: str) -> str:
@@ -71,13 +71,13 @@ def parse_time(s: str) -> str:
     try:
         return datetime.strptime(s, "%H:%M").strftime("%H:%M")
     except ValueError:
-        raise OncError("Time format must be HH:MM, e.g. 20:00") from None
+        raise OncError("فرمت ساعت باید HH:MM باشد، مثلاً 20:00") from None
 
 
 def parse_interval(s: str) -> int:
-    m = re.match(r"^\s*(\d{1,4})\s*(m|min|mins|minutes?)?\s*$", norm_digits(s), re.I)
+    m = re.match(r"^\s*(\d{1,4})\s*(m|min|mins|minutes?|دقیقه)?\s*$", norm_digits(s), re.I)
     if not m or int(m.group(1)) <= 0:
-        raise OncError("Send the interval in minutes, e.g. 30")
+        raise OncError("فاصله را به دقیقه بفرست، مثلاً 30")
     return int(m.group(1))
 
 
@@ -90,7 +90,7 @@ async def create_tournament(admin: int, name: str, date: str, time: str, interva
     require_admin(admin)
     name = name.strip()
     if not name or len(name) > 60:
-        raise OncError("Tournament name must be 1–60 characters.")
+        raise OncError("نام تورنمنت باید بین ۱ تا ۶۰ کاراکتر باشد.")
     async with dbx.tx():
         tid = await dbx.execute(
             "INSERT INTO onc_tournaments(name,start_date,start_time,round_interval,created_at,created_by) VALUES(?,?,?,?,?,?)",
@@ -132,7 +132,7 @@ async def update_tournament(admin: int, tid: int, **fields) -> None:
     t = await get_tournament(tid)
     if ("start_date" in fields or "start_time" in fields or "round_interval" in fields) and await dbx.scalar(
             "SELECT 1 FROM onc_rounds WHERE tournament_id=?", tid):
-        raise OncError("The schedule is already generated. Use REBUILD SCHEDULE after changing the date/time/interval.")
+        raise OncError("برنامه قبلاً ساخته شده. بعد از تغییر تاریخ/ساعت/فاصله، «ساخت دوباره برنامه» را بزن.")
     async with dbx.tx():
         for k, v in fields.items():
             assert k in {"name", "start_date", "start_time", "round_interval"}
@@ -171,18 +171,18 @@ async def team_names(tid: int) -> dict[int, str]:
     return {r["id"]: r["name"] for r in await dbx.fetchall("SELECT id,name FROM onc_teams WHERE tournament_id=?", tid)}
 
 
-def _clean_name(s: str, what: str = "Name") -> str:
+def _clean_name(s: str, what: str = "نام") -> str:
     s = re.sub(r"\s+", " ", (s or "").strip())
     if not s or len(s) > 30:
-        raise OncError(f"{what} must be 1–30 characters.")
+        raise OncError(f"{what} باید بین ۱ تا ۳۰ کاراکتر باشد.")
     return s
 
 
 async def add_team(admin: int, tid: int, name: str, logo: str | None = None) -> int:
     require_admin(admin)
-    name = _clean_name(name, "Team name")
+    name = _clean_name(name, "نام تیم")
     if await dbx.scalar("SELECT 1 FROM onc_teams WHERE tournament_id=? AND name=?", tid, name):
-        raise OncError("A team with this name already exists in the tournament.")
+        raise OncError("تیمی با این نام در این تورنمنت وجود دارد.")
     async with dbx.tx():
         team_id = await dbx.execute("INSERT INTO onc_teams(tournament_id,name,logo_file_id) VALUES(?,?,?)", tid, name, logo)
         await audit(admin, "ADD TEAM", name, tid)
@@ -192,9 +192,9 @@ async def add_team(admin: int, tid: int, name: str, logo: str | None = None) -> 
 async def rename_team(admin: int, team_id: int, name: str) -> None:
     require_admin(admin)
     t = await get_team(team_id)
-    name = _clean_name(name, "Team name")
+    name = _clean_name(name, "نام تیم")
     if await dbx.scalar("SELECT 1 FROM onc_teams WHERE tournament_id=? AND name=? AND id<>?", t["tournament_id"], name, team_id):
-        raise OncError("A team with this name already exists in the tournament.")
+        raise OncError("تیمی با این نام در این تورنمنت وجود دارد.")
     await dbx.execute("UPDATE onc_teams SET name=? WHERE id=?", name, team_id)
     await audit(admin, "RENAME TEAM", f"{t['name']} → {name}", t["tournament_id"])
 
@@ -210,7 +210,7 @@ async def delete_team(admin: int, team_id: int) -> None:
     require_admin(admin)
     t = await get_team(team_id)
     if await dbx.scalar("SELECT 1 FROM onc_matches WHERE team_a=? OR team_b=?", team_id, team_id):
-        raise OncError("This team already has scheduled matches. REBUILD the schedule (or reset results) before deleting it.")
+        raise OncError("این تیم بازی برنامه‌ریزی‌شده دارد. اول برنامه را دوباره بساز (یا نتایج را ریست کن).")
     async with dbx.tx():
         await dbx.execute("DELETE FROM onc_teams WHERE id=?", team_id)
         await audit(admin, "DELETE TEAM", t["name"], t["tournament_id"])
@@ -222,10 +222,10 @@ async def players_of(team_id: int) -> list[dict]:
 
 async def add_player(admin: int, team_id: int, player_id: str) -> None:
     require_admin(admin)
-    player_id = _clean_name(player_id, "Player ID")
+    player_id = _clean_name(player_id, "آیدی بازیکن")
     t = await get_team(team_id)
     if await dbx.scalar("SELECT 1 FROM onc_players WHERE team_id=? AND player_id=?", team_id, player_id):
-        raise OncError("This player ID is already in the team.")
+        raise OncError("این آیدی قبلاً در تیم ثبت شده.")
     await dbx.execute("INSERT INTO onc_players(team_id,player_id) VALUES(?,?)", team_id, player_id)
     await audit(admin, "ADD PLAYER", f"{player_id} → {t['name']}", t["tournament_id"])
 
@@ -258,8 +258,8 @@ async def get_group(gid: int) -> dict | None:
 async def _locked(tid: int) -> None:
     """Group membership can't change once the schedule has been generated."""
     if await dbx.scalar("SELECT 1 FROM onc_rounds WHERE tournament_id=? AND stage='GROUP'", tid):
-        raise OncError("The group schedule is already generated. REBUILD SCHEDULE after changing groups "
-                       "(results must be reset first if any exist).")
+        raise OncError("برنامه‌ی گروهی قبلاً ساخته شده. بعد از تغییر گروه‌ها «ساخت دوباره برنامه» را بزن "
+                       "(اگر نتیجه‌ای ثبت شده، اول ریست کن).")
 
 
 async def create_group(admin: int, tid: int, name: str | None = None) -> int:
@@ -269,14 +269,14 @@ async def create_group(admin: int, tid: int, name: str | None = None) -> int:
         used = {g["name"].upper() for g in await groups_of(tid)}
         i = 0
         while True:
-            cand = f"GROUP {chr(65 + i % 26)}{'' if i < 26 else i // 26}"
+            cand = f"گروه {chr(65 + i % 26)}{'' if i < 26 else i // 26}"
             if cand not in used:
                 name = cand
                 break
             i += 1
-    name = _clean_name(name, "Group name")
+    name = _clean_name(name, "نام گروه")
     if await dbx.scalar("SELECT 1 FROM onc_groups WHERE tournament_id=? AND name=?", tid, name):
-        raise OncError("A group with this name already exists.")
+        raise OncError("گروهی با این نام وجود دارد.")
     async with dbx.tx():
         gid = await dbx.execute("INSERT INTO onc_groups(tournament_id,name) VALUES(?,?)", tid, name)
         await audit(admin, "CREATE GROUP", name, tid)
@@ -286,9 +286,9 @@ async def create_group(admin: int, tid: int, name: str | None = None) -> int:
 async def rename_group(admin: int, gid: int, name: str) -> None:
     require_admin(admin)
     g = await get_group(gid)
-    name = _clean_name(name, "Group name")
+    name = _clean_name(name, "نام گروه")
     if await dbx.scalar("SELECT 1 FROM onc_groups WHERE tournament_id=? AND name=? AND id<>?", g["tournament_id"], name, gid):
-        raise OncError("A group with this name already exists.")
+        raise OncError("گروهی با این نام وجود دارد.")
     await dbx.execute("UPDATE onc_groups SET name=? WHERE id=?", name, gid)
     await audit(admin, "RENAME GROUP", f"{g['name']} → {name}", g["tournament_id"])
 
@@ -299,14 +299,14 @@ async def delete_group(admin: int, gid: int) -> None:
     await _locked(g["tournament_id"])
     async with dbx.tx():
         await dbx.execute("DELETE FROM onc_groups WHERE id=?", gid)  # members are released (cascade), teams stay
-        await audit(admin, "DELETE GROUP", f"{g['name']} ({len(g['members'])} teams released)", g["tournament_id"])
+        await audit(admin, "DELETE GROUP", f"{g['name']} ({len(g['members'])} تیم آزاد شد)", g["tournament_id"])
 
 
 async def set_qualifiers(admin: int, gid: int, n: int) -> None:
     require_admin(admin)
     g = await get_group(gid)
     if n < 0 or n > max(len(g["members"]), 0):
-        raise OncError(f"Qualifiers must be between 0 and {len(g['members'])} (teams in the group).")
+        raise OncError(f"تعداد صعودکننده باید بین ۰ و {len(g['members'])} (تعداد تیم‌های گروه) باشد.")
     await dbx.execute("UPDATE onc_groups SET qualifiers=? WHERE id=?", n, gid)
     await audit(admin, "SET QUALIFIERS", f"{g['name']}: {g['qualifiers']} → {n}", g["tournament_id"])
 
@@ -318,7 +318,7 @@ async def assign_team(admin: int, team_id: int, gid: int | None) -> None:
     await _locked(t["tournament_id"])
     new = await get_group(gid) if gid else None
     if new and new["tournament_id"] != t["tournament_id"]:
-        raise OncError("Group belongs to another tournament.")
+        raise OncError("این گروه مال تورنمنت دیگری است.")
     async with dbx.tx():
         if gid is None:
             await dbx.execute("DELETE FROM onc_group_members WHERE team_id=?", team_id)
@@ -339,9 +339,9 @@ async def auto_draw(admin: int, tid: int, seed: int | None = None) -> dict[str, 
     groups = await groups_of(tid)
     teams = await teams_of(tid)
     if not groups:
-        raise OncError("Create the groups first.")
+        raise OncError("اول گروه‌ها را بساز.")
     if len(teams) < len(groups):
-        raise OncError("There are fewer teams than groups.")
+        raise OncError("تعداد تیم‌ها از تعداد گروه‌ها کمتر است.")
     rnd = random.Random(seed)
     ids = [t["id"] for t in teams]
     rnd.shuffle(ids)
@@ -349,7 +349,7 @@ async def auto_draw(admin: int, tid: int, seed: int | None = None) -> dict[str, 
         await dbx.execute("DELETE FROM onc_group_members WHERE group_id IN (SELECT id FROM onc_groups WHERE tournament_id=?)", tid)
         for i, team_id in enumerate(ids):  # round-robin dealing = sizes differ by at most 1
             await dbx.execute("INSERT INTO onc_group_members(team_id,group_id) VALUES(?,?)", team_id, groups[i % len(groups)]["id"])
-        await audit(admin, "AUTOMATIC DRAW", f"{len(ids)} teams → {len(groups)} groups", tid)
+        await audit(admin, "AUTOMATIC DRAW", f"{len(ids)} تیم → {len(groups)} گروه", tid)
     names = await team_names(tid)
     out: dict[str, list[str]] = {g["name"]: [] for g in groups}
     for i, team_id in enumerate(ids):
@@ -372,7 +372,7 @@ async def get_round(rid: int) -> dict | None:
 
 async def round_label(r: dict) -> str:
     if r["stage"] == "GROUP":
-        return f"GROUP STAGE — ROUND {r['number']}"
+        return f"مرحله گروهی — راند {r['number']}"
     return algo.STAGE_NAME[r["stage"]]
 
 
@@ -403,11 +403,11 @@ async def generate_schedule(admin: int, tid: int) -> dict:
     t = await get_tournament(tid)
     groups = await groups_of(tid)
     if not groups:
-        raise OncError("Create groups first.")
+        raise OncError("اول گروه‌ها را بساز.")
     if any(len(g["members"]) < 2 for g in groups):
-        raise OncError("Every group needs at least 2 teams.")
+        raise OncError("هر گروه حداقل ۲ تیم لازم دارد.")
     if await has_results(tid):
-        raise OncError("Results exist. RESET RESULTS before rebuilding the schedule.")
+        raise OncError("نتیجه ثبت شده است. اول «ریست نتایج» را بزن.")
     plans = {g["id"]: algo.round_robin([m["id"] for m in g["members"]]) for g in groups}
     n_rounds = max(len(p) for p in plans.values())
     async with dbx.tx():
@@ -426,7 +426,7 @@ async def generate_schedule(admin: int, tid: int) -> dict:
                         await dbx.execute("INSERT INTO onc_match_participants(round_id,team_id,match_id) VALUES(?,?,?)", rid, team, mid)
         if t["status"] == "DRAFT":
             pass
-        await audit(admin, "GENERATE SCHEDULE", f"{n_rounds} rounds", tid)
+        await audit(admin, "GENERATE SCHEDULE", f"{n_rounds} راند", tid)
     total = await dbx.scalar("SELECT COUNT(*) FROM onc_matches WHERE tournament_id=?", tid)
     return {"rounds": n_rounds, "matches": total}
 
@@ -445,7 +445,7 @@ async def reset_results(admin: int, tid: int) -> None:
 # ----------------------------------------------------------------- results
 def _validate_goals(n) -> int:
     if not isinstance(n, int) or n < 0 or n > 99:
-        raise OncError("Goals must be a whole number between 0 and 99.")
+        raise OncError("گل باید عدد صحیح بین ۰ تا ۹۹ باشد.")
     return n
 
 
@@ -455,7 +455,7 @@ async def _resolve_winner(m: dict, ga: int, gb: int, winner: int | None) -> int 
     if ga != gb:
         return m["team_a"] if ga > gb else m["team_b"]
     if winner not in (m["team_a"], m["team_b"]):
-        raise OncError("Knockout match is level — choose the winner manually.")
+        raise OncError("بازی حذفی مساوی شده — برنده را دستی انتخاب کن.")
     return winner
 
 
@@ -465,9 +465,9 @@ async def save_result(admin: int, mid: int, ga: int, gb: int, winner: int | None
     ga, gb = _validate_goals(ga), _validate_goals(gb)
     m = await get_match(mid)
     if not m:
-        raise OncError("Match not found.")
+        raise OncError("بازی پیدا نشد.")
     if m["round_status"] == "CONFIRMED":
-        raise OncError("This round is already confirmed — use the edit flow.")
+        raise OncError("این راند قبلاً تأیید شده — از ویرایش نتیجه استفاده کن.")
     win = await _resolve_winner(m, ga, gb, winner)
     async with dbx.tx():
         old = f"{m['goals_a']}-{m['goals_b']}" if m["goals_a"] is not None else "—"
@@ -476,7 +476,7 @@ async def save_result(admin: int, mid: int, ga: int, gb: int, winner: int | None
             "ON CONFLICT(match_id) DO UPDATE SET goals_a=excluded.goals_a, goals_b=excluded.goals_b, "
             "winner_team_id=excluded.winner_team_id, updated_at=excluded.updated_at, updated_by=excluded.updated_by",
             mid, ga, gb, win, now(), admin)
-        await audit(admin, "SAVED RESULT", f"{m['name_a']} vs {m['name_b']}: {old} → {ga}-{gb}", m["tournament_id"])
+        await audit(admin, "SAVED RESULT", f"{m['name_a']} 🆚 {m['name_b']}: {old} → {ga}-{gb}", m["tournament_id"])
     return await round_progress(m["round_id"])
 
 
@@ -493,9 +493,9 @@ async def confirm_round(admin: int, rid: int) -> dict:
     async with dbx.tx():
         prog = await round_progress(rid)
         if not prog["completed"]:
-            raise OncError(f"Only {prog['entered']}/{prog['total']} results are entered.")
+            raise OncError(f"فقط {prog['entered']} از {prog['total']} نتیجه ثبت شده.")
         if r["status"] == "CONFIRMED":
-            raise OncError("Round already confirmed.")
+            raise OncError("این راند قبلاً تأیید شده.")
         await dbx.execute("UPDATE onc_results SET status='CONFIRMED' WHERE match_id IN (SELECT id FROM onc_matches WHERE round_id=?)", rid)
         await dbx.execute("UPDATE onc_rounds SET status='CONFIRMED', content_version=content_version+1 WHERE id=?", rid)
         await dbx.execute("UPDATE onc_tournaments SET status='LIVE' WHERE id=? AND status IN ('DRAFT','READY')", r["tournament_id"])
@@ -552,7 +552,7 @@ async def set_tie_decision(admin: int, gid: int, order: list[int]) -> None:
     tbl = next(t for t in tables if t["group"]["id"] == gid)
     block = next((b for b in tbl["unresolved"] if sorted(b) == sorted(order)), None)
     if block is None:
-        raise OncError("This tie is no longer open (results changed).")
+        raise OncError("این تساوی دیگر باز نیست (نتایج عوض شده).")
     async with dbx.tx():
         await dbx.execute("INSERT OR REPLACE INTO onc_tie_decisions(group_id,signature,order_json) VALUES(?,?,?)",
                           gid, algo.signature(order), json.dumps(order))
@@ -565,15 +565,15 @@ async def qualification(tid: int) -> dict:
     tables = await group_tables(tid)
     blockers, teams = [], []
     if not tables:
-        blockers.append("No groups.")
+        blockers.append("گروهی وجود ندارد.")
     for t in tables:
         g = t["group"]
         if g["qualifiers"] is None:
-            blockers.append(f"{g['name']}: qualifiers not set")
+            blockers.append(f"{g['name']}: تعداد صعودکننده تعیین نشده")
         elif t["status"]["state"] == "PENDING":
-            blockers.append(f"{g['name']}: {t['played']}/{t['total']} matches confirmed")
+            blockers.append(f"{g['name']}: {t['played']} از {t['total']} بازی تأیید شده")
         elif t["status"]["state"] == "NEEDS ADMIN DECISION":
-            blockers.append(f"{g['name']}: NEEDS ADMIN DECISION (tie on the qualification line)")
+            blockers.append(f"{g['name']}: نیاز به تصمیم ادمین (تساوی روی خط صعود)")
         else:
             teams += t["status"]["qualified"]
     return {"ready": not blockers, "teams": teams if not blockers else [], "blockers": blockers}
@@ -588,18 +588,18 @@ async def create_ko_stage(admin: int, tid: int, stage: str) -> int:
     require_admin(admin)
     t = await get_tournament(tid)
     if stage not in algo.STAGES:
-        raise OncError("Unknown stage.")
+        raise OncError("مرحله نامعتبر است.")
     q = await qualification(tid)
     if not q["ready"]:
-        raise OncError("Group stage is not final:\n• " + "\n• ".join(q["blockers"]))
+        raise OncError("مرحله گروهی هنوز نهایی نشده:\n• " + "\n• ".join(q["blockers"]))
     existing = await ko_rounds(tid)
     have = [r["stage"] for r in existing]
     if stage in have:
-        raise OncError("This stage already exists.")
+        raise OncError("این مرحله قبلاً ساخته شده.")
     if have and algo.STAGES.index(stage) <= max(algo.STAGES.index(s) for s in have):
-        raise OncError("Stages must go in order (e.g. Quarter Final → Semi Final → Final).")
+        raise OncError("مرحله‌ها باید به ترتیب باشند (مثلاً یک‌چهارم → نیمه‌نهایی → فینال).")
     if have and not all(r["status"] == "CONFIRMED" for r in existing):
-        raise OncError("Confirm the previous knockout stage first.")
+        raise OncError("اول مرحله‌ی حذفی قبلی را تأیید کن.")
     n_group = await dbx.scalar("SELECT COUNT(*) FROM onc_rounds WHERE tournament_id=? AND stage='GROUP'", tid)
     idx = n_group + len(existing)
     async with dbx.tx():
@@ -628,21 +628,21 @@ async def add_ko_match(admin: int, rid: int, a: int, b: int) -> int:
     require_admin(admin)
     r = await get_round(rid)
     if r["stage"] == "GROUP":
-        raise OncError("Not a knockout round.")
+        raise OncError("این راند حذفی نیست.")
     if r["status"] == "CONFIRMED":
-        raise OncError("This stage is already confirmed.")
+        raise OncError("این مرحله قبلاً تأیید شده.")
     if r["stage"] == "F" and await dbx.scalar("SELECT 1 FROM onc_matches WHERE round_id=?", rid):
-        raise OncError("The final has a single match.")
+        raise OncError("فینال فقط یک بازی دارد.")
     pool = await ko_pool(r["tournament_id"], rid)
     if a == b or a not in pool or b not in pool:
-        raise OncError("Pick two different available teams.")
+        raise OncError("دو تیم متفاوت از تیم‌های در دسترس انتخاب کن.")
     async with dbx.tx():
         mid = await dbx.execute("INSERT INTO onc_matches(round_id,tournament_id,group_id,team_a,team_b) VALUES(?,?,NULL,?,?)",
                                 rid, r["tournament_id"], a, b)
         for team in (a, b):
             await dbx.execute("INSERT INTO onc_match_participants(round_id,team_id,match_id) VALUES(?,?,?)", rid, team, mid)
         names = await team_names(r["tournament_id"])
-        await audit(admin, "KNOCKOUT MATCHUP", f"{algo.STAGE_NAME[r['stage']]}: {names[a]} vs {names[b]}", r["tournament_id"])
+        await audit(admin, "KNOCKOUT MATCHUP", f"{algo.STAGE_NAME[r['stage']]}: {names[a]} 🆚 {names[b]}", r["tournament_id"])
     return mid
 
 
@@ -650,19 +650,19 @@ async def remove_ko_match(admin: int, mid: int) -> None:
     require_admin(admin)
     m = await get_match(mid)
     if m["round_status"] == "CONFIRMED":
-        raise OncError("This stage is already confirmed.")
+        raise OncError("این مرحله قبلاً تأیید شده.")
     await dbx.execute("DELETE FROM onc_matches WHERE id=?", mid)
-    await audit(admin, "REMOVE MATCHUP", f"{m['name_a']} vs {m['name_b']}", m["tournament_id"])
+    await audit(admin, "REMOVE MATCHUP", f"{m['name_a']} 🆚 {m['name_b']}", m["tournament_id"])
 
 
 async def delete_ko_stage(admin: int, rid: int) -> None:
     require_admin(admin)
     r = await get_round(rid)
     if r["status"] == "CONFIRMED":
-        raise OncError("Confirmed stages can't be deleted; edit results instead.")
+        raise OncError("مرحله‌ی تأییدشده حذف نمی‌شود؛ نتایج را ویرایش کن.")
     later = await dbx.scalar("SELECT 1 FROM onc_rounds WHERE tournament_id=? AND stage<>'GROUP' AND start_at>?", r["tournament_id"], r["start_at"])
     if later:
-        raise OncError("Delete the later stages first.")
+        raise OncError("اول مرحله‌های بعدی را حذف کن.")
     await dbx.execute("DELETE FROM onc_rounds WHERE id=?", rid)
     await audit(admin, "DELETE KNOCKOUT STAGE", algo.STAGE_NAME[r["stage"]], r["tournament_id"])
 
@@ -678,12 +678,12 @@ async def _invalid_ko_matches(tid: int) -> list[dict]:
         ms = await matches_of_round(rd["id"])
         if i == 0 and not q["ready"]:
             # qualification became unresolved: can't verify the bracket → report as one warning entry
-            invalid.append({"id": None, "round_id": rd["id"], "text": "Qualification is no longer final", "unverifiable": True})
+            invalid.append({"id": None, "round_id": rd["id"], "text": "صعود دیگر نهایی نیست", "unverifiable": True})
             break
         pool = set(q["teams"]) if i == 0 else prev_winners
         bad = [m for m in ms if m["team_a"] not in pool or m["team_b"] not in pool]
         for m in bad:
-            invalid.append({"id": m["id"], "round_id": rd["id"], "text": f"{algo.STAGE_NAME[rd['stage']]}: {m['name_a']} vs {m['name_b']}"})
+            invalid.append({"id": m["id"], "round_id": rd["id"], "text": f"{algo.STAGE_NAME[rd['stage']]}: {m['name_a']} 🆚 {m['name_b']}"})
         bad_ids = {m["id"] for m in bad}
         prev_winners = {m["winner_team_id"] for m in ms if m["id"] not in bad_ids and m["rstatus"] == "CONFIRMED" and m["winner_team_id"]}
     return invalid
@@ -700,7 +700,7 @@ async def edit_confirmed_result(admin: int, mid: int, ga: int, gb: int, winner: 
     ga, gb = _validate_goals(ga), _validate_goals(gb)
     m = await get_match(mid)
     if m["round_status"] != "CONFIRMED":
-        raise OncError("Round is not confirmed — use normal result entry.")
+        raise OncError("این راند هنوز تأیید نشده — از ثبت عادی نتیجه استفاده کن.")
     win = await _resolve_winner(m, ga, gb, winner)
     rd = await get_round(m["round_id"])
     old = f"{m['goals_a']}-{m['goals_b']}"
@@ -722,8 +722,8 @@ async def edit_confirmed_result(admin: int, mid: int, ga: int, gb: int, winner: 
             if impact:  # later stages lose their pool → reopen/clean them
                 await _cascade_ko(m["tournament_id"])
             await _refresh_champion(m["tournament_id"])
-            await audit(admin, "CHANGED RESULT", f"{m['name_a']} vs {m['name_b']}\n{old} → {ga}-{gb}"
-                        + (" (knockout rebuilt)" if impact else ""), m["tournament_id"])
+            await audit(admin, "CHANGED RESULT", f"{m['name_a']} 🆚 {m['name_b']}\n{old} → {ga}-{gb}"
+                        + (" (حذفی بازسازی شد)" if impact else ""), m["tournament_id"])
             result["applied"] = True
     except _Rollback:
         pass
@@ -755,17 +755,17 @@ async def validation(tid: int) -> list[tuple[bool, str]]:
     channel = await get_setting("channel_id")
     small = [g for g in groups if len(g["members"]) < 2]
     checks = [
-        (len(teams) >= 2, f"TEAMS REGISTERED ({len(teams)})" if len(teams) >= 2 else "TEAMS REGISTERED — add at least 2 teams"),
-        (bool(groups) and not small, f"GROUPS CREATED ({len(groups)})" if groups and not small else
-         ("GROUPS CREATED — create at least one group" if not groups else "GROUPS CREATED — " + ", ".join(g["name"] for g in small) + " need ≥ 2 teams")),
-        (bool(teams) and not unassigned, "TEAMS ASSIGNED" if teams and not unassigned else
-         f"TEAMS ASSIGNED — {len(unassigned)} unassigned: " + ", ".join(t["name"] for t in unassigned[:6]) + ("…" if len(unassigned) > 6 else "")),
-        (bool(groups) and not no_q, "QUALIFIER COUNTS SET" if groups and not no_q else
-         "QUALIFIER COUNTS SET — missing for " + ", ".join(g["name"] for g in no_q)),
-        (n_matches > 0 and n_matches == expected, f"SCHEDULE GENERATED ({n_matches} matches)" if n_matches and n_matches == expected else
-         ("SCHEDULE GENERATED — not generated yet" if not n_matches else "SCHEDULE GENERATED — outdated, rebuild it")),
-        (not missing_tpl, "GRAPHIC TEMPLATES READY" if not missing_tpl else "GRAPHIC TEMPLATES READY — missing: " + ", ".join(missing_tpl)),
-        (bool(channel), "ONC CHANNEL CONFIGURED" if channel else "ONC CHANNEL CONFIGURED — set it in CHANNEL"),
+        (len(teams) >= 2, f"تیم‌ها ثبت شده‌اند ({len(teams)})" if len(teams) >= 2 else "ثبت تیم‌ها — حداقل ۲ تیم اضافه کن"),
+        (bool(groups) and not small, f"گروه‌ها ساخته شده‌اند ({len(groups)})" if groups and not small else
+         ("ساخت گروه‌ها — حداقل یک گروه بساز" if not groups else "ساخت گروه‌ها — " + ", ".join(g["name"] for g in small) + " حداقل ۲ تیم لازم دارند")),
+        (bool(teams) and not unassigned, "تیم‌ها در گروه‌ها قرار گرفته‌اند" if teams and not unassigned else
+         f"قرارگیری تیم‌ها در گروه — {len(unassigned)} تیم بدون گروه: " + ", ".join(t["name"] for t in unassigned[:6]) + ("…" if len(unassigned) > 6 else "")),
+        (bool(groups) and not no_q, "تعداد صعودکننده‌ها تعیین شده" if groups and not no_q else
+         "تعداد صعودکننده‌ها — تعیین نشده برای " + ", ".join(g["name"] for g in no_q)),
+        (n_matches > 0 and n_matches == expected, f"برنامه ساخته شده ({n_matches} بازی)" if n_matches and n_matches == expected else
+         ("برنامه — هنوز ساخته نشده" if not n_matches else "برنامه — قدیمی شده، دوباره بساز")),
+        (not missing_tpl, "تمپلیت‌های گرافیکی آماده‌اند" if not missing_tpl else "تمپلیت‌های گرافیکی — ناقص: " + ", ".join(missing_tpl)),
+        (bool(channel), "کانال وان نایت چمپیون تنظیم شده" if channel else "کانال — در بخش «کانال» تنظیمش کن"),
     ]
     return checks
 
@@ -775,7 +775,7 @@ async def start_tournament(admin: int, tid: int) -> None:
     checks = await validation(tid)
     bad = [c for ok, c in checks if not ok]
     if bad:
-        raise OncError("Not ready:\n• " + "\n• ".join(bad))
+        raise OncError("آماده نیست:\n• " + "\n• ".join(bad))
     await dbx.execute("UPDATE onc_tournaments SET status='LIVE' WHERE id=?", tid)
     await audit(admin, "START TOURNAMENT", "", tid)
 

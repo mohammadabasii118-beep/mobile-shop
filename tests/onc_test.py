@@ -19,8 +19,8 @@ from PIL import Image  # noqa: E402
 
 from tests.onc_driver import ADMIN, ADMIN2, CHANNEL, VIEWER, Driver  # noqa: E402
 
-GROUPS = {"GROUP A": ["TAJ", "AZADI", "LEGACY", "INVADERZ"], "GROUP B": ["ARYA", "HANGOVER", "PERSIAN GULF", "GRAVITY"],
-          "GROUP C": ["PHOENIX", "TITANS", "VIPERS"], "GROUP D": ["WOLVES", "EAGLES", "RAIDERS"]}
+GROUPS = {"گروه A": ["TAJ", "AZADI", "LEGACY", "INVADERZ"], "گروه B": ["ARYA", "HANGOVER", "PERSIAN GULF", "GRAVITY"],
+          "گروه C": ["PHOENIX", "TITANS", "VIPERS"], "گروه D": ["WOLVES", "EAGLES", "RAIDERS"]}
 # crafted scores (goals of the FIRST named team first)
 SC = {
     ("TAJ", "AZADI"): (1, 0), ("TAJ", "LEGACY"): (0, 2), ("TAJ", "INVADERZ"): (3, 0),
@@ -31,7 +31,7 @@ SC = {
 
 
 def scores(a, b, group):
-    if group == "GROUP B":
+    if group == "گروه B":
         return 1, 1
     for (x, y), (p, q) in SC.items():
         if (x, y) == (a, b):
@@ -70,47 +70,47 @@ async def run():
 
         # ------------------------------------------------ main menu + two sections + Transfer untouched
         await d.say("/start", VIEWER)
-        assert [t for t, _ in d.buttons(VIEWER)] == ["🔄 TRANSFER", "🏆 ONE NIGHT CHAMPION"]
+        assert [t for t, _ in d.buttons(VIEWER)] == ["🔄 ترنسفر", "🏆 وان نایت چمپیون"]
         d.snap("Main menu — two sections", VIEWER)
-        await d.tap("TRANSFER", VIEWER)
+        await d.tap("ترنسفر", VIEWER)
         labels = [t for t, _ in d.buttons(VIEWER)]
-        assert any("ثبت آگهی" in t for t in labels) and "🏠 MAIN MENU" in labels, labels      # existing Transfer menu is intact
+        assert any("ثبت آگهی" in t for t in labels) and "🏠 منوی اصلی" in labels, labels      # existing Transfer menu is intact
         d.snap("TRANSFER opens the existing Transfer menu", VIEWER)
-        await d.tap("MAIN MENU", VIEWER)
-        await d.tap("ONE NIGHT CHAMPION", VIEWER)
+        await d.tap("منوی اصلی", VIEWER)
+        await d.tap("وان نایت چمپیون", VIEWER)
         assert "No tournament" not in d.text(VIEWER) or True
-        for lab in ("LIVE", "SCHEDULE", "RESULTS", "STANDINGS", "KNOCKOUT", "TEAMS", "PLAYERS", "CHAMPION", "MAIN MENU"):
+        for lab in ("پخش زنده", "برنامه بازی‌ها", "نتایج", "جدول", "مرحله حذفی", "تیم‌ها", "بازیکنان", "قهرمان", "منوی اصلی"):
             assert any(lab in t for t, _ in d.buttons(VIEWER)), lab
         d.snap("ONC viewer panel", VIEWER)
 
         # viewer cannot reach admin functions even by forging callback data
         for forged in ("onc:a", "onc:cr", "onc:crok", "onc:cy:dtn:1", "onc:rsv", "onc:rc:1", "onc:ch"):
             await d.press(forged, VIEWER)
-            assert S.alerts and "Admins only" in S.alerts[-1], forged
+            assert S.alerts and "فقط ادمین" in S.alerts[-1], forged
         assert await dbx.scalar("SELECT COUNT(*) FROM onc_tournaments") == 0
         await d.say("/admin", VIEWER)
-        assert "ADMIN" not in d.text(VIEWER)
+        assert "پنل مدیریت" not in d.text(VIEWER)
 
         # ------------------------------------------------ two admin panels
         await d.say("/admin")
-        assert [t for t, _ in d.buttons()][:2] == ["🔄 TRANSFER PANEL", "🏆 ONE NIGHT CHAMPION PANEL"]
+        assert [t for t, _ in d.buttons()][:2] == ["🔄 پنل ترنسفر", "🏆 پنل وان نایت چمپیون"]
         d.snap("Admin: two independent panels")
-        await d.tap("TRANSFER PANEL")
+        await d.tap("پنل ترنسفر")
         assert "پنل مدیریت" in d.text()
-        await d.say("/admin"); await d.tap("ONE NIGHT CHAMPION PANEL")
-        for lab in ("CREATE TOURNAMENT", "MANAGE TOURNAMENTS", "LIVE MATCHES", "STANDINGS", "KNOCKOUT", "TEAMS & PLAYERS", "GRAPHICS", "CHANNEL", "SETTINGS", "ADMIN PANEL"):
+        await d.say("/admin"); await d.tap("پنل وان نایت چمپیون")
+        for lab in ("ساخت تورنمنت", "مدیریت تورنمنت‌ها", "بازی‌های زنده", "جدول رده‌بندی", "مرحله حذفی", "تیم‌ها و بازیکنان", "گرافیک", "کانال", "تنظیمات", "پنل مدیریت"):
             assert any(lab in t for t, _ in d.buttons()), lab
         d.snap("ONC admin panel")
 
         # ------------------------------------------------ create tournament wizard (validation + back)
-        await d.tap("CREATE TOURNAMENT"); await d.say("ONE NIGHT CHAMPION #5")
-        await d.say("2026/13/45"); assert "Date format" in d.text()
+        await d.tap("ساخت تورنمنت"); await d.say("وان نایت چمپیون #5")
+        await d.say("2026/13/45"); assert "فرمت تاریخ" in d.text()
         await d.say("2026/10/10")
-        await d.say("25:99"); assert "Time format" in d.text()
-        await d.say("20:00"); await d.say("0"); assert "minutes" in d.text()
+        await d.say("25:99"); assert "فرمت ساعت" in d.text()
+        await d.say("20:00"); await d.say("0"); assert "دقیقه" in d.text()
         await d.say("30")
         d.snap("Create tournament — confirm step")
-        await d.tap("✅ CREATE")
+        await d.tap("✅ ساخت")
         t = await service.active_tournament()
         assert t and t["status"] == "DRAFT" and t["round_interval"] == 30 and t["start_time"] == "20:00"
         tid = t["id"]
@@ -118,31 +118,31 @@ async def run():
 
         # ------------------------------------------------ channel (separate from Transfer) + test connection
         await db.set_setting("publish_chat", "-100999")          # the Transfer ads group
-        await d.tap("CHANNEL"); d.snap("ONC channel — not configured")
-        await d.tap("SET CHANNEL")
-        await d.say("-100999"); assert "TRANSFER ads group" in d.text()  # can't reuse the Transfer destination
+        await d.tap("کانال"); d.snap("ONC channel — not configured")
+        await d.tap("تنظیم کانال")
+        await d.say("-100999"); assert "گروه آگهی‌های ترنسفر" in d.text()  # can't reuse the Transfer destination
         await d.say("@onc_news")
-        assert await service.get_setting("channel_id") == str(CHANNEL) and "CONNECTED" in d.text()
+        assert await service.get_setting("channel_id") == str(CHANNEL) and "متصل" in d.text()
         d.snap("ONC channel — connected")
         S.channel_perms = {"can_post_messages": True, "can_edit_messages": False}
-        await d.tap("TEST CONNECTION"); assert "❌ PROBLEM" in d.text() and "Edit messages" in d.text()
+        await d.tap("تست اتصال"); assert "❌ مشکل دارد" in d.text() and "ویرایش پیام" in d.text()
         d.snap("Test connection — missing permission")
         S.channel_perms = {"can_post_messages": True, "can_edit_messages": True}
-        await d.tap("TEST CONNECTION"); assert "✅ CONNECTED" in d.text()
+        await d.tap("تست اتصال"); assert "✅ متصل" in d.text()
         assert await db.get_setting("publish_chat") == "-100999"   # Transfer destination untouched
 
         # ------------------------------------------------ teams via UI (name + logo + players)
         await d.press(f"onc:ta:{tid}")
-        await d.say("TAJ"); assert "TEAM LOGO" in d.text()
+        await d.say("TAJ"); assert "لوگوی تیم" in d.text()
         await d.photo(png((220, 160, 20)))
-        assert "Team added" in d.text()
-        await d.tap("MANAGE PLAYERS"); await d.tap("ADD PLAYER")
-        await d.say("tajPlayer1, tajPlayer2\ntajPlayer3"); assert "Added 3" in d.text()
-        await d.say("tajPlayer1"); assert "already" in d.text()
+        assert "تیم اضافه شد" in d.text()
+        await d.tap("مدیریت بازیکنان"); await d.tap("افزودن بازیکن")
+        await d.say("tajPlayer1, tajPlayer2\ntajPlayer3"); assert "اضافه شد: 3" in d.text()
+        await d.say("tajPlayer1"); assert "قبلاً" in d.text()
         d.snap("Team players")
         await d.say("done")
-        await d.press(f"onc:ta:{tid}"); await d.say("taj"); assert "already exists" in d.text()      # duplicate (case-insensitive)
-        await d.say("AZADI"); await d.tap("SKIP LOGO")
+        await d.press(f"onc:ta:{tid}"); await d.say("taj"); assert "وجود دارد" in d.text()      # duplicate (case-insensitive)
+        await d.say("AZADI"); await d.tap("بدون لوگو")
         for name in [n for g in GROUPS.values() for n in g if n not in ("TAJ", "AZADI")]:
             await service.add_team(ADMIN, tid, name, None)
         await service.dbx.execute("UPDATE onc_teams SET logo_file_id='file0'")   # every team has a logo, yet only the champion poster may use one
@@ -154,34 +154,34 @@ async def run():
         # ------------------------------------------------ groups: create, rename, manual assign, move, qualifiers
         await d.press(f"onc:gm:{tid}")
         for _ in range(4):
-            await d.tap("CREATE NEW GROUP")
+            await d.tap("ساخت گروه جدید")
         gs = {g["name"]: g["id"] for g in await service.groups_of(tid)}
         assert set(gs) == set(GROUPS), gs
-        await d.press(f"onc:gp:{gs['GROUP D']}"); await d.tap("RENAME"); await d.say("GROUP A"); assert "already exists" in d.text()
-        await d.say("GROUP D")   # same name allowed for itself? -> treated as duplicate of itself only if other group; ensure no crash
-        await d.press(f"onc:tg:{teams['TAJ']}"); await d.tap("GROUP A")                       # manual assignment
-        assert (await service.get_team(teams["TAJ"]))["group_name"] == "GROUP A"
+        await d.press(f"onc:gp:{gs['گروه D']}"); await d.tap("تغییر نام"); await d.say("گروه A"); assert "وجود دارد" in d.text()
+        await d.say("گروه D")   # same name allowed for itself? -> treated as duplicate of itself only if other group; ensure no crash
+        await d.press(f"onc:tg:{teams['TAJ']}"); await d.tap("گروه A")                       # manual assignment
+        assert (await service.get_team(teams["TAJ"]))["group_name"] == "گروه A"
         for g, names in GROUPS.items():
             for n in names:
                 await service.assign_team(ADMIN, teams[n], gs[g])
-        await service.assign_team(ADMIN, teams["VIPERS"], gs["GROUP D"])       # move between groups …
-        assert (await service.get_team(teams["VIPERS"]))["group_name"] == "GROUP D"
-        await service.assign_team(ADMIN, teams["VIPERS"], gs["GROUP C"])       # … and back; team data is untouched
+        await service.assign_team(ADMIN, teams["VIPERS"], gs["گروه D"])       # move between groups …
+        assert (await service.get_team(teams["VIPERS"]))["group_name"] == "گروه D"
+        await service.assign_team(ADMIN, teams["VIPERS"], gs["گروه C"])       # … and back; team data is untouched
         assert (await service.get_team(teams["VIPERS"]))["name"] == "VIPERS"
         await d.press(f"onc:gm:{tid}"); d.snap("Group management (4/4/3/3 teams)")
         assert [len(g["members"]) for g in await service.groups_of(tid)] == [4, 4, 3, 3]
-        await d.press(f"onc:v:{tid}"); assert "✗ QUALIFIER COUNTS SET" in d.text() and "SCHEDULE GENERATED — not generated" in d.text()
+        await d.press(f"onc:v:{tid}"); assert "✗ تعداد صعودکننده‌ها" in d.text() and "برنامه — هنوز ساخته نشده" in d.text()
         d.snap("Pre-tournament checklist (incomplete)")
-        await d.press(f"onc:gq:{gs['GROUP A']}"); d.snap("Set qualifiers")
+        await d.press(f"onc:gq:{gs['گروه A']}"); d.snap("Set qualifiers")
         for g in gs.values():
             await d.press(f"onc:gqs:{g}:2")
         try:
-            await service.set_qualifiers(ADMIN, gs["GROUP C"], 9); assert False
+            await service.set_qualifiers(ADMIN, gs["گروه C"], 9); assert False
         except service.OncError:
             pass
 
         # ------------------------------------------------ schedule: single round robin, simultaneous matches per round
-        await d.press(f"onc:sc:{tid}"); await d.tap("GENERATE SCHEDULE")
+        await d.press(f"onc:sc:{tid}"); await d.tap("ساخت برنامه")
         rounds = await service.rounds_of(tid)
         assert [r["start_at"][11:] for r in rounds] == ["20:00", "20:30", "21:00"], rounds
         assert await dbx.scalar("SELECT COUNT(*) FROM onc_matches WHERE tournament_id=?", tid) == 6 + 6 + 3 + 3
@@ -198,7 +198,7 @@ async def run():
             await dbx.execute("INSERT INTO onc_match_participants(round_id,team_id,match_id) SELECT round_id,team_id,match_id FROM onc_match_participants LIMIT 1"); assert False
         except Exception:
             pass
-        await d.tap("📢 PUBLISH SCHEDULE")
+        await d.tap("📢 انتشار برنامه")
         n_sched = len(d.channel())
         assert n_sched == 3 and d.channel()[0]["photo"], "21 rows → 3 pages (pagination)"
         d.snap("Schedule graphic in the ONC channel", channel=True)
@@ -207,14 +207,14 @@ async def run():
         await d.press(f"onc:t:{tid}")
         assert await service.get_setting("channel_id")
         assert (await service.get_tournament(tid))["status"] == "READY"
-        assert any("START TOURNAMENT" in t for t, _ in d.buttons())
+        assert any("شروع تورنمنت" in t for t, _ in d.buttons())
         d.snap("All checks ✓ → START TOURNAMENT enabled")
-        await d.tap("START TOURNAMENT")
+        await d.tap("شروع تورنمنت")
         assert (await service.get_tournament(tid))["status"] == "LIVE"
 
         # ------------------------------------------------ LIVE MATCHES + fast result entry (round 1)
-        await d.tap("LIVE MATCHES")
-        assert "ROUND 1" in d.text() and "ENTER RESULT" in "".join(t for t, _ in d.buttons())
+        await d.tap("بازی‌های زنده")
+        assert "راند 1" in d.text() and "ثبت نتیجه" in "".join(t for t, _ in d.buttons())
         d.snap("Live matches — round 1")
         r1 = rounds[0]
         ms = await service.matches_of_round(r1["id"])
@@ -223,27 +223,27 @@ async def run():
             await d.press(f"onc:rm:{m['id']}")
             if i == 0:
                 d.snap("Result entry — first team goals")
-                await d.say("abc"); assert "whole number" in d.text()
+                await d.say("abc"); assert "عدد صحیح" in d.text()
                 await d.say(str(a)); d.snap("Result entry — second team goals"); await d.say(str(b))
                 assert f"{m['name_a']} {a} - {b} {m['name_b']}" in d.text()
                 d.snap("Result preview")
-                await d.tap("EDIT"); await d.say(f"{a}-{b}")                       # one message works too
+                await d.tap("ویرایش"); await d.say(f"{a}-{b}")                       # one message works too
             else:
                 await d.say(f"{a}-{b}")
-            await d.tap("SAVE RESULT")
+            await d.tap("ثبت نتیجه")
             if i < len(ms) - 1:
-                assert "ROUND COMPLETED" not in d.text()
-        assert "ROUND COMPLETED" in d.text() and "CONFIRM & PUBLISH" in "".join(t for t, _ in d.buttons())
+                assert "راند کامل شد" not in d.text()
+        assert "راند کامل شد" in d.text() and "تأیید و انتشار" in "".join(t for t, _ in d.buttons())
         assert len(d.channel()) == n_sched, "nothing is published before CONFIRM & PUBLISH"     # only the schedule posts
         assert (await service.group_tables(tid))[0]["played"] == 0, "unconfirmed results never count"
         d.snap("ROUND COMPLETED — text summary for review (nothing published yet)")
         # edit before publishing
-        await d.tap("EDIT RESULTS"); await d.tap(ms[0]["name_a"])
-        await d.say("5-0"); await d.tap("SAVE RESULT"); assert "5 - 0" in d.text() or "5-0" in d.text()
-        await d.tap("EDIT RESULTS"); await d.tap(ms[0]["name_a"]); a, b = scores(ms[0]["name_a"], ms[0]["name_b"], ms[0]["group_name"])
-        await d.say(f"{a}-{b}"); await d.tap("SAVE RESULT")
-        await d.tap("CONFIRM & PUBLISH")
-        assert len(d.channel()) == n_sched + 1 and "published" in d.text().lower(), d.text()
+        await d.tap("ویرایش نتایج"); await d.tap(ms[0]["name_a"])
+        await d.say("5-0"); await d.tap("ثبت نتیجه"); assert "5 - 0" in d.text() or "5-0" in d.text()
+        await d.tap("ویرایش نتایج"); await d.tap(ms[0]["name_a"]); a, b = scores(ms[0]["name_a"], ms[0]["name_b"], ms[0]["group_name"])
+        await d.say(f"{a}-{b}"); await d.tap("ثبت نتیجه")
+        await d.tap("تأیید و انتشار")
+        assert len(d.channel()) == n_sched + 1 and "منتشر شد" in d.text(), d.text()
         assert (await service.group_tables(tid))[0]["played"] >= 1
         pubs = await dbx.fetchall("SELECT * FROM onc_publications WHERE kind='RESULTS'")
         assert len(pubs) == 1 and pubs[0]["channel_id"] == str(CHANNEL) and pubs[0]["published_by"] == ADMIN and pubs[0]["content_version"] >= 1
@@ -265,54 +265,54 @@ async def run():
             a, b = scores(m["name_a"], m["name_b"], m["group_name"])
             await service.save_result(ADMIN, m["id"], a, b)
         await d.press(f"onc:rd:{r3['id']}")
-        assert "ROUND COMPLETED" in d.text()
+        assert "راند کامل شد" in d.text()
         d.snap("Final group round — review")
-        await d.tap("CONFIRM & PUBLISH")
+        await d.tap("تأیید و انتشار")
 
         # ------------------------------------------------ standings / tie-break / qualification
         tables = {x["group"]["name"]: x for x in await service.group_tables(tid)}
-        A = [r["name"] for r in tables["GROUP A"]["rows"]]
+        A = [r["name"] for r in tables["گروه A"]["rows"]]
         assert A[:2] == ["LEGACY", "TAJ"] or A[0] in ("LEGACY", "TAJ"), A
-        rowsA = {r["name"]: r for r in tables["GROUP A"]["rows"]}
+        rowsA = {r["name"]: r for r in tables["گروه A"]["rows"]}
         assert rowsA["TAJ"]["Pts"] == rowsA["LEGACY"]["Pts"] == 6 and rowsA["LEGACY"]["pos"] < rowsA["TAJ"]["pos"] and rowsA["LEGACY"]["tb"] == "H2H"
         assert rowsA["TAJ"]["GD"] > rowsA["LEGACY"]["GD"], "head-to-head beats goal difference for exactly two teams"
-        C = {r["name"]: r for r in tables["GROUP C"]["rows"]}
+        C = {r["name"]: r for r in tables["گروه C"]["rows"]}
         assert C["VIPERS"]["pos"] < C["TITANS"]["pos"] and C["VIPERS"]["tb"] == "GD"             # H2H level → GD
-        D = [r["name"] for r in tables["GROUP D"]["rows"]]
+        D = [r["name"] for r in tables["گروه D"]["rows"]]
         assert D == ["EAGLES", "RAIDERS", "WOLVES"], D                                          # 3 teams level: GD, no H2H
-        B = tables["GROUP B"]
+        B = tables["گروه B"]
         assert len(B["unresolved"]) == 1 and len(B["unresolved"][0]) == 4 and B["status"]["state"] == "NEEDS ADMIN DECISION"
         q = await service.qualification(tid)
-        assert not q["ready"] and any("GROUP B" in b for b in q["blockers"])
+        assert not q["ready"] and any("گروه B" in b for b in q["blockers"])
         await d.press(f"onc:st:{tid}")
-        assert "NEEDS ADMIN DECISION" in d.text()
+        assert "نیاز به تصمیم ادمین" in d.text()
         d.snap("Standings: unresolved tie blocks qualification")
         try:
             await service.create_ko_stage(ADMIN, tid, "QF"); assert False
         except service.OncError as e:
-            assert "GROUP B" in str(e)
-        await d.tap("DECIDE ORDER")
+            assert "گروه B" in str(e)
+        await d.tap("تعیین ترتیب")
         d.snap("Admin decides the unresolved tie")
         order = ["GRAVITY", "ARYA", "PERSIAN GULF", "HANGOVER"]
         for n in order:
             await d.tap(n)
         tables = {x["group"]["name"]: x for x in await service.group_tables(tid)}
-        assert [r["name"] for r in tables["GROUP B"]["rows"]] == order and tables["GROUP B"]["rows"][0]["tb"] == "ADMIN"
+        assert [r["name"] for r in tables["گروه B"]["rows"]] == order and tables["گروه B"]["rows"][0]["tb"] == "ADMIN"
         q = await service.qualification(tid)
         assert q["ready"] and len(q["teams"]) == 8
         d.snap("Standings after the decision — qualification final")
-        await d.tap("PUBLISH STANDINGS")
-        await d.tap("PUBLISH QUALIFIED TEAMS")
+        await d.tap("انتشار جدول")
+        await d.tap("انتشار تیم‌های صعودکننده")
         d.snap("Group tables / qualified teams in the ONC channel", channel=True)
 
         # ------------------------------------------------ knockout: admin picks every matchup
         await d.press(f"onc:ko:{tid}"); d.snap("Knockout — qualified teams")
-        await d.tap("CREATE STAGE"); d.snap("Choose the stage")
-        await d.tap("QUARTER FINALS")
+        await d.tap("ساخت مرحله"); d.snap("Choose the stage")
+        await d.tap("یک‌چهارم نهایی")
         qual = [teams[n] for n in ["TAJ", "LEGACY", "GRAVITY", "ARYA", "VIPERS", "PHOENIX", "EAGLES", "RAIDERS"]]
         assert set(qual) == set(q["teams"]), "qualified teams are the top 2 of each group"
         rid_qf = (await service.ko_rounds(tid))[0]["id"]
-        await d.tap("ADD MATCHUP"); await d.tap("TAJ"); d.snap("Matchup: pick the opponent"); await d.tap("GRAVITY")
+        await d.tap("افزودن بازی"); await d.tap("TAJ"); d.snap("Matchup: pick the opponent"); await d.tap("GRAVITY")
         pairs = [("LEGACY", "EAGLES"), ("ARYA", "RAIDERS"), ("VIPERS", "PHOENIX")]
         for a, b in pairs:
             await service.add_ko_match(ADMIN, rid_qf, teams[a], teams[b])
@@ -321,50 +321,50 @@ async def run():
         except service.OncError:
             pass
         await d.press(f"onc:ks:{rid_qf}"); d.snap("Quarter finals — admin chose the matchups")
-        await d.tap("PUBLISH MATCHUPS")
+        await d.tap("انتشار بازی‌ها")
         # results: level match → winner must be chosen by the admin
         qms = await service.matches_of_round(rid_qf)
         m0 = qms[0]
         await d.press(f"onc:rm:{m0['id']}"); await d.say("2-2")
-        assert "choose manually" in d.text(); d.snap("Level knockout match — admin chooses the winner")
-        await d.tap(m0["name_b"]); await d.tap("SAVE RESULT")
+        assert "دستی انتخاب کن" in d.text(); d.snap("Level knockout match — admin chooses the winner")
+        await d.tap(m0["name_b"]); await d.tap("ثبت نتیجه")
         try:
             await service.save_result(ADMIN, qms[1]["id"], 1, 1); assert False                      # no winner → refused
         except service.OncError as e:
-            assert "winner" in str(e)
+            assert "برنده" in str(e)
         for m in qms[1:]:
             await service.save_result(ADMIN, m["id"], 2, 0)
         await d.press(f"onc:rd:{rid_qf}")
-        assert "QUARTER FINALS" in d.text() and "ROUND COMPLETED" in d.text()
+        assert "یک‌چهارم نهایی" in d.text() and "راند کامل شد" in d.text()
         d.snap("Quarter finals — review before publishing")
-        await d.tap("CONFIRM & PUBLISH")
+        await d.tap("تأیید و انتشار")
         qw = [m["winner_team_id"] for m in await service.matches_of_round(rid_qf)]
         assert teams["GRAVITY"] in qw and teams["TAJ"] not in qw
 
         # ------------------------------------------------ edit a PUBLISHED result: update the same post, never a duplicate
         posts_before = len(d.channel())
         pub_before = await dbx.fetchone("SELECT * FROM onc_publications WHERE kind='RESULTS' AND ref_id=?", rounds[0]["id"])
-        m = next(x for x in await service.matches_of_round(rounds[0]["id"]) if x["group_name"] != "GROUP B" and x["goals_a"] != x["goals_b"])
+        m = next(x for x in await service.matches_of_round(rounds[0]["id"]) if x["group_name"] != "گروه B" and x["goals_a"] != x["goals_b"])
         a, b = m["goals_a"], m["goals_b"]
         na, nb = (a + 3, b) if a > b else (a, b + 3)       # same winner → qualification unchanged
-        await d.press(f"onc:rm:{m['id']}"); await d.say(f"{na}-{nb}"); await d.tap("SAVE RESULT")
-        assert "ROUND ALREADY PUBLISHED" in d.text() and "RESULT HAS BEEN CHANGED" in d.text(), d.text()
+        await d.press(f"onc:rm:{m['id']}"); await d.say(f"{na}-{nb}"); await d.tap("ثبت نتیجه")
+        assert "این راند قبلاً منتشر شده" in d.text() and "نتیجه تغییر کرده" in d.text(), d.text()
         d.snap("Published result edited — update the channel post?")
         assert len(d.channel()) == posts_before, "no automatic new post"
-        await d.tap("UPDATE CHANNEL POST")
+        await d.tap("به‌روزرسانی پست کانال")
         assert len(d.channel()) == posts_before, "same message edited in place"
         pub_after = await dbx.fetchone("SELECT * FROM onc_publications WHERE id=?", pub_before["id"])
         assert pub_after["message_id"] == pub_before["message_id"] and pub_after["content_version"] > pub_before["content_version"]
         assert any(x.get("edited") for x in d.channel()), "Telegram message was edited"
         # keep-current-post path
-        await d.press(f"onc:rm:{m['id']}"); await d.say(f"{a}-{b}"); await d.tap("SAVE RESULT"); await d.tap("KEEP CURRENT POST")
+        await d.press(f"onc:rm:{m['id']}"); await d.say(f"{a}-{b}"); await d.tap("ثبت نتیجه"); await d.tap("پست فعلی بماند")
         assert len(d.channel()) == posts_before
 
         # ------------------------------------------------ dependency protection (qualified team would change)
-        gA = [x for x in await service.matches_of_round(rounds[0]["id"]) if x["group_name"] == "GROUP A"][0]
+        gA = [x for x in await service.matches_of_round(rounds[0]["id"]) if x["group_name"] == "گروه A"][0]
         # find a group-A match whose reversal changes the qualified pair
         impact_found = False
-        for mm in await dbx.fetchall("SELECT m.id FROM onc_matches m WHERE m.group_id=(SELECT id FROM onc_groups WHERE name='GROUP A' AND tournament_id=?)", tid):
+        for mm in await dbx.fetchall("SELECT m.id FROM onc_matches m WHERE m.group_id=(SELECT id FROM onc_groups WHERE name='گروه A' AND tournament_id=?)", tid):
             mt = await service.get_match(mm["id"])
             res = await service.edit_confirmed_result(ADMIN, mm["id"], mt["goals_b"] + 5, mt["goals_a"], None)
             if not res["applied"]:
@@ -374,10 +374,10 @@ async def run():
                 break
             await service.edit_confirmed_result(ADMIN, mm["id"], mt["goals_a"], mt["goals_b"], None)
         assert impact_found
-        await d.press(f"onc:rm:{mm['id']}"); await d.say(f"{mt['goals_b'] + 5}-{mt['goals_a']}"); await d.tap("SAVE RESULT")
-        assert "AFFECTS THE KNOCKOUT" in d.text()
+        await d.press(f"onc:rm:{mm['id']}"); await d.say(f"{mt['goals_b'] + 5}-{mt['goals_a']}"); await d.tap("ثبت نتیجه")
+        assert "روی مرحله‌ی حذفی اثر می‌گذارد" in d.text()
         d.snap("Dependency protection — knockout would break")
-        await d.tap("CANCEL CHANGE")
+        await d.tap("لغو تغییر")
         assert (await service.get_match(mm["id"]))["goals_a"] == mt["goals_a"]
         assert len(await service.ko_rounds(tid)) == 1 and len(await service.matches_of_round(rid_qf)) == 4
 
@@ -410,20 +410,20 @@ async def run():
         await service.add_ko_match(ADMIN, rid_f, pool[0], pool[1])
         await d.press(f"onc:ks:{rid_f}"); d.snap("Final")
         fm = (await service.matches_of_round(rid_f))[0]
-        await d.press(f"onc:rm:{fm['id']}"); await d.say("1-1"); await d.tap(fm["name_a"]); await d.tap("SAVE RESULT")
-        await d.tap("CONFIRM & PUBLISH")
+        await d.press(f"onc:rm:{fm['id']}"); await d.say("1-1"); await d.tap(fm["name_a"]); await d.tap("ثبت نتیجه")
+        await d.tap("تأیید و انتشار")
         t = await service.get_tournament(tid)
         assert t["status"] == "FINISHED" and t["champion_team_id"] == fm["team_a"]
         champ_posts = await dbx.fetchall("SELECT * FROM onc_publications WHERE kind='CHAMPION'")
         assert len(champ_posts) == 1
         d.snap("Final + champion poster published", channel=True)
-        await d.press(f"onc:ko:{tid}"); await d.tap("PUBLISH BRACKET"); d.snap("Bracket + champion in the channel", channel=True)
+        await d.press(f"onc:ko:{tid}"); await d.tap("انتشار جدول حذفی"); d.snap("Bracket + champion in the channel", channel=True)
 
         # ------------------------------------------------ viewer sees confirmed data
         await d.press("onc:u", VIEWER)
         for cb in ("onc:ust", "onc:ur", "onc:us", "onc:uk", "onc:ut", "onc:uc"):
             await d.press(cb, VIEWER)
-        assert "CHAMPION" in d.text(VIEWER)
+        assert "قهرمان" in d.text(VIEWER)
         await d.press("onc:ust", VIEWER); d.snap("Viewer: standings", VIEWER)
         await d.press("onc:uc", VIEWER); d.snap("Viewer: champion", VIEWER)
 
@@ -455,41 +455,41 @@ async def run():
         assert f.size < cfg["cols"]["a"]["size"] and f.size >= cfg["cols"]["a"]["min"] and "…" not in txt
 
         # ------------------------------------------------ graphics management UI
-        await d.press("onc:gx"); await d.tap("TEMPLATES OF ACTIVE SET"); d.snap("Template set")
+        await d.press("onc:gx"); await d.tap("تمپلیت‌های ست فعال"); d.snap("Template set")
         sid = (await templates.active_set())["id"]
         tpl = (await templates.templates_of(sid))[2]
         await d.press(f"onc:xt:{tpl['id']}"); d.snap("Template page")
-        await d.tap("EDIT POSITIONS"); x0 = (await templates.get_template(tpl["id"]))["config"]["elements"]["brand"]["y"]
-        await d.tap("STEP 5px"); await d.tap("STEP 10px"); await d.tap("DOWN")
+        await d.tap("ویرایش موقعیت‌ها"); x0 = (await templates.get_template(tpl["id"]))["config"]["elements"]["brand"]["y"]
+        await d.tap("گام 5px"); await d.tap("گام 10px"); await d.tap("پایین")
         assert (await templates.get_template(tpl["id"]))["config"]["elements"]["brand"]["y"] == x0 + 25
-        await d.tap("COLOR"); await d.tap("FONT SIZE +"); d.snap("Position editor")
-        await d.tap("PREVIEW")
+        await d.tap("رنگ"); await d.tap("اندازه فونت +"); d.snap("Position editor")
+        await d.tap("پیش‌نمایش")
         assert S.log[-1][0] in ("SendPhoto",)
         await d.press(f"onc:xt:{tpl['id']}")
-        await d.tap("UPLOAD BACKGROUND"); await d.photo(png((10, 80, 160), 400))
+        await d.tap("آپلود پس‌زمینه"); await d.photo(png((10, 80, 160), 400))
         assert (await templates.get_template(tpl["id"]))["bg_path"] and os.path.exists((await templates.get_template(tpl["id"]))["bg_path"])
-        await d.tap("DUPLICATE"); await d.press(f"onc:xsp:{sid}"); await d.tap("DUPLICATE SET")
+        await d.tap("کپی"); await d.press(f"onc:xsp:{sid}"); await d.tap("کپی ست")
         assert len(await templates.sets()) == 2
-        await d.tap("ACTIVATE SET"); assert (await templates.active_set())["id"] != sid
+        await d.tap("فعال‌سازی ست"); assert (await templates.active_set())["id"] != sid
         await d.tap("DELETE SET") if False else None
         d.snap("Template sets: duplicate / activate")
         await d.press(f"onc:xsa:{sid}")
 
         # ------------------------------------------------ dangerous ops need confirmation; audit log
-        await d.press(f"onc:ts:{tid}"); await d.tap("RESET RESULTS")
-        assert "ARE YOU SURE" in d.text() and any("CONFIRM" in t for t, _ in d.buttons())
+        await d.press(f"onc:ts:{tid}"); await d.tap("ریست نتایج")
+        assert "مطمئنی" in d.text() and any("تأیید" in t for t, _ in d.buttons())
         d.snap("Dangerous operation → confirmation")
-        await d.tap("CANCEL")
+        await d.tap("لغو")
         assert await service.has_results(tid)
-        await d.tap("RESET RESULTS"); await d.tap("✅ CONFIRM")
+        await d.tap("ریست نتایج"); await d.tap("✅ تأیید")
         assert not await service.has_results(tid) and (await service.get_tournament(tid))["champion_team_id"] is None
         await d.press("onc:au"); log = d.text(); d.snap("Audit log")
-        assert "RESET RESULTS" in log
+        assert "ریست نتایج" in log
         allog = await service.audit_log(limit=2000)
         acts = {r["action"] for r in allog}
         assert {"CHANGED RESULT", "MOVED TEAM", "CREATE TOURNAMENT", "SAVED RESULT", "CONFIRMED ROUND", "TIE DECISION", "KNOCKOUT MATCHUP"} <= acts, acts
         moved = next(r for r in allog if r["action"] == "MOVED TEAM")
-        assert moved["details"] == "VIPERS: GROUP C → GROUP D" or "→" in moved["details"], moved
+        assert moved["details"] == "VIPERS: گروه C → گروه D" or "→" in moved["details"], moved
         chg = next(r for r in allog if r["action"] == "CHANGED RESULT")
         assert "→" in chg["details"] and chg["admin_id"] == ADMIN and chg["ts"] > 0
 
@@ -509,13 +509,13 @@ async def run():
         for m in await service.matches_of_round(r1["id"]):
             await service.save_result(ADMIN, m["id"], 1, 0)
         S.fail_channel = True
-        await d.press(f"onc:rd:{r1['id']}"); await d.tap("CONFIRM & PUBLISH")
-        assert "FAILED" in d.text() and "RETRY PUBLISH" in "".join(t for t, _ in d.buttons())
+        await d.press(f"onc:rd:{r1['id']}"); await d.tap("تأیید و انتشار")
+        assert "ناموفق" in d.text() and "تلاش دوباره" in "".join(t for t, _ in d.buttons())
         assert (await service.get_round(r1["id"]))["status"] == "CONFIRMED"
         assert (await service.get_round(r1["id"]))["published_version"] == 0
         d.snap("Channel error → retry publish")
         S.fail_channel = False
-        await d.tap("RETRY PUBLISH")
+        await d.tap("تلاش دوباره")
         assert (await service.get_round(r1["id"]))["published_version"] > 0
 
         # ------------------------------------------------ automatic draw: sizes differ by at most one
@@ -524,7 +524,7 @@ async def run():
             await service.add_team(ADMIN, t2, f"T{i}")
         for _ in range(4):
             await service.create_group(ADMIN, t2)
-        await d.press(f"onc:gm:{t2}"); await d.tap("AUTOMATIC DRAW"); await d.tap("✅ CONFIRM")
+        await d.press(f"onc:gm:{t2}"); await d.tap("قرعه‌کشی خودکار"); await d.tap("✅ تأیید")
         sizes = sorted(len(g["members"]) for g in await service.groups_of(t2))
         assert sizes == [3, 3, 4, 4], sizes
         d.snap("Automatic draw (then editable by hand)")
@@ -533,16 +533,16 @@ async def run():
 
         # ------------------------------------------------ FSM / callback isolation between the two sections
         n_t = await dbx.scalar("SELECT COUNT(*) FROM onc_tournaments")
-        await d.say("/admin"); await d.tap("TRANSFER PANEL"); await d.tap("تعرفه و تنظیمات")
+        await d.say("/admin"); await d.tap("پنل ترنسفر"); await d.tap("تعرفه و تنظیمات")
         await d.press("adm:s:price_normal")
         assert (await d.state()).startswith("AdminSt"), await d.state()          # Transfer admin state
         await d.say("2026/10/10")                                                 # ONC wizard text must NOT be consumed by ONC
         assert await dbx.scalar("SELECT COUNT(*) FROM onc_tournaments") == n_t
-        await d.say("/admin"); await d.tap("ONE NIGHT CHAMPION PANEL"); await d.tap("CREATE TOURNAMENT")
+        await d.say("/admin"); await d.tap("پنل وان نایت چمپیون"); await d.tap("ساخت تورنمنت")
         assert (await d.state()).startswith("CreateSt"), await d.state()          # ONC state
         await d.say("/start")                                                     # leaving ONC resets cleanly
         assert await d.state() is None
-        await d.tap("TRANSFER")
+        await d.tap("ترنسفر")
         assert any("ثبت آگهی" in t for t, _ in d.buttons())
         await d.press("onc:crok")                                                 # stale ONC button after leaving → harmless
         assert await dbx.scalar("SELECT COUNT(*) FROM onc_tournaments") == n_t

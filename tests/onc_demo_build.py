@@ -13,37 +13,37 @@ import sys
 FA = {
     "Main menu — two sections": "منوی اصلی — دو بخش مستقل",
     "TRANSFER opens the existing Transfer menu": "بخش TRANSFER همان منوی قبلی ربات را باز می‌کند",
-    "ONC viewer panel": "پنل کاربر ONE NIGHT CHAMPION (فقط بیننده)",
+    "وان نایت چمپیون viewer panel": "پنل کاربر ONE NIGHT CHAMPION (فقط بیننده)",
     "Admin: two independent panels": "ادمین: دو پنل مستقل",
-    "ONC admin panel": "پنل ادمین مسابقات",
+    "وان نایت چمپیون admin panel": "پنل ادمین مسابقات",
     "Create tournament — confirm step": "ساخت تورنمنت — مرحله تأیید (نام، تاریخ، ساعت، فاصله راندها)",
     "Tournament dashboard": "داشبورد تورنمنت",
-    "ONC channel — not configured": "تنظیم کانال ONC — هنوز تنظیم نشده",
-    "ONC channel — connected": "کانال ONC — متصل (عنوان، آیدی، یوزرنیم، وضعیت)",
+    "وان نایت چمپیون channel — not configured": "تنظیم کانال وان نایت چمپیون — هنوز تنظیم نشده",
+    "وان نایت چمپیون channel — connected": "کانال وان نایت چمپیون — متصل (عنوان، آیدی، یوزرنیم، وضعیت)",
     "Test connection — missing permission": "تست اتصال — دسترسی ویرایش پیام ندارد",
     "Team players": "بازیکنان تیم (فقط Player ID)",
     "Teams": "لیست تیم‌ها",
     "Group management (4/4/3/3 teams)": "مدیریت گروه‌ها — گروه‌ها با تعداد تیم نابرابر (۴/۴/۳/۳)",
     "Pre-tournament checklist (incomplete)": "چک‌لیست قبل از شروع — موارد ناقص دقیقاً مشخص است",
     "Set qualifiers": "تعیین تعداد صعودکننده هر گروه",
-    "Schedule: all matches of a round share one time": "برنامه بازی‌ها — همهٔ مسابقات یک Round همزمان",
-    "Schedule graphic in the ONC channel": "گرافیک برنامه در کانال ONC (دو صفحه، بدون لوگو)",
-    "All checks ✓ → START TOURNAMENT enabled": "همه چک‌ها ✓ → دکمهٔ START TOURNAMENT فعال شد",
-    "Live matches — round 1": "LIVE MATCHES — Round 1",
+    "Schedule: all matches of a round share one time": "برنامه بازی‌ها — همهٔ مسابقات یک راند همزمان",
+    "Schedule graphic in the وان نایت چمپیون channel": "گرافیک برنامه در کانال وان نایت چمپیون (دو صفحه، بدون لوگو)",
+    "All checks ✓ → شروع تورنمنت enabled": "همه چک‌ها ✓ → دکمهٔ شروع تورنمنت فعال شد",
+    "Live matches — round 1": "بازی‌های زنده — راند ۱",
     "Result entry — first team goals": "ثبت نتیجه — گل تیم اول",
     "Result entry — second team goals": "ثبت نتیجه — گل تیم دوم",
-    "Result preview": "پیش‌نمایش نتیجه (SAVE / EDIT / CANCEL)",
-    "ROUND COMPLETED — text summary for review (nothing published yet)": "ROUND COMPLETED — خلاصهٔ متنی برای ادمین؛ هنوز چیزی منتشر نشده",
-    "Round results graphic in the ONC channel": "بعد از CONFIRM & PUBLISH — گرافیک نتایج راند در کانال",
+    "Result preview": "پیش‌نمایش نتیجه (ثبت / ویرایش / لغو)",
+    "راند کامل شد — text summary for review (nothing published yet)": "راند کامل شد — خلاصهٔ متنی برای ادمین؛ هنوز چیزی منتشر نشده",
+    "راند results graphic in the وان نایت چمپیون channel": "بعد از تأیید و انتشار — گرافیک نتایج راند در کانال",
     "Standings after round 2": "جدول بعد از راند ۲ (فقط نتایج تأییدشده)",
     "Final group round — review": "آخرین راند گروهی — بازبینی",
-    "Standings: unresolved tie blocks qualification": "تساوی حل‌نشده — صعود نهایی نمی‌شود (NEEDS ADMIN DECISION)",
+    "Standings: unresolved tie blocks qualification": "تساوی حل‌نشده — صعود نهایی نمی‌شود (نیاز به تصمیم ادمین)",
     "Admin decides the unresolved tie": "ادمین ترتیب را دستی تعیین می‌کند",
     "Standings after the decision — qualification final": "بعد از تصمیم ادمین — صعود نهایی شد",
-    "Group tables / qualified teams in the ONC channel": "جدول گروه‌ها و تیم‌های صعودکننده در کانال",
+    "Group tables / qualified teams in the وان نایت چمپیون channel": "جدول گروه‌ها و تیم‌های صعودکننده در کانال",
     "Knockout — qualified teams": "حذفی — تیم‌های صعودکننده",
     "Choose the stage": "انتخاب مرحله (فقط مرحله‌های لازم)",
-    "Matchup: pick the opponent": "ادمین خودش حریف را انتخاب می‌کند (A1 vs B2 تحمیل نمی‌شود)",
+    "Matchup: pick the opponent": "ادمین خودش حریف را انتخاب می‌کند (مثلاً A1 در برابر B2 تحمیل نمی‌شود)",
     "Quarter finals — admin chose the matchups": "یک‌چهارم نهایی — matchupها را ادمین تعیین کرده",
     "Level knockout match — admin chooses the winner": "بازی مساوی در حذفی — برنده را ادمین انتخاب می‌کند",
     "Quarter finals — review before publishing": "یک‌چهارم نهایی — بازبینی قبل از انتشار",
@@ -56,10 +56,10 @@ FA = {
     "Viewer: champion": "کاربر عادی: قهرمان",
     "Template set": "مجموعهٔ تمپلیت‌ها",
     "Template page": "صفحهٔ تمپلیت",
-    "Position editor": "ادیتور موقعیت (UP/DOWN/LEFT/RIGHT، Step 1/5/10/25)",
-    "Template sets: duplicate / activate": "Template Set — کپی و فعال‌سازی",
+    "Position editor": "ادیتور موقعیت (بالا/پایین/چپ/راست، گام ۱/۵/۱۰/۲۵)",
+    "Template sets: duplicate / activate": "ست تمپلیت — کپی و فعال‌سازی",
     "Dangerous operation → confirmation": "عملیات خطرناک → تأیید لازم",
-    "Audit log": "Audit Log",
+    "Audit log": "گزارش عملیات",
     "Channel error → retry publish": "خطای کانال → نتایج ثبت شده‌اند، انتشار قابل تکرار است",
     "Automatic draw (then editable by hand)": "قرعه‌کشی خودکار (بعدش دستی هم قابل تغییر)",
 }
@@ -100,13 +100,13 @@ h1{font-size:19px;margin:0 0 4px}.sub{color:var(--mut);font-size:13px;margin:0 0
 .stage{display:flex;flex-direction:column;align-items:center}
 .cap{width:100%;max-width:440px;margin-bottom:10px}.cap b{display:block;font-size:16px}.cap span{color:var(--mut);font-size:12.5px;direction:ltr;display:block;text-align:left}
 .phone{width:100%;max-width:440px;background:var(--panel);border:1px solid var(--line);border-radius:22px;overflow:hidden}
-.top{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);direction:ltr}
+.top{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);direction:rtl}
 .av{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#ff4d5e,#7a1030);display:grid;place-items:center;font-weight:700;color:#fff}
 .nm{font-weight:600}.st{font-size:12px;color:var(--mut)}
-.chat{padding:14px;display:flex;flex-direction:column;gap:6px;direction:ltr;min-height:240px}
-.bub{background:var(--bub);border:1px solid var(--line);border-radius:14px;padding:9px 12px;max-width:100%;white-space:pre-wrap;word-wrap:break-word;text-align:left;unicode-bidi:plaintext}
+.chat{padding:14px;display:flex;flex-direction:column;gap:6px;direction:rtl;min-height:240px}
+.bub{background:var(--bub);border:1px solid var(--line);border-radius:14px;padding:9px 12px;max-width:100%;white-space:pre-wrap;word-wrap:break-word;text-align:right;direction:rtl}
 .bub img{display:block;width:100%;border-radius:10px;margin-bottom:8px}
-.bub pre{margin:6px 0;font:12.5px/1.45 ui-monospace,Menlo,Consolas,monospace;white-space:pre;overflow:auto;background:rgba(0,0,0,.18);padding:7px 8px;border-radius:8px}
+.bub pre{direction:ltr;text-align:left;unicode-bidi:isolate;margin:6px 0;font:12.5px/1.45 ui-monospace,Menlo,Consolas,monospace;white-space:pre;overflow:auto;background:rgba(0,0,0,.18);padding:7px 8px;border-radius:8px}
 .bub code{font:13px ui-monospace,Menlo,monospace;background:rgba(127,127,127,.2);padding:0 4px;border-radius:4px}
 .kb{display:grid;gap:4px;margin-top:2px}.kb .r{display:flex;gap:4px}
 .kb .b{flex:1;background:var(--btn);border-radius:9px;padding:8px 6px;text-align:center;font-size:13px;min-width:0;overflow-wrap:anywhere}
@@ -133,7 +133,7 @@ body.shot .side,body.shot .nav,body.shot h1,body.shot .sub{display:none}body.sho
 <script>
 const F=__DATA__;let cur=0;
 const $=id=>document.getElementById(id);
-function render(){const f=F[cur];$('ft').textContent=f.fa;$('fe').textContent=f.title;
+function render(){const f=F[cur];$('ft').textContent=f.fa;
  const ch=f.kind==='channel';$('nm').textContent=ch?'ONE NIGHT CHAMPION | News':'PCL BOT';$('st').textContent=ch?'کانال — فقط اخبار تورنمنت':'ربات';
  $('chat').className='chat'+(ch?' feed':'');
  $('chat').innerHTML=f.messages.map(m=>`<div class="bub">${m.img?`<img src="${m.img}">`:''}${m.text}</div>`+

@@ -7,8 +7,13 @@ from .. import config
 from . import dbx
 
 TYPES = ["SCHEDULE", "GROUP_TABLE", "ROUND_RESULTS", "QUALIFIED", "KO_MATCHES", "BRACKET", "CHAMPION"]
-TYPE_LABEL = {"SCHEDULE": "MATCH SCHEDULE", "GROUP_TABLE": "GROUP TABLE", "ROUND_RESULTS": "ROUND RESULTS",
-              "QUALIFIED": "QUALIFIED TEAMS", "KO_MATCHES": "KNOCKOUT MATCHES", "BRACKET": "KNOCKOUT BRACKET", "CHAMPION": "CHAMPION POSTER"}
+TYPE_LABEL = {"SCHEDULE": "برنامه بازی‌ها", "GROUP_TABLE": "جدول گروه", "ROUND_RESULTS": "نتایج راند",
+              "QUALIFIED": "تیم‌های صعودکننده", "KO_MATCHES": "بازی‌های حذفی", "BRACKET": "جدول مرحله حذفی", "CHAMPION": "پوستر قهرمان"}
+THEME_FA = {"RED": "قرمز", "BLUE": "آبی", "GOLD": "طلایی"}
+ELEMENT_FA = {"brand": "نام رویداد", "title": "عنوان", "subtitle": "زیرعنوان", "page": "شماره صفحه", "logo": "لوگو", "team": "نام تیم",
+              "stage": "نام مرحله", "rows": "ردیف‌ها", "col:slot": "ساعت و راند", "col:match": "ردیف بازی", "col:a": "تیم اول", "col:b": "تیم دوم",
+              "col:score": "نتیجه", "col:group": "گروه", "col:pos": "رتبه", "col:team": "نام تیم", "col:P": "بازی", "col:W": "برد", "col:D": "مساوی",
+              "col:L": "باخت", "col:GF": "گل زده", "col:GA": "گل خورده", "col:GD": "تفاضل", "col:PTS": "امتیاز"}
 
 THEMES = {
     "RED": {"bg1": "#1a0509", "bg2": "#5a0f1c", "accent": "#ff3b4e", "panel": "#ffffff14", "gold": "#ffd24a"},
@@ -46,13 +51,13 @@ def default_config(type_: str, theme: str = "RED") -> dict:
     gold = th["gold"]
     el["brand"] = _el(540, 95, 58, "#ffffff", text="ONE NIGHT CHAMPION", max_w=960, min_=30)
     if type_ == "SCHEDULE":
-        el["title"] = _el(540, 185, 44, gold, text="MATCH SCHEDULE")
+        el["title"] = _el(540, 185, 44, gold, text="برنامه بازی‌ها")
         el["subtitle"] = _el(540, 245, 30, "#b8c0cc", min_=18)
         el["page"] = _el(540, 1300, 26, "#b8c0cc", min_=16)
         cfg["rows"] = {"start_y": 330, "row_h": 78, "gap": 10, "max_rows": 10}
         cfg["cols"] = {"slot": _el(90, 0, 40, gold, "left", 900), "match": _el(540, 0, 36, "#ffffff", "center", 900, 20)}
     elif type_ == "GROUP_TABLE":
-        el["title"] = _el(540, 185, 52, gold, text="GROUP TABLE")
+        el["title"] = _el(540, 185, 52, gold, text="جدول گروه")
         el["subtitle"] = _el(540, 250, 36, "#ffffff", min_=20)
         el["page"] = _el(540, 1300, 26, "#b8c0cc", min_=16)
         cfg["rows"] = {"start_y": 400, "row_h": 84, "gap": 10, "max_rows": 9}
@@ -65,21 +70,21 @@ def default_config(type_: str, theme: str = "RED") -> dict:
             "GF": _el(820, 0, 32, "#ffffff", "center", 70, 20), "GA": _el(895, 0, 32, "#ffffff", "center", 70, 20),
             "GD": _el(970, 0, 32, "#ffffff", "center", 80, 20), "PTS": _el(1035, 0, 36, gold, "center", 80, 20)}
     elif type_ == "ROUND_RESULTS":
-        el["title"] = _el(540, 195, 60, gold, text="RESULTS")
+        el["title"] = _el(540, 195, 60, gold, text="نتایج")
         el["subtitle"] = _el(540, 265, 40, "#ffffff", min_=20)
         el["page"] = _el(540, 1300, 26, "#b8c0cc", min_=16)
         cfg["rows"] = {"start_y": 360, "row_h": 92, "gap": 14, "max_rows": 8}
         cfg["cols"] = {"a": _el(80, 0, 40, "#ffffff", "left", 380, 20), "score": _el(540, 0, 46, gold, "center", 200, 30),
                        "b": _el(1000, 0, 40, "#ffffff", "right", 380, 20)}
     elif type_ == "QUALIFIED":
-        el["title"] = _el(540, 195, 56, gold, text="QUALIFIED TEAMS")
+        el["title"] = _el(540, 195, 56, gold, text="تیم‌های صعودکننده")
         el["subtitle"] = _el(540, 262, 32, "#b8c0cc", min_=18)
         el["page"] = _el(540, 1300, 26, "#b8c0cc", min_=16)
         cfg["rows"] = {"start_y": 350, "row_h": 80, "gap": 10, "max_rows": 10}
         cfg["cols"] = {"group": _el(90, 0, 32, gold, "left", 260, 18), "pos": _el(420, 0, 34, "#ffffff", "center", 70, 20),
                        "team": _el(480, 0, 40, "#ffffff", "left", 520, 20)}
     elif type_ == "KO_MATCHES":
-        el["title"] = _el(540, 195, 56, gold, text="KNOCKOUT")
+        el["title"] = _el(540, 195, 56, gold, text="مرحله حذفی")
         el["subtitle"] = _el(540, 265, 42, "#ffffff", min_=20)
         el["page"] = _el(540, 1300, 26, "#b8c0cc", min_=16)
         cfg["rows"] = {"start_y": 360, "row_h": 100, "gap": 16, "max_rows": 7}
@@ -88,13 +93,13 @@ def default_config(type_: str, theme: str = "RED") -> dict:
     elif type_ == "BRACKET":
         cfg["w"], cfg["h"] = 1920, 1080
         el["brand"] = _el(960, 70, 56, "#ffffff", text="ONE NIGHT CHAMPION", max_w=1500, min_=30)
-        el["title"] = _el(960, 140, 40, gold, text="KNOCKOUT BRACKET")
+        el["title"] = _el(960, 140, 40, gold, text="جدول مرحله حذفی")
         el["stage"] = _el(0, 0, 30, gold, "center", 380, 18)
         el["team"] = _el(0, 0, 30, "#ffffff", "left", 330, 16)
         cfg["bracket"] = {"top": 200, "bottom": 1020, "left": 60, "right": 1860}
     elif type_ == "CHAMPION":
         el["brand"] = _el(540, 120, 62, "#ffffff", text="ONE NIGHT CHAMPION", max_w=960, min_=30)
-        el["title"] = _el(540, 260, 76, gold, text="CHAMPION")
+        el["title"] = _el(540, 260, 76, gold, text="قهرمان")
         el["logo"] = {"x": 540, "y": 620, "size": 420}
         el["team"] = _el(540, 960, 96, "#ffffff", max_w=960, min_=40)
         el["subtitle"] = _el(540, 1100, 36, "#b8c0cc", min_=20)
@@ -111,7 +116,7 @@ async def ensure_defaults() -> None:
     if await dbx.scalar("SELECT COUNT(*) FROM onc_template_sets"):
         return
     async with dbx.tx():
-        sid = await dbx.execute("INSERT INTO onc_template_sets(name,is_active) VALUES('ONE NIGHT CHAMPION — RED',1)")
+        sid = await dbx.execute("INSERT INTO onc_template_sets(name,is_active) VALUES('وان نایت چمپیون — قرمز',1)")
         for t in TYPES:
             await dbx.execute("INSERT INTO onc_templates(set_id,type,name,config,active) VALUES(?,?,?,?,1)",
                               sid, t, TYPE_LABEL[t], json.dumps(default_config(t, "RED")))
@@ -173,7 +178,7 @@ async def create_set(name: str, theme: str = "RED") -> int:
 async def duplicate_set(sid: int) -> int:
     s = await get_set(sid)
     async with dbx.tx():
-        new = await dbx.execute("INSERT INTO onc_template_sets(name) VALUES(?)", f"{s['name']} (copy)"[:50])
+        new = await dbx.execute("INSERT INTO onc_template_sets(name) VALUES(?)", f"{s['name']} (کپی)"[:50])
         for t in await templates_of(sid):
             await dbx.execute("INSERT INTO onc_templates(set_id,type,name,bg_path,config,active) VALUES(?,?,?,?,?,?)",
                               new, t["type"], t["name"], t["bg_path"], json.dumps(t["config"]), t["active"])
@@ -206,7 +211,7 @@ async def add_template(sid: int, type_: str, theme: str = "RED") -> int:
 async def duplicate_template(tid: int) -> int:
     t = await get_template(tid)
     return await dbx.execute("INSERT INTO onc_templates(set_id,type,name,bg_path,config,active) VALUES(?,?,?,?,?,0)",
-                             t["set_id"], t["type"], f"{t['name']} (copy)"[:50], t["bg_path"], json.dumps(t["config"]))
+                             t["set_id"], t["type"], f"{t['name']} (کپی)"[:50], t["bg_path"], json.dumps(t["config"]))
 
 
 async def set_active_flag(tid: int, on: bool) -> None:

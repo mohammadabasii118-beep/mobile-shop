@@ -16,8 +16,8 @@ fallback = Router()
 @fallback.callback_query(F.data.startswith("onc:"))
 async def stale(c: CallbackQuery):
     if not is_admin(c.from_user.id):
-        return await c.answer("⛔️ Admins only.", show_alert=True)
-    await c.answer("This button has expired — open the panel again (/admin).", show_alert=True)
+        return await c.answer("⛔️ فقط ادمین‌ها دسترسی دارند.", show_alert=True)
+    await c.answer("این دکمه منقضی شده — پنل را دوباره باز کن (/admin).", show_alert=True)
 
 
 def routers() -> list[Router]:

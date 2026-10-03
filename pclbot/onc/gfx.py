@@ -15,7 +15,7 @@ async def _render(type_: str, data: dict) -> list[bytes]:
 def _cells(m: dict, with_score: bool) -> list[str]:
     if with_score and m["goals_a"] is not None:
         return [m["name_a"], f"{m['goals_a']} - {m['goals_b']}", m["name_b"]]
-    return [m["name_a"], "VS", m["name_b"]]
+    return [m["name_a"], "×", m["name_b"]]
 
 
 async def schedule(tid: int) -> list[bytes]:
@@ -25,8 +25,8 @@ async def schedule(tid: int) -> list[bytes]:
         ms = await service.matches_of_round(r["id"])
         if not ms:
             continue
-        lines.append({"kind": "slot", "text": f"{r['start_at'][11:]} · " + (f"ROUND {r['number']}" if r["stage"] == "GROUP" else algo.STAGE_NAME[r["stage"]])})
-        lines += [{"kind": "match", "text": f"{m['name_a']} vs {m['name_b']}"} for m in ms]
+        lines.append({"kind": "slot", "text": f"{r['start_at'][11:]} · " + (f"راند {r['number']}" if r["stage"] == "GROUP" else algo.STAGE_NAME[r["stage"]])})
+        lines += [{"kind": "match", "text": f"{m['name_a']} × {m['name_b']}"} for m in ms]
     return await _render("SCHEDULE", {"subtitle": f"{t['name']} · {service.fmt_date(t['start_date'])}", "rows": lines})
 
 
@@ -43,7 +43,7 @@ async def round_results(rid: int) -> list[bytes]:
     label = await service.round_label(r)
     if r["stage"] == "GROUP":
         rows = [{"cells": [m["name_a"], f"{m['goals_a']} - {m['goals_b']}", m["name_b"]]} for m in ms]
-        return await _render("ROUND_RESULTS", {"title": "RESULTS", "subtitle": label, "rows": rows})
+        return await _render("ROUND_RESULTS", {"title": "نتایج", "subtitle": label, "rows": rows})
     rows = []
     for m in ms:  # a level knockout match shows its manually chosen winner with a marker
         cells = [m["name_a"], f"{m['goals_a']} - {m['goals_b']}", m["name_b"]]
@@ -51,19 +51,19 @@ async def round_results(rid: int) -> list[bytes]:
             cells[0 if m["winner_team_id"] == m["team_a"] else 2] = "▶ " + cells[0 if m["winner_team_id"] == m["team_a"] else 2]
         rows.append({"cells": cells})
     sub = label
-    return await _render("ROUND_RESULTS", {"title": "RESULTS", "subtitle": sub, "rows": rows})
+    return await _render("ROUND_RESULTS", {"title": "نتایج", "subtitle": sub, "rows": rows})
 
 
 async def qualified(tid: int) -> list[bytes]:
     q = await service.qualification(tid)
     if not q["ready"]:
-        raise service.OncError("Qualification is not final:\n• " + "\n• ".join(q["blockers"]))
+        raise service.OncError("صعود هنوز نهایی نشده:\n• " + "\n• ".join(q["blockers"]))
     rows = []
     for t in await service.group_tables(tid):
         for r in t["rows"]:
             if r["team"] in t["status"]["qualified"]:
                 rows.append({"cells": [t["group"]["name"], str(r["pos"]), r["name"]]})
-    return await _render("QUALIFIED", {"subtitle": "GROUP STAGE COMPLETED", "rows": rows})
+    return await _render("QUALIFIED", {"subtitle": "پایان مرحله گروهی", "rows": rows})
 
 
 async def ko_matches(rid: int) -> list[bytes]:
@@ -92,7 +92,7 @@ async def champion(bot: Bot, tid: int) -> list[bytes]:
     t = await service.get_tournament(tid)
     team = await service.get_team(t["champion_team_id"]) if t["champion_team_id"] else None
     if not team:
-        raise service.OncError("No champion yet.")
+        raise service.OncError("هنوز قهرمانی مشخص نشده.")
     logo = None
     if team["logo_file_id"]:  # the ONLY graphic that uses a team logo
         try:

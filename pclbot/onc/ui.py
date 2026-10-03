@@ -20,12 +20,29 @@ def grid(buttons: list[B], per_row: int = 2) -> list[list[B]]:
     return [buttons[i:i + per_row] for i in range(0, len(buttons), per_row)]
 
 
-def nav(back_data: str, back_text: str = "🔙 BACK", home: bool = True) -> list[B]:
+def nav(back_data: str, back_text: str = "🔙 بازگشت", home: bool = True) -> list[B]:
     row = [ob(back_text, back_data)]
     return row
 
 
 STATUS_ICON = {"DRAFT": "📝", "READY": "🟢", "LIVE": "🔴", "FINISHED": "🏁", "ARCHIVED": "🗄"}
+STATUS_FA = {"DRAFT": "پیش‌نویس", "READY": "آماده", "LIVE": "در حال برگزاری", "FINISHED": "پایان‌یافته", "ARCHIVED": "بایگانی"}
+
+AUDIT_FA = {
+    "CREATE TOURNAMENT": "ساخت تورنمنت", "SET ACTIVE TOURNAMENT": "انتخاب تورنمنت فعال", "EDIT TOURNAMENT": "ویرایش تورنمنت",
+    "DELETE TOURNAMENT": "حذف تورنمنت", "STATUS": "تغییر وضعیت", "ADD TEAM": "افزودن تیم", "RENAME TEAM": "تغییر نام تیم",
+    "CHANGE LOGO": "تغییر لوگو", "DELETE TEAM": "حذف تیم", "ADD PLAYER": "افزودن بازیکن", "REMOVE PLAYER": "حذف بازیکن",
+    "CREATE GROUP": "ساخت گروه", "RENAME GROUP": "تغییر نام گروه", "DELETE GROUP": "حذف گروه", "SET QUALIFIERS": "تعیین صعودکننده‌ها",
+    "REMOVE TEAM FROM GROUP": "خروج تیم از گروه", "MOVED TEAM": "جابه‌جایی تیم", "ASSIGN TEAM": "قرار دادن تیم در گروه",
+    "AUTOMATIC DRAW": "قرعه‌کشی خودکار", "GENERATE SCHEDULE": "ساخت برنامه", "RESET RESULTS": "ریست نتایج",
+    "SAVED RESULT": "ثبت نتیجه", "CONFIRMED ROUND": "تأیید راند", "CHANGED RESULT": "تغییر نتیجه", "TIE DECISION": "تصمیم تساوی",
+    "CREATE KNOCKOUT STAGE": "ساخت مرحله حذفی", "KNOCKOUT MATCHUP": "تعیین بازی حذفی", "REMOVE MATCHUP": "حذف بازی حذفی",
+    "DELETE KNOCKOUT STAGE": "حذف مرحله حذفی", "START TOURNAMENT": "شروع تورنمنت", "SET CHANNEL": "تنظیم کانال",
+    "REMOVE CHANNEL": "حذف کانال", "SETTING auto_standings": "تنظیم انتشار خودکار جدول", "ADD TEMPLATE SET": "ساخت ست تمپلیت",
+    "ACTIVATE TEMPLATE SET": "فعال‌سازی ست تمپلیت", "DUPLICATE TEMPLATE SET": "کپی ست تمپلیت", "DELETE TEMPLATE SET": "حذف ست تمپلیت",
+    "ADD TEMPLATE": "افزودن تمپلیت", "ACTIVATE TEMPLATE": "فعال‌سازی تمپلیت", "DEACTIVATE TEMPLATE": "غیرفعال‌سازی تمپلیت",
+    "DELETE TEMPLATE": "حذف تمپلیت", "TEMPLATE BACKGROUND": "پس‌زمینه تمپلیت",
+}
 
 
 def title(t: dict) -> str:
@@ -42,31 +59,38 @@ def match_line(m: dict, with_score: bool = True) -> str:
         if m.get("winner_team_id") and m["goals_a"] == m["goals_b"]:
             extra = f" ▶ {E(m['name_a'] if m['winner_team_id'] == m['team_a'] else m['name_b'])}"
         return f"{E(m['name_a'])} {m['goals_a']} - {m['goals_b']} {E(m['name_b'])}{extra}"
-    return f"{E(m['name_a'])} vs {E(m['name_b'])}"
+    return f"{E(m['name_a'])} 🆚 {E(m['name_b'])}"
+
+
+LRM = "\u200e"
+TB_FA = {"H2H": "رو", "GD": "تف", "GF": "گز", "ADMIN": "ادمین", "UNRESOLVED": "⚠", "": ""}
 
 
 def standings_block(tbl: dict) -> str:
     g, rows = tbl["group"], tbl["rows"]
-    tb = {"H2H": "H2H", "GD": "GD", "GF": "GF", "ADMIN": "ADM", "UNRESOLVED": "⚠", "": ""}
-    head = " # TEAM         P W D L GF GA  GD PTS TB"
-    lines = [head]
+    head = ["#", "تیم", "بز", "بر", "مس", "با", "گز", "گخ", "تف", "امت", "معیار"]  # LRM after each word keeps the columns in order
+    lines = [LRM + f" {head[0]}{LRM}  {head[1]}{LRM}           " + " ".join(h + LRM for h in head[2:])]
     q = g["qualifiers"] or 0
+    used = set()
     for r in rows:
         mark = "✓" if q and r["pos"] <= q else " "
-        lines.append(f"{r['pos']:>2}{mark}{r['name'][:12]:<12} {r['P']} {r['W']} {r['D']} {r['L']} {r['GF']:>2} {r['GA']:>2} {r['GD']:>+3} {r['Pts']:>3} {tb[r['tb']]}")
+        used.add(r["tb"])
+        lines.append(LRM + f"{r['pos']:>2}{mark}{r['name'][:12]:<12} {r['P']:>2} {r['W']:>2} {r['D']:>2} {r['L']:>2} {r['GF']:>2} {r['GA']:>2} {r['GD']:>+3} {r['Pts']:>3}  {TB_FA[r['tb']]}")
     st = tbl["status"]["state"]
-    note = {"PENDING": f"⏳ {tbl['played']}/{tbl['total']} matches confirmed",
-            "NEEDS ADMIN DECISION": "⚠️ NEEDS ADMIN DECISION (tie on the qualification line)",
-            "FINAL": "✅ final" if tbl["complete"] else ""}[st]
+    note = {"PENDING": f"⏳ {tbl['played']} از {tbl['total']} بازی تأیید شده",
+            "NEEDS ADMIN DECISION": "⚠️ نیاز به تصمیم ادمین (تساوی روی خط صعود)",
+            "FINAL": "✅ نهایی" if tbl["complete"] else ""}[st]
     if tbl["unresolved"] and st != "NEEDS ADMIN DECISION":
-        note += ("\n" if note else "") + "⚠ unresolved tie (does not affect qualification)"
-    qual = f"Qualifiers: {g['qualifiers']}" if g["qualifiers"] is not None else "Qualifiers: not set"
-    return f"<b>{E(g['name'])}</b>  <i>({qual})</i>\n<pre>{E(chr(10).join(lines))}</pre>{note}"
+        note += ("\n" if note else "") + "⚠ تساوی حل‌نشده (روی صعود اثری ندارد)"
+    legend = [f"{TB_FA[k]}={v}" for k, v in (("H2H", "رودررو"), ("GD", "تفاضل"), ("GF", "گل زده"), ("ADMIN", "تصمیم ادمین")) if k in used]
+    qual = f"صعودکننده‌ها: {g['qualifiers']}" if g["qualifiers"] is not None else "صعودکننده‌ها: تعیین نشده"
+    return (f"<b>{E(g['name'])}</b>  <i>({qual})</i>\n<pre>{E(chr(10).join(lines))}</pre>"
+            + (f"<i>معیار: {'، '.join(legend)}</i>\n" if legend else "") + note)
 
 
 def results_summary(t: dict, label: str, matches: list[dict], first_line: str | None = None) -> str:
     body = "\n".join(match_line(m) for m in matches)
-    return f"🏆 <b>{E(t['name'])}</b>\n<b>{label}</b>\n\n<b>RESULTS</b>\n\n{body}"
+    return f"🏆 <b>{E(t['name'])}</b>\n<b>{label}</b>\n\n<b>نتایج</b>\n\n{body}"
 
 
 def progress(p: dict) -> str:
@@ -80,8 +104,8 @@ def when(r: dict) -> str:
 async def dashboard_text(t: dict) -> str:
     teams = await service.teams_of(t["id"])
     groups = await service.groups_of(t["id"])
-    mark = "⭐ ACTIVE" if t["is_active"] else ""
+    mark = "⭐ فعال" if t["is_active"] else ""
     return (f"{title(t)}  {mark}\n\n"
-            f"📅 {service.fmt_date(t['start_date'])}\n🕐 {t['start_time']}\n⏱ ROUND INTERVAL: {t['round_interval']} MIN\n\n"
-            f"TEAMS: {len(teams)}\nGROUPS: {len(groups)}\n\n"
-            f"STATUS: {STATUS_ICON[t['status']]} <b>{t['status']}</b>")
+            f"📅 {service.fmt_date(t['start_date'])}\n🕐 {t['start_time']}\n⏱ فاصله‌ی راندها: {t['round_interval']} دقیقه\n\n"
+            f"تیم‌ها: {len(teams)}\nگروه‌ها: {len(groups)}\n\n"
+            f"وضعیت: {STATUS_ICON[t['status']]} <b>{STATUS_FA[t['status']]}</b>")

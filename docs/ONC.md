@@ -1,6 +1,6 @@
 # 🏆 ONE NIGHT CHAMPION (ONC)
 
-ماژول مسابقات داخل همان ربات PCL؛ کاملاً جدا از TRANSFER.
+ماژول مسابقات داخل همان ربات PCL؛ کاملاً جدا از TRANSFER. رابط ربات (هر دو بخش) و گرافیک‌ها فارسی‌اند؛ فقط نام رویداد روی گرافیک‌ها «ONE NIGHT CHAMPION» است.
 
 ```
 PCL BOT
@@ -42,7 +42,7 @@ pclbot/onc/
 * تراکنش: تأیید Round، ویرایش نتیجه، قرعه‌کشی، ساخت برنامه و … داخل `dbx.tx()` (BEGIN IMMEDIATE) هستند. اگر ارسال به کانال خطا بدهد، نتایج تأییدشده می‌مانند و «RETRY PUBLISH» دارد.
 
 ## گرافیک
-۷ نوع: SCHEDULE، GROUP_TABLE، ROUND_RESULTS، QUALIFIED، KO_MATCHES، BRACKET، CHAMPION. هر تمپلیت: پس‌زمینه‌ی PNG/JPG (آپلود)، المان‌ها با `x/y/size/min/color/align/max_w/font`، ردیف‌های پویا (`start_y/row_h/gap/max_rows`) و صفحه‌بندی خودکار، کوچک‌شدن فونت تا حداقل (بعد از آن «…»). ادیتور موقعیت: UP/DOWN/LEFT/RIGHT با گام 1/5/10/25px. Template Set: کپی/فعال‌سازی. فونت: `ONC_FONT` یا DejaVu/Liberation (روی Ubuntu: `apt install fonts-dejavu-core`).
+۷ نوع: SCHEDULE، GROUP_TABLE، ROUND_RESULTS، QUALIFIED، KO_MATCHES، BRACKET، CHAMPION. هر تمپلیت: پس‌زمینه‌ی PNG/JPG (آپلود)، المان‌ها با `x/y/size/min/color/align/max_w/font`، ردیف‌های پویا (`start_y/row_h/gap/max_rows`) و صفحه‌بندی خودکار، کوچک‌شدن فونت تا حداقل (بعد از آن «…»). ادیتور موقعیت: UP/DOWN/LEFT/RIGHT با گام 1/5/10/25px. Template Set: کپی/فعال‌سازی. فونت: `ONC_FONT` یا DejaVu/Liberation (روی Ubuntu: `apt install fonts-dejavu-core`). نوشتن فارسی روی تصویر: اگر libraqm باشد خود Pillow انجام می‌دهد، وگرنه `arabic-reshaper` + `python-bidi` (هر دو در requirements هستند).
 
 ## نصب/به‌روزرسانی
 ```

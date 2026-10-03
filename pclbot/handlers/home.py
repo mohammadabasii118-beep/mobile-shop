@@ -14,16 +14,16 @@ from ..utils import is_admin, parse_ref, show
 
 router = Router()
 
-HOME_TEXT = "🏠 <b>MAIN MENU</b>\n\nیک بخش را انتخاب کن  ·  Choose a section"
-ADMIN_TEXT = "🛠 <b>ADMIN PANEL</b>\n\nکدام پنل مدیریتی؟  ·  Which panel?"
+HOME_TEXT = "🏠 <b>منوی اصلی</b>\n\nیک بخش را انتخاب کن:"
+ADMIN_TEXT = "🛠 <b>پنل مدیریت</b>\n\nکدام پنل را می‌خواهی؟"
 
 
 def home_markup(uid: int):
-    return kb([[btn("🔄 TRANSFER", "menu")], [btn("🏆 ONE NIGHT CHAMPION", "onc:u")]])
+    return kb([[btn("🔄 ترنسفر", "menu")], [btn("🏆 وان نایت چمپیون", "onc:u")]])
 
 
 def admin_markup():
-    return kb([[btn("🔄 TRANSFER PANEL", "adm")], [btn("🏆 ONE NIGHT CHAMPION PANEL", "onc:a")], [btn("🔙 MAIN MENU", "home")]])
+    return kb([[btn("🔄 پنل ترنسفر", "adm")], [btn("🏆 پنل وان نایت چمپیون", "onc:a")], [btn("🔙 منوی اصلی", "home")]])
 
 
 @router.message(CommandStart())

@@ -28,13 +28,13 @@ async def gfx_menu(c: CallbackQuery, state: FSMContext):
     await state.clear()
     s = await templates.active_set()
     miss = await templates.missing_types()
-    text = (f"🎨 <b>GRAPHICS</b>\n\nActive template set: <b>{E(s['name']) if s else '—'}</b>\n"
-            + ("⚠️ Missing active templates: " + ", ".join(miss) if miss else "✅ All 7 graphic types have an active template")
-            + "\n\n<i>Team logos appear ONLY on the Champion poster.</i>")
-    rows = [[ob("🗂 TEMPLATE SETS", "onc:xs")]]
+    text = (f"🎨 <b>گرافیک</b>\n\nست تمپلیت فعال: <b>{E(s['name']) if s else '—'}</b>\n"
+            + ("⚠️ تمپلیت فعال ندارد: " + ", ".join(miss) if miss else "✅ هر ۷ نوع گرافیک تمپلیت فعال دارند")
+            + "\n\n<i>لوگوی تیم‌ها فقط روی پوستر قهرمان نمایش داده می‌شود.</i>")
+    rows = [[ob("🗂 ست‌های تمپلیت", "onc:xs")]]
     if s:
-        rows.append([ob("🎨 TEMPLATES OF ACTIVE SET", f"onc:xsp:{s['id']}")])
-    rows.append([ob("🔙 BACK", PANEL)])
+        rows.append([ob("🎨 تمپلیت‌های ست فعال", f"onc:xsp:{s['id']}")])
+    rows.append([ob("🔙 بازگشت", PANEL)])
     await show(c, text, okb(rows))
     await c.answer()
 
@@ -42,8 +42,8 @@ async def gfx_menu(c: CallbackQuery, state: FSMContext):
 async def sets_screen(c) -> None:
     ss = await templates.sets()
     rows = [[ob(("✅ " if s["is_active"] else "") + s["name"], f"onc:xsp:{s['id']}")] for s in ss]
-    await show(c, "🗂 <b>TEMPLATE SETS</b>\n\nA set holds one template per graphic type (schedule, group table, round results, "
-               "qualified, knockout matches, bracket, champion).", okb(rows + [[ob("➕ NEW SET", "onc:xsn")], [ob("🔙 BACK", "onc:gx")]]))
+    await show(c, "🗂 <b>ست‌های تمپلیت</b>\n\nهر ست برای هر نوع گرافیک یک تمپلیت دارد (برنامه، جدول گروه، نتایج راند، "
+               "صعودکننده‌ها، بازی‌های حذفی، جدول حذفی، قهرمان).", okb(rows + [[ob("➕ ست جدید", "onc:xsn")], [ob("🔙 بازگشت", "onc:gx")]]))
 
 
 @router.callback_query(F.data == "onc:xs")
@@ -55,17 +55,17 @@ async def sets_open(c: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "onc:xsn")
 async def set_new(c: CallbackQuery):
-    rows = [[ob(f"🎨 {t}", f"onc:xsc:{t}") for t in templates.THEMES]]
-    await show(c, "➕ <b>NEW TEMPLATE SET</b>\n\nChoose a colour theme (you can upload your own backgrounds afterwards):", okb(rows + [[ob("🔙 BACK", "onc:xs")]]))
+    rows = [[ob(f"🎨 {templates.THEME_FA[t]}", f"onc:xsc:{t}") for t in templates.THEMES]]
+    await show(c, "➕ <b>ست تمپلیت جدید</b>\n\nیک رنگ‌بندی انتخاب کن (بعداً می‌توانی پس‌زمینه‌ی خودت را آپلود کنی):", okb(rows + [[ob("🔙 بازگشت", "onc:xs")]]))
     await c.answer()
 
 
 @router.callback_query(F.data.startswith("onc:xsc:"))
 async def set_create(c: CallbackQuery):
     theme = c.data.split(":")[2]
-    sid = await templates.create_set(f"ONE NIGHT CHAMPION — {theme}", theme)
+    sid = await templates.create_set(f"وان نایت چمپیون — {templates.THEME_FA[theme]}", theme)
     await service.audit(c.from_user.id, "ADD TEMPLATE SET", theme)
-    await c.answer("Set created")
+    await c.answer("ست ساخته شد")
     await set_screen(c, sid)
 
 
@@ -73,12 +73,12 @@ async def set_screen(c, sid: int) -> None:
     s = await templates.get_set(sid)
     ts = await templates.templates_of(sid)
     rows = [[ob(f"{'🟢' if t['active'] else '⚪'} {t['name']}" + (" 🖼" if t["bg_path"] else ""), f"onc:xt:{t['id']}")] for t in ts]
-    text = f"🗂 <b>{E(s['name'])}</b> {'✅ ACTIVE' if s['is_active'] else ''}\n\n🟢 active template · ⚪ inactive · 🖼 custom background"
-    act = [] if s["is_active"] else [ob("✅ ACTIVATE SET", f"onc:xsa:{sid}")]
-    rows += [[ob("➕ ADD TEMPLATE", f"onc:xta:{sid}")],
-             act + [ob("📑 DUPLICATE SET", f"onc:xsd:{sid}"), ob("✏️ RENAME", f"onc:xsr:{sid}")],
-             ([ob("🗑 DELETE SET", f"onc:cf:dss:{sid}")] if not s["is_active"] else []),
-             [ob("🔙 SETS", "onc:xs")]]
+    text = f"🗂 <b>{E(s['name'])}</b> {'✅ فعال' if s['is_active'] else ''}\n\n🟢 تمپلیت فعال · ⚪ غیرفعال · 🖼 پس‌زمینه‌ی دلخواه"
+    act = [] if s["is_active"] else [ob("✅ فعال‌سازی ست", f"onc:xsa:{sid}")]
+    rows += [[ob("➕ افزودن تمپلیت", f"onc:xta:{sid}")],
+             act + [ob("📑 کپی ست", f"onc:xsd:{sid}"), ob("✏️ تغییر نام", f"onc:xsr:{sid}")],
+             ([ob("🗑 حذف ست", f"onc:cf:dss:{sid}")] if not s["is_active"] else []),
+             [ob("🔙 ست‌ها", "onc:xs")]]
     await show(c, text, okb([r for r in rows if r]))
 
 
@@ -94,7 +94,7 @@ async def set_activate(c: CallbackQuery):
     sid = int(c.data.split(":")[2])
     await templates.activate_set(sid)
     await service.audit(c.from_user.id, "ACTIVATE TEMPLATE SET", str(sid))
-    await c.answer("✅ Activated")
+    await c.answer("✅ فعال شد")
     await set_screen(c, sid)
 
 
@@ -102,7 +102,7 @@ async def set_activate(c: CallbackQuery):
 async def set_duplicate(c: CallbackQuery):
     new = await templates.duplicate_set(int(c.data.split(":")[2]))
     await service.audit(c.from_user.id, "DUPLICATE TEMPLATE SET", str(new))
-    await c.answer("Duplicated")
+    await c.answer("کپی شد")
     await set_screen(c, new)
 
 
@@ -111,7 +111,7 @@ async def set_rename(c: CallbackQuery, state: FSMContext):
     sid = int(c.data.split(":")[2])
     await state.set_state(TplSt.set_name)
     await state.update_data(sid=sid)
-    await show(c, "✏️ Send the new <b>SET NAME</b>", okb([[ob("❌ CANCEL", f"onc:xsp:{sid}")]]))
+    await show(c, "✏️ <b>نام جدید ست</b> را بفرست", okb([[ob("❌ لغو", f"onc:xsp:{sid}")]]))
     await c.answer()
 
 
@@ -127,7 +127,7 @@ async def set_rename_do(m: Message, state: FSMContext):
 async def tpl_add_type(c: CallbackQuery):
     sid = int(c.data.split(":")[2])
     rows = [[ob(templates.TYPE_LABEL[t], f"onc:xtn:{sid}:{i}")] for i, t in enumerate(templates.TYPES)]
-    await show(c, "➕ <b>ADD TEMPLATE</b>\n\nChoose the template type:", okb(rows + [[ob("🔙 BACK", f"onc:xsp:{sid}")]]))
+    await show(c, "➕ <b>افزودن تمپلیت</b>\n\nنوع تمپلیت را انتخاب کن:", okb(rows + [[ob("🔙 بازگشت", f"onc:xsp:{sid}")]]))
     await c.answer()
 
 
@@ -136,7 +136,7 @@ async def tpl_add(c: CallbackQuery):
     _, _, sid, i = c.data.split(":")
     tid = await templates.add_template(int(sid), templates.TYPES[int(i)])
     await service.audit(c.from_user.id, "ADD TEMPLATE", templates.TYPES[int(i)])
-    await c.answer("Template added (inactive)")
+    await c.answer("تمپلیت اضافه شد (غیرفعال)")
     await tpl_screen(c, tid)
 
 
@@ -144,16 +144,16 @@ async def tpl_add(c: CallbackQuery):
 async def tpl_screen(c, tid: int, note: str = "") -> None:
     t = await templates.get_template(tid)
     cfg = t["config"]
-    text = (f"{note}🎨 <b>{E(t['name'])}</b>\nType: {templates.TYPE_LABEL[t['type']]}\nStatus: {'🟢 ACTIVE' if t['active'] else '⚪ inactive'}\n"
-            f"Background: {'🖼 custom' if t['bg_path'] else 'built-in theme'}\nCanvas: {cfg['w']}×{cfg['h']}")
+    text = (f"{note}🎨 <b>{E(t['name'])}</b>\nنوع: {templates.TYPE_LABEL[t['type']]}\nوضعیت: {'🟢 فعال' if t['active'] else '⚪ غیرفعال'}\n"
+            f"پس‌زمینه: {'🖼 دلخواه' if t['bg_path'] else 'پیش‌فرض (رنگ‌بندی ست)'}\nابعاد: {cfg['w']}×{cfg['h']}")
     rows = [
-        [ob("👁 PREVIEW", f"onc:xtv:{tid}"), ob("✏️ EDIT POSITIONS", f"onc:xe:{tid}:0:1")],
-        [ob("🖼 UPLOAD BACKGROUND", f"onc:xtb:{tid}")] + ([ob("🧽 REMOVE BG", f"onc:xtr:{tid}")] if t["bg_path"] else []),
-        [ob("⛔ DEACTIVATE" if t["active"] else "✅ ACTIVATE", f"onc:xtt:{tid}"), ob("📑 DUPLICATE", f"onc:xtd:{tid}")],
+        [ob("👁 پیش‌نمایش", f"onc:xtv:{tid}"), ob("✏️ ویرایش موقعیت‌ها", f"onc:xe:{tid}:0:1")],
+        [ob("🖼 آپلود پس‌زمینه", f"onc:xtb:{tid}")] + ([ob("🧽 حذف پس‌زمینه", f"onc:xtr:{tid}")] if t["bg_path"] else []),
+        [ob("⛔ غیرفعال‌سازی" if t["active"] else "✅ فعال‌سازی", f"onc:xtt:{tid}"), ob("📑 کپی", f"onc:xtd:{tid}")],
     ]
     if t["type"] == "GROUP_TABLE":
-        rows.append([ob(("✓ " if k in cfg["show"] else "✗ ") + k, f"onc:xtc:{tid}:{k}") for k in ("W", "D", "L", "GF", "GA", "GD")])
-    rows += [[ob("🗑 DELETE", f"onc:cf:dtp:{tid}")], [ob("🔙 SET", f"onc:xsp:{t['set_id']}")]]
+        rows.append([ob(("✓ " if k in cfg["show"] else "✗ ") + templates.ELEMENT_FA["col:" + k], f"onc:xtc:{tid}:{k}") for k in ("W", "D", "L", "GF", "GA", "GD")])
+    rows += [[ob("🗑 حذف", f"onc:cf:dtp:{tid}")], [ob("🔙 ست", f"onc:xsp:{t['set_id']}")]]
     await show(c, text, okb(rows))
 
 
@@ -170,14 +170,14 @@ async def tpl_toggle(c: CallbackQuery):
     t = await templates.get_template(tid)
     await templates.set_active_flag(tid, not t["active"])
     await service.audit(c.from_user.id, "ACTIVATE TEMPLATE" if not t["active"] else "DEACTIVATE TEMPLATE", t["name"])
-    await c.answer("Done")
+    await c.answer("انجام شد")
     await tpl_screen(c, tid)
 
 
 @router.callback_query(F.data.startswith("onc:xtd:"))
 async def tpl_dup(c: CallbackQuery):
     new = await templates.duplicate_template(int(c.data.split(":")[2]))
-    await c.answer("Duplicated (inactive)")
+    await c.answer("کپی شد (غیرفعال)")
     await tpl_screen(c, new)
 
 
@@ -189,16 +189,16 @@ async def tpl_toggle_col(c: CallbackQuery):
     cfg["show"] = [k for k in cfg["show"] if k != col] if col in cfg["show"] else \
         [k for k in ["pos", "team", "P", "W", "D", "L", "GF", "GA", "GD", "PTS"] if k in cfg["show"] or k == col]
     await templates.save_config(int(tid), cfg)
-    await c.answer("Saved")
+    await c.answer("ذخیره شد")
     await tpl_screen(c, int(tid))
 
 
 @router.callback_query(F.data.startswith("onc:xtv:"))
 async def tpl_preview(c: CallbackQuery):
     t = await templates.get_template(int(c.data.split(":")[2]))
-    await c.answer("Rendering…")
+    await c.answer("در حال ساخت…")
     pages = render.render(t["type"], t["config"], render.sample(t["type"]), t["bg_path"])
-    await c.message.answer_photo(BufferedInputFile(pages[0], "preview.png"), caption=f"👁 PREVIEW — {E(t['name'])}\n<i>sample data</i>")
+    await c.message.answer_photo(BufferedInputFile(pages[0], "preview.png"), caption=f"👁 پیش‌نمایش — {E(t['name'])}\n<i>داده‌ی نمونه</i>")
 
 
 @router.callback_query(F.data.startswith("onc:xtb:"))
@@ -206,8 +206,8 @@ async def tpl_bg_ask(c: CallbackQuery, state: FSMContext):
     tid = int(c.data.split(":")[2])
     await state.set_state(TplSt.bg)
     await state.update_data(tid=tid)
-    await show(c, "🖼 Send the <b>BACKGROUND</b> as a PNG or JPG (send it as a file/document for full quality).\n"
-               "It is scaled to fill the template canvas.", okb([[ob("❌ CANCEL", f"onc:xt:{tid}")]]))
+    await show(c, "🖼 <b>پس‌زمینه</b> را به‌صورت PNG یا JPG بفرست (برای کیفیت کامل به‌صورت فایل/Document بفرست).\n"
+               "تصویر به اندازه‌ی بوم تمپلیت تنظیم می‌شود.", okb([[ob("❌ لغو", f"onc:xt:{tid}")]]))
     await c.answer()
 
 
@@ -217,7 +217,7 @@ async def tpl_bg_save(m: Message, state: FSMContext, bot: Bot):
     if m.document:
         mt = (m.document.mime_type or "").lower()
         if mt not in ("image/png", "image/jpeg"):
-            return await m.answer("⚠️ Only PNG or JPG files are accepted.")
+            return await m.answer("⚠️ فقط فایل PNG یا JPG قبول است.")
         fid, ext = m.document.file_id, ".png" if mt == "image/png" else ".jpg"
     else:
         fid, ext = m.photo[-1].file_id, ".jpg"
@@ -229,14 +229,14 @@ async def tpl_bg_save(m: Message, state: FSMContext, bot: Bot):
     except Exception:
         if os.path.exists(path):
             os.remove(path)
-        return await m.answer("⚠️ Could not read that image. Send a valid PNG/JPG.")
+        return await m.answer("⚠️ این تصویر خوانده نشد. یک PNG/JPG معتبر بفرست.")
     old = (await templates.get_template(d["tid"]))["bg_path"]
     await templates.set_bg(d["tid"], path)
     if old and os.path.exists(old) and not await service.dbx.scalar("SELECT 1 FROM onc_templates WHERE bg_path=? AND id<>?", old, d["tid"]):
         os.remove(old)
     await service.audit(m.from_user.id, "TEMPLATE BACKGROUND", str(d["tid"]))
     await state.clear()
-    await tpl_screen(m, d["tid"], "✅ Background saved.\n\n")
+    await tpl_screen(m, d["tid"], "✅ پس‌زمینه ذخیره شد.\n\n")
 
 
 @router.callback_query(F.data.startswith("onc:xtr:"))
@@ -246,7 +246,7 @@ async def tpl_bg_remove(c: CallbackQuery):
     await templates.set_bg(tid, None)
     if t["bg_path"] and os.path.exists(t["bg_path"]) and not await service.dbx.scalar("SELECT 1 FROM onc_templates WHERE bg_path=?", t["bg_path"]):
         os.remove(t["bg_path"])
-    await c.answer("Removed")
+    await c.answer("حذف شد")
     await tpl_screen(c, tid)
 
 
@@ -259,32 +259,32 @@ async def editor_screen(c, tid: int, idx: int, step_i: int) -> None:
     name = its[idx]
     st = templates.item_style(cfg, name)
     if name == "rows":
-        info = f"start Y {st['start_y']} · row height {st['row_h']} · gap {st['gap']} · max rows/page {st['max_rows']}"
+        info = f"start Y {st['start_y']} · ارتفاع ردیف {st['row_h']} · فاصله {st['gap']} · حداکثر ردیف هر صفحه {st['max_rows']}"
     elif name == "logo":
-        info = f"x {st['x']} · y {st['y']} · size {st['size']}"
+        info = f"x {st['x']} · y {st['y']} · اندازه {st['size']}"
     else:
         fl = templates.fonts()
-        info = (f"x {st['x']} · y {st.get('y', 0)} · size {st['size']} (min {st.get('min', '-')}) · color {st.get('color')} · "
-                f"align {st.get('align')} · max width {st.get('max_w')} · font {fl[st.get('font', 0) % len(fl)][0] if fl else '-'}")
+        info = (f"x {st['x']} · y {st.get('y', 0)} · اندازه {st['size']} (حداقل {st.get('min', '-')}) · رنگ {st.get('color')} · "
+                f"تراز {st.get('align')} · حداکثر عرض {st.get('max_w')} · فونت {fl[st.get('font', 0) % len(fl)][0] if fl else '-'}")
     step = STEPS[step_i]
     rows = [
-        [ob("◀️ PREV", f"onc:xe:{tid}:{idx - 1}:{step_i}"), ob(f"{idx + 1}/{len(its)}", "onc:noop"), ob("NEXT ▶️", f"onc:xe:{tid}:{idx + 1}:{step_i}")],
-        [ob("⬆️ UP", f"onc:xo:{tid}:{idx}:{step_i}:u")],
-        [ob("⬅️ LEFT", f"onc:xo:{tid}:{idx}:{step_i}:l"), ob(f"STEP {step}px 🔁", f"onc:xe:{tid}:{idx}:{(step_i + 1) % len(STEPS)}"), ob("RIGHT ➡️", f"onc:xo:{tid}:{idx}:{step_i}:r")],
-        [ob("⬇️ DOWN", f"onc:xo:{tid}:{idx}:{step_i}:d")],
+        [ob("◀️ قبلی", f"onc:xe:{tid}:{idx - 1}:{step_i}"), ob(f"{idx + 1}/{len(its)}", "onc:noop"), ob("بعدی ▶️", f"onc:xe:{tid}:{idx + 1}:{step_i}")],
+        [ob("⬆️ بالا", f"onc:xo:{tid}:{idx}:{step_i}:u")],
+        [ob("⬅️ چپ", f"onc:xo:{tid}:{idx}:{step_i}:l"), ob(f"گام {step}px 🔁", f"onc:xe:{tid}:{idx}:{(step_i + 1) % len(STEPS)}"), ob("راست ➡️", f"onc:xo:{tid}:{idx}:{step_i}:r")],
+        [ob("⬇️ پایین", f"onc:xo:{tid}:{idx}:{step_i}:d")],
     ]
     if name == "rows":
-        rows.append([ob("ROW HEIGHT −", f"onc:xo:{tid}:{idx}:{step_i}:fs-"), ob("ROW HEIGHT +", f"onc:xo:{tid}:{idx}:{step_i}:fs+")])
-        rows.append([ob("MAX ROWS −", f"onc:xo:{tid}:{idx}:{step_i}:w-"), ob("MAX ROWS +", f"onc:xo:{tid}:{idx}:{step_i}:w+")])
+        rows.append([ob("ارتفاع ردیف −", f"onc:xo:{tid}:{idx}:{step_i}:fs-"), ob("ارتفاع ردیف +", f"onc:xo:{tid}:{idx}:{step_i}:fs+")])
+        rows.append([ob("حداکثر ردیف −", f"onc:xo:{tid}:{idx}:{step_i}:w-"), ob("حداکثر ردیف +", f"onc:xo:{tid}:{idx}:{step_i}:w+")])
     elif name == "logo":
-        rows.append([ob("SIZE −", f"onc:xo:{tid}:{idx}:{step_i}:fs-"), ob("SIZE +", f"onc:xo:{tid}:{idx}:{step_i}:fs+")])
+        rows.append([ob("اندازه −", f"onc:xo:{tid}:{idx}:{step_i}:fs-"), ob("اندازه +", f"onc:xo:{tid}:{idx}:{step_i}:fs+")])
     else:
-        rows.append([ob("FONT SIZE −", f"onc:xo:{tid}:{idx}:{step_i}:fs-"), ob("FONT SIZE +", f"onc:xo:{tid}:{idx}:{step_i}:fs+")])
-        rows.append([ob("MAX WIDTH −", f"onc:xo:{tid}:{idx}:{step_i}:w-"), ob("MAX WIDTH +", f"onc:xo:{tid}:{idx}:{step_i}:w+")])
-        rows.append([ob("🎨 COLOR", f"onc:xo:{tid}:{idx}:{step_i}:col"), ob("↔️ ALIGN", f"onc:xo:{tid}:{idx}:{step_i}:al"), ob("🔤 FONT", f"onc:xo:{tid}:{idx}:{step_i}:font")])
-    rows.append([ob("👁 PREVIEW", f"onc:xtv:{tid}"), ob("✅ DONE", f"onc:xt:{tid}")])
-    label = name.replace("col:", "column · ")
-    await show(c, f"✏️ <b>POSITION EDITOR</b> — {E(t['name'])}\n\nElement: <b>{E(label)}</b>\n<code>{E(info)}</code>\n\nStep: {step}px", okb(rows))
+        rows.append([ob("اندازه فونت −", f"onc:xo:{tid}:{idx}:{step_i}:fs-"), ob("اندازه فونت +", f"onc:xo:{tid}:{idx}:{step_i}:fs+")])
+        rows.append([ob("حداکثر عرض −", f"onc:xo:{tid}:{idx}:{step_i}:w-"), ob("حداکثر عرض +", f"onc:xo:{tid}:{idx}:{step_i}:w+")])
+        rows.append([ob("🎨 رنگ", f"onc:xo:{tid}:{idx}:{step_i}:col"), ob("↔️ تراز", f"onc:xo:{tid}:{idx}:{step_i}:al"), ob("🔤 فونت", f"onc:xo:{tid}:{idx}:{step_i}:font")])
+    rows.append([ob("👁 پیش‌نمایش", f"onc:xtv:{tid}"), ob("✅ تمام", f"onc:xt:{tid}")])
+    label = templates.ELEMENT_FA.get(name, name)
+    await show(c, f"✏️ <b>ویرایش موقعیت</b> — {E(t['name'])}\n\nالمان: <b>{E(label)}</b>\n<code>{E(info)}</code>\n\nگام: {step}px", okb(rows))
 
 
 @router.callback_query(F.data == "onc:noop")
@@ -316,19 +316,19 @@ async def channel_screen(c, bot: Bot, tested: bool = False) -> None:
     info = await publish.channel_info(bot) if tested or await service.get_setting("channel_id") else {"id": "", "problems": ["No channel configured"], "ok": False}
     cid = await service.get_setting("channel_id")
     if not cid:
-        text = "📢 <b>ONC CHANNEL</b>\n\nNo channel configured.\nAdd the bot as an admin of your ONE NIGHT CHAMPION news channel, then set it here."
+        text = "📢 <b>کانال وان نایت چمپیون</b>\n\nکانالی تنظیم نشده.\nربات را ادمین کانال خبری وان نایت چمپیون کن و بعد اینجا تنظیمش کن."
     else:
-        text = (f"📢 <b>ONC CHANNEL</b>\n\n<b>CHANNEL TITLE:</b> {E(info.get('title') or '—')}\n<b>CHANNEL ID:</b> <code>{E(cid)}</code>\n"
-                f"<b>CHANNEL USERNAME:</b> {('@' + E(info['username'])) if info.get('username') else '—'}\n"
-                f"<b>CONNECTION STATUS:</b> {'✅ CONNECTED' if info.get('ok') else '❌ PROBLEM'}\n\n"
-                f"SEND MESSAGE / SEND PHOTO: {'✅' if info.get('can_post') else '❌'}\nEDIT MESSAGE: {'✅' if info.get('can_edit') else '❌'}")
+        text = (f"📢 <b>کانال وان نایت چمپیون</b>\n\n<b>عنوان کانال:</b> {E(info.get('title') or '—')}\n<b>آیدی کانال:</b> <code>{E(cid)}</code>\n"
+                f"<b>یوزرنیم کانال:</b> {('@' + E(info['username'])) if info.get('username') else '—'}\n"
+                f"<b>وضعیت اتصال:</b> {'✅ متصل' if info.get('ok') else '❌ مشکل دارد'}\n\n"
+                f"ارسال پیام / ارسال عکس: {'✅' if info.get('can_post') else '❌'}\nویرایش پیام: {'✅' if info.get('can_edit') else '❌'}")
         if info.get("problems"):
             text += "\n\n⚠️ " + "\n⚠️ ".join(E(p) for p in info["problems"])
-    text += "\n\n<i>This is separate from the TRANSFER ADS GROUP. Tournament content is only ever sent here.</i>"
-    rows = [[ob("✏️ SET CHANNEL", "onc:chs")]]
+    text += "\n\n<i>این کانال از گروه آگهی‌های ترنسفر کاملاً جداست. محتوای تورنمنت فقط اینجا منتشر می‌شود.</i>"
+    rows = [[ob("✏️ تنظیم کانال", "onc:chs")]]
     if cid:
-        rows += [[ob("🔌 TEST CONNECTION", "onc:cht")], [ob("🗑 REMOVE CHANNEL", "onc:cf:chx:0")]]
-    rows.append([ob("🔙 BACK", PANEL)])
+        rows += [[ob("🔌 تست اتصال", "onc:cht")], [ob("🗑 حذف کانال", "onc:cf:chx:0")]]
+    rows.append([ob("🔙 بازگشت", PANEL)])
     await show(c, text, okb(rows))
 
 
@@ -341,16 +341,16 @@ async def channel_open(c: CallbackQuery, state: FSMContext, bot: Bot):
 
 @router.callback_query(F.data == "onc:cht")
 async def channel_test(c: CallbackQuery, bot: Bot):
-    await c.answer("Testing…")
+    await c.answer("در حال تست…")
     await channel_screen(c, bot, tested=True)
 
 
 @router.callback_query(F.data == "onc:chs")
 async def channel_set(c: CallbackQuery, state: FSMContext):
     await state.set_state(ChanSt.chat)
-    await show(c, "✏️ <b>SET ONC CHANNEL</b>\n\nSend the channel as <code>@username</code> or numeric id (<code>-100…</code>), "
-               "or <b>forward any post</b> from the channel.\nThe bot must already be an admin of that channel.",
-               okb([[ob("❌ CANCEL", "onc:ch")]]))
+    await show(c, "✏️ <b>تنظیم کانال</b>\n\nکانال را به‌صورت <code>@username</code> یا آیدی عددی (<code>-100…</code>) بفرست، "
+               "یا <b>یک پست از کانال را فوروارد کن</b>.\nربات باید از قبل ادمین آن کانال باشد.",
+               okb([[ob("❌ لغو", "onc:ch")]]))
     await c.answer()
 
 
@@ -362,14 +362,14 @@ async def channel_set_do(m: Message, state: FSMContext, bot: Bot):
     elif m.text:
         raw = m.text.strip()
     if not raw or not re.fullmatch(r"@[A-Za-z0-9_]{4,}|-?\d{5,}", raw):
-        return await m.answer("⚠️ Send @username, a numeric id like -1001234567890, or forward a channel post.")
+        return await m.answer("⚠️ @username، آیدی عددی مثل -1001234567890 یا یک پست فورواردشده از کانال بفرست.")
     transfer = (await service.main_db.get_setting("publish_chat")).strip()
     try:
         chat = await bot.get_chat(raw)
     except TelegramAPIError as e:
-        return await m.answer(f"⚠️ Telegram can't open that chat: {E(str(e))}")
+        return await m.answer(f"⚠️ تلگرام این چت را باز نکرد: {E(str(e))}")
     if transfer and (str(chat.id) == transfer or (chat.username and f"@{chat.username}".lower() == transfer.lower())):
-        return await m.answer("⛔ That is the TRANSFER ads group. The ONE NIGHT CHAMPION channel must be a different chat.")
+        return await m.answer("⛔ این همان گروه آگهی‌های ترنسفر است. کانال وان نایت چمپیون باید چت دیگری باشد.")
     await service.set_setting("channel_id", str(chat.id))
     await service.audit(m.from_user.id, "SET CHANNEL", f"{chat.title} ({chat.id})")
     await state.clear()

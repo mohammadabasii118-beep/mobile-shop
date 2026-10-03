@@ -20,10 +20,22 @@ _RTL = re.compile(r"[؀-ۿ]")
 _font_cache: dict = {}
 
 
+try:
+    from PIL import features as _features
+    RAQM = _features.check("raqm")      # Pillow itself shapes + reorders Persian when libraqm is available
+except Exception:  # pragma: no cover
+    RAQM = False
+
+
 def shape(text: str) -> str:
-    if get_display and _RTL.search(text or ""):
+    """Without libraqm, Persian must be reshaped and reordered by hand (arabic-reshaper + python-bidi)."""
+    if not RAQM and get_display and _RTL.search(text or ""):
         return get_display(arabic_reshaper.reshape(text))
     return text
+
+
+def text_kw(text: str) -> dict:
+    return {"direction": "rtl", "language": "fa"} if RAQM and _RTL.search(text or "") else {}
 
 
 def font_at(idx: int, size: int):
@@ -32,7 +44,7 @@ def font_at(idx: int, size: int):
     key = (path, size)
     if key not in _font_cache:
         try:
-            _font_cache[key] = ImageFont.truetype(path, size) if path else ImageFont.load_default(size)
+            _font_cache[key] = (ImageFont.truetype(path, size, layout_engine=None if RAQM else ImageFont.Layout.BASIC) if path else ImageFont.load_default(size))
         except Exception:
             _font_cache[key] = ImageFont.load_default(size)
     return _font_cache[key]
@@ -50,11 +62,12 @@ def fit(d: ImageDraw.ImageDraw, text: str, st: dict, size: int | None = None):
     size = size or st["size"]
     lo = min(st.get("min", 12), size)
     s = size
-    while s > lo and d.textlength(text, font=font_at(st.get("font", 0), s)) > st.get("max_w", 10_000):
+    kw = text_kw(text)
+    while s > lo and d.textlength(text, font=font_at(st.get("font", 0), s), **kw) > st.get("max_w", 10_000):
         s -= 1
     f = font_at(st.get("font", 0), s)
-    if d.textlength(text, font=f) > st.get("max_w", 10_000):
-        while len(text) > 1 and d.textlength(text + "…", font=f) > st["max_w"]:
+    if d.textlength(text, font=f, **kw) > st.get("max_w", 10_000):
+        while len(text) > 1 and d.textlength(text + "…", font=f, **kw) > st["max_w"]:
             text = text[:-1]
         text += "…"
     return text, f
@@ -64,7 +77,7 @@ def put(d, text: str, st: dict, y: float, size: int | None = None, color: str | 
     text = shape(str(text))
     text, f = fit(d, text, st, size)
     anchor = {"left": "lm", "center": "mm", "right": "rm"}[st.get("align", "center")]
-    d.text((st["x"] + dx, y), text, font=f, fill=hex_rgba(color or st["color"]), anchor=anchor)
+    d.text((st["x"] + dx, y), text, font=f, fill=hex_rgba(color or st["color"]), anchor=anchor, **text_kw(text))
 
 
 def background(cfg: dict, bg_path: str | None) -> Image.Image:
@@ -124,7 +137,7 @@ def _static(d, cfg, data, page_i, pages_n):
         if text:
             put(d, text, st, st["y"])
     if pages_n > 1 and "page" in cfg["elements"]:
-        put(d, f"PAGE {page_i}/{pages_n}", cfg["elements"]["page"], cfg["elements"]["page"]["y"])
+        put(d, f"صفحه {page_i} از {pages_n}", cfg["elements"]["page"], cfg["elements"]["page"]["y"])
 
 
 def _panel(im, cfg, y, h, x0=40, x1=None, fill=None):
@@ -145,10 +158,10 @@ def render_rows(type_: str, cfg: dict, data: dict, bg_path: str | None = None) -
         _static(d, cfg, data, pi, len(pages))
         y0, rh, gap = rows_cfg["start_y"], rows_cfg["row_h"], rows_cfg["gap"]
         if type_ == "GROUP_TABLE":  # header line
-            hdr = {"pos": "#", "team": "TEAM"}
+            hdr = {"pos": "#", "team": "تیم", "P": "بازی", "W": "برد", "D": "مس", "L": "باخت", "GF": "گز", "GA": "گخ", "GD": "تفاضل", "PTS": "امتیاز"}
             for key in cfg["show"]:
                 c = cfg["cols"][key]
-                put(d, hdr.get(key, key), c, cfg.get("header_y", y0 - 60), size=max(c["size"] - 8, 14), color="#b8c0cc")
+                put(d, hdr.get(key, key), c, cfg.get("header_y", y0 - 60), size=max(c["size"] - 12, 14), color="#b8c0cc")
         for i, row in enumerate(chunk):
             top = y0 + i * (rh + gap)
             mid = top + rh / 2
@@ -178,7 +191,7 @@ def render_bracket(cfg: dict, data: dict, bg_path: str | None = None) -> list[by
     b = cfg["bracket"]
     stages = data["stages"]
     if not stages:
-        put(d, "No knockout stage yet", cfg["elements"]["title"], cfg["h"] / 2)
+        put(d, "هنوز مرحله حذفی ساخته نشده", cfg["elements"]["title"], cfg["h"] / 2)
         return [_to_png(im)]
     n = len(stages)
     col_w = (b["right"] - b["left"]) / n
@@ -262,30 +275,30 @@ def render(type_: str, cfg: dict, data: dict, bg_path: str | None = None) -> lis
 
 # ----------------------------------------------------------------- sample data for template previews
 def sample(type_: str) -> dict:
-    names = ["TAJ", "AZADI", "LEGACY", "INVADERZ", "ARYA", "HANGOVER", "PERSIAN GULF UNITED", "GRAVITY"]
+    names = ["تاج", "آزادی", "لگسی", "اینویدرز", "آریا", "هنگ‌اوور", "خلیج فارس متحد", "گرویتی"]
     if type_ == "SCHEDULE":
         lines = []
         for i, t in enumerate(["20:00", "20:30", "21:00"], 1):
-            lines.append({"kind": "slot", "text": f"{t} · ROUND {i}"})
-            lines += [{"kind": "match", "text": f"{names[j]} vs {names[j + 1]}"} for j in (0, 2, 4)]
+            lines.append({"kind": "slot", "text": f"{t} · راند {i}"})
+            lines += [{"kind": "match", "text": f"{names[j]} × {names[j + 1]}"} for j in (0, 2, 4)]
         return {"subtitle": "2026/10/10", "rows": lines}
     if type_ == "GROUP_TABLE":
         rows = [{"pos": i + 1, "team": names[i], "P": 3, "W": 3 - i if i < 3 else 0, "D": 0, "L": i, "GF": 7 - i, "GA": i + 1,
                  "GD": f"+{6 - 2 * i}" if 6 - 2 * i >= 0 else str(6 - 2 * i), "PTS": 9 - 3 * i if i < 3 else 0} for i in range(4)]
-        return {"subtitle": "GROUP A", "rows": rows}
+        return {"subtitle": "گروه A", "rows": rows}
     if type_ == "ROUND_RESULTS":
         sc = ["3 - 1", "2 - 2", "0 - 2", "1 - 3"]
-        return {"subtitle": "GROUP STAGE · ROUND 2", "rows": [{"cells": [names[i * 2 % 8], sc[i], names[(i * 2 + 1) % 8]]} for i in range(4)]}
+        return {"subtitle": "مرحله گروهی · راند 2", "rows": [{"cells": [names[i * 2 % 8], sc[i], names[(i * 2 + 1) % 8]]} for i in range(4)]}
     if type_ == "QUALIFIED":
-        return {"subtitle": "GROUP STAGE COMPLETED", "rows": [{"cells": [f"GROUP {g}", str(p), names[(ord(g) - 65) * 2 + p - 1]]} for g in "AB" for p in (1, 2)]}
+        return {"subtitle": "پایان مرحله گروهی", "rows": [{"cells": [f"گروه {g}", str(p), names[(ord(g) - 65) * 2 + p - 1]]} for g in "AB" for p in (1, 2)]}
     if type_ == "KO_MATCHES":
-        return {"subtitle": "QUARTER FINALS", "rows": [{"cells": [names[i * 2], "VS", names[i * 2 + 1]]} for i in range(4)]}
+        return {"subtitle": "یک‌چهارم نهایی", "rows": [{"cells": [names[i * 2], "×", names[i * 2 + 1]]} for i in range(4)]}
     if type_ == "BRACKET":
         return {"stages": [
-            {"name": "QUARTER FINALS", "matches": [{"a": names[i * 2], "b": names[i * 2 + 1], "ga": 2, "gb": 1, "win": "a"} for i in range(4)]},
-            {"name": "SEMI FINALS", "matches": [{"a": names[0], "b": names[2], "ga": None, "gb": None, "win": None},
+            {"name": "یک‌چهارم نهایی", "matches": [{"a": names[i * 2], "b": names[i * 2 + 1], "ga": 2, "gb": 1, "win": "a"} for i in range(4)]},
+            {"name": "نیمه‌نهایی", "matches": [{"a": names[0], "b": names[2], "ga": None, "gb": None, "win": None},
                                                 {"a": names[4], "b": names[6], "ga": None, "gb": None, "win": None}]},
-            {"name": "FINAL", "matches": [{"a": "TBD", "b": "TBD", "ga": None, "gb": None, "win": None}]}]}
+            {"name": "فینال", "matches": [{"a": "؟", "b": "؟", "ga": None, "gb": None, "win": None}]}]}
     if type_ == "CHAMPION":
-        return {"team": "TAJ", "logo": None, "subtitle": "ONE NIGHT CHAMPION #5"}
+        return {"team": "تاج", "logo": None, "subtitle": "وان نایت چمپیون #5"}
     raise ValueError(type_)

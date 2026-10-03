@@ -27,5 +27,5 @@ def main_menu(is_admin: bool = False) -> InlineKeyboardMarkup:
     rows = pairs(items)
     if is_admin:
         rows.append([btn("🛠 پنل مدیریت", "admhome")])
-    rows.append([btn("🏠 MAIN MENU", "home")])
+    rows.append([btn("🏠 منوی اصلی", "home")])
     return kb(rows)

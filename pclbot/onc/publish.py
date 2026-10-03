@@ -29,7 +29,7 @@ async def channel_info(bot: Bot) -> dict:
     cid = await channel_id()
     info = {"id": cid, "title": "", "username": "", "ok": False, "problems": [], "can_post": False, "can_edit": False}
     if not cid:
-        info["problems"].append("No channel configured")
+        info["problems"].append("کانالی تنظیم نشده")
         return info
     try:
         chat = await bot.get_chat(cid)
@@ -37,7 +37,7 @@ async def channel_info(bot: Bot) -> dict:
         me = await bot.get_me()
         mem = await bot.get_chat_member(cid, me.id)
     except TelegramAPIError as ex:
-        info["problems"].append(f"Telegram: {ex.message if hasattr(ex, 'message') else ex}")
+        info["problems"].append(f"تلگرام: {ex.message if hasattr(ex, 'message') else ex}")
         return info
     if mem.status == "creator":
         info["can_post"] = info["can_edit"] = True
@@ -45,18 +45,18 @@ async def channel_info(bot: Bot) -> dict:
         info["can_post"] = bool(getattr(mem, "can_post_messages", False))
         info["can_edit"] = bool(getattr(mem, "can_edit_messages", False))
     else:
-        info["problems"].append("Bot is not an admin of the channel")
+        info["problems"].append("ربات ادمین کانال نیست")
     if mem.status in ("administrator", "creator"):
         if not info["can_post"]:
-            info["problems"].append("Missing permission: Post messages (send message / photo)")
+            info["problems"].append("دسترسی «ارسال پیام» (متن/عکس) داده نشده")
         if not info["can_edit"]:
-            info["problems"].append("Missing permission: Edit messages of others")
+            info["problems"].append("دسترسی «ویرایش پیام‌ها» داده نشده")
     info["ok"] = not info["problems"]
     return info
 
 
 def _caption(text: str, page: int, pages: int) -> str:
-    return text + (f"\n\n<i>Page {page}/{pages}</i>" if pages > 1 else "")
+    return text + (f"\n\n<i>صفحه {page} از {pages}</i>" if pages > 1 else "")
 
 
 async def publish(bot: Bot, tid: int, stage: str, kind: str, ref_id: int, images: list[bytes], caption: str,
@@ -68,7 +68,7 @@ async def publish(bot: Bot, tid: int, stage: str, kind: str, ref_id: int, images
     """
     cid = await channel_id()
     if not cid:
-        raise PublishError("ONC channel is not configured (ONE NIGHT CHAMPION → CHANNEL).")
+        raise PublishError("کانال وان نایت چمپیون تنظیم نشده (پنل → کانال).")
     prior = {r["page"]: r for r in await dbx.fetchall(
         "SELECT * FROM onc_publications WHERE tournament_id=? AND kind=? AND ref_id=? AND channel_id=?", tid, kind, ref_id, cid)}
     sent = edited = 0
@@ -100,7 +100,7 @@ async def publish(bot: Bot, tid: int, stage: str, kind: str, ref_id: int, images
                     "content_version=excluded.content_version", tid, stage, kind, ref_id, i, cid, m.message_id, service.now(), admin, version)
             sent += 1
     except TelegramAPIError as ex:
-        raise PublishError(f"Telegram refused the post: {ex}") from ex
+        raise PublishError(f"تلگرام پست را نپذیرفت: {ex}") from ex
     finally:
         pass
     return {"sent": sent, "edited": edited}
@@ -116,7 +116,7 @@ async def round_results(bot: Bot, rid: int, admin: int, update: bool = False) ->
     t = await service.get_tournament(r["tournament_id"])
     label = await service.round_label(r)
     imgs = await gfx.round_results(rid)
-    cap = f"🏆 <b>{html.escape(t['name'])}</b>\n{label}\n<b>RESULTS</b>"
+    cap = f"🏆 <b>{html.escape(t['name'])}</b>\n{label}\n<b>نتایج</b>"
     res = await publish(bot, r["tournament_id"], r["stage"], "RESULTS", rid, imgs, cap, admin, r["content_version"], update)
     await service.mark_published(rid)
     return res
@@ -126,21 +126,21 @@ async def group_standings(bot: Bot, tid: int, gid: int, round_id: int, admin: in
     t = await service.get_tournament(tid)
     g = await service.get_group(gid)
     imgs = await gfx.group_table(tid, gid)
-    cap = f"🏆 <b>{html.escape(t['name'])}</b>\n📊 <b>{html.escape(g['name'])}</b> — updated standings"
+    cap = f"🏆 <b>{html.escape(t['name'])}</b>\n📊 <b>{html.escape(g['name'])}</b> — جدول به‌روز"
     return await publish(bot, tid, "GROUP", "STANDINGS", gid * 100000 + round_id, imgs, cap, admin, 1, update)
 
 
 async def schedule(bot: Bot, tid: int, admin: int) -> dict:
     t = await service.get_tournament(tid)
     imgs = await gfx.schedule(tid)
-    cap = f"🏆 <b>{html.escape(t['name'])}</b>\n📅 <b>MATCH SCHEDULE</b> — {service.fmt_date(t['start_date'])}"
+    cap = f"🏆 <b>{html.escape(t['name'])}</b>\n📅 <b>برنامه بازی‌ها</b> — {service.fmt_date(t['start_date'])}"
     return await publish(bot, tid, "GROUP", "SCHEDULE", 0, imgs, cap, admin, 1, update=True)
 
 
 async def qualified(bot: Bot, tid: int, admin: int) -> dict:
     t = await service.get_tournament(tid)
     imgs = await gfx.qualified(tid)
-    cap = f"🏆 <b>{html.escape(t['name'])}</b>\n✅ <b>QUALIFIED TEAMS</b>"
+    cap = f"🏆 <b>{html.escape(t['name'])}</b>\n✅ <b>تیم‌های صعودکننده</b>"
     return await publish(bot, tid, "GROUP", "QUALIFIED", 0, imgs, cap, admin, 1, update=True)
 
 
@@ -149,14 +149,14 @@ async def ko_matches(bot: Bot, rid: int, admin: int) -> dict:
     t = await service.get_tournament(r["tournament_id"])
     from .algo import STAGE_NAME
     imgs = await gfx.ko_matches(rid)
-    cap = f"🏆 <b>{html.escape(t['name'])}</b>\n⚔️ <b>{STAGE_NAME[r['stage']]}</b> — matchups"
+    cap = f"🏆 <b>{html.escape(t['name'])}</b>\n⚔️ <b>{STAGE_NAME[r['stage']]}</b> — بازی‌ها"
     return await publish(bot, r["tournament_id"], r["stage"], "KO_MATCHES", rid, imgs, cap, admin, r["content_version"], update=True)
 
 
 async def bracket(bot: Bot, tid: int, admin: int) -> dict:
     t = await service.get_tournament(tid)
     imgs = await gfx.bracket(tid)
-    cap = f"🏆 <b>{html.escape(t['name'])}</b>\n🧩 <b>KNOCKOUT BRACKET</b>"
+    cap = f"🏆 <b>{html.escape(t['name'])}</b>\n🧩 <b>جدول مرحله حذفی</b>"
     return await publish(bot, tid, "KO", "BRACKET", 0, imgs, cap, admin, 1, update=True)
 
 
@@ -164,7 +164,7 @@ async def champion(bot: Bot, tid: int, admin: int, update: bool = False) -> dict
     t = await service.get_tournament(tid)
     imgs = await gfx.champion(bot, tid)
     team = await service.get_team(t["champion_team_id"])
-    cap = f"🏆 <b>{html.escape(t['name'])}</b>\n👑 <b>CHAMPION: {html.escape(team['name'])}</b>"
+    cap = f"🏆 <b>{html.escape(t['name'])}</b>\n👑 <b>قهرمان: {html.escape(team['name'])}</b>"
     return await publish(bot, tid, "F", "CHAMPION", 0, imgs, cap, admin, 1, update=True)
 
 

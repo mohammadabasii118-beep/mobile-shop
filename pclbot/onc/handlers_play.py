@@ -21,8 +21,8 @@ router.callback_query.filter(lambda c: is_admin(c.from_user.id))
 async def live_screen(c, t: dict, rid: int | None = None) -> None:
     r = await service.get_round(rid) if rid else await service.current_round(t["id"])
     if not r:
-        rows = [[ob("⚽ ALL ROUNDS", f"onc:rs:{t['id']}")], [ob("🔙 BACK", f"onc:t:{t['id']}")]]
-        return await show(c, f"🔴 <b>LIVE MATCHES</b> — {E(t['name'])}\n\nNo open round with matches.\n(generate the schedule / create a knockout stage first)", okb(rows))
+        rows = [[ob("⚽ همه‌ی راندها", f"onc:rs:{t['id']}")], [ob("🔙 بازگشت", f"onc:t:{t['id']}")]]
+        return await show(c, f"🔴 <b>بازی‌های زنده</b> — {E(t['name'])}\n\nراند بازِ دارای بازی وجود ندارد.\n(اول برنامه را بساز / مرحله‌ی حذفی را بساز)", okb(rows))
     await round_screen(c, r["id"], live=True)
 
 
@@ -48,8 +48,8 @@ async def rounds_list(c: CallbackQuery, state: FSMContext):
             continue
         icon = "✅" if r["status"] == "CONFIRMED" else ("🟡" if p["completed"] else "⏳")
         rows.append([ob(f"{icon} {r['start_at'][11:]} · {await service.round_label(r)} ({ui.progress(p)})", f"onc:rd:{r['id']}")])
-    await show(c, f"⚽ <b>RESULTS</b> — {E(t['name'])}\n\n✅ confirmed · 🟡 completed, waiting for confirmation · ⏳ in progress",
-               okb(rows + [[ob("🔙 BACK", f"onc:t:{t['id']}")]]))
+    await show(c, f"⚽ <b>نتایج</b> — {E(t['name'])}\n\n✅ تأییدشده · 🟡 کامل شده و منتظر تأیید · ⏳ در حال ثبت",
+               okb(rows + [[ob("🔙 بازگشت", f"onc:t:{t['id']}")]]))
     await c.answer()
 
 
@@ -61,29 +61,29 @@ async def round_screen(c, rid: int, live: bool = False, note: str = "") -> None:
     label = await service.round_label(r)
     back = f"onc:rs:{t['id']}"
     if r["status"] == "CONFIRMED":
-        pub = "📢 published" if r["published_version"] >= r["content_version"] and r["published_version"] else "⚠️ NOT published / changed since publishing"
-        text = f"{note}{ui.title(t)}\n<b>{label}</b> — 🕐 {r['start_at'][11:]}\n✅ CONFIRMED · {pub}\n\n" + "\n".join(ui.match_line(m) for m in ms)
+        pub = "📢 منتشر شده" if r["published_version"] >= r["content_version"] and r["published_version"] else "⚠️ منتشر نشده / بعد از انتشار تغییر کرده"
+        text = f"{note}{ui.title(t)}\n<b>{label}</b> — 🕐 {r['start_at'][11:]}\n✅ تأییدشده · {pub}\n\n" + "\n".join(ui.match_line(m) for m in ms)
         rows = [[ob(f"✏️ {m['name_a']} {m['goals_a']}-{m['goals_b']} {m['name_b']}", f"onc:rm:{m['id']}")] for m in ms]
         if not (r["published_version"] and r["published_version"] >= r["content_version"]):
-            rows.append([ob("📢 PUBLISH / UPDATE CHANNEL POST", f"onc:ru:{rid}")])
-        rows.append([ob("🔙 BACK", back)])
+            rows.append([ob("📢 انتشار / به‌روزرسانی پست کانال", f"onc:ru:{rid}")])
+        rows.append([ob("🔙 بازگشت", back)])
         return await show(c, text, okb(rows))
     if p["completed"]:  # ROUND COMPLETED → text summary for the admin, nothing is published yet
-        text = (f"{note}✅ <b>ROUND COMPLETED</b> — review before publishing\n\n" + ui.results_summary(t, label, ms)
-                + "\n\n<i>Nothing has been published yet.</i>")
-        rows = [[ob("✅ CONFIRM & PUBLISH", f"onc:rc:{rid}")], [ob("✏️ EDIT RESULTS", f"onc:re:{rid}")], [ob("❌ CANCEL", back)]]
+        text = (f"{note}✅ <b>راند کامل شد</b> — قبل از انتشار بررسی کن\n\n" + ui.results_summary(t, label, ms)
+                + "\n\n<i>هنوز چیزی منتشر نشده است.</i>")
+        rows = [[ob("✅ تأیید و انتشار", f"onc:rc:{rid}")], [ob("✏️ ویرایش نتایج", f"onc:re:{rid}")], [ob("❌ لغو", back)]]
         return await show(c, text, okb(rows))
     lines, rows = [], []
     for m in ms:
         score = f"{m['goals_a']}-{m['goals_b']}" if m["goals_a"] is not None else None
         lines.append(("✅ " if score else "⏳ ") + ui.match_line(m))
-        rows.append([ob(f"{'✏️' if score else '▶️'} ENTER RESULT: {m['name_a']} vs {m['name_b']}" if not score else f"✏️ {m['name_a']} {score} {m['name_b']}",
+        rows.append([ob(f"{'✏️' if score else '▶️'} ثبت نتیجه: {m['name_a']} 🆚 {m['name_b']}" if not score else f"✏️ {m['name_a']} {score} {m['name_b']}",
                         f"onc:rm:{m['id']}")])
-    head = "🔴 <b>LIVE MATCHES</b>\n\n" if live else ""
-    text = f"{note}{head}{ui.title(t)}\n<b>{label.upper()}</b> — 🕐 {r['start_at'][11:]}  ({ui.progress(p)} entered)\n\n" + "\n".join(lines)
+    head = "🔴 <b>بازی‌های زنده</b>\n\n" if live else ""
+    text = f"{note}{head}{ui.title(t)}\n<b>{label}</b> — 🕐 {r['start_at'][11:]}  ({ui.progress(p)} ثبت شده)\n\n" + "\n".join(lines)
     if r["stage"] != "GROUP":
-        rows.append([ob("⚔️ KNOCKOUT STAGE", f"onc:ks:{rid}")])
-    rows.append([ob("⚽ ALL ROUNDS", f"onc:rs:{t['id']}"), ob("🔙 BACK", f"onc:t:{t['id']}")])
+        rows.append([ob("⚔️ مرحله‌ی حذفی", f"onc:ks:{rid}")])
+    rows.append([ob("⚽ همه‌ی راندها", f"onc:rs:{t['id']}"), ob("🔙 بازگشت", f"onc:t:{t['id']}")])
     await show(c, text[:4000], okb(rows))
 
 
@@ -100,13 +100,13 @@ async def round_edit_list(c: CallbackQuery):
     r = await service.get_round(rid)
     ms = await service.matches_of_round(rid)
     rows = [[ob(f"✏️ {m['name_a']} {m['goals_a']}-{m['goals_b']} {m['name_b']}", f"onc:rm:{m['id']}")] for m in ms]
-    await show(c, f"✏️ <b>EDIT RESULTS</b> — {await service.round_label(r)}\nChoose the match to correct:", okb(rows + [[ob("🔙 BACK", f"onc:rd:{rid}")]]))
+    await show(c, f"✏️ <b>ویرایش نتایج</b> — {await service.round_label(r)}\nبازی مورد نظر را انتخاب کن:", okb(rows + [[ob("🔙 بازگشت", f"onc:rd:{rid}")]]))
     await c.answer()
 
 
 # ----------------------------------------------------------------- result entry (fast: "3" then "1", or "3-1" at once)
 def _cancel_kb(mid: int, rid: int):
-    return okb([[ob("❌ CANCEL", f"onc:rcx:{rid}")]])
+    return okb([[ob("❌ لغو", f"onc:rcx:{rid}")]])
 
 
 @router.callback_query(F.data.startswith("onc:rm:"))
@@ -116,8 +116,8 @@ async def result_start(c: CallbackQuery, state: FSMContext):
     await state.clear()
     await state.set_state(ResultSt.ga)
     await state.update_data(mid=mid, rid=m["round_id"], confirmed=m["round_status"] == "CONFIRMED")
-    warn = "\n⚠️ This round is already confirmed — changing it will recalculate standings." if m["round_status"] == "CONFIRMED" else ""
-    await show(c, f"⚽ <b>{E(m['name_a'])} vs {E(m['name_b'])}</b>{warn}\n\n<b>{E(m['name_a']).upper()} GOALS:</b>\n<i>(send a number, or both as 3-1)</i>",
+    warn = "\n⚠️ این راند قبلاً تأیید شده — تغییر نتیجه جدول را دوباره حساب می‌کند." if m["round_status"] == "CONFIRMED" else ""
+    await show(c, f"⚽ <b>{E(m['name_a'])} 🆚 {E(m['name_b'])}</b>{warn}\n\n<b>{E(m['name_a'])} گل:</b>\n<i>(یک عدد بفرست، یا هر دو را مثل 3-1)</i>",
                _cancel_kb(mid, m["round_id"]))
     await c.answer()
 
@@ -130,7 +130,7 @@ def _parse_goals(text: str) -> tuple[int, int | None]:
         return int(mm.group(1)), int(mm.group(2))
     if re.fullmatch(r"\d{1,2}", t):
         return int(t), None
-    raise OncError("Send a whole number (0–99), e.g. 3 — or both goals like 3-1.")
+    raise OncError("یک عدد صحیح (۰ تا ۹۹) بفرست، مثلاً 3 — یا هر دو گل را مثل 3-1.")
 
 
 @router.message(ResultSt.ga, F.text)
@@ -146,7 +146,7 @@ async def result_ga(m: Message, state: FSMContext):
         await state.update_data(gb=b)
         return await _after_goals(m, state)
     await state.set_state(ResultSt.gb)
-    await m.answer(f"<b>{E(match['name_b']).upper()} GOALS:</b>", reply_markup=_cancel_kb(d["mid"], d["rid"]))
+    await m.answer(f"<b>{E(match['name_b'])} گل:</b>", reply_markup=_cancel_kb(d["mid"], d["rid"]))
 
 
 @router.message(ResultSt.gb, F.text)
@@ -155,7 +155,7 @@ async def result_gb(m: Message, state: FSMContext):
     try:
         b, extra = _parse_goals(m.text)
         if extra is not None:
-            raise OncError("Send only the second team's goals (a number).")
+            raise OncError("فقط گل تیم دوم را (یک عدد) بفرست.")
     except OncError as e:
         return await m.answer(f"⚠️ {e}", reply_markup=_cancel_kb(d["mid"], d["rid"]))
     await state.update_data(gb=b)
@@ -167,9 +167,9 @@ async def _after_goals(m: Message, state: FSMContext) -> None:
     match = await service.get_match(d["mid"])
     if match["stage"] != "GROUP" and d["ga"] == d["gb"]:  # level knockout match: never guess the winner
         await state.set_state(ResultSt.winner)
-        return await m.answer(f"🤝 Level: <b>{E(match['name_a'])} {d['ga']} - {d['gb']} {E(match['name_b'])}</b>\n\nWho won? (choose manually)",
+        return await m.answer(f"🤝 مساوی: <b>{E(match['name_a'])} {d['ga']} - {d['gb']} {E(match['name_b'])}</b>\n\nبرنده کیست؟ (دستی انتخاب کن)",
                               reply_markup=okb([[ob(f"🏆 {match['name_a']}", "onc:rw:a"), ob(f"🏆 {match['name_b']}", "onc:rw:b")],
-                                                [ob("❌ CANCEL", f"onc:rcx:{d['rid']}")]]))
+                                                [ob("❌ لغو", f"onc:rcx:{d['rid']}")]]))
     await _preview(m, state)
 
 
@@ -188,16 +188,16 @@ async def _preview(m: Message, state: FSMContext) -> None:
     await state.set_state(ResultSt.preview)
     extra = ""
     if d.get("winner"):
-        extra = f"\n▶ Winner: <b>{E(match['name_a'] if d['winner'] == match['team_a'] else match['name_b'])}</b>"
+        extra = f"\n▶ برنده: <b>{E(match['name_a'] if d['winner'] == match['team_a'] else match['name_b'])}</b>"
     await m.answer(f"<b>{E(match['name_a'])} {d['ga']} - {d['gb']} {E(match['name_b'])}</b>{extra}",
-                   reply_markup=okb([[ob("✅ SAVE RESULT", "onc:rsv")], [ob("✏️ EDIT", f"onc:rm:{d['mid']}"), ob("❌ CANCEL", f"onc:rcx:{d['rid']}")]]))
+                   reply_markup=okb([[ob("✅ ثبت نتیجه", "onc:rsv")], [ob("✏️ ویرایش", f"onc:rm:{d['mid']}"), ob("❌ لغو", f"onc:rcx:{d['rid']}")]]))
 
 
 @router.callback_query(F.data.startswith("onc:rcx:"))
 async def result_cancel(c: CallbackQuery, state: FSMContext):
     await state.clear()
     await round_screen(c, int(c.data.split(":")[2]))
-    await c.answer("Cancelled")
+    await c.answer("لغو شد")
 
 
 @router.callback_query(F.data == "onc:rsv", ResultSt.preview)
@@ -211,24 +211,24 @@ async def result_save(c: CallbackQuery, state: FSMContext, bot: Bot):
     except OncError as e:
         return await alert(c, str(e))
     await state.clear()
-    await c.answer("✅ Saved")
-    await round_screen(c, d["rid"], note="✅ Result saved (not published).\n\n")
+    await c.answer("✅ ذخیره شد")
+    await round_screen(c, d["rid"], note="✅ نتیجه ثبت شد (منتشر نشده).\n\n")
 
 
 async def _after_edit(c: CallbackQuery, state: FSMContext, res: dict) -> None:
     m, rid = res["match"], res["round"]["id"]
     if not res["applied"]:  # dependency protection: knockout would silently break
         await state.set_state(ResultSt.impact)
-        text = ("⚠️ <b>THIS CHANGE AFFECTS THE KNOCKOUT</b>\n\n" + f"{E(m['name_a'])} vs {E(m['name_b'])}: {res['old']} → {res['new']}\n\nInvalid after the change:\n"
+        text = ("⚠️ <b>این تغییر روی مرحله‌ی حذفی اثر می‌گذارد</b>\n\n" + f"{E(m['name_a'])} 🆚 {E(m['name_b'])}: {res['old']} → {res['new']}\n\nبعد از تغییر این موارد نامعتبر می‌شوند:\n"
                 + "\n".join(f"• {E(x)}" for x in res["impact"])
-                + "\n\nApplying removes the invalid knockout matchups (their stages reopen) — you then pick the matchups again.")
-        return await show(c, text, okb([[ob("✅ APPLY & REBUILD KNOCKOUT", "onc:rrb")], [ob("❌ CANCEL CHANGE", f"onc:rcx:{rid}")]]))
+                + "\n\nبا اعمال تغییر، بازی‌های حذفیِ نامعتبر حذف می‌شوند (مرحله‌شان دوباره باز می‌شود) و باید دوباره بازی‌ها را تعیین کنی.")
+        return await show(c, text, okb([[ob("✅ اعمال و بازسازی حذفی", "onc:rrb")], [ob("❌ لغو تغییر", f"onc:rcx:{rid}")]]))
     await state.clear()
-    await c.answer("✅ Result changed — standings recalculated")
+    await c.answer("✅ نتیجه عوض شد — جدول دوباره حساب شد")
     if res["was_published"]:
-        return await show(c, f"✅ Result changed: {E(m['name_a'])} vs {E(m['name_b'])}: {res['old']} → {res['new']}\n\n⚠️ <b>ROUND ALREADY PUBLISHED</b>\n\n<b>RESULT HAS BEEN CHANGED</b>",
-                          okb([[ob("🔄 UPDATE CHANNEL POST", f"onc:ru:{rid}")], [ob("❌ KEEP CURRENT POST", f"onc:rk:{rid}")]]))
-    await round_screen(c, rid, note="✅ Result changed (round was never published).\n\n")
+        return await show(c, f"✅ نتیجه عوض شد: {E(m['name_a'])} 🆚 {E(m['name_b'])}: {res['old']} → {res['new']}\n\n⚠️ <b>این راند قبلاً منتشر شده</b>\n\n<b>نتیجه تغییر کرده است</b>",
+                          okb([[ob("🔄 به‌روزرسانی پست کانال", f"onc:ru:{rid}")], [ob("❌ پست فعلی بماند", f"onc:rk:{rid}")]]))
+    await round_screen(c, rid, note="✅ نتیجه عوض شد (این راند هرگز منتشر نشده بود).\n\n")
 
 
 @router.callback_query(F.data == "onc:rrb", ResultSt.impact)
@@ -244,8 +244,8 @@ async def result_rebuild(c: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data.startswith("onc:rk:"))
 async def keep_post(c: CallbackQuery):
     rid = int(c.data.split(":")[2])
-    await c.answer("Channel post kept as is")
-    await round_screen(c, rid, note="Channel post kept as is (it no longer matches the confirmed results).\n\n")
+    await c.answer("پست کانال بدون تغییر ماند")
+    await round_screen(c, rid, note="پست کانال بدون تغییر ماند (دیگر با نتایج تأییدشده یکی نیست).\n\n")
 
 
 # ----------------------------------------------------------------- CONFIRM & PUBLISH / update / retry
@@ -256,7 +256,7 @@ async def confirm_publish(c: CallbackQuery, bot: Bot):
         await service.confirm_round(c.from_user.id, rid)
     except OncError as e:
         return await alert(c, str(e))
-    await c.answer("Confirmed — publishing…")
+    await c.answer("تأیید شد — در حال انتشار…")
     await _publish_round(c, bot, rid)
 
 
@@ -269,28 +269,28 @@ async def _publish_round(c: CallbackQuery, bot: Bot, rid: int, update: bool = Fa
             if t["champion_team_id"]:
                 await publish.champion(bot, r["tournament_id"], c.from_user.id, update=True)
         res = out["results"]
-        note = f"📢 Published to the ONC channel ({res['sent']} new, {res['edited']} updated).\n"
+        note = f"📢 در کانال منتشر شد ({res['sent']} جدید، {res['edited']} ویرایش‌شده).\n"
         if "champion" in out:
-            note += "👑 Champion poster published.\n"
+            note += "👑 پوستر قهرمان منتشر شد.\n"
         if r["stage"] == "GROUP":
             q = await service.qualification(r["tournament_id"])
-            note += "\n✅ Qualification is FINAL — you can create the knockout stage." if q["ready"] else ""
+            note += "\n✅ صعود نهایی شد — می‌توانی مرحله‌ی حذفی را بسازی." if q["ready"] else ""
         await round_screen(c, rid, note=note + "\n")
     except (publish.PublishError, OncError) as e:
-        await show(c, f"✅ Results are <b>confirmed</b> (standings updated) but the channel post FAILED:\n\n⚠️ {E(str(e))}\n\nFix the channel in CHANNEL and retry.",
-                   okb([[ob("🔁 RETRY PUBLISH", f"onc:rp:{rid}")], [ob("📢 CHANNEL", "onc:ch")], [ob("🔙 BACK", f"onc:rd:{rid}")]]))
+        await show(c, f"✅ نتایج <b>تأیید شد</b> (جدول به‌روز شد) ولی انتشار در کانال <b>ناموفق</b> بود:\n\n⚠️ {E(str(e))}\n\nمشکل کانال را در بخش «کانال» درست کن و دوباره امتحان کن.",
+                   okb([[ob("🔁 تلاش دوباره برای انتشار", f"onc:rp:{rid}")], [ob("📢 کانال", "onc:ch")], [ob("🔙 بازگشت", f"onc:rd:{rid}")]]))
 
 
 @router.callback_query(F.data.startswith("onc:rp:"))
 async def retry_publish(c: CallbackQuery, bot: Bot):
-    await c.answer("Publishing…")
+    await c.answer("در حال انتشار…")
     await _publish_round(c, bot, int(c.data.split(":")[2]))
 
 
 @router.callback_query(F.data.startswith("onc:ru:"))
 async def update_post(c: CallbackQuery, bot: Bot):
     """Edits the earlier channel message(s) in place (a new post is sent only when none exists)."""
-    await c.answer("Updating…")
+    await c.answer("در حال به‌روزرسانی…")
     await _publish_round(c, bot, int(c.data.split(":")[2]), update=True)
 
 
@@ -298,22 +298,22 @@ async def update_post(c: CallbackQuery, bot: Bot):
 async def standings_screen(c, t: dict) -> None:
     tables = await service.group_tables(t["id"])
     q = await service.qualification(t["id"])
-    text = f"📊 <b>STANDINGS</b> — {E(t['name'])}\n<i>Confirmed results only</i>\n\n" + (
+    text = f"📊 <b>جدول رده‌بندی</b> — {E(t['name'])}\n<i>فقط نتایج تأییدشده</i>\n\n" + (
         "\n\n".join(ui.standings_block(x) for x in tables) if tables else "No groups yet.")
     rows = []
     for x in tables:
         if x["unresolved"]:
-            rows.append([ob(f"⚖️ DECIDE ORDER — {x['group']['name']}", f"onc:tb:{x['group']['id']}")])
+            rows.append([ob(f"⚖️ تعیین ترتیب — {x['group']['name']}", f"onc:tb:{x['group']['id']}")])
     names = await service.team_names(t["id"])
     if q["ready"]:
-        text += "\n\n✅ <b>QUALIFIED</b>: " + ", ".join(E(names[i]) for i in q["teams"])
+        text += "\n\n✅ <b>صعودکننده‌ها</b>: " + ", ".join(E(names[i]) for i in q["teams"])
     elif tables:
-        text += "\n\n⏳ <b>Qualification not final:</b>\n" + "\n".join(f"• {E(b)}" for b in q["blockers"])
+        text += "\n\n⏳ <b>صعود هنوز نهایی نیست:</b>\n" + "\n".join(f"• {E(b)}" for b in q["blockers"])
     if tables:
-        rows.append([ob("📢 PUBLISH STANDINGS", f"onc:stp:{t['id']}")])
+        rows.append([ob("📢 انتشار جدول", f"onc:stp:{t['id']}")])
         if q["ready"]:
-            rows.append([ob("✅ PUBLISH QUALIFIED TEAMS", f"onc:qlp:{t['id']}"), ob("🏆 KNOCKOUT", f"onc:ko:{t['id']}")])
-    rows.append([ob("🔙 BACK", f"onc:t:{t['id']}")])
+            rows.append([ob("✅ انتشار تیم‌های صعودکننده", f"onc:qlp:{t['id']}"), ob("🏆 مرحله حذفی", f"onc:ko:{t['id']}")])
+    rows.append([ob("🔙 بازگشت", f"onc:t:{t['id']}")])
     await show(c, text[:4000], okb(rows))
 
 
@@ -337,7 +337,7 @@ async def standings_publish(c: CallbackQuery, bot: Bot):
             n += 1
     except (publish.PublishError, OncError) as e:
         return await alert(c, str(e))
-    await c.answer(f"📢 {n} group table(s) published to the ONC channel.")
+    await c.answer(f"📢 {n} جدول گروه در کانال منتشر شد.")
 
 
 @router.callback_query(F.data.startswith("onc:qlp:"))
@@ -347,7 +347,7 @@ async def qualified_publish(c: CallbackQuery, bot: Bot):
         await publish.qualified(bot, tid, c.from_user.id)
     except (publish.PublishError, OncError) as e:
         return await alert(c, str(e))
-    await c.answer("📢 Qualified teams published to the ONC channel.")
+    await c.answer("📢 تیم‌های صعودکننده در کانال منتشر شد.")
 
 
 @router.callback_query(F.data.startswith("onc:tb:"))
@@ -356,7 +356,7 @@ async def tie_start(c: CallbackQuery, state: FSMContext):
     g = await service.get_group(gid)
     tbl = next(x for x in await service.group_tables(g["tournament_id"]) if x["group"]["id"] == gid)
     if not tbl["unresolved"]:
-        return await alert(c, "No unresolved tie in this group.")
+        return await alert(c, "در این گروه تساوی حل‌نشده‌ای نیست.")
     block = tbl["unresolved"][0]
     await state.set_state(TieSt.pick)
     await state.update_data(gid=gid, block=block, order=[])
@@ -371,9 +371,9 @@ async def _tie_screen(c: CallbackQuery, state: FSMContext) -> None:
     left = [t for t in d["block"] if t not in d["order"]]
     picked = "\n".join(f"{i}. {E(names[t])}" for i, t in enumerate(d["order"], 1))
     rows = ui.grid([ob(names[t], f"onc:tbp:{t}") for t in left], 2)
-    rows.append([ob("🧹 CLEAR", f"onc:tb:{d['gid']}"), ob("❌ CANCEL", f"onc:st:{g['tournament_id']}")])
-    await show(c, f"⚖️ <b>NEEDS ADMIN DECISION</b> — {E(g['name'])}\n\nThese teams are level on every rule (Pts, "
-               f"{'H2H, ' if len(d['block']) == 2 else ''}GD, GF).\nTap the teams in the order they should finish (first = higher):\n\n{picked or '—'}", okb(rows))
+    rows.append([ob("🧹 پاک کردن", f"onc:tb:{d['gid']}"), ob("❌ لغو", f"onc:st:{g['tournament_id']}")])
+    await show(c, f"⚖️ <b>نیاز به تصمیم ادمین</b> — {E(g['name'])}\n\nاین تیم‌ها در همه‌ی معیارها برابرند (امتیاز، "
+               f"{'H2H, ' if len(d['block']) == 2 else ''}تفاضل، گل زده).\nتیم‌ها را به ترتیبِ رتبه بزن (اولی = بالاتر):\n\n{picked or '—'}", okb(rows))
 
 
 @router.callback_query(F.data.startswith("onc:tbp:"), TieSt.pick)
@@ -390,7 +390,7 @@ async def tie_pick(c: CallbackQuery, state: FSMContext):
             return await alert(c, str(e))
         g = await service.get_group(d["gid"])
         await state.clear()
-        await c.answer("✅ Order saved")
+        await c.answer("✅ ترتیب ذخیره شد")
         return await standings_screen(c, await service.get_tournament(g["tournament_id"]))
     await _tie_screen(c, state)
     await c.answer()
@@ -407,23 +407,23 @@ async def ko_screen(c: CallbackQuery, raw: str) -> None:
     rounds = await service.ko_rounds(tid)
     lines = []
     if q["ready"]:
-        lines.append("✅ <b>Qualified</b>: " + ", ".join(E(names[i]) for i in q["teams"]))
+        lines.append("✅ <b>صعودکننده‌ها</b>: " + ", ".join(E(names[i]) for i in q["teams"]))
     else:
-        lines.append("⏳ Group stage not final:\n" + "\n".join(f"• {E(b)}" for b in q["blockers"]))
+        lines.append("⏳ مرحله‌ی گروهی هنوز نهایی نیست:\n" + "\n".join(f"• {E(b)}" for b in q["blockers"]))
     rows = []
     for r in rounds:
         ms = await service.matches_of_round(r["id"])
         lines.append(f"\n<b>{algo.STAGE_NAME[r['stage']]}</b> {'✅' if r['status'] == 'CONFIRMED' else ''}\n" + (
-            "\n".join(f"• {ui.match_line(m, with_score=m['rstatus'] == 'CONFIRMED')}" for m in ms) or "<i>no matchups yet</i>"))
+            "\n".join(f"• {ui.match_line(m, with_score=m['rstatus'] == 'CONFIRMED')}" for m in ms) or "<i>هنوز بازی‌ای تعیین نشده</i>"))
         rows.append([ob(f"⚔️ {algo.STAGE_NAME[r['stage']]}", f"onc:ks:{r['id']}")])
     if q["ready"]:
-        rows.append([ob("➕ CREATE STAGE", f"onc:kc:{tid}")])
+        rows.append([ob("➕ ساخت مرحله", f"onc:kc:{tid}")])
     if rounds:
-        rows.append([ob("🧩 PUBLISH BRACKET", f"onc:kb:{tid}")])
+        rows.append([ob("🧩 انتشار جدول حذفی", f"onc:kb:{tid}")])
         if t["champion_team_id"]:
-            rows.append([ob("👑 PUBLISH CHAMPION POSTER", f"onc:kch:{tid}")])
-    rows.append([ob("🔙 BACK", f"onc:t:{tid}")])
-    await show(c, f"🏆 <b>KNOCKOUT</b> — {E(t['name'])}\n\n" + "\n".join(lines), okb(rows))
+            rows.append([ob("👑 انتشار پوستر قهرمان", f"onc:kch:{tid}")])
+    rows.append([ob("🔙 بازگشت", f"onc:t:{tid}")])
+    await show(c, f"🏆 <b>مرحله حذفی</b> — {E(t['name'])}\n\n" + "\n".join(lines), okb(rows))
 
 
 @router.callback_query(F.data.startswith("onc:ko:"))
@@ -440,7 +440,7 @@ async def ko_stage_pick(c: CallbackQuery):
     last = max((algo.STAGES.index(s) for s in have), default=-1)
     options = [s for s in algo.STAGES if s not in have and algo.STAGES.index(s) > last]
     rows = [[ob(algo.STAGE_NAME[s], f"onc:kcs:{tid}:{s}")] for s in options]
-    await show(c, "➕ <b>CREATE KNOCKOUT STAGE</b>\n\nChoose the stage (only the stages you need):", okb(rows + [[ob("🔙 BACK", f"onc:ko:{tid}")]]))
+    await show(c, "➕ <b>ساخت مرحله‌ی حذفی</b>\n\nمرحله را انتخاب کن (فقط مرحله‌های لازم):", okb(rows + [[ob("🔙 بازگشت", f"onc:ko:{tid}")]]))
     await c.answer()
 
 
@@ -451,7 +451,7 @@ async def ko_stage_create(c: CallbackQuery):
         rid = await service.create_ko_stage(c.from_user.id, int(tid), stage)
     except OncError as e:
         return await alert(c, str(e))
-    await c.answer("Stage created")
+    await c.answer("مرحله ساخته شد")
     await ko_stage_screen(c, rid)
 
 
@@ -461,19 +461,19 @@ async def ko_stage_screen(c: CallbackQuery, rid: int) -> None:
     ms = await service.matches_of_round(rid)
     pool = await service.ko_pool(t["id"], rid)
     names = await service.team_names(t["id"])
-    text = (f"⚔️ <b>{algo.STAGE_NAME[r['stage']]}</b> — {E(t['name'])}\n🕐 {ui.when(r)}\n\n<b>Matchups chosen by you</b>\n"
+    text = (f"⚔️ <b>{algo.STAGE_NAME[r['stage']]}</b> — {E(t['name'])}\n🕐 {ui.when(r)}\n\n<b>بازی‌هایی که تو تعیین کردی</b>\n"
             + ("\n".join(f"• {ui.match_line(m, with_score=m['rstatus'] == 'CONFIRMED')}" for m in ms) or "—")
-            + f"\n\n<b>Available teams</b>: " + (", ".join(E(names[i]) for i in pool) or "—"))
+            + f"\n\n<b>تیم‌های در دسترس</b>: " + (", ".join(E(names[i]) for i in pool) or "—"))
     rows = []
     if r["status"] != "CONFIRMED":
         if len(pool) >= 2 and not (r["stage"] == "F" and ms):
-            rows.append([ob("➕ ADD MATCHUP", f"onc:kma:{rid}")])
-        rows += [[ob(f"➖ {m['name_a']} vs {m['name_b']}", f"onc:kmd:{m['id']}")] for m in ms]
+            rows.append([ob("➕ افزودن بازی", f"onc:kma:{rid}")])
+        rows += [[ob(f"➖ {m['name_a']} 🆚 {m['name_b']}", f"onc:kmd:{m['id']}")] for m in ms]
     if ms:
-        rows.append([ob("⚽ ENTER RESULTS", f"onc:rd:{rid}"), ob("📢 PUBLISH MATCHUPS", f"onc:kp:{rid}")])
+        rows.append([ob("⚽ ثبت نتایج", f"onc:rd:{rid}"), ob("📢 انتشار بازی‌ها", f"onc:kp:{rid}")])
     if r["status"] != "CONFIRMED":
-        rows.append([ob("🗑 DELETE STAGE", f"onc:cf:dks:{rid}")])
-    rows.append([ob("🔙 BACK", f"onc:ko:{t['id']}")])
+        rows.append([ob("🗑 حذف مرحله", f"onc:cf:dks:{rid}")])
+    rows.append([ob("🔙 بازگشت", f"onc:ko:{t['id']}")])
     await show(c, text, okb(rows))
 
 
@@ -491,7 +491,7 @@ async def ko_add_a(c: CallbackQuery):
     names = await service.team_names(r["tournament_id"])
     pool = await service.ko_pool(r["tournament_id"], rid)
     rows = ui.grid([ob(names[i], f"onc:kmb:{rid}:{i}") for i in pool], 2)
-    await show(c, "➕ <b>MATCHUP</b> — pick the FIRST team", okb(rows + [[ob("🔙 BACK", f"onc:ks:{rid}")]]))
+    await show(c, "➕ <b>بازی جدید</b> — تیم اول را انتخاب کن", okb(rows + [[ob("🔙 بازگشت", f"onc:ks:{rid}")]]))
     await c.answer()
 
 
@@ -502,7 +502,7 @@ async def ko_add_b(c: CallbackQuery):
     names = await service.team_names(r["tournament_id"])
     pool = [i for i in await service.ko_pool(r["tournament_id"], int(rid)) if i != int(a)]
     rows = ui.grid([ob(names[i], f"onc:kmc:{rid}:{a}:{i}") for i in pool], 2)
-    await show(c, f"➕ <b>MATCHUP</b> — {E(names[int(a)])} vs ?\nPick the SECOND team", okb(rows + [[ob("🔙 BACK", f"onc:kma:{rid}")]]))
+    await show(c, f"➕ <b>بازی جدید</b> — {E(names[int(a)])} 🆚 ؟\nتیم دوم را انتخاب کن", okb(rows + [[ob("🔙 بازگشت", f"onc:kma:{rid}")]]))
     await c.answer()
 
 
@@ -513,7 +513,7 @@ async def ko_add_do(c: CallbackQuery):
         await service.add_ko_match(c.from_user.id, int(rid), int(a), int(b))
     except OncError as e:
         return await alert(c, str(e))
-    await c.answer("Matchup added")
+    await c.answer("بازی اضافه شد")
     await ko_stage_screen(c, int(rid))
 
 
@@ -524,7 +524,7 @@ async def ko_del(c: CallbackQuery):
         await service.remove_ko_match(c.from_user.id, m["id"])
     except OncError as e:
         return await alert(c, str(e))
-    await c.answer("Removed")
+    await c.answer("حذف شد")
     await ko_stage_screen(c, m["round_id"])
 
 
@@ -535,7 +535,7 @@ async def ko_publish(c: CallbackQuery, bot: Bot):
         await publish.ko_matches(bot, rid, c.from_user.id)
     except (publish.PublishError, OncError) as e:
         return await alert(c, str(e))
-    await c.answer("📢 Matchups published to the ONC channel.")
+    await c.answer("📢 بازی‌ها در کانال منتشر شد.")
 
 
 @router.callback_query(F.data.startswith("onc:kb:"))
@@ -544,7 +544,7 @@ async def bracket_publish(c: CallbackQuery, bot: Bot):
         await publish.bracket(bot, int(c.data.split(":")[2]), c.from_user.id)
     except (publish.PublishError, OncError) as e:
         return await alert(c, str(e))
-    await c.answer("📢 Bracket published to the ONC channel.")
+    await c.answer("📢 جدول حذفی در کانال منتشر شد.")
 
 
 @router.callback_query(F.data.startswith("onc:kch:"))
@@ -553,4 +553,4 @@ async def champion_publish(c: CallbackQuery, bot: Bot):
         await publish.champion(bot, int(c.data.split(":")[2]), c.from_user.id)
     except (publish.PublishError, OncError) as e:
         return await alert(c, str(e))
-    await c.answer("📢 Champion poster published to the ONC channel.")
+    await c.answer("📢 پوستر قهرمان در کانال منتشر شد.")

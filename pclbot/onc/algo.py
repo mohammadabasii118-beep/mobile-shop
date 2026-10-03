@@ -3,9 +3,9 @@ import json
 from datetime import datetime, timedelta
 
 STAGES = ["R32", "R16", "QF", "SF", "F"]
-STAGE_NAME = {"GROUP": "GROUP STAGE", "R32": "ROUND OF 32", "R16": "ROUND OF 16",
-              "QF": "QUARTER FINALS", "SF": "SEMI FINALS", "F": "FINAL"}
-STAGE_SHORT = {"R32": "Round of 32", "R16": "Round of 16", "QF": "Quarter Final", "SF": "Semi Final", "F": "Final"}
+STAGE_NAME = {"GROUP": "مرحله گروهی", "R32": "یک‌سی‌ودوم نهایی", "R16": "یک‌شانزدهم نهایی",
+              "QF": "یک‌چهارم نهایی", "SF": "نیمه‌نهایی", "F": "فینال"}
+STAGE_SHORT = dict(STAGE_NAME)
 
 
 def round_robin(teams: list[int]) -> list[list[tuple[int, int]]]:
