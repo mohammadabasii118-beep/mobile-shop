@@ -159,7 +159,7 @@ const $=id=>document.getElementById(id);
 function render(){const f=F[cur];$('ft').textContent=f.fa;
  const ch=f.kind==='channel';$('nm').textContent=ch?'ONE NIGHT CHAMPION | News':'PCL BOT';$('st').textContent=ch?'کانال — فقط اخبار تورنمنت':'ربات';
  $('chat').className='chat'+(ch?' feed':'');
- $('chat').innerHTML=f.messages.map(m=>`<div class="bub">${m.img?`<img src="${m.img}">`:''}${m.text}</div>`+
+ $('chat').innerHTML=f.messages.map(m=>`<div class="bub" ${(!m.img&&ch)?'style="direction:ltr;text-align:left"':''}>${m.img?`<img src="${m.img}">`:''}${m.text}</div>`+
   (m.rows.length?`<div class="kb">${m.rows.map(r=>`<div class="r">${r.map(t=>`<div class="b">${t.replace(/</g,'&lt;')}</div>`).join('')}</div>`).join('')}</div>`:'')).join('');
  document.querySelectorAll('.item').forEach((e,i)=>e.classList.toggle('on',i===cur));
  $('prev').disabled=cur===0;$('next').disabled=cur===F.length-1;
