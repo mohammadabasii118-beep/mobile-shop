@@ -11,6 +11,7 @@ import { Toaster } from '@/components/Toast';
 const ProductPage = lazy(() => import('@/pages/Product'));
 const Cart = lazy(() => import('@/pages/Cart'));
 const Checkout = lazy(() => import('@/pages/Checkout'));
+const DesignDemo = lazy(() => import('@/pages/DesignDemo'));
 const Admin = lazy(() => import('@/pages/admin/Admin'));
 
 const Loading = () => <div className="grid min-h-[60vh] place-items-center text-mist/50">در حال بارگذاری…</div>;
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="returns" element={<Returns />} />
           <Route path="*" element={<NotFound />} />
         </Route>
+        <Route path="design-demo" element={<DesignDemo />} />
         <Route path="admin" element={<Admin />} />
         <Route path="admin/:section" element={<Admin />} />
       </Routes>
