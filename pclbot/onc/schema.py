@@ -99,6 +99,9 @@ CREATE TABLE IF NOT EXISTS onc_templates(
     config TEXT NOT NULL,
     active INTEGER NOT NULL DEFAULT 0);
 
+-- which bottom keyboard (user/admin variant) each chat already has; used by handlers/home.py
+CREATE TABLE IF NOT EXISTS ui_kb(user_id INTEGER PRIMARY KEY, kind TEXT NOT NULL);
+
 CREATE TABLE IF NOT EXISTS onc_settings(key TEXT PRIMARY KEY, value TEXT NOT NULL);
 
 CREATE TABLE IF NOT EXISTS onc_publications(

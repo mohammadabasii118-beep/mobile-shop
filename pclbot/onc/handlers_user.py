@@ -27,14 +27,18 @@ async def _active(c: CallbackQuery):
     return t
 
 
-@router.callback_query(F.data == "onc:u")
-async def home(c: CallbackQuery, state: FSMContext):
-    await state.clear()
+async def home_text() -> str:
     t = await service.active_tournament()
     head = "🏆 <b>وان نایت چمپیون</b>"
     if t:
         head += f"\n\n<b>{E(t['name'])}</b>\n📅 {service.fmt_date(t['start_date'])}  🕐 {t['start_time']}\n{ui.STATUS_ICON[t['status']]} {ui.STATUS_FA[t['status']]}"
-    await show(c, head, MENU)
+    return head
+
+
+@router.callback_query(F.data == "onc:u")
+async def home(c: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await show(c, await home_text(), MENU)
     await c.answer()
 
 

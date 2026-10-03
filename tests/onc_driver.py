@@ -16,7 +16,7 @@ from aiogram.client.session.base import BaseSession
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.methods import (AnswerCallbackQuery, DeleteMessage, EditMessageMedia, EditMessageText, GetChat, GetChatMember,
-                             GetFile, GetMe, SendMessage, SendPhoto)
+                             GetFile, GetMe, SendMessage, SendPhoto, SetChatMenuButton, SetMyCommands)
 from aiogram.types import (CallbackQuery, Chat, ChatFullInfo, ChatMemberAdministrator, File, InlineKeyboardMarkup, Message,
                            PhotoSize, Update, User)
 
@@ -35,6 +35,7 @@ class FakeSession(BaseSession):
         self.channel_perms = {"can_post_messages": True, "can_edit_messages": True}
         self.fail_channel = False
         self.alerts: list[str] = []
+        self.commands: list = []
 
     async def close(self): ...
 
@@ -91,6 +92,9 @@ class FakeSession(BaseSession):
             if method.text:
                 self.alerts.append(method.text)
             return True
+        if isinstance(method, (SetMyCommands, SetChatMenuButton)):
+            self.commands.append((method.scope, [c.command for c in getattr(method, 'commands', [])])) if isinstance(method, SetMyCommands) else None
+            return True
         if isinstance(method, GetMe):
             return User(id=999, is_bot=True, first_name="PCL", username="pcl_bot")
         if isinstance(method, GetChat):
@@ -131,6 +135,9 @@ class Driver:
         dp = Dispatcher(storage=MemoryStorage())
         dp.message.outer_middleware(UserMiddleware())
         dp.callback_query.outer_middleware(UserMiddleware())
+        dp.message.outer_middleware(home.BottomMenuMiddleware())
+        dp.callback_query.outer_middleware(home.BottomMenuMiddleware())
+        self.home = home
         dp.include_routers(home.router, user.router, *onc_setup.routers(), admin.router, wallet.router, ads.router, onc_setup.fallback)
         self.dp = dp
         return self
@@ -152,15 +159,18 @@ class Driver:
         key = self.last_shown.get(uid)
         if key and key in self.session.screens:
             return self.session.screens[key]
-        ids = self.session.order.get(uid, [])
-        for mid in reversed(ids):
-            if (uid, mid) in self.session.screens:
-                return self.session.screens[(uid, mid)]
+        for mid in reversed(self._screens(uid)):
+            return self.session.screens[(uid, mid)]
         return None
+
+    def _screens(self, uid):
+        from aiogram.types import ReplyKeyboardMarkup
+        return [i for i in self.session.order.get(uid, []) if (uid, i) in self.session.screens
+                and not isinstance(self.session.screens[(uid, i)]["markup"], ReplyKeyboardMarkup)]
 
     def _track(self, uid, before):
         # the screen the user now looks at = newest message in their chat
-        ids = [i for i in self.session.order.get(uid, []) if (uid, i) in self.session.screens]
+        ids = self._screens(uid)
         if ids:
             self.last_shown[uid] = (uid, ids[-1])
 
@@ -198,7 +208,7 @@ class Driver:
         self._track_after_press(uid, key)
 
     def _track_after_press(self, uid, key):
-        ids = [i for i in self.session.order.get(uid, []) if (uid, i) in self.session.screens]
+        ids = self._screens(uid)
         if key in self.session.screens and (not ids or ids[-1] == key[1] or True):
             # an edit keeps the same message; a delete+send moves to the newest one
             newest = ids[-1] if ids else key[1]
@@ -233,7 +243,7 @@ class Driver:
             msgs = [pack(x) for x in self.channel()[-6:]]
             self.frames.append({"title": title, "kind": "channel", "messages": msgs, "note": note})
         else:
-            ids = [i for i in self.session.order.get(uid, []) if (uid, i) in self.session.screens]
+            ids = self._screens(uid)
             msgs = [pack(self.session.screens[(uid, i)]) for i in ids[-1:]]
             self.frames.append({"title": title, "kind": "chat", "messages": msgs, "note": note})
 

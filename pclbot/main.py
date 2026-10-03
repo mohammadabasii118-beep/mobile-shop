@@ -27,10 +27,13 @@ async def main() -> None:
     dp = Dispatcher(storage=MemoryStorage())
     dp.message.outer_middleware(UserMiddleware())
     dp.callback_query.outer_middleware(UserMiddleware())
+    dp.message.outer_middleware(home.BottomMenuMiddleware())      # bottom keyboard (after the ban / forced-join checks)
+    dp.callback_query.outer_middleware(home.BottomMenuMiddleware())
     # user router first so /start and /admin always win over FSM-state catch-all handlers
     # home first: /start and /admin open the section chooser; ONC routers sit beside Transfer's, in their own `onc:` namespace
     dp.include_routers(home.router, user.router, *onc_setup.routers(), admin.router, wallet.router, ads.router, onc_setup.fallback)
     await services.setup_bot(bot)
+    await home.setup_menu(bot)
     runner = await payments.start_web(bot)
     expiry = asyncio.create_task(services.expiry_loop(bot))
     try:

@@ -72,6 +72,31 @@ async def run():
         await d.say("/start", VIEWER)
         assert [t for t, _ in d.buttons(VIEWER)] == ["🔄 ترنسفر", "🏆 وان نایت چمپیون"]
         d.snap("Main menu — two sections", VIEWER)
+        # ---- persistent bottom menu: sent once, never needs /start again
+        from aiogram.types import ReplyKeyboardMarkup
+        def kb_msgs(uid):
+            return [x for x in S.screens.values() if x["chat"] == uid and isinstance(x["markup"], ReplyKeyboardMarkup)]
+        assert len(kb_msgs(VIEWER)) == 1
+        mk = kb_msgs(VIEWER)[0]["markup"]
+        assert [b.text for r in mk.keyboard for b in r] == ["🏠 منوی اصلی", "🔄 ترنسفر", "🏆 وان نایت چمپیون"] and mk.is_persistent
+        await d.say("/start", VIEWER); assert len(kb_msgs(VIEWER)) == 1, "the keyboard is not re-sent every time"
+        await d.say("🔄 ترنسفر", VIEWER)                                   # bottom button instead of /start
+        assert any("ثبت آگهی" in t for t, _ in d.buttons(VIEWER))
+        await d.say("🏆 وان نایت چمپیون", VIEWER)
+        assert any("پخش زنده" in t for t, _ in d.buttons(VIEWER))
+        await d.say("🏠 منوی اصلی", VIEWER)
+        assert [t for t, _ in d.buttons(VIEWER)] == ["🔄 ترنسفر", "🏆 وان نایت چمپیون"]
+        await d.say("🛠 پنل مدیریت", VIEWER); assert [t for t, _ in d.buttons(VIEWER)] == ["🔄 ترنسفر", "🏆 وان نایت چمپیون"], "normal users can't use the admin key"
+        await d.say("/onc", VIEWER); assert any("پخش زنده" in t for t, _ in d.buttons(VIEWER))
+        await d.say("/start", VIEWER)
+        await d.say("/start", ADMIN)
+        akb = [x for x in S.screens.values() if x["chat"] == ADMIN and isinstance(x["markup"], ReplyKeyboardMarkup)]
+        assert [b.text for r in akb[-1]["markup"].keyboard for b in r][-1] == "🛠 پنل مدیریت"
+        await d.say("🛠 پنل مدیریت", ADMIN)
+        assert [t for t, _ in d.buttons(ADMIN)][:2] == ["🔄 پنل ترنسفر", "🏆 پنل وان نایت چمپیون"]
+        await d.home.setup_menu(d.bot)
+        assert ["start", "transfer", "onc"] in [c for _, c in S.commands]
+        assert any("admin" in c for _, c in S.commands), "admins get /admin in their menu"
         # the admin-panel button lives in the main menu, for admins only
         await d.say("/start", ADMIN)
         assert [t for t, _ in d.buttons(ADMIN)] == ["🔄 ترنسفر", "🏆 وان نایت چمپیون", "🛠 پنل مدیریت"], d.buttons(ADMIN)
