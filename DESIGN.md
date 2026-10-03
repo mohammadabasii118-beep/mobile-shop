@@ -1,0 +1,541 @@
+---
+version: alpha
+name: Volta-design-system
+status: draft-v0.1 (در انتظار تأیید)
+description: |
+  سیستم طراحی فروشگاه «ولتا» (نام موقت) برای لوازم جانبی موبایل. فارسی، RTL کامل، فوتوگرافی‌محور و مینیمال.
+  ترکیب: استودیوی خاکستری و دکمه‌های pill مشکی (Nike) + کاشی‌های متناوب روشن/تیره و تنها یک رنگ تعاملی (Apple)
+  + تجربه خرید لوازم جانبی و CTA خرید (Meta) + چگالی و تیرگی پنل ادمین (Linear) + اعداد tabular برای قیمت و گزارش (Stripe)
+  + حرکت کنترل‌شده (Framer). یک رنگ نشانگر شخصیت برند («Charge» لیمویی) فقط روی سطح تیره و نشان‌های کوچک.
+
+colors:
+  # --- سطوح (Light) ---
+  canvas: "#ffffff"
+  studio: "#f3f4f6"        # پس‌زمینه عکس محصول (استودیو)
+  studio-deep: "#e8eaee"
+  parchment: "#f7f7f9"     # کاشی‌های نرم و فرم‌ها
+  hairline: "#e3e5e9"
+  hairline-strong: "#c9ccd3"
+  # --- متن ---
+  ink: "#111216"           # CTA اصلی، تیترها
+  body: "#2b2d33"
+  mute: "#6b6f7a"
+  stone: "#9a9ea8"
+  # --- سطوح تیره (کاشی hero، فوتر، ادمین) ---
+  night: "#0c0d10"
+  night-1: "#14161a"
+  night-2: "#1c1f24"
+  night-hairline: "#2a2d34"
+  on-night: "#f4f5f7"
+  on-night-mute: "#9da1ab"
+  # --- تعاملی ---
+  action: "#0a5cff"        # لینک، فوکس، انتخاب، دکمه خرید ثانویه
+  action-press: "#0847c7"
+  action-soft: "#e6efff"
+  # --- نشانگر برند ---
+  charge: "#d6ff3d"        # فقط روی night، نشان «جدید»، نقطه‌ی انرژی. هرگز متن روی سفید.
+  on-charge: "#111216"
+  # --- معنایی ---
+  sale: "#d30a1c"          # فقط قیمت تخفیف‌خورده و درصد تخفیف
+  sale-soft: "#fdecee"
+  success: "#0a7d48"
+  success-soft: "#e3f5ec"
+  warning: "#b86e00"
+  warning-soft: "#fff3dc"
+  info: "#0a5cff"
+
+colors-dark:   # تم تیره (انتخاب کاربر / prefers-color-scheme)
+  canvas: "#0c0d10"
+  studio: "#1a1c21"
+  studio-deep: "#23262c"
+  parchment: "#14161a"
+  hairline: "#2a2d34"
+  hairline-strong: "#3b3f48"
+  ink: "#f4f5f7"
+  body: "#d7d9de"
+  mute: "#9da1ab"
+  stone: "#6b6f7a"
+  action: "#4d8dff"
+  action-soft: "#14233f"
+  sale: "#ff5a68"
+  sale-soft: "#2e1418"
+  success: "#3ddc97"
+  success-soft: "#10281d"
+  warning: "#ffb340"
+  warning-soft: "#2c2111"
+
+typography:
+  font-family-sans: "Vazirmatn, 'Vazir', Tahoma, system-ui, sans-serif"
+  font-family-latin: "Vazirmatn, system-ui, sans-serif"   # برندها/مدل‌ها در همان خانواده (glyph لاتین Vazirmatn)
+  font-family-mono: "ui-monospace, 'SF Mono', Menlo, monospace"
+  scale:
+    display-xl:  { size: 72px, weight: 800, line-height: 1.12, tracking: -0.02em }   # فقط hero صفحه اصلی
+    display-lg:  { size: 56px, weight: 800, line-height: 1.15, tracking: -0.02em }
+    display-md:  { size: 40px, weight: 700, line-height: 1.2,  tracking: -0.015em }
+    heading-xl:  { size: 32px, weight: 700, line-height: 1.3 }
+    heading-lg:  { size: 24px, weight: 700, line-height: 1.4 }
+    heading-md:  { size: 20px, weight: 600, line-height: 1.5 }
+    title:       { size: 16px, weight: 600, line-height: 1.7 }
+    body-lg:     { size: 18px, weight: 400, line-height: 1.9 }
+    body:        { size: 15px, weight: 400, line-height: 1.85 }
+    body-sm:     { size: 14px, weight: 400, line-height: 1.75 }
+    caption:     { size: 13px, weight: 500, line-height: 1.6 }
+    micro:       { size: 12px, weight: 500, line-height: 1.5 }
+    price-lg:    { size: 28px, weight: 800, line-height: 1.2, numeric: tabular }
+    price:       { size: 17px, weight: 700, line-height: 1.3, numeric: tabular }
+  weights: [300, 400, 500, 600, 700, 800]
+
+rounded:
+  xs: 6px
+  sm: 10px
+  md: 14px
+  lg: 20px
+  xl: 28px
+  pill: 9999px
+
+spacing:    # مقیاس ۴px
+  1: 4px
+  2: 8px
+  3: 12px
+  4: 16px
+  5: 20px
+  6: 24px
+  8: 32px
+  10: 40px
+  12: 48px
+  16: 64px
+  24: 96px
+  section: 80px   # دسکتاپ؛ ۴۸px موبایل
+
+container:
+  shop: 1280px
+  content: 1120px
+  reading: 720px
+  admin: 1600px
+  gutter: { mobile: 16px, tablet: 24px, desktop: 32px }
+
+shadow:
+  none: "none"
+  product: "0 24px 32px -18px rgba(12,13,16,0.38)"       # تنها سایه‌ی «تصویر محصول روی سطح»
+  float: "0 12px 40px rgba(12,13,16,0.16)"               # فقط modal / dropdown / toast
+  focus: "0 0 0 3px rgba(10,92,255,0.35)"
+
+motion:
+  duration: { instant: 90ms, fast: 160ms, base: 240ms, slow: 420ms }
+  easing: { standard: "cubic-bezier(0.2, 0, 0, 1)", emphasized: "cubic-bezier(0.3, 0, 0, 1.2)" }
+---
+
+# DESIGN.md — فروشگاه ولتا
+
+> **این فایل تنها منبع حقیقت طراحی است.** قبل از هر تغییر UI بخوانید؛ تصمیم جدید ابتدا اینجا ثبت می‌شود، بعد کد.
+> نام «ولتا» و رنگ‌ها موقت‌اند تا تأیید نهایی.
+
+---
+
+## ۰. نتیجه‌ی بررسی repository مرجع
+
+منبع: [VoltAgent/awesome-design-md](https://github.com/VoltAgent/awesome-design-md) — ۷۳ سیستم طراحی (هر کدام `DESIGN.md` + preview).
+
+### دسته‌بندی
+
+| دسته | سیستم‌ها |
+|---|---|
+| AI & LLM (12) | Claude, Cohere, ElevenLabs, Minimax, Mistral, Ollama, OpenCode, Replicate, Runway, Together, VoltAgent, xAI |
+| Developer Tools (7) | Cursor, Expo, Lovable, Raycast, Superhuman, Vercel, Warp |
+| Backend / DevOps (8) | ClickHouse, Composio, HashiCorp, MongoDB, PostHog, Sanity, Sentry, Supabase |
+| Productivity & SaaS (7) | Cal.com, Intercom, Linear, Mintlify, Notion, Resend, Zapier |
+| Design & Creative (6) | Airtable, Clay, Figma, Framer, Miro, Webflow |
+| Fintech & Crypto (7) | Binance, Coinbase, Kraken, Mastercard, Revolut, Stripe, Wise |
+| E-commerce & Retail (5) | Airbnb, Meta, Nike, Shopify, Starbucks |
+| Media & Consumer Tech (12) | Apple, HP, IBM, NVIDIA, Pinterest, PlayStation, SpaceX, Spotify, The Verge, Uber, Vodafone, WIRED |
+| Automotive (7) | BMW, BMW M, Bugatti, Ferrari, Lamborghini, Renault, Tesla |
+| Retro (2) | Dell 1996, Nintendo 2001 |
+
+### آنچه از هر سیستم می‌گیریم (اصول، نه ظاهر)
+
+| منبع | اصل قابل‌استفاده | نحوه‌ی اعمال در ولتا | آنچه نمی‌گیریم |
+|---|---|---|---|
+| **Nike** | عکس‌محور؛ کارت محصول تخت و بدون padding؛ استودیوی خاکستری `#f5f5f5`؛ CTA مشکی pill؛ قرمز فقط برای قیمت | کارت محصول، دکمه‌ها، `studio`، قانون «قرمز فقط قیمت» | تایپوگرافی uppercase کمپین (در فارسی بی‌معنی است) |
+| **Apple** | کاشی‌های تمام‌عرض متناوب روشن/تیره؛ فقط یک رنگ تعاملی؛ یک سایه‌ی منحصر به محصول؛ nav شیشه‌ای | ریتم صفحه‌ی Home، `action`، `shadow.product`، header | فاصله‌ی ۸۰px بیش‌ازحد؛ تایپوگرافی SF |
+| **Meta** | صفحه‌ی لوازم جانبی با CTA خرید آبی کبالت، کارت‌های ۲۴–۳۲px، دو CTA (مشکی + outline) | PDP، رادیوس کارت‌های بزرگ، جفت CTA hero | رنگ‌بندی فیسبوک |
+| **Shopify** | دو مسیر طراحی با قطبیت متفاوت (بازاریابی تیره / تراکنش روشن)؛ pill؛ سطوح سبز pastel | ایده‌ی «سایت روشن + hero/ادمین تیره»؛ نشان سبز-لیمویی | فونت‌های thin، کرم-نعنایی |
+| **Linear** | ادمین بسیار متراکم، hairline بجای سایه، سطوح تیره‌ی لایه‌ای | کل پنل `/admin` | بنفش-آبی برند |
+| **Stripe** | اعداد tabular برای پول، جدول و داشبورد خوانا | قیمت، جدول، KPI | gradient mesh سنگین |
+| **Framer** | حرکت دقیق، نورپردازی گرادیانی فقط در نقاط خاص | glow ملایم hero، micro-interaction | کاشی‌های gradient بزرگ |
+| **Airbnb** | search pill مرکزی، کارت با تصویر بزرگ و rating | search bar و rating | رنگ Rausch |
+
+**نتیجه:** *«گالری استودیویی Apple + چارچوب خرید Nike + ادمین Linear»* با رنگ شخصیتی `charge` و تایپوگرافی فارسی Vazirmatn.
+
+---
+
+## ۱. Visual Theme
+
+- **حس:** گالری محصول در استودیوی خاکستری؛ تکنولوژیک، تمیز، سریع. لوازم جانبی «شی‌ء» هستند، نه کالای انبوه.
+- **اصل ۱:** محصول قهرمان است؛ UI عقب می‌نشیند. هر پیکسل رنگی یا از عکس می‌آید یا سیگنال است (قیمت، موجودی، عمل).
+- **اصل ۲:** یک رنگ تعاملی (`action`)، یک رنگ تخفیف (`sale`)، یک رنگ شخصیت (`charge`، فقط روی تیره).
+- **اصل ۳:** تخت (flat). عمق از تغییر سطح می‌آید، نه سایه. تنها سایه‌ی مجاز، سایه‌ی زیر تصویر محصول است.
+- **اصل ۴:** ریتم صفحه با کاشی‌های تمام‌عرض روشن/تیره (استودیو ↔ شب) ایجاد می‌شود، نه خط جداکننده.
+- **اصل ۵:** فارسی اول. طراحی برای RTL ساخته می‌شود، نه آینه‌ی LTR.
+- **حالت پیش‌فرض:** سایت روشن؛ hero، بنر پیشنهاد، فوتر و ادمین می‌توانند تیره باشند. تم تیره‌ی کامل با همان tokenها پشتیبانی می‌شود.
+
+## ۲. Brand Identity
+
+- **نام:** ولتا / Volta (موقت). لوگو: واژه‌ی «ولتا» با نقطه‌ی `charge` به شکل جرقه‌ی کوچک.
+- **صدا:** کوتاه، دقیق، مطمئن. «شارژ سریع‌تر. حمل سبک‌تر.» نه «ارزان‌ترین!».
+- **اصالت:** گارانتی اصالت کالا، ارسال سریع، مرجوعی ۷ روزه، به‌عنوان وعده‌های ثابت در نوار بالا و بخش مزایا.
+- **عکاسی:** هر محصول روی `studio`، نور از بالا-چپ، سایه‌ی تماسی نرم، بدون پس‌زمینه‌ی شلوغ. نسبت ۱:۱ برای کارت، ۴:۵ برای گالری PDP. سبک سه‌چهارم برای شارژر/کابل، رو به رو برای قاب و گلس.
+
+## ۳. Color Tokens
+
+مقادیر در front-matter بالا. استفاده:
+
+| Token | کاربرد | ممنوع |
+|---|---|---|
+| `ink` | CTA اصلی، تیتر، آیکن فعال | پس‌زمینه‌ی کارت |
+| `studio` | استیج عکس محصول، chip، input جستجو | متن |
+| `night` / `night-1` | hero، بنر تخفیف، فوتر، ادمین | کل صفحه‌ی شاپ |
+| `action` | لینک، فوکس، انتخاب فیلتر، «همین حالا بخر» | تزئین |
+| `charge` | نشان «جدید» روی تیره، نقطه‌ی لوگو، glow hero | متن/آیکن روی پس‌زمینه‌ی روشن |
+| `sale` | قیمت تخفیف‌خورده، درصد تخفیف | پس‌زمینه، دکمه، نوار |
+| `success` / `warning` | موجودی / رو به اتمام | تزئین |
+
+کنتراست: متن عادی ≥ 4.5:1، متن بزرگ و آیکن ≥ 3:1. `charge` فقط با `on-charge` (`#111216`) یا روی `night`.
+
+## ۴. Typography
+
+- **فونت اصلی:** Vazirmatn (Google Fonts، variable 300–800) برای همه‌ی متن‌ها. fallback: Tahoma.
+- **ارقام:** ارقام فارسی (۰-۹) در UI. قیمت‌ها و همه‌ی ستون‌های عددی با `font-variant-numeric: tabular-nums`.
+- **نام برند/مدل:** لاتین بماند (`iPhone 15 Pro`, `Anker Nano`). اگر داخل جمله‌ی فارسی است: `<bdi>` یا `unicode-bidi: isolate`.
+- **مقیاس:** جدول `typography.scale` بالا. فقط از همین مقادیر استفاده شود.
+- **وزن:** تیتر ۷۰۰–۸۰۰، عنوان کارت ۶۰۰، بدنه ۴۰۰. وزن ۳۰۰ استفاده نشود (در فارسی کم‌جان است).
+- **line-height:** فارسی بلندتر از لاتین است؛ بدنه ≥ ۱.۷۵، تیتر ≥ ۱.۱۲. هرگز `letter-spacing` مثبت یا منفی روی متن فارسی (حروف را می‌شکند)؛ tracking منفی فقط روی ارقام/لاتین display.
+- **طول خط:** حداکثر ۶۵ نویسه (۶۰ فارسی) برای متن خوانا.
+- **Uppercase** در فارسی نداریم. برای برچسب‌های لاتین (برند) می‌توان `tracking: 0.06em` داد.
+
+## ۵. Spacing System
+
+- مقیاس ۴px (`spacing`). فاصله‌ی داخلی اجزا: ۸/۱۲/۱۶. بین گروه‌ها: ۲۴/۳۲/۴۸.
+- فاصله‌ی سکشن‌ها: ۸۰px دسکتاپ، ۶۴px تبلت، ۴۸px موبایل. جداکننده‌ی تزئینی نداریم؛ تغییر سطح جداکننده است.
+- فقط از `gap` و `padding-inline/block` (logical properties) استفاده شود؛ `margin-left/right` ممنوع.
+
+## ۶. Border Radius
+
+| Token | px | کاربرد |
+|---|---|---|
+| `xs` | 6 | badge مستطیلی، tag |
+| `sm` | 10 | input، تصویر داخل کارت کوچک |
+| `md` | 14 | کارت‌های سبک، toast |
+| `lg` | 20 | کارت‌های بزرگ، تصویر محصول |
+| `xl` | 28 | کاشی‌های hero و بنر |
+| `pill` | ∞ | **همه‌ی دکمه‌ها، chip، search، badge** |
+
+شکل دکمه فقط دو حالت دارد: pill و دایره (icon). مستطیل گرد برای دکمه ممنوع.
+
+## ۷. Shadows / Elevation
+
+| سطح | توضیح | استفاده |
+|---|---|---|
+| 0 Flat | بدون سایه و border | کارت محصول، کاشی‌ها، بدنه |
+| 1 Hairline | `1px solid hairline` | input، جدول، سبد، کارت ادمین |
+| 2 Product | `shadow.product` | **فقط** زیر تصویر محصول |
+| 3 Float | `shadow.float` | modal، dropdown، toast، drawer |
+| Frosted | `backdrop-filter: saturate(180%) blur(20px)` + سطح ۸۰٪ | header sticky، bottom nav |
+
+## ۸. Container Widths & Grid
+
+- کانتینر شاپ ۱۲۸۰، محتوای متنی ۷۲۰، ادمین ۱۶۰۰ (یا تمام‌عرض با sidebar).
+- Gutter: ۱۶ (موبایل) / ۲۴ (تبلت) / ۳۲ (دسکتاپ).
+- **گرید محصول:** ۲ ستون (<۶۴۰) · ۳ (۶۴۰–۱۰۲۳) · ۴ (≥۱۰۲۴)؛ gap ۱۶ موبایل / ۲۴ دسکتاپ.
+- **گرید دسته‌بندی:** ۳ ستون موبایل (آیکن)، ۶ ستون دسکتاپ.
+- **گرید بنر:** ۱ ستون موبایل، ۲-up یا ۱+۲ دسکتاپ.
+- گرید ۱۲ ستونی برای صفحه‌ی PDP: گالری ۷ + اطلاعات ۵.
+
+---
+
+## ۹. Components — فروشگاه
+
+### Header
+- دو لایه: **utility bar** (۳۶px، `studio`، پیام‌های گارانتی/ارسال) + **main bar** (۶۴px، canvas، frosted).
+- راست→چپ: لوگو، search pill (مرکز، عرض بیشینه ۵۶۰)، آیکن‌ها (علاقه‌مندی، حساب، سبد با شمارنده‌ی `ink`).
+- زیر آن **category nav**: متن ۱۴px/۵۰۰ با خط زیرین ۲px برای فعال. Hover: mega-menu تمام‌عرض (سطح canvas، گرید دسته + کارت ویژه).
+- با اسکرول: utility bar جمع می‌شود، main bar ثابت و frosted.
+
+### Mobile Navigation
+- Header: منو، لوگو، سبد؛ search زیر آن به‌صورت pill تمام‌عرض.
+- **Bottom nav** ثابت ۵ آیتم: خانه، دسته‌ها، جستجو، سبد (با badge)، حساب. ارتفاع ۶۴ + safe-area؛ frosted؛ آیتم فعال `ink`، غیرفعال `mute`.
+- منوی همبرگری: drawer از راست، ۸۸٪ عرض، accordion دسته‌ها.
+
+### Search
+- Pill، ۴۴px، `studio`؛ focus: سطح canvas + `shadow.focus` + dropdown پیشنهاد (آخرین جستجوها، دسته‌ها، ۴ محصول با تصویر).
+- placeholder: «جستجوی قاب، شارژر، پاوربانک…». میان‌بر `/` و ⌘K.
+- نتایج: highlight عبارت با `action-soft`. بدون نتیجه → Empty State.
+- نرمال‌سازی فارسی/عربی (ي→ی، ك→ک، ارقام) در پیاده‌سازی الزامی است.
+
+### Category Navigation
+- **کاشی دسته (Home):** مربع ۱:۱، `studio`، آیکن/تصویر محصول ۶۴px در مرکز، نام زیر آن ۱۳px/۶۰۰. Hover: سطح `studio-deep` + حرکت ۴px تصویر به بالا.
+- **Chip bar (Shop):** اسکرول افقی، chip pill ۴۰px؛ فعال = `ink`.
+- دسته‌ها: قاب و کاور · گلس و محافظ · کابل · شارژر · پاوربانک · هندزفری و هدفون · هولدر · مبدل · فلش و حافظه · Apple · Samsung · سایر برندها.
+
+### Buttons
+| نوع | ظاهر | استفاده |
+|---|---|---|
+| Primary | `ink` + سفید، pill، ۴۸px | یک CTA اصلی در هر viewport |
+| Secondary | `studio` + `ink`، pill | جایگزین نرم |
+| Buy (action) | `action` + سفید، pill | «همین حالا بخر» در PDP/سبد |
+| Outline-on-image | سفید + `ink` | روی تصویر/کاشی تیره |
+| Outline | border `hairline-strong`، transparent | عمل‌های کم‌اهمیت |
+| Ghost / Link | بدون پس‌زمینه، `action`، زیرخط در hover | عمل‌های درون‌خطی |
+| Icon | دایره ۴۰/۴۴px، `studio` | wishlist، بستن، share |
+- اندازه‌ها: `lg 52`، `md 44` (پیش‌فرض)، `sm 36`. padding افقی ۲۴–۳۲.
+- حالت‌ها: hover (روشن/تیره‌تر ۸٪)، active (`scale(.97)`)، focus (`shadow.focus`)، disabled (۴۰٪ opacity، بدون hover)، loading (spinner جایگزین آیکن، عرض ثابت).
+- ناحیه‌ی لمس ≥ ۴۴×۴۴.
+
+### Inputs
+- ارتفاع ۴۸، `sm` radius، border ۱px `hairline-strong`، label بالا ۱۳px/۶۰۰ (نه placeholder-as-label).
+- Focus: border `action` + `shadow.focus`. خطا: border `sale` + پیام ۱۳px زیر فیلد با آیکن. موفقیت: تیک `success`.
+- ارقام (تلفن، کد پستی) `dir="ltr"` با `text-align: right`. ورودی عددی fa/en هر دو پذیرفته و به لاتین نرمال‌سازی شود.
+- Select/Checkbox/Radio/Switch: ۲۰px (Switch ۴۴×۲۴)، رنگ انتخاب `ink` (فیلتر) یا `action` (فرم).
+
+### Filters
+- دسکتاپ: sidebar راست ۲۶۰px، آکاردئون (دسته، برند، قیمت، رنگ، سازگاری با مدل گوشی، موجودی، امتیاز)، جداکننده hairline.
+- **سازگاری با مدل** فیلتر ویژه: انتخاب برند گوشی ← مدل (iPhone 15 Pro، Galaxy S24 Ultra …).
+- اسلایدر قیمت با دو دستگیره ۲۴px و ورودی عددی تومان.
+- موبایل: دکمه‌ی «فیلترها (۳)» → bottom sheet تمام‌قد با دکمه‌ی «نمایش ۱۲۸ کالا» ثابت پایین.
+- فیلترهای فعال: chips بالای گرید، با «حذف همه».
+- مرتب‌سازی: dropdown pill (پرفروش‌ترین، جدیدترین، ارزان‌ترین، گران‌ترین، بیشترین تخفیف).
+
+### Product Card ★
+ساختار از بالا:
+1. **تصویر:** نسبت ۱:۱، پس‌زمینه `studio`، `lg` radius، محصول با `shadow.product`، padding ۱۶٪. Hover: تصویر دوم (cross-fade) یا scale(1.04) در ۲۴۰ms.
+2. **Badge** (گوشه‌ی راست-بالا): «جدید» (`night` + `charge`)، «پرفروش» (`ink` + سفید)، «تخفیف ویژه» (سفید + `ink`). حداکثر یکی.
+3. **Wishlist** (گوشه‌ی چپ-بالا): دایره‌ی ۳۶px سفید، آیکن قلب؛ فعال = قلب پر `sale`. همیشه روی موبایل نمایان، روی دسکتاپ از اول هم نمایان.
+4. **Quick Add:** روی دسکتاپ، pill `ink` ۴۰px تمام‌عرض داخل تصویر (پایین) در hover/focus با slide-up ۸px؛ روی موبایل دکمه‌ی دایره‌ای + در گوشه‌ی پایین-چپ تصویر.
+5. **متادیتا** (بدون padding، فاصله‌ی ۸):
+   - برند: ۱۲px/۵۰۰ `mute` (لاتین).
+   - نام: ۱۵px/۶۰۰، حداکثر ۲ خط (`line-clamp`)، ارتفاع ثابت.
+   - امتیاز: ستاره‌ی `ink` + «۴٫۸» + «(۲۱۴)» ۱۲px.
+   - **قیمت:** `price` ۱۷px/۷۰۰ + «تومان» ۱۲px `mute`؛ در تخفیف: قیمت اصلی خط‌خورده `stone` ۱۳px، درصد تخفیف badge `sale` روی `sale-soft`، قیمت نهایی `sale`.
+   - **موجودی:** نقطه ۸px + متن ۱۲px: موجود (`success`)، «تنها ۳ عدد» (`warning`)، ناموجود (`stone`، کارت ۶۰٪ opacity، Quick Add → «خبرم کن»).
+6. **سوآچ رنگ** (در صورت وجود): نقطه‌های ۱۲px با حلقه‌ی انتخاب `ink`، حداکثر ۴ + «+۲».
+- کل کارت قابل کلیک است (stretched link روی عنوان با `::after`)؛ دکمه‌های wishlist و Quick Add با `z-index` بالاتر، بیرون از `<a>` (HTML معتبر). کارت بدون border و سایه.
+- حالت loading: skeleton با همان ابعاد. حالت ناموجود و رو به اتمام الزامی است.
+
+### Product Gallery
+- دسکتاپ: thumbnail عمودی (راست، ۷۲px) + تصویر اصلی ۴:۵ روی `studio`، `xl` radius؛ zoom hover (۲×) و lightbox.
+- موبایل: carousel تمام‌عرض با snap و نقطه‌های شاخص؛ swipe؛ pinch-zoom در lightbox.
+- ترتیب تصاویر: لایف‌استایل/محصول اصلی، زاویه‌ها، جزئیات، ابعاد، داخل جعبه. ویدیوی کوتاه (muted loop) اختیاری.
+
+### Product Detail (PDP)
+- ستون راست (در RTL): گالری. ستون چپ **sticky**: breadcrumb، برند، نام (`heading-xl`)، امتیاز + لینک نظرات، قیمت (`price-lg`) و تخفیف، انتخاب مدل گوشی/رنگ (chip)، «سازگار با مدل شما» (✓ سبز)، تعداد، **دکمه‌ی «افزودن به سبد»** (Primary) + «علاقه‌مندی»، مزایا (گارانتی، ارسال، مرجوعی) به صورت ردیف آیکن.
+- زیر آن: آکاردئون (توضیحات، مشخصات فنی، محتویات بسته، گارانتی)، جدول مشخصات، نظرات (امتیاز کلی ۶۴px + نوار توزیع)، محصولات مرتبط.
+- موبایل: نوار خرید ثابت پایین (قیمت + دکمه) بالای bottom nav.
+
+### Cart
+- صفحه‌ی `/cart`: لیست راست، **خلاصه‌ی سفارش sticky** چپ (۳۶۰px، hairline، `lg`).
+- ردیف کالا: تصویر ۹۶px `studio`، نام/برند/مدل، stepper (−۱+، pill)، قیمت واحد و جمع، حذف. تغییر تعداد بدون reload.
+- Mini-cart: drawer از چپ با همان ردیف‌ها.
+- خلاصه: جمع کالاها، تخفیف (`sale`)، هزینه‌ی ارسال، کد تخفیف (input + «اعمال»)، **مبلغ قابل پرداخت** `price-lg`، دکمه‌ی «ادامه‌ی خرید».
+- نوار پیشرفت «۴۲٬۰۰۰ تومان تا ارسال رایگان» (`action` روی `studio`).
+
+### Checkout
+- تک‌صفحه‌ی خطی ۳ مرحله‌ای با آکاردئون: ۱) آدرس و تحویل ۲) روش ارسال ۳) پرداخت. هر مرحله‌ی تمام‌شده خلاصه‌ی خود را نشان می‌دهد با «ویرایش».
+- بدون header کامل (لوگو + «بازگشت به سبد» + قفل امنیت). خلاصه‌ی سفارش ثابت کنار.
+- ورودی تلفن/کدپستی `ltr`، اعتبارسنجی inline، انتخاب استان/شهر با جستجو.
+- پرداخت: درگاه بانکی / پرداخت در محل (کارت radio بزرگ، انتخاب = border ۲px `ink`).
+- دکمه‌ی نهایی تمام‌عرض در موبایل: «پرداخت ۱٬۲۴۵٬۰۰۰ تومان».
+
+### Badges
+- pill، ۲۴px، ۱۲px/۶۰۰، padding ۴×۱۰. انواع: `new` (night+charge)، `bestseller` (ink)، `promo` (سفید+ink)، `sale` (sale-soft + sale)، `stock-low` (warning-soft)، `stock-out` (studio+mute)، وضعیت‌های سفارش در ادمین (بخش ۱۰).
+
+### Discount Labels
+- درصد تخفیف: `−۲۵٪` (علامت منفی U+2212) در pill `sale-soft`/`sale` کنار قیمت، نه روی تصویر.
+- روی بنر: عدد بزرگ display + «٪ تخفیف».
+- زمان‌دار: شمارنده‌ی tabular با ارقام ۴۰px داخل کاشی تیره؛ پایان → «پایان یافت» و کارت‌ها عادی.
+- قیمت: همیشه سه‌تایی قیمت اصلی (خط‌خورده) → درصد → قیمت نهایی. قیمت‌ها بدون اعشار.
+
+### قالب قیمت
+- نمایش: `۱٬۲۴۵٬۰۰۰ تومان`؛ جداکننده‌ی هزارگان «٬»، ارقام فارسی، واحد کوچک‌تر `mute` بعد از عدد.
+- ذخیره در پایگاه داده: عدد صحیح به **تومان** (یا ریال با تبدیل واحد در یک نقطه). فرمت کردن فقط یک util مرکزی.
+
+### Empty States
+- ساختار: تصویر خطی ۸۰px (stroke ۱.۵، `stone`)، تیتر ۱۸px/۶۰۰، توضیح یک‌خطی `mute`، یک CTA.
+- موارد: سبد خالی («سبد خرید شما خالی است» → «دیدن پرفروش‌ها»)، علاقه‌مندی خالی، بدون نتیجه‌ی جستجو (پیشنهاد املایی + دسته‌های محبوب)، فیلتر بیش‌ازحد (دکمه‌ی «حذف فیلترها»)، سفارش ندارید.
+
+### Loading States
+- **Skeleton** با همان ابعاد محتوا، `studio` + shimmer ۱.۴s (غیرفعال با reduced-motion).
+- دکمه: spinner ۲۰px جایگزین متن با عرض ثابت. صفحه: top-progress ۲px `action`.
+- هرگز spinner تمام‌صفحه برای محتوای قابل پیش‌بینی. تصاویر با blur-up یا رنگ `studio`.
+
+### Toasts
+- پایین-چپ دسکتاپ، پایین-وسط موبایل (بالای bottom nav). سطح `night`، متن `on-night`، `md` radius، `shadow.float`، ۳۶۰px.
+- محتوا: آیکن ۲۰px + پیام کوتاه + عمل اختیاری («مشاهده‌ی سبد»). ۴ثانیه، pause در hover. حداکثر ۲ تا هم‌زمان. `role="status"` (خطا: `role="alert"`).
+
+### Modals / Drawers / Sheets
+- overlay `rgba(12,13,16,.5)` + blur ۴px. پنل canvas، `xl` radius، `shadow.float`، عرض ۴۸۰ (پیش‌فرض).
+- موبایل: bottom sheet با گرفتن‌دسته (handle) و اسکرول داخلی. Esc/تپ بیرون بستن؛ focus trap؛ بازگشت فوکس.
+- ورود: scale .96→1 + fade در ۲۴۰ms. یک modal هم‌زمان؛ modal روی modal ممنوع.
+
+### Tables (فروشگاه)
+- جدول مشخصات فنی: دو ستون، ردیف‌های راه‌راه با `parchment`، label `mute`، بدون border عمودی. موبایل: stack عمودی.
+
+### Rating & Reviews
+- ستاره ۱۴px پر `ink` / خالی `hairline-strong`. توزیع: نوار ۶px. «خرید تأییدشده» با تیک.
+
+### Footer
+- تیره (`night`)، ۴ ستون لینک + خبرنامه (input pill + دکمه‌ی `charge`، تنها جای مجاز دکمه‌ی charge) + نمادهای اعتماد + شبکه‌های اجتماعی + کپی‌رایت. موبایل: آکاردئون.
+
+---
+
+## ۱۰. Admin Dashboard Components
+
+**اصل:** همان tokenها، ولی **متراکم** (Linear)، با hairline بجای فضای خالی.
+
+### Layout
+- **Sidebar** راست، ۲۶۴px (جمع‌شونده به ۶۴px آیکن)، سطح `night-1`، آیتم‌ها ۴۰px، فعال: `night-2` + نوار ۳px `charge` در لبه‌ی راست.
+- گروه‌ها: نمای کلی · فروش (سفارش‌ها، پرداخت‌ها، تخفیف‌ها، کد تخفیف) · کاتالوگ (محصولات، دسته‌بندی‌ها، برندها، موجودی) · مشتریان (کاربران) · محتوا (بنرها) · گزارش‌ها · تنظیمات فروشگاه.
+- **Topbar** ۵۶px: breadcrumb، جستجوی سراسری (⌘K)، اعلان‌ها، منوی کاربر.
+- محتوا: تمام‌عرض تا ۱۶۰۰، padding ۲۴؛ پس‌زمینه‌ی `parchment` (تم روشن) یا `night` (تم تیره). ادمین به‌طور پیش‌فرض با تم کاربر؛ پیشنهاد تیره.
+- اندازه‌ی پایه‌ی متن ۱۴px، کنترل‌ها ۳۶px (نه ۴۸).
+
+### KPI Cards
+- hairline، `md` radius، padding ۱۶؛ label ۱۳px `mute`، مقدار ۲۸px/۸۰۰ tabular، دلتا pill (`success`/`sale`) با فلش، sparkline ۴۸px (خط ۱.۵px `action`، endpoint پررنگ). KPIها: فروش امروز، سفارش‌ها، مشتریان جدید، نرخ تبدیل، میانگین سبد.
+
+### Data Table
+- ستون‌ها: انتخاب (checkbox)، تصویر ۴۰px، نام، SKU (mono, ltr)، موجودی، قیمت، وضعیت، عملیات.
+- ردیف ۴۸px، hairline افقی، hover `parchment`، header sticky با sort (فلش)، ستون‌های عددی tabular و **هم‌تراز با راست** (ارقام فارسی)، SKU ltr.
+- نوار bulk-action هنگام انتخاب: pill `night` پایین-وسط «۳ مورد انتخاب شد · حذف · تغییر دسته · انتشار».
+- فیلتر/جستجو بالای جدول، فیلترهای ذخیره‌شده (tabs: همه ۱۲۸، فعال، پیش‌نویس، ناموجود)، pagination و انتخاب تعداد در صفحه، ستون‌ها قابل مخفی‌سازی، export CSV.
+
+### وضعیت‌ها (Status pills)
+سفارش: در انتظار پرداخت (warning) · در حال پردازش (info) · ارسال شد (action-soft) · تحویل شد (success) · لغو (sale-soft) · مرجوعی (studio). پرداخت: موفق / ناموفق / در انتظار / بازگشت‌شده. همیشه رنگ + متن (نه فقط رنگ).
+
+### فرم‌ها و ویرایشگرها
+- صفحه‌ی ویرایش محصول: دو ستون (۲/۳ محتوا + ۱/۳ سایدبار وضعیت/دسته/برند/تصاویر)، نوار ذخیره‌ی sticky پایین با «لغو / ذخیره پیش‌نویس / انتشار» و هشدار تغییرات ذخیره‌نشده.
+- آپلود تصویر: drag-and-drop، thumbnailها قابل مرتب‌سازی، اولین = تصویر اصلی.
+- مدیریت موجودی: ویرایش inline در جدول، تاریخچه‌ی تغییر، آستانه‌ی «رو به اتمام».
+- کد تخفیف: نوع (درصد/مبلغ)، سقف، حداقل سبد، تاریخ شروع/پایان (تقویم شمسی)، تعداد استفاده.
+- تاریخ‌ها همیشه **شمسی** در UI، میلادی در پایگاه داده.
+
+### نمودارها
+رنگ‌ها: `action` (سری اصلی)، سپس `ink`، `stone`؛ semantic فقط برای معنا. شبکه‌ی خفیف hairline، tooltip، محور با ارقام فارسی، دسترسی‌پذیر با جدول معادل.
+
+### بخش‌ها
+محصولات · دسته‌بندی‌ها (درختی drag-reorder) · سفارش‌ها (جزئیات + timeline) · کاربران · موجودی · تخفیف‌ها · کد تخفیف · بنرها (پیش‌نمایش نسبت‌ها) · برندها · پرداخت‌ها · گزارش‌ها (فروش، محصولات پرفروش، دسته‌ها، مشتریان؛ بازه‌ی زمانی) · تنظیمات فروشگاه (عمومی، ارسال، پرداخت، اعلان‌ها، نقش‌ها).
+
+---
+
+## ۱۱. Responsive Rules
+
+| Breakpoint | عرض | رفتار |
+|---|---|---|
+| `xs` | < 480 | ۲ ستون محصول، bottom nav، فیلتر در sheet |
+| `sm` | 480–639 | مثل xs با gutter بزرگ‌تر |
+| `md` | 640–1023 | ۳ ستون، header کامل بدون mega-menu |
+| `lg` | 1024–1279 | ۴ ستون، sidebar فیلتر، mega-menu |
+| `xl` | ≥ 1280 | کانتینر ۱۲۸۰ ثابت |
+
+- Mobile-first. هیچ اسکرول افقی صفحه (فقط chip bar و carousel داخل کانتینر خود).
+- تیتر hero: ۷۲→۵۶→۴۰→۳۲ با `clamp()`.
+- ناحیه‌ی لمس ≥ ۴۴px. فاصله‌ی سکشن ۸۰→۶۴→۴۸.
+- جدول ادمین: روی موبایل اسکرول افقی در کانتینر خودش یا تبدیل به کارت.
+- تصاویر: `srcset` + `sizes`، فرمت AVIF/WebP، `aspect-ratio` ثابت برای جلوگیری از CLS، lazy زیر fold، `priority` برای LCP.
+
+## ۱۲. RTL Rules
+
+- `<html lang="fa" dir="rtl">`. فقط **logical properties**: `margin-inline-start`, `padding-inline`, `inset-inline-end`, `text-align: start`، Tailwind: `ms-*`, `me-*`, `ps-*`, `pe-*`, `start-*`, `end-*`. ممنوع: `left/right/ml/mr/pl/pr/text-left`.
+- **آینه می‌شوند:** چیدمان، جهت progress، carousel (اولین آیتم راست)، فلش‌های «بعدی/قبلی»، آیکن‌های جهت‌دار (chevron، arrow، back)، slide-in drawer.
+- **آینه نمی‌شوند:** لوگو، آیکن‌های غیرجهت‌دار (قلب، سبد، جستجو)، پخش ویدیو، ساعت/نمودار زمانی (زمان LTR در نمودارها، ولی محور فارسی)، ستاره‌ی امتیاز (از راست پر می‌شود).
+- متن لاتین/اعداد داخل جمله: `<bdi>`. بلوک لاتین مستقل (SKU، کد تخفیف، ایمیل، URL): `dir="ltr"` + `text-align: start`.
+- ارقام فارسی در UI (`toLocaleString('fa-IR')`)، لاتین در URL، SKU، پایگاه داده و ورودی‌های فنی.
+- جداکننده‌ی هزارگان «٬» و ممیز «٫». علامت درصد «٪». کاما «،».
+- تاریخ شمسی با نام ماه فارسی؛ هفته از شنبه.
+- فلش‌ها و آیکن‌ها: lucide با `rtl:-scale-x-100` یا نسخه‌ی آینه‌ای.
+- فونت با ZWNJ (نیم‌فاصله) به‌درستی تایپ شود (می‌خرید، کتاب‌ها).
+
+## ۱۳. Accessibility
+
+- WCAG 2.2 AA. کنتراست ≥ 4.5:1 (متن)، ≥ 3:1 (UI/آیکن).
+- فوکس همیشه مرئی: `shadow.focus` (حلقه‌ی ۳px `action`)؛ هرگز `outline: none` بدون جایگزین.
+- همه‌ی عملیات با کیبورد؛ ترتیب tab منطقی در RTL. skip-link «پرید به محتوا».
+- ناحیه‌ی لمس ≥ ۴۴px (حداقل ۲۴px در ادمین متراکم).
+- دکمه‌های آیکنی `aria-label` فارسی («افزودن به علاقه‌مندی‌ها»). toggle wishlist: `aria-pressed`.
+- وضعیت فقط با رنگ نیست (متن/آیکن همراه). قیمت خط‌خورده با `<s>` و متن مخفی «قیمت قبل از تخفیف».
+- تصاویر محصول `alt` توصیفی («قاب سیلیکونی مشکی آیفون ۱۵ پرو»). تزئینی: `alt=""`.
+- live regions: افزودن به سبد `role="status"`، خطای فرم `role="alert"`.
+- modal: `role="dialog"`، `aria-modal`، focus trap، بازگشت فوکس.
+- `prefers-reduced-motion`: حذف parallax/shimmer/slide، فقط fade ≤ ۹۰ms.
+- زبان محتوای لاتین با `lang="en"` در صورت نیاز.
+- فرم‌ها: label مرتبط، خطا با `aria-describedby`، autocomplete مناسب.
+
+## ۱۴. Hover / Focus / Active States
+
+| عنصر | Hover | Focus-visible | Active |
+|---|---|---|---|
+| Primary btn | `#2b2d33` | حلقه `focus` | `scale(.97)` |
+| Secondary btn | `studio-deep` | حلقه | `scale(.97)` |
+| Link | زیرخط | حلقه | رنگ `action-press` |
+| Product card | تصویر ۱.۰۴× / تصویر دوم + نمایش Quick Add | حلقه دور تصویر | — |
+| Category tile | `studio-deep` + تصویر ۴px↑ | حلقه | `scale(.98)` |
+| Chip | border `ink` | حلقه | — |
+| Table row | `parchment` | حلقه داخلی | — |
+| Icon btn | `studio-deep` | حلقه | `scale(.92)` |
+- نمایش‌دهنده‌ی hover فقط روی دستگاه‌های `(hover: hover)`؛ در لمس، عناصر مخفی (Quick Add) از اول نمایان‌اند.
+- انتقال‌ها `fast 160ms standard`.
+
+## ۱۵. Motion / Animation Rules
+
+- **هدف:** بازخورد و جهت‌یابی، نه تزئین. یک «لحظه‌ی» هماهنگ در Home (ورود hero)، بقیه micro-interaction.
+- مدت: micro ۹۰–۱۶۰ms، انتقال ۲۴۰ms، صحنه‌ها ≤ ۴۲۰ms. Easing: `standard`؛ برای «پرش» افزودن به سبد `emphasized`.
+- جهت‌ها در RTL آینه: drawer سبد از چپ، منو از راست، carousel راست→چپ.
+- الگوها: افزودن به سبد (آیکن سبد bump + toast)، قلب (scale + fill)، کارت‌ها fade-up ۸px با stagger ۴۰ms (حداکثر ۸ آیتم)، شمارنده‌ی قیمت بدون انیمیشن عددی طولانی.
+- Framer Motion فقط برای: hero، carousel، drawer/modal/layout animation. بقیه با CSS.
+- ممنوع: autoplay carousel سریع، parallax سنگین، انیمیشن باعث layout-shift، چشمک‌زدن تخفیف، صدا.
+- همیشه `prefers-reduced-motion` را رعایت کنید.
+
+---
+
+## ۱۶. Do / Don't
+
+### Do
+- محصول را روی `studio` با یک سایه‌ی `shadow.product` نمایش دهید.
+- یک CTA اصلی (`ink`) در هر viewport.
+- `sale` فقط برای قیمت/تخفیف.
+- `charge` فقط روی سطح تیره و نشان «جدید».
+- ریتم صفحه را با کاشی‌های روشن/تیره بسازید.
+- قیمت‌ها: ارقام فارسی، tabular، «تومان» کوچک‌تر.
+- از logical properties استفاده کنید.
+- متن UI فارسی، نام برند/مدل لاتین.
+- هر صفحه‌ی لیست: loading، empty، error.
+- پس از هر تصمیم جدید UI، همین فایل را به‌روز کنید.
+
+### Don't
+- سایه روی کارت/دکمه/متن نگذارید. کارت محصول border ندارد.
+- دکمه‌ی مستطیلی یا شکل سوم نسازید.
+- `charge` یا `sale` را پس‌زمینه‌ی بزرگ یا دکمه نکنید.
+- gradient تزئینی، bevel، glassmorphism روی کارت‌ها ممنوع (فقط frosted header/bottom nav).
+- هیچ `left/right` فیزیکی.
+- letter-spacing روی متن فارسی.
+- ارقام لاتین در UI فارسی (جز SKU/کد/URL).
+- چند badge روی یک کارت، یا برچسب‌های رنگارنگ «تخفیف ویژه!!!».
+- placeholder به‌جای label.
+- جابه‌جا شدن layout هنگام لود (CLS).
+- طراحی شبیه قالب‌های آماده‌ی فروشگاهی: grid بی‌هدف، بنر شلوغ، شمارنده‌ی قرمز چشمک‌زن، قاب‌های رنگارنگ.
+
+---
+
+## ۱۷. معماری سیستم طراحی در کد (پس از تأیید)
+
+```
+src/
+  styles/tokens.css            ← CSS variables از این فایل (تنها محل رنگ/اندازه)
+  styles/globals.css           ← Tailwind layers، RTL، فونت
+  components/ui/               ← primitives (shadcn/ui سفارشی‌شده): Button, Input, Badge, Sheet…
+  components/shop/             ← ProductCard, ProductGallery, CartDrawer, FilterPanel…
+  components/admin/            ← DataTable, KpiCard, StatusPill, AdminShell…
+  lib/format.ts                ← فرمت قیمت، تاریخ شمسی، ارقام
+tailwind.config.ts             ← theme.extend از tokens (colors, radius, spacing, shadow)
+```
+
+- Tailwind theme فقط از CSS variables می‌خواند؛ هیچ hex در کامپوننت‌ها.
+- هر کامپوننت جدید: یک بخش در این فایل + یک نمونه در صفحه‌ی `/design` (living style-guide).
+- تم تیره با `data-theme="dark"` روی `<html>`.
