@@ -74,6 +74,15 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .rail ul{margin:6px 0 0;padding-inline-start:18px;font-size:.76rem;line-height:1.8;color:var(--mute)}
 .urlbtn{position:relative;display:block;text-align:center;text-decoration:none;background:var(--kb);color:var(--kbtxt);border-radius:12px;padding:12px 28px;font-size:.88rem}
 .urlbtn span{position:absolute;top:5px;inset-inline-end:9px;font-size:.7rem;opacity:.85}
+.bub pre{margin:4px 0 0;font:12px/1.6 ui-monospace,Menlo,monospace;white-space:pre;overflow-x:auto;direction:ltr;text-align:left;background:rgba(127,140,155,.16);padding:6px 8px;border-radius:8px}
+.gfx{border-radius:12px;padding:12px;margin-bottom:6px;color:#fff;font-size:.78rem;direction:ltr;text-align:left}
+.gfx.neon{background:linear-gradient(135deg,#0b1030,#241a5a 58%,#0d6b7a)}.gfx.gold{background:linear-gradient(135deg,#241703,#6b4a0f 55%,#d4a72c)}
+.gfx .gh{font-weight:700;letter-spacing:.1em;margin-bottom:8px;font-size:.72rem;opacity:.95}.gfx .gh2{font-weight:700;margin:6px 0 2px;opacity:.9}
+.gfx table{width:100%;border-collapse:collapse}.gfx th{font-size:.64rem;opacity:.7;text-align:left;padding:2px 4px}.gfx td{padding:3px 4px;border-top:1px solid #ffffff22}
+.gfx .gl{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-top:1px solid #ffffff22}.gfx .gl b{white-space:nowrap}
+.gfx .gcols{display:grid;grid-template-columns:1fr 1fr;gap:10px}.gfx .gcols b{display:block;margin-bottom:3px}
+.gfx.poster{text-align:center;padding:22px 12px}.gfx .logo{width:68px;height:68px;border-radius:50%;margin:0 auto 8px;background:#ffffff2a;display:grid;place-items:center;font-weight:800;font-size:1.3rem;border:2px solid #ffffff66}
+.gfx .pt{letter-spacing:.2em;font-weight:700;font-size:.8rem;opacity:.9}.gfx .pn{font-size:1.4rem;font-weight:800;margin:4px 0}.gfx .ps{font-size:.68rem;opacity:.75}
 .hint{font-size:.72rem;color:var(--mute);padding:0 12px 6px;background:var(--panel)}
 .rail{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;position:sticky;top:16px;min-width:0}
 .rail h2{margin:0;font-size:.9rem}
@@ -147,15 +156,16 @@ function init(){S={free:0,msgOv:{},emoOn:true,emoIds:{},emoExtra:[],lbl:{},chann
       {id:2,kind:'team',special:1,st:'expired',d:{...SAMPLE.team,team:'Iron Wolves',captain_tg:'@wolf_cap'},exp:'1405/06/02'}],
  chats:{user:[],admin:[]}}}
 const chat=()=>S.chats[S.role];
-function say(html,kb,o={}){const c=S.chats[o.role||S.role];c.forEach(m=>m.live=false);c.push({from:o.me?'me':'bot',html,kb,live:!o.me&&!!kb,card:o.card});paint()}
-function screen(html,kb){const c=chat(),l=c[c.length-1];if(l&&l.live&&l.from==='bot'){l.html=html;l.kb=kb;l.card=null;paint()}else say(html,kb)}
+function say(html,kb,o={}){const c=S.chats[o.role||S.role];c.forEach(m=>m.live=false);c.push({from:o.me?'me':'bot',html,kb,live:!o.me&&!!kb,card:o.card,gfx:o.gfx});paint()}
+function screen(html,kb){const c=chat(),l=c[c.length-1];if(l&&l.live&&l.from==='bot'){l.html=html;l.kb=kb;l.card=null;l.gfx=null;paint()}else say(html,kb)}
 function paint(){
  const el=$('#chat');
  const fresh=S.fresh&&S.role==='user'&&S.tab==='bot';
  $('#form').hidden=fresh;$('#startbar').hidden=!fresh;$('#cmds').hidden=true;$('#replykb').hidden=!(S.replykb&&!fresh);
  if(fresh){el.innerHTML=`<div class="intro"><div class="ava">PCL</div><b>PCL TransferMarket</b><p>🔮 بزرگ‌ترین بازار نقل‌وانتقالات تیم‌ها و بازیکنان ایرانی پروکلاب.\nثبت آگهی بازیکن آزاد و جذب بازیکن، کیف پول و نشان‌های افتخار.</p></div>`;$('#hint').textContent='';return}
  if(S.tab==='group'){el.innerHTML='';groupView();return}
- el.innerHTML=chat().map((m,i)=>`<div class="msg ${m.from}"><div class="bub">${m.card?cardHtml(m.card):''}${applyPE(m.html)}</div>${m.kb?kbHtml(m.kb,m.live,i):''}</div>`).join('');
+ if(S.tab==='onc'){oncChannelView();return}
+ el.innerHTML=chat().map((m,i)=>`<div class="msg ${m.from}"><div class="bub">${m.card?cardHtml(m.card):''}${m.gfx||''}${applyPE(m.html)}</div>${m.kb?kbHtml(m.kb,m.live,i):''}</div>`).join('');
  el.scrollTop=el.scrollHeight;
  $('#hint').textContent=S.expect?S.expect.hint:'';
  $('#txt').placeholder=S.expect?'بنویس و ارسال کن...':'پیام...';
@@ -194,6 +204,7 @@ function menu(){
  const kb=LBL.slice(0,8).map(x=>[lbl(x[0]),x[0]]);
  const rows=[];for(let i=0;i<kb.length;i+=2)rows.push(kb.slice(i,i+2));
  if(S.role==='admin')rows.push([['🛠 پنل مدیریت','adm']]);
+ rows.push([['🏠 انتخاب بخش','home']]);
  screen('👋 به ربات <b>PCL Transfer</b> خوش اومدی!\n\nاینجا می‌تونی آگهی بازیکن آزاد یا جذب بازیکن برای تیم پروکلابت ثبت کنی.',rows)}
 function badgeInfo(){const c=S.counted;let cur=null,nxt=null;for(const b of S.badges){if(c>=b[2])cur=b;else if(!nxt)nxt=b}return{cur,nxt,c}}
 function act(a){
@@ -356,7 +367,7 @@ act=function(a){const p=a.split(':');if(p[0]!=='adm'||!p[1])return orig(a);S.exp
  case'bc':S.expect={hint:'متن پیام همگانی',fn:t=>{say('✅ ارسال شد: 1,284 از 1,284',[BK()]);say('📣 '+esc(t),[BK()[0]],{role:'user'})}};screen('📣 پیامی که می‌خوای برای همه کاربران ارسال بشه رو بفرست:',[BK()]);paint();break;
  }};
 // ---- wiring ----
-function setRole(r){S.role=r;S.fresh=false;S.tab='bot';S.expect=null;$('#r-user').setAttribute('aria-pressed',r==='user');$('#r-admin').setAttribute('aria-pressed',r==='admin');$('#sub').textContent=r==='admin'?'ربات (دید مدیر)':'ربات';$('#title').textContent='PCL Transfer';if(!chat().length){if(r==='admin'){say('🛠 <b>پنل مدیریت</b>',null);act('adm')}else menu()}else paint();setChip(null)}
+function setRole(r){S.role=r;S.fresh=false;S.tab='bot';S.expect=null;$('#r-user').setAttribute('aria-pressed',r==='user');$('#r-admin').setAttribute('aria-pressed',r==='admin');$('#sub').textContent=r==='admin'?'ربات (دید مدیر)':'ربات';$('#title').textContent='PCL Transfer';if(!chat().length){if(r==='admin'){oncRoute(['admhome'])}else oncHome()}else paint();setChip(null)}
 function setChip(id){document.querySelectorAll('#chips button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.j===id))}
 const JUMPS=[
  ['کاربر','منوی اصلی',()=>act('menu')],['کاربر','ورود کاربر تازه (START)',()=>{S.chats.user=[];S.fresh=true;S.replykb=false;paint()}],['کاربر','دکمه Menu و دستورها',()=>{S.fresh=false;S.replykb=false;act('menu');setTimeout(openCmds,0)}],['کاربر','گزینه: دکمه ثابت منو',()=>{S.fresh=false;S.replykb=true;act('menu')}],['کاربر','ثبت آگهی: انتخاب نوع',()=>act('ad:new')],['کاربر','فرم آگهی بازیکن',()=>{act('s:player:0');S.flow.vals={};S.flow.idx=0;S.flow.vals={name:'امیرحسین کریمی',psn:'Amir_CAM10'};S.flow.idx=2;ask()}],
@@ -364,23 +375,197 @@ const JUMPS=[
  ['کاربر','کیف پول',()=>act('wallet')],['کاربر','درگاه پرداخت',()=>{act('pay:100000');act('gate:100000')}],['کاربر','کارت هدیه',()=>{act('gift');handleText('PCL2026')}],
  ['کاربر','دعوت دوستان',()=>act('invite')],['کاربر','نشان‌های افتخار',()=>act('badges')],['کاربر','مشخصات من',()=>act('profile')],['کاربر','ارتباط با ما',()=>act('support')],['کاربر','جوین اجباری',()=>screen('📢 برای استفاده از ربات اول در کانال‌های زیر عضو شو، بعد روی «✅ عضو شدم» بزن:',[[['📢 ProClubs Transfer','menu']],[['✅ عضو شدم','menu']]])],
  ['مدیر','پنل مدیریت',()=>act('adm')],['مدیر','آگهی‌های در انتظار',()=>{ensurePending();act('adm:al:pending')}],['مدیر','آمار',()=>act('adm:stats')],['مدیر','تعرفه‌ها',()=>act('adm:set')],['مدیر','کارت‌های هدیه',()=>act('adm:gifts')],['مدیر','نشان‌ها',()=>act('adm:badges')],['مدیر','جوین اجباری',()=>act('adm:ch')],['مدیر','مدیران',()=>act('adm:admins')],
- ['ایموجی پرمیوم','قبل و بعد از تبدیل',()=>{S.fresh=false;const ad={kind:'player',special:1,d:{...SAMPLE.player}};S.chats.user=[];say('<span class="tag2 before">قبل — ایموجی معمولی</span>\n'+adHtml(ad,null,false),null,{card:'card'});say('<span class="tag2 after">بعد — ایموجی پرمیوم</span>\n'+adHtml(ad,null,true),null,{card:'card'})},'user'],['ایموجی پرمیوم','بخش ایموجی‌ها (مدیر)',()=>{['🛡','🏆','🔮','👉','⭐','✅','🔙'].forEach(k=>S.emoIds[k]=emoId(k));act('adm:emo')},'admin'],['ایموجی پرمیوم','ویرایش دکمه‌ها (مدیر)',()=>{S.lbl={wallet:{t:'شارژ کیف پول',e:'💎',pid:true}};act('adm:btn')},'admin'],['ایموجی پرمیوم','ویرایش پیام‌ها (مدیر)',()=>{S.msgOv={ad_approved:'🎉 آگهی <b>{id}</b> تأیید شد و تا چند لحظه دیگه تو کانال می‌بینیش!'};act('adm:ms')},'admin'],['ایموجی پرمیوم','منوی کاربر با ایموجی پرمیوم',()=>{REG.forEach(x=>S.emoIds[noVS(x[0])]=emoId(x[0]));act('menu')},'user'],['ایموجی پرمیوم','ابزار گرفتن ID (مدیر)',()=>act('adm:eid'),'admin'],['ایموجی پرمیوم','آگهی تیم با ایموجی پرمیوم',()=>{REG.forEach(x=>S.emoIds[noVS(x[0])]=emoId(x[0]));S.flow={kind:'team',special:1,vals:{...SAMPLE.team},idx:0,mode:'new'};S.chats.user=[];preview()},'user'],['گروه','گروه انتشار',()=>{ensurePending();S.ads.filter(a=>a.st==='pending').forEach(a=>{a.st='approved';a.posted=true});S.ads.forEach(a=>{if(a.st==='approved')a.posted=true});S.tab='group';paint()}]];
+ ['ایموجی پرمیوم','قبل و بعد از تبدیل',()=>{S.fresh=false;const ad={kind:'player',special:1,d:{...SAMPLE.player}};S.chats.user=[];say('<span class="tag2 before">قبل — ایموجی معمولی</span>\n'+adHtml(ad,null,false),null,{card:'card'});say('<span class="tag2 after">بعد — ایموجی پرمیوم</span>\n'+adHtml(ad,null,true),null,{card:'card'})},'user'],['ایموجی پرمیوم','بخش ایموجی‌ها (مدیر)',()=>{['🛡','🏆','🔮','👉','⭐','✅','🔙'].forEach(k=>S.emoIds[k]=emoId(k));act('adm:emo')},'admin'],['ایموجی پرمیوم','ویرایش دکمه‌ها (مدیر)',()=>{S.lbl={wallet:{t:'شارژ کیف پول',e:'💎',pid:true}};act('adm:btn')},'admin'],['ایموجی پرمیوم','ویرایش پیام‌ها (مدیر)',()=>{S.msgOv={ad_approved:'🎉 آگهی <b>{id}</b> تأیید شد و تا چند لحظه دیگه تو کانال می‌بینیش!'};act('adm:ms')},'admin'],['ایموجی پرمیوم','منوی کاربر با ایموجی پرمیوم',()=>{REG.forEach(x=>S.emoIds[noVS(x[0])]=emoId(x[0]));act('menu')},'user'],['ایموجی پرمیوم','ابزار گرفتن ID (مدیر)',()=>act('adm:eid'),'admin'],['ایموجی پرمیوم','آگهی تیم با ایموجی پرمیوم',()=>{REG.forEach(x=>S.emoIds[noVS(x[0])]=emoId(x[0]));S.flow={kind:'team',special:1,vals:{...SAMPLE.team},idx:0,mode:'new'};S.chats.user=[];preview()},'user'],['ONC · کاربر','انتخاب بخش (HOME)',()=>oncHome(),'user'],['ONC · کاربر','منوی بیننده',()=>oncRoute(['onc']),'user'],['ONC · کاربر','جدول گروه‌ها (بیننده)',()=>oncRoute(['onc','std']),'user'],['ONC · کاربر','کانال اخبار ONC',()=>oncRoute(['onca','ch'].slice(0,0).concat(['onc','ch'])),'user'],
+ ['ONC · مدیر','انتخاب پنل مدیریت',()=>oncRoute(['admhome']),'admin'],['ONC · مدیر','پنل ONC',()=>oncRoute(['onca']),'admin'],['ONC · مدیر','تورنمنت',()=>oncRoute(['onca','t']),'admin'],['ONC · مدیر','گروه‌ها',()=>oncRoute(['onca','g']),'admin'],['ONC · مدیر','تیم‌ها',()=>oncRoute(['onca','tm']),'admin'],['ONC · مدیر','برنامه (Round Robin)',()=>oncRoute(['onca','sc']),'admin'],['ONC · مدیر','ثبت نتایج',()=>oncRoute(['onca','re']),'admin'],['ONC · مدیر','مرور Round ۳',()=>oncRoute(['onca','rv','3']),'admin'],['ONC · مدیر','رده‌بندی و تساوی',()=>oncRoute(['onca','std']),'admin'],['ONC · مدیر','صعودکنندگان',()=>oncRoute(['onca','q']),'admin'],['ONC · مدیر','مرحله حذفی',()=>oncRoute(['onca','ko']),'admin'],['ONC · مدیر','گرافیک',()=>oncRoute(['onca','gr']),'admin'],['ONC · مدیر','کانال انتشار',()=>oncRoute(['onca','cn']),'admin'],['ONC · مدیر','گزارش تغییرات',()=>{oncRoute(['onca','ch'].slice(0,0).concat(['onca','au']))},'admin'],
+ ['گروه','گروه انتشار',()=>{ensurePending();S.ads.filter(a=>a.st==='pending').forEach(a=>{a.st='approved';a.posted=true});S.ads.forEach(a=>{if(a.st==='approved')a.posted=true});S.tab='group';paint()}]];
 function ensurePending(){if(!S.ads.some(a=>a.st==='pending')){const ad={id:S.nextId++,kind:'player',special:1,st:'pending',d:{...SAMPLE.player}};S.ads.push(ad);if(!S.chats.admin.length)S.chats.admin.push({from:'bot',html:'🛠 <b>پنل مدیریت</b>'})}}
-function buildChips(){const g={};JUMPS.forEach((j,i)=>(g[j[0]]=g[j[0]]||[]).push([i,j[1]]));$('#chips').innerHTML=Object.entries(g).map(([k,v])=>`<h3>${k==='کاربر'?'نقش کاربر':k==='مدیر'?'نقش مدیر':k==='گروه'?'گروه':'ایموجی پرمیوم (پیشنهاد)'}</h3><div class="chips">${v.map(([i,t])=>`<button data-j="${i}">${t}</button>`).join('')}</div>`).join('')}
+function buildChips(){const g={};JUMPS.forEach((j,i)=>(g[j[0]]=g[j[0]]||[]).push([i,j[1]]));$('#chips').innerHTML=Object.entries(g).map(([k,v])=>`<h3>${({'کاربر':'نقش کاربر','مدیر':'نقش مدیر','گروه':'گروه','ایموجی پرمیوم':'ایموجی پرمیوم (پیشنهاد)'})[k]||k}</h3><div class="chips">${v.map(([i,t])=>`<button data-j="${i}">${t}</button>`).join('')}</div>`).join('')}
 document.addEventListener('click',e=>{
  const b=e.target.closest('button[data-a]');if(b){act(b.dataset.a);return}
- const j=e.target.closest('#chips button');if(j){const J=JUMPS[+j.dataset.j];const role=J[3]||(J[0]==='مدیر'?'admin':'user');S.emoIds={};S.lbl={};S.msgOv={};S.emoExtra=[];setRole(role);J[2]();setChip(j.dataset.j);if(J[0]==='گروه'){$('#title').textContent=S.group;$('#sub').textContent='گروه'}}
+ const j=e.target.closest('#chips button');if(j){const J=JUMPS[+j.dataset.j];const role=J[3]||(J[0]==='مدیر'?'admin':'user');S.emoIds={};S.lbl={};S.msgOv={};S.emoExtra=[];S.onc=oncSeed();setRole(role);J[2]();setChip(j.dataset.j);if(J[0]==='گروه'){$('#title').textContent=S.group;$('#sub').textContent='گروه'}}
 });
 function openCmds(){const box=$('#cmds');const items=[['/start','🏠 شروع و منوی اصلی']];if(S.role==='admin')items.push(['/admin','🛠 پنل مدیریت']);
  box.innerHTML=items.map(i=>`<button type="button" data-cmd="${i[0]}"><code>${i[0]}</code><span>${i[1]}</span></button>`).join('');box.hidden=false;$('#menubtn').setAttribute('aria-expanded','true')}
 $('#menubtn').onclick=e=>{e.stopPropagation();const box=$('#cmds');if(box.hidden)openCmds();else{box.hidden=true;$('#menubtn').setAttribute('aria-expanded','false')}};
-document.addEventListener('click',e=>{const c=e.target.closest('[data-cmd]');if(c){const cmd=c.dataset.cmd;$('#cmds').hidden=true;S.expect=null;if(cmd==='/admin'){setRole('admin');return}S.fresh=false;S.flow=null;menu();return}
+document.addEventListener('click',e=>{const c=e.target.closest('[data-cmd]');if(c){const cmd=c.dataset.cmd;$('#cmds').hidden=true;S.expect=null;if(cmd==='/admin'){setRole('admin');return}S.fresh=false;S.flow=null;oncHome();return}
  if(!e.target.closest('#cmds')&&!e.target.closest('#menubtn'))$('#cmds').hidden=true});
-$('#startbtn').onclick=()=>{S.fresh=false;menu()};
+$('#startbtn').onclick=()=>{S.fresh=false;oncHome()};
 $('#r-user').onclick=()=>setRole('user');$('#r-admin').onclick=()=>setRole('admin');
 function handleText(t,silent){if(!silent)say(esc(t),null,{me:true});const e=S.expect;if(e){S.expect=null;e.fn(t)}else say('از دکمه‌های بالا استفاده کن 👆',null)}
-$('#form').onsubmit=e=>{e.preventDefault();const v=$('#txt').value.trim();if(!v)return;$('#txt').value='';if(v==='/start'){S.expect=null;return menu()}if(v==='/admin'){setRole('admin');return}handleText(v)};
+$('#form').onsubmit=e=>{e.preventDefault();const v=$('#txt').value.trim();if(!v)return;$('#txt').value='';if(v==='/start'){S.expect=null;return oncHome()}if(v==='/admin'){setRole('admin');oncRoute(['admhome']);return}handleText(v)};
 $('#gok').onclick=()=>{$('#gateway').hidden=true;const a=S.pending;S.balance+=a;S.tx.push({amt:a,t:'💳 افزایش موجودی'});say(`✅ پرداخت موفق!\n💰 ${fmt(a)} به کیف پولت اضافه شد.\n🧾 کد پیگیری: <code>${Math.floor(1e9+Math.random()*9e9)}</code>`,[[['💰 کیف پول','wallet'],['🔙 منو','menu']]])};
 $('#gno').onclick=()=>{$('#gateway').hidden=true;say('❌ پرداخت انجام نشد یا لغو شد.',[BK('wallet')])};
+// =====================================================================================================
+// ONE NIGHT CHAMPION (demo). The algorithms below are the ones proposed in docs/ONC_ARCHITECTURE.md.
+// =====================================================================================================
+function roundRobin(teams){const t=[...teams];if(t.length%2)t.push(null);const m=t.length,rounds=[];
+ for(let r=0;r<m-1;r++){const pairs=[];for(let i=0;i<m/2;i++){const a=t[i],b=t[m-1-i];if(a!==null&&b!==null)pairs.push(a<b?[a,b]:[b,a])}rounds.push(pairs);t.splice(1,0,t.pop())}
+ return rounds}
+function standingsOf(teams,results,manual={}){
+ const rows=new Map(teams.map(t=>[t,{t,P:0,W:0,D:0,L:0,GF:0,GA:0,GD:0,Pts:0,tie:null,unresolved:false}]));
+ for(const r of results){const A=rows.get(r.a),B=rows.get(r.b);if(!A||!B)continue;A.P++;B.P++;A.GF+=r.sa;A.GA+=r.sb;B.GF+=r.sb;B.GA+=r.sa;
+  if(r.sa>r.sb){A.W++;B.L++;A.Pts+=3}else if(r.sa<r.sb){B.W++;A.L++;B.Pts+=3}else{A.D++;B.D++;A.Pts++;B.Pts++}}
+ rows.forEach(x=>x.GD=x.GF-x.GA);
+ const sorted=[...rows.values()].sort((x,y)=>y.Pts-x.Pts),out=[];
+ for(let i=0;i<sorted.length;){let j=i;while(j<sorted.length&&sorted[j].Pts===sorted[i].Pts)j++;out.push(...resolveTie(sorted.slice(i,j),results,manual));i=j}
+ return out}
+function resolveTie(c,results,manual){
+ if(c.length===1)return c;
+ if(c.length===2){const[x,y]=c,h=results.find(r=>(r.a===x.t&&r.b===y.t)||(r.a===y.t&&r.b===x.t));
+  if(h){const xs=h.a===x.t?h.sa:h.sb,ys=h.a===x.t?h.sb:h.sa;if(xs!==ys){const[w,l]=xs>ys?[x,y]:[y,x];w.tie=l.tie='H2H';return[w,l]}}}
+ const s=[...c].sort((x,y)=>y.GD-x.GD||y.GF-x.GF),out=[];
+ for(let i=0;i<s.length;){let j=i;while(j<s.length&&s[j].GD===s[i].GD&&s[j].GF===s[i].GF)j++;const sub=s.slice(i,j);
+  sub.forEach(r=>r.tie=(s[0].GD!==s[s.length-1].GD)?'GD':'GF');
+  if(sub.length>1){if(sub.every(r=>manual[r.t]!=null)){sub.sort((a,b)=>manual[a.t]-manual[b.t]);sub.forEach(r=>r.tie='ADMIN')}else sub.forEach(r=>{r.unresolved=true;r.tie='UNRESOLVED'})}
+  out.push(...sub);i=j}
+ return out}
+
+const ONC_TEAMS0={1:{n:'Shadow Lions',g:'A',p:['SL_Ali','SL_Reza','SL_Amir']},2:{n:'Iron Wolves',g:'A',p:['IW_Sina','IW_Kian']},3:{n:'Phoenix FC',g:'A',p:['PF_Nima','PF_Arman']},4:{n:'Night Owls',g:'A',p:['NO_Mani','NO_Sam']},5:{n:'Blue Falcons',g:'B',p:['BF_Omid','BF_Ario']},6:{n:'Red Dragons',g:'B',p:['RD_Pouya','RD_Ali']},7:{n:'Storm FC',g:'B',p:['SF_Hadi','SF_Reza']}};
+function oncSeed(){const rk=(g,a,b)=>g+'|'+Math.min(a,b)+'-'+Math.max(a,b);
+ const res={};[['A',1,4,3,1,'c'],['A',2,3,2,2,'c'],['A',1,3,0,1,'c'],['A',2,4,2,0,'c'],['B',6,7,1,0,'c'],['B',5,7,3,0,'c'],['A',1,2,1,1,'e'],['A',3,4,2,0,'e'],['B',5,6,1,1,'e']].forEach(([g,a,b,sa,sb,st])=>res[rk(g,a,b)]={sa,sb,st:st==='c'?'confirmed':'entered',v:1});
+ return{name:'One Night Champion — فصل ۱',interval:20,start:'21:00',theme:'neon',groups:[{id:'A',name:'گروه A',q:2},{id:'B',name:'گروه B',q:1}],
+  teams:JSON.parse(JSON.stringify(ONC_TEAMS0)),nextTeam:8,res,pub:{1:true,2:true},manual:{A:{},B:{}},tieDemo:false,ko:[],pubs:[],audit:[],
+  chan:{title:'ONE NIGHT CHAMPION | News',id:'-1002233445566'},champion:null,draft:null}}
+const OK=(g,a,b)=>g+'|'+Math.min(a,b)+'-'+Math.max(a,b);
+const oT=()=>S.onc.teams,tn=id=>oT()[id]?.n||'?',gTeams=g=>Object.keys(oT()).map(Number).filter(id=>oT()[id].g===g);
+const gName=g=>S.onc.groups.find(x=>x.id===g)?.name||g;
+function oncHM(n){const[h,m]=S.onc.start.split(':').map(Number),t=h*60+m+(n-1)*S.onc.interval;return String(Math.floor(t/60)%24).padStart(2,'0')+':'+String(t%60).padStart(2,'0')}
+function oncRounds(){const per=S.onc.groups.map(g=>({g:g.id,r:roundRobin(gTeams(g.id))})),max=Math.max(0,...per.map(p=>p.r.length)),out=[];
+ for(let k=0;k<max;k++){const ms=[];per.forEach(p=>(p.r[k]||[]).forEach(([a,b])=>ms.push({g:p.g,a,b,key:OK(p.g,a,b)})));out.push({n:k+1,ms})}return out}
+const resOf=m=>S.onc.res[m.key];
+function roundStatus(R){const rs=R.ms.map(resOf),have=rs.filter(Boolean).length;
+ if(S.onc.pub[R.n])return'published';if(!R.ms.length)return'scheduled';if(have===0)return'scheduled';if(have<R.ms.length)return'entering';return rs.every(x=>x.st==='confirmed')?'confirmed':'review'}
+const RS_ICON={scheduled:'⏳',entering:'✍️',review:'📋',confirmed:'✅',published:'📢'};
+const RS_TXT={scheduled:'برنامه‌ریزی‌شده',entering:'در حال ثبت نتایج',review:'آماده مرور و انتشار',confirmed:'تأییدشده (منتشر نشده)',published:'منتشرشده'};
+function confirmedRes(g){const demo=S.onc.tieDemo&&g==='B';
+ if(demo)return[{a:5,b:6,sa:1,sb:1},{a:5,b:7,sa:1,sb:0},{a:6,b:7,sa:1,sb:0}];
+ return Object.entries(S.onc.res).filter(([k,v])=>k.startsWith(g+'|')&&v.st==='confirmed').map(([k,v])=>{const[a,b]=k.split('|')[1].split('-').map(Number);return{a,b,sa:v.sa,sb:v.sb}})}
+const oncStand=g=>standingsOf(gTeams(g),confirmedRes(g),S.onc.manual[g]||{});
+function qual(g){const rows=oncStand(g),q=S.onc.groups.find(x=>x.id===g).q;let pending=false;
+ if(q>0&&q<rows.length&&rows[q-1].unresolved&&rows[q].unresolved&&rows[q-1].Pts===rows[q].Pts&&rows[q-1].GD===rows[q].GD&&rows[q-1].GF===rows[q].GF)pending=true;
+ return{rows,q,pending,list:rows.slice(0,q).map(r=>r.t)}}
+const sgn=n=>(n>0?'+':'')+n;
+function stTable(g){const rows=oncStand(g),tb=r=>r.tie==='UNRESOLVED'?'⚠':(r.tie==='ADMIN'?'ADM':(r.tie||''));
+ const head=' # '+'TEAM'.padEnd(12)+' P W-D-L GF:GA  GD PTS TB';
+ return `<b>${gName(g)}</b>\n<pre>${head}\n`+rows.map((r,i)=>`${String(i+1).padStart(2)} ${tn(r.t).padEnd(12)} ${r.P} ${(r.W+'-'+r.D+'-'+r.L).padEnd(5)} ${(r.GF+':'+r.GA).padEnd(5)} ${sgn(r.GD).padStart(3)} ${String(r.Pts).padStart(3)} ${tb(r)}`).join('\n')+'</pre>'}
+function matchLine(m){const r=resOf(m);return `${tn(m.a)} ${r?r.sa+' - '+r.sb:'vs'} ${tn(m.b)}`}
+function reviewText(n){const R=oncRounds()[n-1];const byG={};R.ms.forEach(m=>(byG[m.g]=byG[m.g]||[]).push(m));
+ return `📋 <b>مرور نتایج Round ${n}</b> — ${oncHM(n)}\n${L}\n`+Object.keys(byG).map(g=>`<b>${gName(g)}</b>\n`+byG[g].map(m=>'• '+matchLine(m)).join('\n')).join('\n\n')}
+function audit(a){S.onc.audit.unshift({t:oncHM(1)==='x'?'':new Date().toTimeString().slice(0,5),by:S.role==='admin'?'شما':'—',a})}
+
+// ---- graphics (HTML mock of what the Pillow renderer will draw; team logos only on the champion poster) ----
+const gc=()=>`gfx ${S.onc.theme}`;
+function gfxStandings(g){const rows=oncStand(g);return `<div class="${gc()}"><div class="gh">ONE NIGHT CHAMPION · ${gName(g).toUpperCase()}</div><table><tr><th>#</th><th>TEAM</th><th>P</th><th>GD</th><th>PTS</th></tr>${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${tn(r.t)}</td><td>${r.P}</td><td>${sgn(r.GD)}</td><td><b>${r.Pts}</b></td></tr>`).join('')}</table></div>`}
+function gfxRound(n){const R=oncRounds()[n-1];return `<div class="${gc()}"><div class="gh">ROUND ${n} · RESULTS</div>${R.ms.map(m=>`<div class="gl"><span>${tn(m.a)}</span><b>${resOf(m)?resOf(m).sa+' - '+resOf(m).sb:'vs'}</b><span>${tn(m.b)}</span></div>`).join('')}</div>`}
+function gfxDraw(){return `<div class="${gc()}"><div class="gh">GROUP DRAW</div><div class="gcols">${S.onc.groups.map(g=>`<div><b>${g.name}</b>${gTeams(g.id).map(t=>`<div>${tn(t)}</div>`).join('')}</div>`).join('')}</div></div>`}
+function gfxSchedule(){return `<div class="${gc()}"><div class="gh">SCHEDULE</div>${oncRounds().map(R=>`<div class="gl"><b>R${R.n} · ${oncHM(R.n)}</b><span>${R.ms.length} matches</span></div>`).join('')}</div>`}
+function gfxBracket(){const k=S.onc.ko;return `<div class="${gc()}"><div class="gh">KNOCKOUT</div>${k.length?k.map(s=>`<div class="gh2">${s.name}</div>${s.ms.map(m=>`<div class="gl"><span>${tn(m.a)}</span><b>${m.st?m.sa+' - '+m.sb:'vs'}</b><span>${tn(m.b)}</span></div>`).join('')}`).join(''):'<div class="gl"><span>—</span></div>'}</div>`}
+function gfxPoster(t){const n=tn(t);return `<div class="${gc()} poster"><div class="logo">${n.split(' ').map(w=>w[0]).join('').slice(0,2)}</div><div class="pt">🏆 CHAMPION</div><div class="pn">${n}</div><div class="ps">${S.onc.name}</div></div>`}
+const GKINDS=[['groups_draw','قرعه‌کشی گروه‌ها',gfxDraw],['schedule','برنامه بازی‌ها',gfxSchedule],['round_results','نتایج Round',()=>gfxRound(1)],['standings','رده‌بندی گروه',()=>gfxStandings('A')],['knockout_bracket','جدول حذفی',gfxBracket],['champion_poster','پوستر قهرمان (لوگو + نام)',()=>gfxPoster(S.onc.champion||1)]];
+
+// ---- channel feed ----
+function pubPost(kind,title,text,gfx){const o=S.onc;const ex=o.pubs.find(p=>p.kind===kind&&p.ref===title);
+ if(ex){ex.v++;ex.text=text;ex.gfx=gfx;ex.edited=true;return ex}
+ const p={kind,ref:title,v:1,text,gfx,t:new Date().toTimeString().slice(0,5)};o.pubs.push(p);return p}
+function oncChannelView(){const el=$('#chat');$('#hint').textContent='';
+ el.innerHTML=`<div class="msg bot"><div class="bub">📌 <b>${esc(S.onc.chan.title)}</b>\nاخبار تورنمنت فقط اینجا منتشر می‌شن (جدا از گروه آگهی‌های Transfer).</div></div>`+(S.onc.pubs.length?S.onc.pubs.map(p=>`<div class="msg bot"><div class="bub">${p.gfx||''}${p.text}${p.edited?`\n<span class="tag">✏️ ویرایش‌شده · نسخه ${p.v}</span>`:''}</div></div>`).join(''):'<div class="msg bot"><div class="bub">هنوز چیزی منتشر نشده. از پنل مدیریت ONC یک Round را «Confirm & Publish» کنید.</div></div>')}
+
+// ---- router ----
+const HB=(to='home')=>[['🔙 بازگشت',to]];
+function oncHome(){S.expect=null;screen('🏠 <b>PCL</b>\n\nبخش مورد نظرت رو انتخاب کن:',[[['🔄 TRANSFER','menu'],['🏆 ONE NIGHT CHAMPION','onc']],...(S.role==='admin'?[[['🛠 پنل مدیریت','admhome']]]:[])])}
+function oncRoute(p){const O=S.onc,c=p[0],k=p[1],x=p[2],y=p[3];
+ if(c==='home')return oncHome();
+ if(c==='admhome')return screen('🛠 <b>پنل مدیریت</b>\n\nکدوم بخش؟',[[['🔄 TRANSFER PANEL','adm'],['🏆 ONC PANEL','onca']],[['🔙 بازگشت','home']]]);
+ if(c==='onc'){ // viewer
+  if(!k)return screen(`🏆 <b>${esc(O.name)}</b>\n${L}\nاین‌جا فقط می‌تونی برنامه و نتایج رو ببینی. اخبار رسمی توی کانال منتشر می‌شه.`,[[['📅 برنامه بازی‌ها','onc:sch'],['📊 جدول گروه‌ها','onc:std']],[['🥊 مرحله حذفی','onc:ko'],['👥 تیم‌ها','onc:teams']],[['📢 کانال اخبار','onc:ch']],[['🔙 بازگشت','home']]]);
+  if(k==='sch')return screen('📅 <b>برنامه بازی‌ها</b>\n'+L+'\n'+oncRounds().map(R=>`<b>Round ${R.n}</b> — ${oncHM(R.n)} ${RS_ICON[roundStatus(R)]}\n`+R.ms.map(m=>'• '+matchLine(m)).join('\n')).join('\n\n'),[[['🔙 بازگشت','onc']]]);
+  if(k==='std')return screen('📊 <b>جدول گروه‌ها</b>\n'+L+'\n'+O.groups.map(g=>stTable(g.id)).join('\n\n'),[[['🔙 بازگشت','onc']]]);
+  if(k==='ko')return screen('🥊 <b>مرحله حذفی</b>\n'+L+'\n'+(O.ko.length?O.ko.map(s=>`<b>${s.name}</b>\n`+s.ms.map(m=>'• '+tn(m.a)+(m.st?` ${m.sa} - ${m.sb} `:' vs ')+tn(m.b)).join('\n')).join('\n\n'):'هنوز مشخص نشده.'),[[['🔙 بازگشت','onc']]]);
+  if(k==='teams')return screen('👥 <b>تیم‌ها</b>\n'+L+'\n'+O.groups.map(g=>`<b>${g.name}</b>\n`+gTeams(g.id).map(t=>'• '+tn(t)).join('\n')).join('\n\n'),[[['🔙 بازگشت','onc']]]);
+  if(k==='ch'){S.tab='onc';$('#title').textContent=O.chan.title;$('#sub').textContent='کانال';return paint()}
+ }
+ // ---------- admin ----------
+ if(S.role!=='admin')return say('⛔️ این بخش فقط برای مدیرهاست.',null);   // real permission check inside every handler
+ const B2=(to='onca')=>[['🔙 بازگشت',to]];
+ if(!k)return screen(`🏆 <b>پنل ONE NIGHT CHAMPION</b>\n${L}\n${O.name}\nمرحله: ${O.ko.length?'حذفی':'گروهی'}`,[[['🏆 تورنمنت','onca:t'],['👥 گروه‌ها','onca:g']],[['🛡 تیم‌ها','onca:tm'],['🗓 برنامه بازی‌ها','onca:sc']],[['⚽ ثبت نتایج','onca:re'],['📊 رده‌بندی','onca:std']],[['✅ صعودکنندگان','onca:q'],['🥊 مرحله حذفی','onca:ko']],[['🎨 گرافیک','onca:gr'],['📡 کانال انتشار','onca:cn']],[['🧾 گزارش تغییرات','onca:au']],[['🔙 بازگشت','admhome']]]);
+ if(k==='t'){if(x==='int'){S.expect={hint:'فاصله Roundها (دقیقه)',fn:t=>{const n=parseInt(t);if(!(n>=0&&n<=600))return say('⚠️ یه عدد بین ۰ تا ۶۰۰ بفرست.',[B2('onca:t')]);O.interval=n;audit('فاصله Roundها = '+n+' دقیقه');say('✅ ذخیره شد. زمان Roundها بازمحاسبه شد.',[B2('onca:t')])}};return screen('✍️ فاصله بین <b>Roundها</b> رو به دقیقه بفرست (فاصله تک‌تک مسابقه‌ها نیست؛ همه مسابقه‌های یک Round همزمان‌اند):',[B2('onca:t')]),paint()}
+  if(x==='st'){S.expect={hint:'ساعت شروع، مثل 21:00',fn:t=>{if(!/^\d{1,2}:\d{2}$/.test(t.trim()))return say('⚠️ قالب ساعت مثل 21:00 باشه.',[B2('onca:t')]);const[h,m]=t.trim().split(':').map(Number);O.start=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');audit('ساعت شروع = '+O.start);say('✅ ذخیره شد.',[B2('onca:t')])}};return screen('✍️ ساعت شروع Round 1 رو بفرست (مثل 21:00):',[B2('onca:t')]),paint()}
+  return screen(`🏆 <b>تورنمنت</b>\n${L}\nنام: ${esc(O.name)}\nشروع: ${O.start} (Asia/Tehran)\nفاصله Roundها: ${O.interval} دقیقه\nگروه‌ها: ${O.groups.length} · تیم‌ها: ${Object.keys(oT()).length}\nقالب گرافیک: ${O.theme==='neon'?'Night Neon':'Gold Classic'}`,[[['⏱ فاصله Roundها','onca:t:int'],['🕘 ساعت شروع','onca:t:st']],[['➕ تورنمنت جدید','onca:t:new']],B2()]),(x==='new'?say('ℹ️ در دمو فقط یک تورنمنت فعال داریم؛ ساخت تورنمنت جدید همین مراحل (نام ← شروع ← فاصله ← قالب) است.',null):0)}
+ if(k==='g'){
+  if(x==='add'){S.expect={hint:'نام گروه، مثل C',fn:t=>{const n=t.trim().slice(0,12);if(!n||O.groups.some(g=>g.id===n))return say('⚠️ نام خالی یا تکراری است.',[B2('onca:g')]);O.groups.push({id:n,name:'گروه '+n,q:2});O.manual[n]={};audit('ساخت گروه '+n);say('✅ گروه ساخته شد.',[B2('onca:g')])}};return screen('✍️ نام گروه جدید رو بفرست:',[B2('onca:g')]),paint()}
+  if(x==='del'){const g=y;const has=Object.keys(O.res).some(k2=>k2.startsWith(g+'|'));return screen(`🗑 گروه <b>${gName(g)}</b> حذف بشه؟${has?'\n⚠️ <b>این گروه نتیجه ثبت‌شده دارد.</b> با حذف، نتایج و رده‌بندی‌اش پاک می‌شود (در گزارش تغییرات می‌ماند).':''}`,[[['✅ بله، حذف کن','onca:g:delok:'+g],['🔙 نه','onca:g']]])}
+  if(x==='delok'){const g=y;gTeams(g).forEach(t=>delete oT()[t]);Object.keys(O.res).filter(k2=>k2.startsWith(g+'|')).forEach(k2=>delete O.res[k2]);O.groups=O.groups.filter(z=>z.id!==g);audit('حذف گروه '+g);return oncRoute(['onca','g'])}
+  if(x==='q'){const g=y;S.expect={hint:'تعداد صعودکننده این گروه',fn:t=>{const n=parseInt(t);if(!(n>=0&&n<=gTeams(g).length))return say('⚠️ عدد بین ۰ تا تعداد تیم‌های گروه.',[B2('onca:g')]);O.groups.find(z=>z.id===g).q=n;audit(gName(g)+': صعودکننده = '+n);say('✅ ذخیره شد.',[B2('onca:g')])}};return screen(`🔢 چند تیم از <b>${gName(g)}</b> صعود کنن؟ (۰ تا ${gTeams(g).length})`,[B2('onca:g')]),paint()}
+  return screen(`👥 <b>گروه‌ها</b>\n${L}\n`+O.groups.map(g=>`<b>${g.name}</b> — ${gTeams(g.id).length} تیم · صعود: ${g.q}`).join('\n')+'\n\nتعداد تیم هر گروه می‌تونه متفاوت باشه.',[[['➕ ساخت گروه','onca:g:add']],...O.groups.map(g=>[[`🔢 صعود ${g.id}`,'onca:g:q:'+g.id],[`🗑 حذف ${g.id}`,'onca:g:del:'+g.id]]),B2()])}
+ if(k==='tm'){
+  if(x==='add'){O.draft={step:'name'};S.expect={hint:'نام تیم',fn:t=>{const n=t.trim().slice(0,24);if(!n||Object.values(oT()).some(z=>z.n.toLowerCase()===n.toLowerCase()))return say('⚠️ نام خالی یا تکراری است.',[B2('onca:tm')]);O.draft={n,step:'logo'};oncRoute(['onca','tm','logo'])}};return screen('➕ <b>تیم جدید</b>\n\nمرحله ۱ از ۴: نام تیم رو بفرست:',[B2('onca:tm')]),paint()}
+  if(x==='logo'){return screen(`➕ <b>${esc(O.draft.n)}</b>\n\nمرحله ۲ از ۴: لوگوی تیم (عکس). لوگو فقط روی «پوستر قهرمان» استفاده می‌شه.`,[[['🖼 ارسال لوگوی نمونه','onca:tm:logook'],['⏭ رد کردن','onca:tm:logook']],B2('onca:tm')])}
+  if(x==='logook'){O.draft.logo=true;S.expect={hint:'Player IDها، هر خط یکی',fn:t=>{const ids=t.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean);if(!ids.length)return say('⚠️ حداقل یک Player ID بفرست.',[B2('onca:tm')]);O.draft.p=ids;oncRoute(['onca','tm','pick'])}};return screen(`➕ <b>${esc(O.draft.n)}</b>\n\nمرحله ۳ از ۴: <b>Player IDها</b> رو بفرست (هر خط یکی). برای Player فقط ID لازمه.`,[B2('onca:tm')]),paint()}
+  if(x==='pick')return screen(`➕ <b>${esc(O.draft.n)}</b> · ${O.draft.p.length} Player\n\nمرحله ۴ از ۴: گروه تیم رو انتخاب کن:`,[O.groups.map(g=>[g.name,'onca:tm:set:'+g.id]),B2('onca:tm')]);
+  if(x==='set'){const g=y,has=Object.keys(O.res).some(k2=>k2.startsWith(g+'|'));if(has&&!O.draft.ok)return screen(`⚠️ <b>${gName(g)}</b> نتیجه ثبت‌شده دارد. افزودن تیم جدول این گروه رو دوباره می‌سازه و نتایجش پاک می‌شن.\nادامه بدیم؟`,[[['✅ بله، ادامه','onca:tm:setok:'+g],['🔙 نه','onca:tm']]]);return oncRoute(['onca','tm','setok',g])}
+  if(x==='setok'){const g=y;Object.keys(O.res).filter(k2=>k2.startsWith(g+'|')).forEach(k2=>delete O.res[k2]);const id=O.nextTeam++;oT()[id]={n:O.draft.n,g,p:O.draft.p};audit(`افزودن تیم ${O.draft.n} به ${gName(g)}`);O.draft=null;return screen(`✅ تیم افزوده شد و جدول <b>${gName(g)}</b> دوباره ساخته شد.`,[[['🗓 دیدن برنامه','onca:sc']],B2('onca:tm')])}
+  if(x==='mv'){const t=+y;return screen(`↔️ انتقال <b>${tn(t)}</b> به کدام گروه؟`,[O.groups.filter(g=>g.id!==oT()[t].g).map(g=>[g.name,'onca:tm:mvok:'+t+':'+g.id]),B2('onca:tm')])}
+  if(x==='mvok'){const t=+y,g=p[4];const from=oT()[t].g;[from,g].forEach(gg=>Object.keys(O.res).filter(k2=>k2.startsWith(gg+'|')).forEach(k2=>delete O.res[k2]));oT()[t].g=g;audit(`جابه‌جایی ${tn(t)}: ${from} ← ${g}`);return screen('✅ منتقل شد. جدول و نتایج دو گروه دوباره ساخته شد.',[B2('onca:tm')])}
+  if(x==='delt'){const t=+y;return screen(`🗑 تیم <b>${tn(t)}</b> حذف بشه؟\n⚠️ جدول گروهش دوباره ساخته می‌شه و نتایجش پاک می‌شن.`,[[['✅ بله','onca:tm:deltok:'+t],['🔙 نه','onca:tm']]])}
+  if(x==='deltok'){const t=+y,g=oT()[t].g;Object.keys(O.res).filter(k2=>k2.startsWith(g+'|')).forEach(k2=>delete O.res[k2]);audit('حذف تیم '+tn(t));delete oT()[t];return oncRoute(['onca','tm'])}
+  return screen('🛡 <b>تیم‌ها</b>\n'+L+'\n'+O.groups.map(g=>`<b>${g.name}</b>\n`+gTeams(g.id).map(t=>`• ${tn(t)} <code>${oT()[t].p.length} Player</code>`).join('\n')).join('\n\n'),[[['➕ افزودن تیم','onca:tm:add']],...Object.keys(oT()).slice(0,6).map(t=>[[`↔️ ${tn(t)}`,'onca:tm:mv:'+t],[`🗑 ${tn(t)}`,'onca:tm:delt:'+t]]),B2()])}
+ if(k==='sc'){return screen('🗓 <b>برنامه بازی‌ها</b> (Single Round Robin)\n'+L+'\n'+oncRounds().map(R=>`<b>Round ${R.n}</b> — ${oncHM(R.n)} ${RS_ICON[roundStatus(R)]}\n`+R.ms.map(m=>'• '+tn(m.a)+' vs '+tn(m.b)+` <code>${m.g}</code>`).join('\n')).join('\n\n')+'\n\nمسابقه‌های هر Round همزمان‌اند؛ هر تیم در هر Round حداکثر یک بازی دارد.',[[['🔄 ساخت مجدد جدول','onca:sc:regen']],B2()]),(x==='regen'?say('⛔️ ساخت مجدد وقتی مجازه که هیچ نتیجه‌ای ثبت نشده باشه. الان نتیجه ثبت‌شده داریم؛ برای تغییر جدول، تیم‌ها رو از «🛡 تیم‌ها» عوض کن (با Warning).',null):0)}
+ if(k==='re'){
+  if(x==='r'){const n=+y,R=oncRounds()[n-1];return screen(`⚽ <b>Round ${n}</b> — ${oncHM(n)} ${RS_ICON[roundStatus(R)]}\n${RS_TXT[roundStatus(R)]}\n${L}\nروی هر مسابقه بزن و فقط <b>Final Score</b> رو بفرست (مثل 2-1).`,[...R.ms.map(m=>[`${resOf(m)?(resOf(m).st==='confirmed'?'✅':'✍️'):'➕'} ${tn(m.a)} ${resOf(m)?resOf(m).sa+'-'+resOf(m).sb:'vs'} ${tn(m.b)}`.slice(0,40),'onca:re:m:'+m.key]),...(roundStatus(R)==='review'||roundStatus(R)==='confirmed'||roundStatus(R)==='published'?[[[S.onc.pub[n]?'📋 مرور Round':'📋 مرور و انتشار','onca:rv:'+n]]]:[[['📋 مرور و انتشار (بعد از ثبت همه نتایج)','onca:re:wait']]]),B2('onca:re')])}
+  if(x==='wait')return say('⚠️ تا همه مسابقه‌های Round ثبت نشده، مرور و انتشار فعال نمی‌شه.',null);
+  if(x==='m'){const key=y,[g,pair]=key.split('|'),[a,b]=pair.split('-').map(Number),R=oncRounds().find(r=>r.ms.some(m=>m.key===key));const old=O.res[key];
+   S.expect={hint:'Final Score، مثل 2-1',fn:t=>{const mm=t.trim().replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).match(/^(\d{1,2})\s*[-:]\s*(\d{1,2})$/);if(!mm){S.expect=null;return say('⚠️ قالب نتیجه مثل 2-1 باشه.',[B2('onca:re:r:'+R.n)])}
+    const before=O.res[key];O.res[key]={sa:+mm[1],sb:+mm[2],st:before&&before.st==='confirmed'?'confirmed':'entered',v:(before?before.v:0)+1};
+    audit(`نتیجه ${tn(a)} ${mm[1]}-${mm[2]} ${tn(b)} (${before?'ویرایش':'ثبت'})`);
+    const pubd=O.pub[R.n];say(`✅ ذخیره شد: ${tn(a)} <b>${mm[1]} - ${mm[2]}</b> ${tn(b)}${pubd?'\n⚠️ این Round قبلاً منتشر شده؛ رده‌بندی و صعود دوباره محاسبه شد. «به‌روزرسانی انتشار» پست قبلی را ویرایش می‌کند (پست تکراری نمی‌سازد).':''}${pubd&&O.ko.length?'\n⚠️ <b>مرحله حذفی ساخته شده؛ چیزی خودکار تغییر نکرد.</b> مسابقه‌های وابسته را خودتان بررسی کنید.':''}`,[...(pubd?[[['🔁 به‌روزرسانی انتشار','onca:rv:'+R.n+':upd']]]:[]),[['🔙 بازگشت به Round','onca:re:r:'+R.n]]])}};
+   return screen(`✍️ نتیجه <b>${tn(a)}</b> vs <b>${tn(b)}</b>${old?`\nفعلی: ${old.sa}-${old.sb}`:''}\n\nFinal Score رو بفرست (مثل 2-1):`,[B2('onca:re:r:'+R.n)]),paint()}
+  const Rs=oncRounds();return screen('⚽ <b>ثبت نتایج</b>\n'+L+'\nیک Round انتخاب کن. فقط Final Score هر مسابقه ثبت می‌شه و چیزی تا «Confirm & Publish» منتشر نمی‌شه.',[...Rs.map(R=>[`${RS_ICON[roundStatus(R)]} Round ${R.n} · ${oncHM(R.n)} · ${R.ms.filter(resOf).length}/${R.ms.length}`,'onca:re:r:'+R.n]),B2()])}
+ if(k==='rv'){const n=+x,R=oncRounds()[n-1];
+  if(y==='upd'){const p2=O.pubs.find(q=>q.ref==='Round '+n);if(p2){pubPost('round_results','Round '+n,pubText(n),gfxRound(n))}audit('به‌روزرسانی انتشار Round '+n+' (همان پیام ویرایش شد)');return screen(`✅ پست قبلی Round ${n} ویرایش شد (نسخه ${p2?p2.v:'?'}). پست تکراری ساخته نشد.`,[[['📢 دیدن کانال','onca:ch']],B2('onca:re')])}
+  if(y==='go'){const unresolved=O.groups.some(g=>qual(g.id).rows.some(r=>r.unresolved));
+   R.ms.forEach(m=>{if(O.res[m.key])O.res[m.key].st='confirmed'});O.pub[n]=true;pubPost('round_results','Round '+n,pubText(n),gfxRound(n));audit(`Confirm & Publish Round ${n}`);
+   return screen(`✅ <b>Round ${n}</b> تأیید و در «${esc(O.chan.title)}» منتشر شد.\nرده‌بندی و صعود دوباره محاسبه شد.${O.groups.some(g=>oncStand(g.id).some(r=>r.unresolved))?'\n⚠️ <b>تساوی حل‌نشده</b> داریم؛ از «📊 رده‌بندی» ترتیب رو تعیین کن.':''}`,[[['📊 رده‌بندی','onca:std'],['📢 دیدن کانال','onca:ch']],B2('onca:re')])}
+  return screen(reviewText(n)+`\n${L}\nاگه همه‌چی درسته «Confirm & Publish» رو بزن. تا قبل از آن چیزی منتشر نمی‌شه.${O.pub[n]?'\n(این Round قبلاً منتشر شده.)':''}`,[...R.ms.map(m=>[`✏️ ${tn(m.a)} ${resOf(m)?resOf(m).sa+'-'+resOf(m).sb:'vs'} ${tn(m.b)}`.slice(0,40),'onca:re:m:'+m.key]),...(O.pub[n]?[[['🔁 به‌روزرسانی انتشار','onca:rv:'+n+':upd']]]:[[['✅ CONFIRM & PUBLISH','onca:rv:'+n+':go']]]),B2('onca:re:r:'+n)])}
+ if(k==='std'){
+  if(x==='tie'){O.tieDemo=!O.tieDemo;O.manual.B={};return oncRoute(['onca','std'])}
+  if(x==='pub'){const un=O.groups.filter(g=>oncStand(g.id).some(r=>r.unresolved));if(un.length)return say(`⛔️ انتشار رده‌بندی مسدوده: ${un.map(g=>g.name).join('، ')} تساوی حل‌نشده دارد.`,null);O.groups.forEach(g=>pubPost('standings',gName(g.id),stTable(g.id),gfxStandings(g.id)));audit('انتشار رده‌بندی');return screen('✅ رده‌بندی گروه‌ها در کانال منتشر شد.',[[['📢 دیدن کانال','onca:ch']],B2('onca:std')])}
+  if(x==='tb'){const g=y,rows=oncStand(g).filter(r=>r.unresolved).map(r=>r.t),cur=O.manual[g];const pick=p[4]?+p[4]:null;if(pick){cur[pick]=Object.keys(cur).length+1}
+   const left=rows.filter(t=>cur[t]==null);return screen(`⚖️ <b>تعیین دستی ترتیب — ${gName(g)}</b>\nتیم‌ها رو به ترتیب (اول = رتبه بالاتر) بزن:\n`+rows.map(t=>cur[t]!=null?`${cur[t]}. ${tn(t)}`:`• ${tn(t)}`).join('\n'),[...left.map(t=>[tn(t),'onca:std:tb:'+g+':'+t]),[['🧹 پاک کردن','onca:std:tbclear:'+g],['✅ تمام','onca:std']]])}
+  if(x==='tbclear'){O.manual[y]={};return oncRoute(['onca','std','tb',y])}
+  const un=O.groups.filter(g=>oncStand(g.id).some(r=>r.unresolved));
+  return screen('📊 <b>رده‌بندی</b> (از نتایج تأییدشده)\n'+L+'\nقانون: امتیاز ← دو تیم: H2H ← GD ← GF · سه تیم یا بیشتر: GD ← GF · باقی‌مانده: تصمیم ادمین\nTB = معیار جداکننده: H2H · GD · GF · ADM (تصمیم ادمین) · ⚠ (حل‌نشده)\n\n'+O.groups.map(g=>stTable(g.id)).join('\n\n')+(un.length?`\n\n⚠️ <b>تساوی حل‌نشده:</b> ${un.map(g=>g.name).join('، ')}`:''),[...un.map(g=>[[`⚖️ تعیین ترتیب ${g.id}`,'onca:std:tb:'+g.id]]),[['📤 انتشار رده‌بندی','onca:std:pub']],[[O.tieDemo?'↩️ برگشت به داده واقعی':'🧪 نمایش سناریوی تساوی حل‌نشده','onca:std:tie']],B2()])}
+ if(k==='q'){const blocks=O.groups.map(g=>{const q=qual(g.id);return `<b>${g.name}</b> — ${q.q} صعودکننده${q.pending?' ⏳ <b>معلق (تساوی حل‌نشده در مرز صعود)</b>':''}\n`+q.rows.map((r,i)=>`${i<q.q?(q.pending&&r.unresolved?'⏳':'✅'):'▫️'} ${i+1}. ${tn(r.t)} (${r.Pts})`).join('\n')}).join('\n\n');
+  return screen('✅ <b>صعودکنندگان</b> (موقت تا پایان مرحله گروهی)\n'+L+'\n'+blocks+'\n\nتعداد صعودکننده هر گروه را از «👥 گروه‌ها» تغییر بده.',[[['👥 گروه‌ها','onca:g'],['🥊 ساخت حذفی','onca:ko']],B2()])}
+ if(k==='ko'){
+  if(x==='new'){S.expect={hint:'نام مرحله، مثل Semi-final',fn:t=>{const n=t.trim().slice(0,20);if(!n)return;O.ko.push({name:n,ms:[],final:false,pub:false,pick:null});audit('ساخت مرحله '+n);oncRoute(['onca','ko','st',O.ko.length-1])}};return screen('✍️ نام مرحله حذفی رو بفرست (مثل Semi-final یا Final):',[B2('onca:ko')]),paint()}
+  if(x==='st'){const s=O.ko[+y],quals=O.groups.flatMap(g=>qual(g.id).list);const pool=Object.keys(oT()).map(Number);
+   return screen(`🥊 <b>${esc(s.name)}</b>\n${L}\n`+(s.ms.length?s.ms.map(m=>'• '+tn(m.a)+(m.st?` ${m.sa}-${m.sb} `:' vs ')+tn(m.b)).join('\n'):'هنوز Matchupی نیست.')+`\n\nMatchupها رو <b>خودت</b> می‌چینی (ربات هیچ قالب A1-B2 تحمیل نمی‌کنه).${s.pick?`\nتیم اول: <b>${tn(s.pick)}</b> ← تیم دوم رو بزن:`:'\nتیم اول رو بزن:'}`,
+    [...pairs(pool.filter(t=>!s.ms.some(m=>m.a===t||m.b===t)&&t!==s.pick).map(t=>[(quals.includes(t)?'✅ ':'')+tn(t),'onca:ko:pk:'+y+':'+t])),[[s.final?'🏁 فینال ✔':'🏁 این مرحله فینال است','onca:ko:fin:'+y],['⚽ ثبت نتایج','onca:ko:rs:'+y]],B2('onca:ko')])}
+  if(x==='pk'){const s=O.ko[+y],t=+p[4];if(!s.pick){s.pick=t}else{s.ms.push({a:s.pick,b:t,st:null});s.pick=null}return oncRoute(['onca','ko','st',y])}
+  if(x==='fin'){const s=O.ko[+y];s.final=!s.final;return oncRoute(['onca','ko','st',y])}
+  if(x==='rs'){const s=O.ko[+y];return screen(`⚽ <b>${esc(s.name)}</b> — ثبت نتایج\n${L}\nFinal Score هر مسابقه (مثل 2-1).`,[...s.ms.map((m,i)=>[`${m.st?'✍️':'➕'} ${tn(m.a)} ${m.st?m.sa+'-'+m.sb:'vs'} ${tn(m.b)}`.slice(0,40),'onca:ko:m:'+y+':'+i]),[['📋 مرور و انتشار','onca:ko:rv:'+y]],B2('onca:ko:st:'+y)])}
+  if(x==='m'){const s=O.ko[+y],m=s.ms[+p[4]];S.expect={hint:'Final Score، مثل 1-1',fn:t=>{const mm=t.trim().match(/^(\d{1,2})\s*[-:]\s*(\d{1,2})$/);if(!mm)return say('⚠️ قالب نتیجه مثل 2-1.',[B2('onca:ko:rs:'+y)]);m.sa=+mm[1];m.sb=+mm[2];m.st='entered';if(m.sa===m.sb){S.expect=null;return screen(`🤝 مساوی شد. برنده (پنالتی) کیه؟`,[[[tn(m.a),'onca:ko:w:'+y+':'+p[4]+':'+m.a],[tn(m.b),'onca:ko:w:'+y+':'+p[4]+':'+m.b]]])}m.w=m.sa>m.sb?m.a:m.b;audit(`حذفی: ${tn(m.a)} ${m.sa}-${m.sb} ${tn(m.b)}`);oncRoute(['onca','ko','rs',y])}};return screen(`✍️ نتیجه <b>${tn(m.a)}</b> vs <b>${tn(m.b)}</b> رو بفرست:`,[B2('onca:ko:rs:'+y)]),paint()}
+  if(x==='w'){const s=O.ko[+y],m=s.ms[+p[4]];m.w=+p[5];audit(`حذفی (پنالتی): برنده ${tn(m.w)}`);return oncRoute(['onca','ko','rs',y])}
+  if(x==='rv'){const s=O.ko[+y];const ok=s.ms.length&&s.ms.every(m=>m.st);
+   if(p[4]==='go'){s.ms.forEach(m=>m.st='confirmed');s.pub=true;pubPost('knockout_bracket',s.name,`🥊 <b>${esc(s.name)}</b>\n`+s.ms.map(m=>`• ${tn(m.a)} ${m.sa} - ${m.sb} ${tn(m.b)}${m.sa===m.sb?` (پنالتی: ${tn(m.w)})`:''}`).join('\n'),gfxBracket());audit('Confirm & Publish '+s.name);
+    if(s.final&&s.ms[0]){O.champion=s.ms[0].w;pubPost('champion','Champion',`🏆 <b>قهرمان ${esc(O.name)}</b>\n<b>${tn(O.champion)}</b>`,gfxPoster(O.champion));audit('انتشار پوستر قهرمان')}
+    return screen(`✅ <b>${esc(s.name)}</b> منتشر شد.${s.final?'\n🏆 پوستر قهرمان (لوگو + نام تیم) هم منتشر شد.':''}`,[[['📢 دیدن کانال','onca:ch']],B2('onca:ko')])}
+   return screen(`📋 <b>مرور نتایج ${esc(s.name)}</b>\n${L}\n`+s.ms.map(m=>'• '+tn(m.a)+(m.st?` ${m.sa} - ${m.sb} `:' vs ')+tn(m.b)+(m.st&&m.sa===m.sb?` (پنالتی: ${tn(m.w)})`:'')).join('\n')+(ok?'':'\n\n⚠️ همه نتایج ثبت نشده.'),[...(ok?[[['✅ CONFIRM & PUBLISH','onca:ko:rv:'+y+':go']]]:[]),B2('onca:ko:rs:'+y)])}
+  return screen(`🥊 <b>مرحله حذفی</b>\n${L}\n`+(O.ko.length?O.ko.map(s=>`• ${s.name} — ${s.ms.length} مسابقه${s.pub?' 📢':''}${s.final?' 🏁':''}`).join('\n'):'هنوز مرحله‌ای ساخته نشده.')+'\n\nMatchupها توسط ادمین تعیین می‌شن.',[[['➕ ساخت مرحله','onca:ko:new']],...O.ko.map((s,i)=>[[`✏️ ${s.name}`,'onca:ko:st:'+i]]),B2()])}
+ if(k==='gr'){
+  if(x==='th'){O.theme=O.theme==='neon'?'gold':'neon';audit('مجموعه قالب: '+(O.theme==='neon'?'Night Neon':'Gold Classic'));return oncRoute(['onca','gr'])}
+  if(x==='p'){const kd=GKINDS.find(z=>z[0]===y);return say(`👁 <b>${kd[1]}</b> — مجموعه ${O.theme==='neon'?'Night Neon':'Gold Classic'}`,[B2('onca:gr')],{gfx:kd[2]()})}
+  return screen(`🎨 <b>گرافیک</b>\n${L}\nمجموعه قالب فعال: <b>${O.theme==='neon'?'Night Neon':'Gold Classic'}</b>\nلوگوی تیم فقط روی «پوستر قهرمان» می‌آد؛ بقیه قالب‌ها فقط نام تیم دارن.`,[...pairs(GKINDS.map(z=>[z[1],'onca:gr:p:'+z[0]])),[['🎨 تغییر مجموعه قالب','onca:gr:th']],B2()])}
+ if(k==='cn'){if(x==='set'){S.expect={hint:'نام کانال ONC',fn:t=>{O.chan.title=t.trim().slice(0,40);audit('کانال ONC = '+O.chan.title);say('✅ کانال ONC ذخیره شد. گروه آگهی‌های Transfer تغییری نکرد.',[B2('onca:cn')])}};return screen('✍️ نام/آیدی <b>کانال اخبار ONC</b> رو بفرست (ربات باید ادمین کانال باشه):',[B2('onca:cn')]),paint()}
+  return screen(`📡 <b>کانال انتشار</b>\n${L}\n🏆 ONE NIGHT CHAMPION ← <b>${esc(O.chan.title)}</b>\n<code>${O.chan.id}</code>\n\n🔄 TRANSFER ← <b>${S.group}</b>\n<code>جدا و مستقل</code>\n\nاین دو هیچ‌وقت جایگزین هم نمی‌شن.`,[[['✏️ تغییر کانال ONC','onca:cn:set']],B2()])}
+ if(k==='ch'){S.tab='onc';$('#title').textContent=O.chan.title;$('#sub').textContent='کانال';return paint()}
+ if(k==='au')return screen('🧾 <b>گزارش تغییرات</b>\n'+L+'\n'+(O.audit.length?O.audit.slice(0,12).map(a=>`🕒 ${a.t} · ${a.by} · ${a.a}`).join('\n'):'هنوز ثبتی نیست.'),[B2()]);
+}
+function pubText(n){const R=oncRounds()[n-1],byG={};R.ms.forEach(m=>(byG[m.g]=byG[m.g]||[]).push(m));
+ return `🏆 <b>ONE NIGHT CHAMPION</b>\n📅 <b>نتایج Round ${n}</b> — ${oncHM(n)}\n${L}\n`+Object.keys(byG).map(g=>`<b>${gName(g)}</b>\n`+byG[g].map(m=>'• '+matchLine(m)).join('\n')).join('\n\n')}
+const pairs=a=>a.reduce((r,b,i)=>{if(i%2===0)r.push(a.slice(i,i+2));return r},[]);
+
+const _initOnc=init;init=function(){_initOnc();S.onc=oncSeed()};
+const _prevAct=act;act=function(a){const p=a.split(':');if(['onc','onca','home','admhome'].includes(p[0])){S.expect=null;return oncRoute(p)}return _prevAct(a)};
 init();buildChips();setRole('user');
 </script>
