@@ -206,6 +206,12 @@ Max 2 badges on a tile (discount first). Badges never use gradients.
 
 **Stock status** (dot + caption): `● موجود` success · `● فقط ۳ عدد` warning (when ≤ 10) · `● ناموجود` danger. PDP shows the same with a sentence.
 
+**Variants (model × color)** — every product may have phone-model and color options; each combination is a *variant* with its own SKU, optional price override and stock.
+- PDP selectors: **model chips** first, then **color swatches** (36px, selected = 2px `ink` ring). Selecting updates price, SKU (`mono`, caption), stock line and the gallery art color.
+- Option states: *available* (normal) · *selected* (`surface-2`/ring) · *out of stock for the current pair* (`text-subtle`, diagonal strike line, still tappable, shows «ناموجود» in the stock line) · *disabled* never hides options. When a model switch makes the chosen color unavailable, auto-select the first available color.
+- Primary CTA label becomes «ناموجود در این ترکیب» (disabled) and a secondary «خبرم کن» pill appears when the selected variant is out of stock.
+- Cart lines show `model · color` in caption and use the variant SKU/price.
+
 **Price & discount**
 - Current price: `ink`, 800 (card) / 900 (PDP `price-lg`). Old price: `text-muted`, strike-through, 12–15px. Discount: danger pill `٪۲۲`.
 - Always tomans, always grouped, Persian digits, unit after number. Never abbreviate to «هزار تومان» except in the free-shipping sentence.
@@ -247,6 +253,7 @@ Principles: **calm density**, hairlines over fills, status as dots, numbers firs
 - **KPI tiles:** `surface-1`, radius `lg`, 1px `hairline`, padding 16: label (caption muted) · value (22px 900, tabular) · delta (caption; success ↑ / danger ↓ / warning). 4-up → 2-up → 2-up (never 1-up).
 - **Charts:** area/line with `brand` gradient fill at 45%→0% opacity, 2.5px line `#8E78FF`, grid lines `hairline`, endpoint dot (white fill, violet stroke). Max one gradient chart per card; secondary series use `text-muted` / `accent-blue`. Axis labels 11–12px `text-muted`. Always include units in the chart title.
 - **Data tables:** §6.7 with filter bar on top (search input + filter chips + sort), bulk-select checkboxes, row actions in a `…` icon button, pagination at the bottom (`۱ – ۲۰ از ۱۲۸` + prev/next icon pills).
+- **Variants editor (product editor, tab «واریانت‌ها»):** step 1 add **models** (chips with ✕ + input pill «افزودن مدل»), step 2 add **colors** (swatch chip with name + color input), step 3 an auto-generated **variant matrix** table: active toggle · model · color · SKU (`mono` input) · price override (placeholder = base price) · stock · status dot. Bulk bar: set stock for all, clear overrides. Rows regenerate when models/colors change and **keep existing SKU/price/stock**; new combos start at stock 0. Product-level stock = sum of active variants (read-only). Inventory screen expands a product row into its variant rows.
 - **Forms (product editor):** two-column on desktop (main form `surface-1` panel + side panel for status/category/tags), single column mobile; sticky save bar with primary sm pill «ذخیره» + secondary «انصراف»; unsaved-changes dot in the page title.
 - **Status vocabulary** (consistent across all admin screens): پرداخت‌شده/تحویل‌شده = success · در انتظار/موجودی کم = warning · لغو/ناموفق/ناموجود = danger · در حال آماده‌سازی = blue · ارسال شد = pink.
 - **Low-stock alert:** warning banner `warning @ 12%` bg, 1px `warning @ 30%` border, radius `lg`, icon + text + secondary sm pill.

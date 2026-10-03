@@ -74,3 +74,16 @@ export interface Coupon {
   code: string; kind: 'percent' | 'fixed' | 'free-shipping'; value: number;
   start: string; end: string; minOrder: number; usageLimit: number; used: number; scope: string;
 }
+
+/** یک ترکیب مدل گوشی × رنگ از یک محصول، با SKU، قیمت و موجودی مستقل */
+export interface Variant {
+  id: string;
+  productId: string;
+  model: string;
+  color: ProductColor;
+  sku: string;
+  price?: number; // اگر خالی باشد قیمت پایه‌ی محصول
+  stock: number;
+  reserved: number;
+  active: boolean;
+}

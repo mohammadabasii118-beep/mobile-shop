@@ -7,6 +7,7 @@ import { ProductArt } from '@/components/ProductArt';
 import { discountPercent, formatPrice, toFa } from '@/utils/format';
 import { useSEO } from '@/utils/seo';
 import type { ArtKind, Product } from '@/types';
+import { buildVariants, variantAvailable, variantPrice } from '@/data/variants';
 
 const HeroProduct3D = lazy(() => import('@/three/HeroProduct3D'));
 const artOf: Record<string, ArtKind> = { cases: 'case', 'screen-protectors': 'glass', chargers: 'charger', cables: 'cable', 'power-banks': 'powerbank', accessories: 'holder' };
@@ -179,25 +180,32 @@ function Shop() {
 /* ───────── Product detail ───────── */
 function Detail() {
   const p = products[0];
-  const [model, setModel] = useState(0); const [color, setColor] = useState(0); const [q, setQ] = useState(1); const [shot, setShot] = useState(0); const [acc, setAcc] = useState(0);
-  const hexes = ['#7357f6', '#ec4899', '#ff8a3d', '#1c1c1f'];
+  const variants = useMemo(() => buildVariants(p, [], true), [p]);
+  const [mi, setMi] = useState(0); const [ci, setCi] = useState(0); const [q, setQ] = useState(1); const [shot, setShot] = useState(0); const [acc, setAcc] = useState(0); const [added, setAdded] = useState(false);
+  const find = (m: number, c: number) => variants.find((v) => v.model === p.models[m] && v.color.name === p.colors[c].name)!;
+  const v = find(mi, ci); const avail = variantAvailable(v); const price = variantPrice(p, v); const out = avail <= 0; const low = avail > 0 && avail <= 5;
+  const pickModel = (m: number) => { setMi(m); if (variantAvailable(find(m, ci)) <= 0) { const alt = p.colors.findIndex((_, c) => variantAvailable(find(m, c)) > 0); if (alt >= 0) setCi(alt); } setQ(1); };
+  const hex = p.colors[ci].hex; const art = ['#cfd8df', '#f1f5f9'].includes(hex) ? '#9fb4c4' : hex;
   return (
     <section className="sec wrap">
-      <Head tag="صفحه محصول · §6.4" title="جزئیات محصول" />
+      <Head tag="صفحه محصول · واریانت مدل × رنگ · §6.4" title="جزئیات محصول" text="هر ترکیب مدل گوشی و رنگ، SKU، موجودی و قیمت خودش را دارد. ترکیب‌های ناموجود خط‌خورده نشان داده می‌شوند." />
       <div className="pd">
-        <div className="gal"><div className="stage"><ProductArt kind="case" color={hexes[color]} className="" /></div>
-          <div className="thumbs">{[0, 1, 2, 3].map((i) => <button key={i} aria-pressed={shot === i} aria-label={`تصویر ${toFa(i + 1)}`} onClick={() => setShot(i)}><ProductArt kind="case" color={hexes[color]} className="" /></button>)}</div></div>
+        <div className="gal"><div className="stage"><ProductArt kind="case" color={art} className="" /></div>
+          <div className="thumbs">{[0, 1, 2, 3].map((i) => <button key={i} aria-pressed={shot === i} aria-label={`تصویر ${toFa(i + 1)}`} onClick={() => setShot(i)}><ProductArt kind="case" color={art} className="" /></button>)}</div></div>
         <div>
           <div className="btnrow"><span className="badge b-best">پرفروش</span><span className="badge b-off">{toFa(22)}٪ تخفیف</span><span className="badge b-ship">ارسال رایگان</span></div>
           <h3>{p.name}</h3>
           <div className="stars"><Star size={14} fill="currentColor" />{(4.8).toLocaleString('fa-IR')} <span>· {toFa(214)} نظر</span></div>
-          <div className="big-price num">{formatPrice(p.price)}<span className="old" style={{ fontSize: 15, fontWeight: 400 }}>{formatPrice(p.oldPrice!)}</span></div>
-          <span className="stock s-in"><i />موجود در انبار — ارسال امروز</span>
+          <div className="big-price num">{formatPrice(price)}<span className="old" style={{ fontSize: 15, fontWeight: 400 }}>{formatPrice(p.oldPrice!)}</span></div>
+          <span className={`stock ${out ? 's-out' : low ? 's-low' : 's-in'}`}><i />{out ? 'این ترکیب ناموجود است' : low ? `فقط ${toFa(avail)} عدد از این ترکیب باقی مانده` : 'موجود در انبار — ارسال امروز'}</span>
           <p className="lead" style={{ fontSize: 15, marginBlockStart: 12 }}>{p.description}</p>
-          <div className="opt"><label>مدل گوشی</label><div className="rowc">{['آیفون ۱۶ پرو مکس', 'آیفون ۱۶ پرو', 'آیفون ۱۶'].map((m, i) => <button key={m} className="chip" aria-pressed={model === i} onClick={() => setModel(i)}>{m}</button>)}</div></div>
-          <div className="opt"><label>رنگ</label><div className="rowc">{hexes.map((h, i) => <button key={h} className="sw" aria-label={`رنگ ${toFa(i + 1)}`} aria-pressed={color === i} onClick={() => setColor(i)} style={{ background: h }} />)}</div></div>
-          <div className="opt"><label>تعداد</label><div className="qty"><button className="ic" aria-label="افزایش" onClick={() => setQ(q + 1)}><Plus size={16} /></button><b className="num">{toFa(q)}</b><button className="ic" aria-label="کاهش" onClick={() => setQ(Math.max(1, q - 1))}><Minus size={16} /></button></div></div>
-          <div className="btnrow" style={{ marginBlockStart: 24 }}><button className="btn btn-p btn-lg" style={{ flex: 1 }}>افزودن به سبد</button><button className="btn btn-s btn-lg" style={{ flex: 1 }}>خرید فوری</button></div>
+          <div className="opt"><label>مدل گوشی: <span className="vlab">{p.models[mi]}</span></label><div className="rowc">{p.models.map((m, i) => { const none = p.colors.every((_, c) => variantAvailable(find(i, c)) <= 0); return <button key={m} className="chip" aria-pressed={mi === i} data-out={none} onClick={() => pickModel(i)}>{m}</button>; })}</div></div>
+          <div className="opt"><label>رنگ: <span className="vlab">{p.colors[ci].name}</span></label><div className="rowc">{p.colors.map((c, i) => <button key={c.name} className="sw" aria-label={`${c.name}${variantAvailable(find(mi, i)) <= 0 ? ' (ناموجود)' : ''}`} aria-pressed={ci === i} data-out={variantAvailable(find(mi, i)) <= 0} onClick={() => { setCi(i); setQ(1); }} style={{ background: c.hex }} />)}</div></div>
+          <div className="vmeta"><span>SKU: <span className="mono">{v.sku}</span></span><span>مدل × رنگ: {p.models[mi]} · {p.colors[ci].name}</span></div>
+          <div className="opt"><label>تعداد</label><div className="qty"><button className="ic" aria-label="افزایش" onClick={() => setQ(Math.min(Math.max(avail, 1), q + 1))}><Plus size={16} /></button><b className="num">{toFa(q)}</b><button className="ic" aria-label="کاهش" onClick={() => setQ(Math.max(1, q - 1))}><Minus size={16} /></button></div></div>
+          <div className="btnrow" style={{ marginBlockStart: 24 }}>
+            <button className="btn btn-p btn-lg" style={{ flex: 1 }} disabled={out} onClick={() => { setAdded(true); setTimeout(() => setAdded(false), 1800); }}>{out ? 'ناموجود در این ترکیب' : added ? 'به سبد اضافه شد ✓' : 'افزودن به سبد'}</button>
+            {out ? <button className="btn btn-s btn-lg" style={{ flex: 1 }}>خبرم کن</button> : <button className="btn btn-s btn-lg" style={{ flex: 1 }}>خرید فوری</button>}</div>
           <div className="infos"><div><b>ارسال سریع</b>تهران ۱ تا ۲ روز، شهرستان ۲ تا ۵ روز</div><div><b>بازگشت کالا</b>تا ۷ روز با شرایط بازگشت</div></div>
           <div className="disc">{[['توضیحات', p.description], ['مشخصات', 'جنس: TPU و پلی‌کربنات · وزن ۳۲ گرم · سازگار با شارژ بی‌سیم'], ['نظرات (۲۱۴)', 'میانگین امتیاز ۴٫۸ از ۵']].map(([t, d], i) => (
             <div key={t}><button onClick={() => setAcc(acc === i ? -1 : i)}>{t}<ChevronDown size={18} style={{ transform: acc === i ? 'rotate(180deg)' : 'none' }} /></button>{acc === i && <p>{d}</p>}</div>))}</div>

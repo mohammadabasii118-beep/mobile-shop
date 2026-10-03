@@ -205,3 +205,11 @@
 .fd .modal { width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; background: var(--s1); border-radius: var(--r-xxl) var(--r-xxl) 0 0; box-shadow: 0 24px 60px rgba(0, 0, 0, .55); padding: 24px; padding-block-end: calc(24px + env(safe-area-inset-bottom, 0px)); } @media (min-width: 810px) { .fd .modal { border-radius: var(--r-xxl); padding: 32px; } }
 .fd .modal header { display: flex; justify-content: space-between; align-items: center; margin-block-end: 20px; } .fd .modal h3 { font-size: 20px; font-weight: 800; color: var(--ink); } .fd .modal footer { display: flex; gap: 10px; margin-block-start: 20px; }
 @media (prefers-reduced-motion: reduce) { .fd *, .fd *::before, .fd *::after { transition-duration: 0.01ms !important; animation: none !important; } }
+
+/* variants (DESIGN.md §6.4 Variants) */
+.fd .chip[data-out='true'], .fd .sw[data-out='true'] { color: var(--subtle); position: relative; overflow: hidden; }
+.fd .chip[data-out='true'] { text-decoration: line-through; }
+.fd .sw[data-out='true']::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top left, transparent calc(50% - 1px), var(--danger) 50%, transparent calc(50% + 1px)); }
+.fd .sw[data-out='true'] { opacity: .6; }
+.fd .vmeta { display: flex; gap: 8px 16px; flex-wrap: wrap; align-items: center; margin-block-start: 10px; font-size: 12px; color: var(--muted); }
+.fd .vlab { font-weight: 600; color: var(--ink); }

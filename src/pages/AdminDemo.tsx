@@ -8,7 +8,9 @@ import { coupons, orders as seedOrders, reviews as seedReviews, orderStatusSteps
 import { ProductArt } from '@/components/ProductArt';
 import { faDate, formatPrice, toFa } from '@/utils/format';
 import { useSEO } from '@/utils/seo';
-import type { Order, Product, Review } from '@/types';
+import type { Order, Product, Review, Variant } from '@/types';
+import { buildVariants, totalAvailable, variantAvailable } from '@/data/variants';
+import { VariantsEditor } from '@/features/design-demo/VariantsEditor';
 
 type View = 'dashboard' | 'products' | 'orders' | 'inventory' | 'customers' | 'reviews' | 'coupons' | 'settings';
 const artColor = (p: Product) => (['شفاف', 'سفید'].includes(p.colors[0].name) ? '#7357f6' : p.colors[0].hex);
@@ -55,34 +57,48 @@ function Dashboard({ go }: { go: (v: View) => void }) {
   );
 }
 
-function ProductsView({ toast }: { toast: (m: string) => void }) {
+type VMap = Record<string, Variant[]>;
+
+function ProductsView({ toast, vmap, setVmap }: { toast: (m: string) => void; vmap: VMap; setVmap: (m: VMap) => void }) {
   const [list, setList] = useState<Product[]>(seed); const [q, setQ] = useState(''); const [cat, setCat] = useState('all');
-  const [edit, setEdit] = useState<Product | null>(null); const [del, setDel] = useState<Product | null>(null);
+  const [edit, setEdit] = useState<Product | null>(null); const [vars, setVars] = useState<Variant[]>([]); const [tab, setTab] = useState(0); const [del, setDel] = useState<Product | null>(null);
   const shown = list.filter((p) => (cat === 'all' || p.category === cat) && (p.name + p.sku).includes(q));
-  const blank = (): Product => ({ id: `n${Date.now()}`, slug: `new-${Date.now()}`, name: '', category: 'cases', brand: 'CaseLine', sku: `CL-NEW-${list.length + 1}`, description: '', price: 0, rating: 0, reviewCount: 0, stock: 0, reserved: 0, minStock: 10, models: [], colors: [{ name: 'مشکی', hex: '#1a1a1d' }], tags: [], art: 'case' });
-  const save = () => { if (!edit?.name.trim()) { toast('نام محصول الزامی است'); return; } setList((l) => (l.some((x) => x.id === edit.id) ? l.map((x) => (x.id === edit.id ? edit : x)) : [edit, ...l])); setEdit(null); toast('محصول ذخیره شد'); };
+  const blank = (): Product => ({ id: `n${Date.now()}`, slug: `new-${Date.now()}`, name: '', category: 'cases', brand: 'CaseLine', sku: `CL-NEW-${list.length + 1}`, description: '', price: 0, rating: 0, reviewCount: 0, stock: 0, reserved: 0, minStock: 10, models: [], colors: [], tags: [], art: 'case' });
+  const open = (p: Product) => { setEdit(p); setVars(vmap[p.id] ?? buildVariants(p)); setTab(0); };
+  const save = () => {
+    if (!edit?.name.trim()) { toast('نام محصول الزامی است'); setTab(0); return; }
+    const saved = { ...edit, stock: vars.reduce((s, v) => s + v.stock, 0) };
+    setList((l) => (l.some((x) => x.id === saved.id) ? l.map((x) => (x.id === saved.id ? saved : x)) : [saved, ...l]));
+    setVmap({ ...vmap, [saved.id]: vars }); setEdit(null); toast(`محصول با ${toFa(vars.length)} ترکیب ذخیره شد`);
+  };
   const flag = (id: string, k: 'isFeatured' | 'isBestseller' | 'isNew') => setList((l) => l.map((p) => (p.id === id ? { ...p, [k]: !p[k] } : p)));
   const set = (k: keyof Product, v: string | number | boolean) => setEdit((e) => e && { ...e, [k]: v });
   return (
     <>
       <div className="ftools"><div className="search" style={{ flex: 1, minWidth: 200 }}><Search size={16} /><input className="inp" id="p-q" placeholder="جستجوی نام یا SKU" value={q} onChange={(e) => setQ(e.target.value)} style={{ minHeight: 36 }} /></div>
         <button className="chip" aria-pressed={cat === 'all'} onClick={() => setCat('all')}>همه</button>{categories.map((c) => <button key={c.slug} className="chip" aria-pressed={cat === c.slug} onClick={() => setCat(c.slug)}>{c.name}</button>)}</div>
-      <div className="tbl ad-tbl"><table><thead><tr><th>محصول</th><th>SKU</th><th>قیمت</th><th>موجودی</th><th>ویژه</th><th>پرفروش</th><th>جدید</th><th style={{ width: 90 }} /></tr></thead><tbody>
-        {shown.map((p) => { const a = p.stock - p.reserved; return (<tr key={p.id}><td><div className="nm"><div className="th"><ProductArt kind={p.art} color={artColor(p)} className="" /></div><span>{p.name}</span></div></td><td><span className="mono">{p.sku}</span></td><td className="num">{formatPrice(p.price)}</td>
+      <div className="tbl ad-tbl"><table><thead><tr><th>محصول</th><th>SKU</th><th>قیمت</th><th>واریانت</th><th>موجودی کل</th><th>ویژه</th><th>پرفروش</th><th>جدید</th><th style={{ width: 90 }} /></tr></thead><tbody>
+        {shown.map((p) => { const vs = vmap[p.id] ?? []; const a = vs.length ? totalAvailable(vs) : p.stock - p.reserved; const outV = vs.filter((v) => v.active && variantAvailable(v) <= 0).length; return (<tr key={p.id}><td><div className="nm"><div className="th"><ProductArt kind={p.art} color={artColor(p)} className="" /></div><span>{p.name}</span></div></td><td><span className="mono">{p.sku}</span></td><td className="num">{formatPrice(p.price)}</td>
+          <td><span className="num">{toFa(p.models.length)} مدل × {toFa(p.colors.length)} رنگ</span>{outV > 0 && <span className="cap" style={{ color: 'var(--warn)', display: 'block' }}>{toFa(outV)} ترکیب ناموجود</span>}</td>
           <td><Status c={a <= 0 ? 'var(--danger)' : a <= p.minStock ? 'var(--warn)' : 'var(--ok)'}>{a <= 0 ? 'ناموجود' : toFa(a)}</Status></td>
           {(['isFeatured', 'isBestseller', 'isNew'] as const).map((k) => <td key={k}><button className="sw-t" aria-pressed={!!p[k]} aria-label={k} onClick={() => flag(p.id, k)}><i /></button></td>)}
-          <td><button className="ic" style={{ width: 32, height: 32, background: 'transparent' }} aria-label="ویرایش" onClick={() => setEdit(p)}><MoreHorizontal size={16} /></button><button className="ic" style={{ width: 32, height: 32, background: 'transparent' }} aria-label="حذف" onClick={() => setDel(p)}><Trash2 size={15} /></button></td></tr>); })}</tbody></table>
+          <td><button className="ic" style={{ width: 32, height: 32, background: 'transparent' }} aria-label="ویرایش" onClick={() => open(p)}><MoreHorizontal size={16} /></button><button className="ic" style={{ width: 32, height: 32, background: 'transparent' }} aria-label="حذف" onClick={() => setDel(p)}><Trash2 size={15} /></button></td></tr>); })}</tbody></table>
         {!shown.length && <div className="empty"><div className="circ"><PackageSearch size={22} /></div><b style={{ color: 'var(--ink)' }}>محصولی پیدا نشد</b><p>جستجو یا فیلتر را تغییر دهید.</p></div>}</div>
-      <div className="pager"><span className="num">{toFa(shown.length)} از {toFa(list.length)} محصول</span><button className="btn btn-p btn-sm" onClick={() => setEdit(blank())}><Plus size={14} />محصول جدید</button></div>
-      {edit && <Modal wide title={list.some((x) => x.id === edit.id) ? 'ویرایش محصول' : 'محصول جدید'} onClose={() => setEdit(null)} footer={<><button className="btn btn-p btn-sm" onClick={save}>ذخیره</button><button className="btn btn-s btn-sm" onClick={() => setEdit(null)}>انصراف</button></>}>
-        <div className="edit-grid"><div>
+      <div className="pager"><span className="num">{toFa(shown.length)} از {toFa(list.length)} محصول</span><button className="btn btn-p btn-sm" onClick={() => open(blank())}><Plus size={14} />محصول جدید</button></div>
+      {edit && <div className="modal-bg" onClick={() => setEdit(null)}><div className="modal wide xwide" role="dialog" aria-label="محصول" onClick={(e) => e.stopPropagation()}>
+        <header><h3>{list.some((x) => x.id === edit.id) ? 'ویرایش محصول' : 'محصول جدید'}</h3><button className="ic" aria-label="بستن" onClick={() => setEdit(null)}><X size={18} /></button></header>
+        <div className="vtabs" role="tablist"><button role="tab" aria-selected={tab === 0} onClick={() => setTab(0)}>اطلاعات</button><button role="tab" aria-selected={tab === 1} onClick={() => setTab(1)}>واریانت‌ها ({toFa(vars.length)})</button></div>
+        {tab === 0 ? <div className="edit-grid"><div>
           <label className="field"><span>نام محصول</span><input className="inp" id="e-name" value={edit.name} onChange={(e) => set('name', e.target.value)} /></label>
-          <div className="two"><label className="field"><span>قیمت (تومان)</span><input className="inp ltr" id="e-price" inputMode="numeric" value={edit.price || ''} onChange={(e) => set('price', +e.target.value.replace(/\D/g, ''))} /></label><label className="field"><span>قیمت قبل از تخفیف</span><input className="inp ltr" id="e-old" inputMode="numeric" value={edit.oldPrice ?? ''} onChange={(e) => set('oldPrice', +e.target.value.replace(/\D/g, ''))} /></label></div>
-          <div className="two"><label className="field"><span>SKU</span><input className="inp ltr" id="e-sku" value={edit.sku} onChange={(e) => set('sku', e.target.value)} /></label><label className="field"><span>موجودی</span><input className="inp ltr" id="e-stock" inputMode="numeric" value={edit.stock} onChange={(e) => set('stock', +e.target.value.replace(/\D/g, ''))} /></label></div>
+          <div className="two"><label className="field"><span>قیمت پایه (تومان)</span><input className="inp ltr" id="e-price" inputMode="numeric" value={edit.price || ''} onChange={(e) => set('price', +e.target.value.replace(/\D/g, ''))} /></label><label className="field"><span>قیمت قبل از تخفیف</span><input className="inp ltr" id="e-old" inputMode="numeric" value={edit.oldPrice ?? ''} onChange={(e) => set('oldPrice', +e.target.value.replace(/\D/g, ''))} /></label></div>
+          <div className="two"><label className="field"><span>SKU پایه</span><input className="inp ltr" id="e-sku" value={edit.sku} onChange={(e) => set('sku', e.target.value)} /></label><label className="field"><span>موجودی کل (از واریانت‌ها)</span><input className="inp ltr" id="e-stock" readOnly value={vars.reduce((s, v) => s + v.stock, 0)} /></label></div>
           <label className="field"><span>توضیحات</span><textarea className="inp" id="e-desc" rows={3} value={edit.description} onChange={(e) => set('description', e.target.value)} /></label></div>
           <div><label className="field"><span>دسته‌بندی</span><select className="inp" id="e-cat" value={edit.category} onChange={(e) => set('category', e.target.value)}>{categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}</select></label>
-            <div className="panel" style={{ background: 'var(--canvas)', padding: 16 }}><b style={{ color: 'var(--ink)', fontSize: 13 }}>پیش‌نمایش</b><div style={{ aspectRatio: '1', background: 'var(--s2)', borderRadius: 14, margin: '10px 0', display: 'grid', placeItems: 'center' }}><ProductArt kind={edit.art} color="#7357f6" className="h-24 w-24" /></div><div className="price num">{formatPrice(edit.price)}</div></div></div></div></Modal>}
-      {del && <Modal title="حذف محصول" onClose={() => setDel(null)} footer={<><button className="btn btn-d btn-sm" onClick={() => { setList((l) => l.filter((x) => x.id !== del.id)); setDel(null); toast('محصول حذف شد'); }}>حذف «{del.sku}»</button><button className="btn btn-s btn-sm" onClick={() => setDel(null)}>انصراف</button></>}><p className="lead" style={{ fontSize: 15 }}>«{del.name}» برای همیشه حذف می‌شود. این کار قابل بازگشت نیست.</p></Modal>}
+            <div className="panel" style={{ background: 'var(--canvas)', padding: 16 }}><b style={{ color: 'var(--ink)', fontSize: 13 }}>خلاصه واریانت‌ها</b><div className="kv"><span>مدل‌ها</span><span>{toFa(edit.models.length)}</span></div><div className="kv"><span>رنگ‌ها</span><span>{toFa(edit.colors.length)}</span></div><div className="kv"><span>ترکیب‌ها</span><span>{toFa(vars.length)}</span></div><button className="btn btn-s btn-sm" style={{ marginBlockStart: 12 }} onClick={() => setTab(1)}>مدیریت واریانت‌ها</button></div></div></div>
+          : <VariantsEditor draft={edit} setDraft={setEdit as (p: Product) => void} variants={vars} setVariants={setVars} />}
+        <footer><button className="btn btn-p btn-sm" onClick={save}>ذخیره</button><button className="btn btn-s btn-sm" onClick={() => setEdit(null)}>انصراف</button></footer>
+      </div></div>}
+      {del && <Modal title="حذف محصول" onClose={() => setDel(null)} footer={<><button className="btn btn-d btn-sm" onClick={() => { setList((l) => l.filter((x) => x.id !== del.id)); setDel(null); toast('محصول حذف شد'); }}>حذف «{del.sku}»</button><button className="btn btn-s btn-sm" onClick={() => setDel(null)}>انصراف</button></>}><p className="lead" style={{ fontSize: 15 }}>«{del.name}» و تمام ترکیب‌های آن برای همیشه حذف می‌شود. این کار قابل بازگشت نیست.</p></Modal>}
     </>
   );
 }
@@ -106,13 +122,25 @@ function OrdersView({ toast }: { toast: (m: string) => void }) {
   );
 }
 
-function InventoryView() {
-  const low = seed.filter((p) => p.stock - p.reserved <= p.minStock);
+function InventoryView({ vmap, setVmap }: { vmap: VMap; setVmap: (m: VMap) => void }) {
+  const [open, setOpen] = useState<string[]>([seed[0].id]);
+  const rows = seed.map((p) => ({ p, vs: vmap[p.id] ?? buildVariants(p) }));
+  const lowCount = rows.filter(({ p, vs }) => totalAvailable(vs) <= p.minStock).length;
+  const outVariants = rows.reduce((s, { vs }) => s + vs.filter((v) => v.active && variantAvailable(v) <= 0).length, 0);
+  const setStock = (pid: string, vid: string, stock: number) => setVmap({ ...vmap, [pid]: (vmap[pid] ?? []).map((v) => (v.id === vid ? { ...v, stock } : v)) });
   return (
     <>
-      <div className="banner"><AlertTriangle size={18} /><span>{toFa(low.length)} محصول به حداقل موجودی رسیده‌اند.</span><button className="btn btn-s btn-sm">ثبت سفارش خرید</button></div>
-      <div className="tbl ad-tbl"><table><thead><tr><th>محصول</th><th>SKU</th><th>موجودی</th><th>رزرو</th><th>قابل فروش</th><th>حداقل</th><th>وضعیت</th></tr></thead><tbody>
-        {seed.map((p) => { const a = p.stock - p.reserved; const c = a <= 0 ? 'var(--danger)' : a <= p.minStock ? 'var(--warn)' : 'var(--ok)'; return <tr key={p.id}><td><div className="nm"><div className="th"><ProductArt kind={p.art} color={artColor(p)} className="" /></div><span>{p.name}</span></div></td><td><span className="mono">{p.sku}</span></td><td className="num">{toFa(p.stock)}</td><td className="num">{toFa(p.reserved)}</td><td className="num"><span className="meter"><i style={{ width: `${Math.min(100, (a / 60) * 100)}%`, background: c }} /></span> {toFa(a)}</td><td className="num">{toFa(p.minStock)}</td><td><Status c={c}>{a <= 0 ? 'ناموجود' : a <= p.minStock ? 'موجودی کم' : 'موجود'}</Status></td></tr>; })}</tbody></table></div>
+      <div className="banner"><AlertTriangle size={18} /><span>{toFa(lowCount)} محصول به حداقل موجودی رسیده‌اند و {toFa(outVariants)} ترکیب مدل/رنگ ناموجود است.</span><button className="btn btn-s btn-sm">ثبت سفارش خرید</button></div>
+      <div className="tbl ad-tbl"><table><thead><tr><th style={{ width: 44 }} /><th>محصول / ترکیب</th><th>SKU</th><th>موجودی</th><th>رزرو</th><th>قابل فروش</th><th>وضعیت</th></tr></thead><tbody>
+        {rows.flatMap(({ p, vs }) => {
+          const tot = vs.reduce((s, v) => s + v.stock, 0), res = vs.reduce((s, v) => s + v.reserved, 0), av = totalAvailable(vs); const c = av <= 0 ? 'var(--danger)' : av <= p.minStock ? 'var(--warn)' : 'var(--ok)'; const isOpen = open.includes(p.id);
+          const head = <tr key={p.id}><td><button className="ic" style={{ width: 32, height: 32, background: 'transparent' }} aria-label={isOpen ? 'بستن ترکیب‌ها' : 'نمایش ترکیب‌ها'} aria-expanded={isOpen} onClick={() => setOpen(isOpen ? open.filter((x) => x !== p.id) : [...open, p.id])}><ChevronDown size={16} style={{ transform: isOpen ? 'rotate(180deg)' : 'none' }} /></button></td>
+            <td><div className="nm"><div className="th"><ProductArt kind={p.art} color={artColor(p)} className="" /></div><span>{p.name} <span className="cap">({toFa(vs.length)} ترکیب)</span></span></div></td><td><span className="mono">{p.sku}</span></td><td className="num">{toFa(tot)}</td><td className="num">{toFa(res)}</td><td className="num"><span className="meter"><i style={{ width: `${Math.min(100, (av / 60) * 100)}%`, background: c }} /></span> {toFa(av)}</td><td><Status c={c}>{av <= 0 ? 'ناموجود' : av <= p.minStock ? 'موجودی کم' : 'موجود'}</Status></td></tr>;
+          const kids = isOpen ? vs.map((v) => { const a = variantAvailable(v); const vc = !v.active ? 'var(--subtle)' : a <= 0 ? 'var(--danger)' : a <= 3 ? 'var(--warn)' : 'var(--ok)'; return (
+            <tr className="vrows" key={v.id}><td /><td><div className="nm"><span><span className="dotc" style={{ background: v.color.hex }} />{v.model} · {v.color.name}</span></div></td><td><span className="mono">{v.sku}</span></td>
+              <td><input className="inp ltr" style={{ width: 76, minHeight: 32, padding: '2px 10px' }} aria-label={`موجودی ${v.sku}`} inputMode="numeric" value={v.stock} onChange={(e) => setStock(p.id, v.id, +e.target.value.replace(/\D/g, ''))} /></td><td className="num">{toFa(v.reserved)}</td><td className="num">{toFa(a)}</td><td><Status c={vc}>{!v.active ? 'غیرفعال' : a <= 0 ? 'ناموجود' : a <= 3 ? 'کم' : 'موجود'}</Status></td></tr>); }) : [];
+          return [head, ...kids];
+        })}</tbody></table></div>
     </>
   );
 }
@@ -139,10 +167,11 @@ const Info = ({ t }: { t: string }) => <div className="empty panel"><div classNa
 
 export default function AdminDemo() {
   useSEO({ title: 'Admin Demo' });
+  const [vmap, setVmap] = useState<VMap>(() => Object.fromEntries(seed.map((p) => [p.id, buildVariants(p, [], true)])));
   const [view, setView] = useState<View>('dashboard'); const [msg, setMsg] = useState<string | null>(null);
   const toast = (m: string) => { setMsg(m); setTimeout(() => setMsg(null), 2400); };
   const nav: [View, string, typeof Package][] = [['dashboard', 'داشبورد', LayoutDashboard], ['products', 'محصولات', Package], ['orders', 'سفارش‌ها', ShoppingCart], ['inventory', 'موجودی', Boxes], ['customers', 'مشتریان', Users], ['reviews', 'نظرات', MessageSquare], ['coupons', 'کدهای تخفیف', Ticket], ['settings', 'تنظیمات', Settings]];
-  const titles: Record<View, [string, string]> = { dashboard: ['داشبورد', 'خلاصه‌ی عملکرد فروشگاه'], products: ['محصولات', 'افزودن، ویرایش و مدیریت کاتالوگ'], orders: ['سفارش‌ها', 'پیگیری و تغییر وضعیت سفارش‌ها'], inventory: ['موجودی', 'SKU، رزرو و موجودی قابل فروش'], customers: ['مشتریان', ''], reviews: ['نظرات', 'بررسی نظرات مشتریان'], coupons: ['کدهای تخفیف', 'مدیریت کمپین‌ها'], settings: ['تنظیمات', ''] };
+  const titles: Record<View, [string, string]> = { dashboard: ['داشبورد', 'خلاصه‌ی عملکرد فروشگاه'], products: ['محصولات', 'محصولات، مدل‌ها، رنگ‌ها و واریانت‌ها'], orders: ['سفارش‌ها', 'پیگیری و تغییر وضعیت سفارش‌ها'], inventory: ['موجودی', 'موجودی هر ترکیب مدل و رنگ'], customers: ['مشتریان', ''], reviews: ['نظرات', 'بررسی نظرات مشتریان'], coupons: ['کدهای تخفیف', 'مدیریت کمپین‌ها'], settings: ['تنظیمات', ''] };
   const customers = useMemo(() => Array.from(new Map(seedOrders.map((o) => [o.phone, o])).values()), []);
   const pending = seedReviews.filter((r) => r.status === 'pending').length;
   return (
@@ -158,7 +187,7 @@ export default function AdminDemo() {
           <div className="ad-top"><div className="crumb"><span>CaseLine</span>/<b>{titles[view][0]}</b></div><div className="cmd"><Search size={14} />جستجو یا دستور…<kbd>⌘K</kbd></div><div className="av">ع</div></div>
           <main className="ad-main">
             <div className="ph"><div><h4>{titles[view][0]}</h4>{titles[view][1] && <p>{titles[view][1]}</p>}</div>{view === 'dashboard' && <div className="row-tools"><button className="btn btn-s btn-sm"><BarChart3 size={14} />گزارش<ChevronDown size={14} /></button><button className="btn btn-p btn-sm" onClick={() => setView('products')}><Plus size={14} />محصول جدید</button></div>}</div>
-            {view === 'dashboard' && <Dashboard go={setView} />}{view === 'products' && <ProductsView toast={toast} />}{view === 'orders' && <OrdersView toast={toast} />}{view === 'inventory' && <InventoryView />}{view === 'reviews' && <ReviewsView toast={toast} />}{view === 'coupons' && <CouponsView toast={toast} />}
+            {view === 'dashboard' && <Dashboard go={setView} />}{view === 'products' && <ProductsView toast={toast} vmap={vmap} setVmap={setVmap} />}{view === 'orders' && <OrdersView toast={toast} />}{view === 'inventory' && <InventoryView vmap={vmap} setVmap={setVmap} />}{view === 'reviews' && <ReviewsView toast={toast} />}{view === 'coupons' && <CouponsView toast={toast} />}
             {view === 'customers' && <div className="tbl ad-tbl"><table><thead><tr><th>مشتری</th><th>موبایل</th><th>آدرس</th><th>سفارش‌ها</th></tr></thead><tbody>{customers.map((o) => <tr key={o.phone}><td>{o.customer}</td><td><span className="mono">{o.phone}</span></td><td>{o.address}</td><td className="num">{toFa(seedOrders.filter((x) => x.phone === o.phone).length)}</td></tr>)}</tbody></table></div>}
             {view === 'settings' && <Info t="تنظیمات فروشگاه" />}
           </main>

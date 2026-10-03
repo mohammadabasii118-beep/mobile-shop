@@ -22,3 +22,15 @@
 .fd .modal.wide { max-width: 760px; } .fd .kv { display: flex; justify-content: space-between; gap: 12px; padding-block: 8px; border-block-end: 1px solid var(--hair-soft); font-size: 13px; } .fd .kv span:first-child { color: var(--muted); }
 .fd .row-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .fd .empty { text-align: center; padding: 48px 16px; color: var(--muted); } .fd .empty .circ { width: 56px; height: 56px; border-radius: 50%; background: var(--s2); display: grid; place-items: center; margin: 0 auto 12px; color: var(--ink); }
+
+/* variants editor */
+.fd .vtabs { display: flex; gap: 20px; border-block-end: 1px solid var(--hair); margin-block-end: 16px; } .fd .vtabs button { padding-block: 10px; font-size: 14px; font-weight: 500; color: var(--muted); border-block-end: 2px solid transparent; margin-block-end: -1px; min-height: 44px; } .fd .vtabs button[aria-selected='true'] { color: var(--ink); border-color: var(--ink); }
+.fd .tagrow { display: flex; flex-wrap: wrap; gap: 8px; margin-block-end: 10px; }
+.fd .tagx { display: inline-flex; align-items: center; gap: 8px; background: var(--s2); color: var(--ink); border-radius: var(--pill); padding-block: 6px; padding-inline: 14px 8px; font-size: 13px; font-weight: 500; } .fd .tagx button { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--s3); color: var(--muted); } .fd .tagx button:hover { color: var(--ink); }
+.fd .tagx i { width: 14px; height: 14px; border-radius: 50%; outline: 1px solid var(--hair); }
+.fd .addrow { display: flex; gap: 8px; align-items: center; } .fd .addrow .inp { flex: 1; min-width: 0; } .fd input[type='color'].cp { width: 44px; height: 44px; padding: 4px; border-radius: 50%; border: 1px solid var(--hair); background: var(--canvas); cursor: pointer; flex: none; }
+.fd .vm { overflow-x: auto; border: 1px solid var(--hair); border-radius: var(--r-lg); } .fd .vm table { min-width: 720px; } .fd .vm td { height: 52px; } .fd .vm .inp { min-height: 34px; padding: 4px 10px; font-size: 13px; border-radius: var(--r-md); } .fd .vm td .mono-in { font-family: ui-monospace, monospace; direction: ltr; text-align: start; width: 170px; }
+.fd .vrows td { background: var(--s1); } .fd .vrows .nm { padding-inline-start: 18px; }
+.fd .bulk { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-block: 12px; } .fd .bulk .inp { width: 120px; min-height: 36px; }
+.fd .dotc { display: inline-block; width: 12px; height: 12px; border-radius: 50%; outline: 1px solid var(--hair); vertical-align: middle; margin-inline-end: 6px; }
+.fd .modal.xwide { max-width: 980px; }
