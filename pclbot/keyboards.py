@@ -25,7 +25,6 @@ def main_menu(is_admin: bool = False) -> InlineKeyboardMarkup:
         btn("👥 دعوت دوستان", "invite"), btn("🏅 نشان‌های افتخار", "badges"),
     ]
     rows = pairs(items)
-    if is_admin:
-        rows.append([btn("🛠 پنل مدیریت", "admhome")])
+    # the admin-panel button now lives in the top-level main menu (handlers/home.py), not in the Transfer menu
     rows.append([btn("🏠 منوی اصلی", "home")])
     return kb(rows)

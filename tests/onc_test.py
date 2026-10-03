@@ -72,6 +72,15 @@ async def run():
         await d.say("/start", VIEWER)
         assert [t for t, _ in d.buttons(VIEWER)] == ["🔄 ترنسفر", "🏆 وان نایت چمپیون"]
         d.snap("Main menu — two sections", VIEWER)
+        # the admin-panel button lives in the main menu, for admins only
+        await d.say("/start", ADMIN)
+        assert [t for t, _ in d.buttons(ADMIN)] == ["🔄 ترنسفر", "🏆 وان نایت چمپیون", "🛠 پنل مدیریت"], d.buttons(ADMIN)
+        await d.tap("پنل مدیریت", ADMIN)
+        assert [t for t, _ in d.buttons(ADMIN)][:2] == ["🔄 پنل ترنسفر", "🏆 پنل وان نایت چمپیون"]
+        await d.tap("منوی اصلی", ADMIN); await d.tap("ترنسفر", ADMIN)
+        assert not any("پنل مدیریت" in t for t, _ in d.buttons(ADMIN)), "no admin button inside the Transfer menu any more"
+        await d.press("admhome", VIEWER); await d.press("adm", VIEWER); await d.press("onc:a", VIEWER)   # forged by a normal user
+        assert "پنل" not in d.text(VIEWER)
         await d.tap("ترنسفر", VIEWER)
         labels = [t for t, _ in d.buttons(VIEWER)]
         assert any("ثبت آگهی" in t for t in labels) and "🏠 منوی اصلی" in labels, labels      # existing Transfer menu is intact

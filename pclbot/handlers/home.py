@@ -19,7 +19,10 @@ ADMIN_TEXT = "🛠 <b>پنل مدیریت</b>\n\nکدام پنل را می‌خ�
 
 
 def home_markup(uid: int):
-    return kb([[btn("🔄 ترنسفر", "menu")], [btn("🏆 وان نایت چمپیون", "onc:u")]])
+    rows = [[btn("🔄 ترنسفر", "menu")], [btn("🏆 وان نایت چمپیون", "onc:u")]]
+    if is_admin(uid):  # admins only; the panels behind it keep their own admin filters
+        rows.append([btn("🛠 پنل مدیریت", "admhome")])
+    return kb(rows)
 
 
 def admin_markup():
