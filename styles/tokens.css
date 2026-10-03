@@ -1,0 +1,77 @@
+/*
+ * Design tokens — منبع: DESIGN.md
+ * هر تغییر اینجا باید ابتدا در DESIGN.md ثبت شود.
+ * کامپوننت‌ها فقط از tokenهای معنایی استفاده می‌کنند.
+ */
+
+:root,
+.surface-light {
+  --bg: #f5f5f2;
+  --surface: #ffffff;
+  --elevated: #ffffff;
+  --stage: #ecebe6;
+  --fg: #0e0f11;
+  --muted: #62646a;
+  --line: #e2e1db;
+  --primary: #0e0f11;
+  --primary-fg: #ffffff;
+  --secondary: #ecebe6;
+  --accent: #c8f135;
+  --accent-fg: #0e0f11;
+  --success: #0b7f55;
+  --warning: #a8660a;
+  --danger: #c8281c;
+  --discount: #d92d20;
+  --shadow-ink: 14 15 17;
+}
+
+.surface-dark {
+  --bg: #0a0b0d;
+  --surface: #121316;
+  --elevated: #1a1c20;
+  --stage: #17191d;
+  --fg: #f4f4f1;
+  --muted: #9a9ca3;
+  --line: #25272c;
+  --primary: #f4f4f1;
+  --primary-fg: #0a0b0d;
+  --secondary: #1f2125;
+  --success: #3ddc97;
+  --warning: #f5b942;
+  --danger: #ff6b60;
+  --discount: #ff5a4f;
+  --shadow-ink: 0 0 0;
+}
+
+:root {
+  /* Radius */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-2xl: 36px;
+
+  /* Shadows */
+  --shadow-hairline: 0 0 0 1px var(--line);
+  --shadow-card: 0 1px 2px rgb(var(--shadow-ink) / 0.04), 0 12px 24px -16px rgb(var(--shadow-ink) / 0.18);
+  --shadow-float: 0 2px 4px rgb(var(--shadow-ink) / 0.05), 0 32px 64px -24px rgb(var(--shadow-ink) / 0.35);
+
+  /* Layout */
+  --section-y: clamp(64px, 10vw, 128px);
+  --gutter: 16px;
+  --container: 1440px;
+
+  /* Motion */
+  --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 150ms;
+  --duration-base: 280ms;
+  --duration-slow: 600ms;
+}
+
+@media (min-width: 768px) {
+  :root { --gutter: 24px; }
+}
+@media (min-width: 1280px) {
+  :root { --gutter: 40px; }
+}
