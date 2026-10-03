@@ -12,6 +12,7 @@ from aiogram.types import BufferedInputFile, InputMediaPhoto
 
 from .. import outgoing
 from . import dbx, gfx, service
+from .ui import en_group as ui_en_group
 
 log = logging.getLogger("pclbot.onc")
 
@@ -126,7 +127,7 @@ async def group_standings(bot: Bot, tid: int, gid: int, round_id: int, admin: in
     t = await service.get_tournament(tid)
     g = await service.get_group(gid)
     imgs = await gfx.group_table(tid, gid)
-    cap = f"🏆 <b>{html.escape(t['name'])}</b>\n📊 <b>{html.escape(g['name'])}</b> — جدول به‌روز"
+    cap = f"🏆 <b>{html.escape(t['name'])}</b>\n📊 <b>{html.escape(ui_en_group(g['name']))} — STANDINGS</b>"
     return await publish(bot, tid, "GROUP", "STANDINGS", gid * 100000 + round_id, imgs, cap, admin, 1, update)
 
 
@@ -180,3 +181,51 @@ async def after_confirm(bot: Bot, rid: int, admin: int) -> dict:
         if t["champion_team_id"]:
             out["champion"] = await champion(bot, r["tournament_id"], admin)
     return out
+
+
+# ---- team list (plain text post in the ONC news channel; the post is edited in place when the captain changes the list)
+TEAM_LIST_FOOTER = "➖" * 12 + "\n⚽️ One Night | One Champion\n👉🏻 Join us: @Onenightchampion"   # exact text requested (12 × ➖)
+
+
+def team_list_text(team_name: str, players: list[str]) -> str:
+    lines = "\n".join(f"• {html.escape(p)}" for p in players)
+    return f"<b>{html.escape(team_name)}</b>\n{lines}\n\n{TEAM_LIST_FOOTER}"
+
+
+async def publish_text(bot: Bot, tid: int, stage: str, kind: str, ref_id: int, text: str, by: int, version: int = 1) -> dict:
+    """Sends the text, or edits the earlier post of the same (tournament, kind, ref) — never a duplicate post."""
+    cid = await channel_id()
+    if not cid:
+        raise PublishError("کانال وان نایت چمپیون تنظیم نشده (پنل → کانال).")
+    outgoing.EXEMPT_CHATS.add(str(cid))
+    old = await dbx.fetchone("SELECT * FROM onc_publications WHERE tournament_id=? AND kind=? AND ref_id=? AND page=1 AND channel_id=?",
+                             tid, kind, ref_id, cid)
+    try:
+        if old:
+            try:
+                await bot.edit_message_text(chat_id=cid, message_id=old["message_id"], text=text, disable_web_page_preview=True)
+                await dbx.execute("UPDATE onc_publications SET content_version=?, published_at=?, published_by=? WHERE id=?",
+                                  old["content_version"] + 1, service.now(), by, old["id"])
+                return {"sent": 0, "edited": 1}
+            except TelegramBadRequest as ex:
+                if "not modified" in str(ex).lower():
+                    return {"sent": 0, "edited": 0}
+                log.warning("ONC text edit failed (%s) — sending a new post instead", ex)
+        m = await bot.send_message(cid, text, disable_web_page_preview=True)
+        async with dbx.tx():
+            await dbx.execute(
+                "INSERT INTO onc_publications(tournament_id,stage,kind,ref_id,page,channel_id,message_id,published_at,published_by,content_version) "
+                "VALUES(?,?,?,?,1,?,?,?,?,?) ON CONFLICT(tournament_id,kind,ref_id,page,channel_id) DO UPDATE SET message_id=excluded.message_id, "
+                "published_at=excluded.published_at, published_by=excluded.published_by, content_version=excluded.content_version",
+                tid, stage, kind, ref_id, cid, m.message_id, service.now(), by, version)
+        return {"sent": 1, "edited": 0}
+    except TelegramAPIError as ex:
+        raise PublishError(f"تلگرام پست را نپذیرفت: {ex}") from ex
+
+
+async def team_list(bot: Bot, team_id: int, by: int) -> dict:
+    team = await service.get_team(team_id)
+    players = [p["player_id"] for p in await service.players_of(team_id)]
+    if not players:
+        raise PublishError("لیست این تیم خالی است.")
+    return await publish_text(bot, team["tournament_id"], "TEAMS", "TEAMLIST", team_id, team_list_text(team["name"], players), by)

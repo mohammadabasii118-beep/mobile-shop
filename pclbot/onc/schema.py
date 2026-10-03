@@ -99,6 +99,31 @@ CREATE TABLE IF NOT EXISTS onc_templates(
     config TEXT NOT NULL,
     active INTEGER NOT NULL DEFAULT 0);
 
+-- 1–2 captains/managers per team; their rights never go beyond that team (checked in the service layer on every call)
+CREATE TABLE IF NOT EXISTS onc_captains(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tournament_id INTEGER NOT NULL REFERENCES onc_tournaments(id) ON DELETE CASCADE,
+    team_id INTEGER NOT NULL REFERENCES onc_teams(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL,
+    added_by INTEGER,
+    added_at INTEGER NOT NULL,
+    UNIQUE(team_id, user_id));
+
+-- results submitted by captains; they are NOT official until an admin approves them
+CREATE TABLE IF NOT EXISTS onc_pending_results(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_id INTEGER NOT NULL REFERENCES onc_matches(id) ON DELETE CASCADE,
+    team_id INTEGER NOT NULL REFERENCES onc_teams(id) ON DELETE CASCADE,   -- the submitting captain's team
+    user_id INTEGER NOT NULL,
+    goals_a INTEGER NOT NULL CHECK(goals_a >= 0),
+    goals_b INTEGER NOT NULL CHECK(goals_b >= 0),
+    winner_team_id INTEGER REFERENCES onc_teams(id),
+    status TEXT NOT NULL DEFAULT 'PENDING' CHECK(status IN ('PENDING','APPROVED','REJECTED','SUPERSEDED')),
+    created_at INTEGER NOT NULL,
+    decided_at INTEGER,
+    decided_by INTEGER);
+CREATE INDEX IF NOT EXISTS onc_pending_status ON onc_pending_results(status, match_id);
+
 -- which bottom keyboard (user/admin variant) each chat already has; used by handlers/home.py
 CREATE TABLE IF NOT EXISTS ui_kb(user_id INTEGER PRIMARY KEY, kind TEXT NOT NULL);
 

@@ -118,7 +118,7 @@ async def key_transfer(m: Message, state: FSMContext):
 @router.message(Command("onc"))
 async def key_onc(m: Message, state: FSMContext):
     await state.clear(); await _clean(m)
-    await m.answer(await onc_user.home_text(), reply_markup=onc_user.MENU)
+    await m.answer(await onc_user.home_text(), reply_markup=await onc_user.entry_markup(m.from_user.id))
 
 
 @router.message(F.text == BTN_ADMIN, F.func(lambda m: is_admin(m.from_user.id)))

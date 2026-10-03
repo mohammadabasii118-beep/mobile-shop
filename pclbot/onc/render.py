@@ -158,7 +158,7 @@ def render_rows(type_: str, cfg: dict, data: dict, bg_path: str | None = None) -
         _static(d, cfg, data, pi, len(pages))
         y0, rh, gap = rows_cfg["start_y"], rows_cfg["row_h"], rows_cfg["gap"]
         if type_ == "GROUP_TABLE":  # header line
-            hdr = {"pos": "#", "team": "تیم", "P": "بازی", "W": "برد", "D": "مس", "L": "باخت", "GF": "گز", "GA": "گخ", "GD": "تفاضل", "PTS": "امتیاز"}
+            hdr = {"pos": "POS", "team": "TEAM"}  # standings header is English: POS TEAM P W D L GF GA GD PTS
             for key in cfg["show"]:
                 c = cfg["cols"][key]
                 put(d, hdr.get(key, key), c, cfg.get("header_y", y0 - 60), size=max(c["size"] - 12, 14), color="#b8c0cc")
@@ -285,7 +285,7 @@ def sample(type_: str) -> dict:
     if type_ == "GROUP_TABLE":
         rows = [{"pos": i + 1, "team": names[i], "P": 3, "W": 3 - i if i < 3 else 0, "D": 0, "L": i, "GF": 7 - i, "GA": i + 1,
                  "GD": f"+{6 - 2 * i}" if 6 - 2 * i >= 0 else str(6 - 2 * i), "PTS": 9 - 3 * i if i < 3 else 0} for i in range(4)]
-        return {"subtitle": "گروه A", "rows": rows}
+        return {"title": "GROUP A — STANDINGS", "subtitle": "ONE NIGHT CHAMPION #5", "rows": rows}
     if type_ == "ROUND_RESULTS":
         sc = ["3 - 1", "2 - 2", "0 - 2", "1 - 3"]
         return {"subtitle": "مرحله گروهی · راند 2", "rows": [{"cells": [names[i * 2 % 8], sc[i], names[(i * 2 + 1) % 8]]} for i in range(4)]}

@@ -5,7 +5,7 @@ from aiogram import F, Router
 from aiogram.types import CallbackQuery
 
 from ..utils import is_admin
-from . import dbx, handlers_admin, handlers_gfx, handlers_play, handlers_user, templates
+from . import dbx, handlers_admin, handlers_captain, handlers_gfx, handlers_play, handlers_user, templates
 
 log = logging.getLogger("pclbot.onc")
 
@@ -21,7 +21,7 @@ async def stale(c: CallbackQuery):
 
 
 def routers() -> list[Router]:
-    return [handlers_user.router, handlers_admin.router, handlers_play.router, handlers_gfx.router]
+    return [handlers_user.router, handlers_captain.router, handlers_admin.router, handlers_captain.admin_router, handlers_play.router, handlers_gfx.router]
 
 
 async def init() -> None:

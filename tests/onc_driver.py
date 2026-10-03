@@ -200,7 +200,7 @@ class Driver:
     async def press(self, data: str, uid: int = ADMIN):
         self.session.alerts.clear()
         s = self.screen(uid)
-        key = self.last_shown.get(uid) or (uid, s["id"])
+        key = self.last_shown.get(uid) or (uid, s["id"] if s else 1)   # a user without any screen yet (forged callbacks)
         self.uid_seq += 1
         msg = Message.model_construct(message_id=key[1], date=dt.datetime.now(), chat=Chat(id=uid, type="private"), from_user=User(id=999, is_bot=True, first_name="PCL"))
         cq = CallbackQuery(id=str(self.uid_seq), from_user=self._user(uid), chat_instance="x", data=data, message=msg)

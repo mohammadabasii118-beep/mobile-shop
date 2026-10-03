@@ -44,3 +44,13 @@ class TplSt(StatesGroup):
 
 class TourSt(StatesGroup):
     edit = State()
+
+
+class CaptSt(StatesGroup):
+    add = State()          # admin: adding a captain/manager to a team
+    ga = State()           # captain: result entry
+    gb = State()
+    winner = State()
+    preview = State()
+    list = State()         # captain: team list
+    list_preview = State()

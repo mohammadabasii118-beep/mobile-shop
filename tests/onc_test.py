@@ -83,11 +83,11 @@ async def run():
         await d.say("🔄 ترنسفر", VIEWER)                                   # bottom button instead of /start
         assert any("ثبت آگهی" in t for t, _ in d.buttons(VIEWER))
         await d.say("🏆 وان نایت چمپیون", VIEWER)
-        assert any("پخش زنده" in t for t, _ in d.buttons(VIEWER))
+        assert [t for t, _ in d.buttons(VIEWER)] == ["🔴 مسابقات زنده", "📁 سایر مسابقات", "🔙 منوی اصلی"]
         await d.say("🏠 منوی اصلی", VIEWER)
         assert [t for t, _ in d.buttons(VIEWER)] == ["🔄 ترنسفر", "🏆 وان نایت چمپیون"]
         await d.say("🛠 پنل مدیریت", VIEWER); assert [t for t, _ in d.buttons(VIEWER)] == ["🔄 ترنسفر", "🏆 وان نایت چمپیون"], "normal users can't use the admin key"
-        await d.say("/onc", VIEWER); assert any("پخش زنده" in t for t, _ in d.buttons(VIEWER))
+        await d.say("/onc", VIEWER); assert any("مسابقات زنده" in t for t, _ in d.buttons(VIEWER))
         await d.say("/start", VIEWER)
         await d.say("/start", ADMIN)
         akb = [x for x in S.screens.values() if x["chat"] == ADMIN and isinstance(x["markup"], ReplyKeyboardMarkup)]
@@ -113,9 +113,10 @@ async def run():
         await d.tap("منوی اصلی", VIEWER)
         await d.tap("وان نایت چمپیون", VIEWER)
         assert "No tournament" not in d.text(VIEWER) or True
-        for lab in ("پخش زنده", "برنامه بازی‌ها", "نتایج", "جدول", "مرحله حذفی", "تیم‌ها", "بازیکنان", "قهرمان", "منوی اصلی"):
-            assert any(lab in t for t, _ in d.buttons(VIEWER)), lab
-        d.snap("ONC viewer panel", VIEWER)
+        assert [t for t, _ in d.buttons(VIEWER)] == ["🔴 مسابقات زنده", "📁 سایر مسابقات", "🔙 منوی اصلی"], "entry shows live / other first"
+        d.snap("ONC entry: live / other tournaments", VIEWER)
+        await d.tap("مسابقات زنده", VIEWER); assert "جریان نیست" in d.text(VIEWER)
+        await d.tap("سایر مسابقات", VIEWER); assert "نداریم" in d.text(VIEWER)
 
         # viewer cannot reach admin functions even by forging callback data
         for forged in ("onc:a", "onc:cr", "onc:crok", "onc:cy:dtn:1", "onc:rsv", "onc:rc:1", "onc:ch"):

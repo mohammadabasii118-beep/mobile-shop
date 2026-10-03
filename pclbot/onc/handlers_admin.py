@@ -42,8 +42,8 @@ def panel_markup():
         [ob("➕ ساخت تورنمنت", "onc:cr"), ob("🏆 مدیریت تورنمنت‌ها", "onc:mt")],
         [ob("🔴 بازی‌های زنده", "onc:lv:0"), ob("📊 جدول رده‌بندی", "onc:st:0")],
         [ob("🏆 مرحله حذفی", "onc:ko:0"), ob("👥 تیم‌ها و بازیکنان", "onc:tm:0")],
-        [ob("🎨 گرافیک", "onc:gx"), ob("📢 کانال", "onc:ch")],
-        [ob("⚙️ تنظیمات", "onc:se")],
+        [ob("⚽ نتایج", "onc:rs:0"), ob("🎨 گرافیک", "onc:gx")],
+        [ob("📢 کانال", "onc:ch"), ob("⚙️ تنظیمات", "onc:se")],
         [ob("🔙 پنل مدیریت", "admhome")],
     ])
 
@@ -455,6 +455,7 @@ async def send_team_page(target, team_id: int, note: str = "") -> None:
         [ob("✏️ تغییر نام", f"onc:ter:{team_id}"), ob("🖼 تغییر لوگو", f"onc:tel:{team_id}")],
         [ob("👥 مدیریت بازیکنان", f"onc:tp:{team_id}")],
         [ob("📁 تعیین / تغییر گروه", f"onc:tg:{team_id}")],
+        [ob("🧢 کاپیتان/منیجر", f"onc:tc:{team_id}"), ob("📢 انتشار لیست در کانال", f"onc:tpub:{team_id}")],
     ]
     if team["group_id"]:
         rows.append([ob("➖ خروج از گروه", f"onc:tgx:{team_id}")])

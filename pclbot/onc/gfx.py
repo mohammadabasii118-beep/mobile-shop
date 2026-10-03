@@ -4,6 +4,7 @@ import io
 from aiogram import Bot
 
 from . import algo, render, service, templates
+from .ui import en_group as ui_en_group
 
 
 async def _render(type_: str, data: dict) -> list[bytes]:
@@ -34,7 +35,7 @@ async def group_table(tid: int, gid: int) -> list[bytes]:
     tbl = next(t for t in await service.group_tables(tid) if t["group"]["id"] == gid)
     rows = [{"pos": r["pos"], "team": r["name"], "P": r["P"], "W": r["W"], "D": r["D"], "L": r["L"], "GF": r["GF"], "GA": r["GA"],
              "GD": f"{r['GD']:+d}" if r["GD"] else "0", "PTS": r["Pts"]} for r in tbl["rows"]]
-    return await _render("GROUP_TABLE", {"subtitle": tbl["group"]["name"], "rows": rows})
+    return await _render("GROUP_TABLE", {"title": f"{ui_en_group(tbl['group']['name'])} — STANDINGS", "subtitle": (await service.get_tournament(tid))["name"], "rows": rows})
 
 
 async def round_results(rid: int) -> list[bytes]:

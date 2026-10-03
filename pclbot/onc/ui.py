@@ -42,6 +42,8 @@ AUDIT_FA = {
     "ACTIVATE TEMPLATE SET": "فعال‌سازی ست تمپلیت", "DUPLICATE TEMPLATE SET": "کپی ست تمپلیت", "DELETE TEMPLATE SET": "حذف ست تمپلیت",
     "ADD TEMPLATE": "افزودن تمپلیت", "ACTIVATE TEMPLATE": "فعال‌سازی تمپلیت", "DEACTIVATE TEMPLATE": "غیرفعال‌سازی تمپلیت",
     "DELETE TEMPLATE": "حذف تمپلیت", "TEMPLATE BACKGROUND": "پس‌زمینه تمپلیت",
+    "ADD CAPTAIN": "افزودن کاپیتان", "REMOVE CAPTAIN": "حذف کاپیتان", "CAPTAIN TEAM LIST": "ثبت لیست تیم (کاپیتان)",
+    "CAPTAIN RESULT SUBMITTED": "ارسال نتیجه (کاپیتان)", "RESULT APPROVED": "تأیید نتیجه", "RESULT REJECTED": "رد نتیجه",
 }
 
 
@@ -63,29 +65,33 @@ def match_line(m: dict, with_score: bool = True) -> str:
 
 
 LRM = "\u200e"
-TB_FA = {"H2H": "رو", "GD": "تف", "GF": "گز", "ADMIN": "ادمین", "UNRESOLVED": "⚠", "": ""}
+TB_FA = {"H2H": "H2H", "GD": "GD", "GF": "GF", "ADMIN": "ADM", "UNRESOLVED": "⚠", "": ""}   # standings are English
+
+
+def en_group(name: str) -> str:
+    """Standings titles are English: «گروه A» → «GROUP A» (other names are left as typed)."""
+    return "GROUP " + name[4:].strip() if name.startswith("گروه ") else name
 
 
 def standings_block(tbl: dict) -> str:
     g, rows = tbl["group"], tbl["rows"]
-    head = ["#", "تیم", "بز", "بر", "مس", "با", "گز", "گخ", "تف", "امت", "معیار"]  # LRM after each word keeps the columns in order
-    lines = [LRM + f" {head[0]}{LRM}  {head[1]}{LRM}           " + " ".join(h + LRM for h in head[2:])]
+    lines = [LRM + f" POS {'TEAM':<12} {'P':>2} {'W':>2} {'D':>2} {'L':>2} {'GF':>2} {'GA':>2} {'GD':>3} {'PTS':>3} TB"]
     q = g["qualifiers"] or 0
     used = set()
     for r in rows:
         mark = "✓" if q and r["pos"] <= q else " "
         used.add(r["tb"])
-        lines.append(LRM + f"{r['pos']:>2}{mark}{r['name'][:12]:<12} {r['P']:>2} {r['W']:>2} {r['D']:>2} {r['L']:>2} {r['GF']:>2} {r['GA']:>2} {r['GD']:>+3} {r['Pts']:>3}  {TB_FA[r['tb']]}")
+        lines.append(LRM + f" {r['pos']:>2}{mark} {r['name'][:12]:<12} {r['P']:>2} {r['W']:>2} {r['D']:>2} {r['L']:>2} {r['GF']:>2} {r['GA']:>2} {r['GD']:>+3} {r['Pts']:>3} {TB_FA[r['tb']]}")
     st = tbl["status"]["state"]
     note = {"PENDING": f"⏳ {tbl['played']} از {tbl['total']} بازی تأیید شده",
             "NEEDS ADMIN DECISION": "⚠️ نیاز به تصمیم ادمین (تساوی روی خط صعود)",
             "FINAL": "✅ نهایی" if tbl["complete"] else ""}[st]
     if tbl["unresolved"] and st != "NEEDS ADMIN DECISION":
         note += ("\n" if note else "") + "⚠ تساوی حل‌نشده (روی صعود اثری ندارد)"
-    legend = [f"{TB_FA[k]}={v}" for k, v in (("H2H", "رودررو"), ("GD", "تفاضل"), ("GF", "گل زده"), ("ADMIN", "تصمیم ادمین")) if k in used]
-    qual = f"صعودکننده‌ها: {g['qualifiers']}" if g["qualifiers"] is not None else "صعودکننده‌ها: تعیین نشده"
-    return (f"<b>{E(g['name'])}</b>  <i>({qual})</i>\n<pre>{E(chr(10).join(lines))}</pre>"
-            + (f"<i>معیار: {'، '.join(legend)}</i>\n" if legend else "") + note)
+    legend = [f"{TB_FA[k]} = {v}" for k, v in (("H2H", "head-to-head"), ("GD", "goal difference"), ("GF", "goals for"), ("ADMIN", "admin decision")) if k in used]
+    qual = f"Qualifiers: {g['qualifiers']}" if g["qualifiers"] is not None else "Qualifiers: not set"
+    return (f"<b>{E(en_group(g['name']))} — STANDINGS</b>  <i>({qual})</i>\n<pre>{E(chr(10).join(lines))}</pre>"
+            + (f"<i>TB: {', '.join(legend)}</i>\n" if legend else "") + note)
 
 
 def results_summary(t: dict, label: str, matches: list[dict], first_line: str | None = None) -> str:

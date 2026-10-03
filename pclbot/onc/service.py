@@ -795,3 +795,222 @@ async def current_round(tid: int) -> dict | None:
     return await dbx.fetchone(
         "SELECT rd.* FROM onc_rounds rd WHERE rd.tournament_id=? AND rd.status='OPEN' "
         "AND EXISTS(SELECT 1 FROM onc_matches m WHERE m.round_id=rd.id) ORDER BY rd.start_at, rd.id LIMIT 1", tid)
+
+
+# ================================================================= captains / managers, team lists, captain results
+from datetime import timedelta  # noqa: E402
+from zoneinfo import ZoneInfo  # noqa: E402
+
+from .. import config  # noqa: E402
+
+TEAM_LIST_LOCK_MINUTES = 60          # captains can edit the list until 1 hour before the tournament starts
+MAX_CAPTAINS = 2
+MAX_LIST = 40
+
+
+def now_local() -> datetime:
+    try:
+        return datetime.now(ZoneInfo(config.ONC_TZ)).replace(tzinfo=None)
+    except Exception:  # unknown tz name / missing tzdata → server local time
+        return datetime.now()
+
+
+def start_dt(t: dict) -> datetime:
+    return datetime.strptime(f"{t['start_date']} {t['start_time']}", "%Y-%m-%d %H:%M")
+
+
+def list_deadline(t: dict) -> datetime:
+    return start_dt(t) - timedelta(minutes=TEAM_LIST_LOCK_MINUTES)
+
+
+def list_open(t: dict) -> bool:
+    return now_local() < list_deadline(t)
+
+
+async def captains_of(team_id: int) -> list[dict]:
+    rows = await dbx.fetchall("SELECT * FROM onc_captains WHERE team_id=? ORDER BY id", team_id)
+    for r in rows:
+        u = await main_db.fetchone("SELECT name, username FROM users WHERE id=?", r["user_id"])
+        r["name"] = (u or {}).get("name") or ""
+        r["username"] = (u or {}).get("username") or ""
+    return rows
+
+
+def captain_label(c: dict) -> str:
+    return (c.get("name") or "کاربر") + (f" (@{c['username']})" if c.get("username") else "") + f" · {c['user_id']}"
+
+
+async def add_captain(admin: int, team_id: int, user_id: int) -> int:
+    require_admin(admin)
+    team = await get_team(team_id)
+    if not team:
+        raise OncError("تیم پیدا نشد.")
+    if not isinstance(user_id, int) or user_id <= 0:
+        raise OncError("آیدی عددی تلگرام معتبر نیست.")
+    async with dbx.tx():
+        if await dbx.scalar("SELECT 1 FROM onc_captains WHERE team_id=? AND user_id=?", team_id, user_id):
+            raise OncError("این کاربر قبلاً کاپیتان همین تیم است.")
+        if await dbx.scalar("SELECT COUNT(*) FROM onc_captains WHERE team_id=?", team_id) >= MAX_CAPTAINS:
+            raise OncError(f"هر تیم حداکثر {MAX_CAPTAINS} کاپیتان/منیجر دارد.")
+        cid = await dbx.execute("INSERT INTO onc_captains(tournament_id,team_id,user_id,added_by,added_at) VALUES(?,?,?,?,?)",
+                                team["tournament_id"], team_id, user_id, admin, now())
+        await audit(admin, "ADD CAPTAIN", f"{team['name']} ← {user_id}", team["tournament_id"])
+    return cid
+
+
+async def remove_captain(admin: int, captain_id: int) -> dict | None:
+    require_admin(admin)
+    c = await dbx.fetchone("SELECT c.*, t.name AS team_name FROM onc_captains c JOIN onc_teams t ON t.id=c.team_id WHERE c.id=?", captain_id)
+    if c:
+        await dbx.execute("DELETE FROM onc_captains WHERE id=?", captain_id)
+        await audit(admin, "REMOVE CAPTAIN", f"{c['team_name']} ✕ {c['user_id']}", c["tournament_id"])
+    return c
+
+
+async def captain_teams(user_id: int) -> list[dict]:
+    """Teams this user is captain of, in tournaments that are not finished/archived."""
+    return await dbx.fetchall(
+        "SELECT t.id AS team_id, t.name AS team_name, tr.id AS tournament_id, tr.name AS tournament_name, tr.status "
+        "FROM onc_captains c JOIN onc_teams t ON t.id=c.team_id JOIN onc_tournaments tr ON tr.id=c.tournament_id "
+        "WHERE c.user_id=? AND tr.status IN ('DRAFT','READY','LIVE') ORDER BY tr.id DESC, t.name", user_id)
+
+
+async def assert_captain(user_id: int, team_id: int) -> dict:
+    """Backend gate for EVERY captain action: user → tournament → team → is this user a captain of this team?"""
+    row = await dbx.fetchone(
+        "SELECT c.*, t.name AS team_name, tr.status, tr.start_date, tr.start_time, tr.name AS tournament_name "
+        "FROM onc_captains c JOIN onc_teams t ON t.id=c.team_id JOIN onc_tournaments tr ON tr.id=c.tournament_id "
+        "WHERE c.user_id=? AND c.team_id=?", user_id, team_id)
+    if not row:
+        raise OncError("⛔ تو کاپیتان/منیجر این تیم نیستی.")
+    if row["status"] in ("FINISHED", "ARCHIVED"):
+        raise OncError("این تورنمنت تمام شده است.")
+    return row
+
+
+async def set_team_list(user_id: int, team_id: int, players: list[str]) -> list[str]:
+    """Captain replaces the whole team list (deadline: 1 hour before the tournament starts). Admins edit via the admin panel."""
+    row = await assert_captain(user_id, team_id)
+    t = await get_tournament(row["tournament_id"])
+    if not list_open(t):
+        raise OncError(f"مهلت ثبت/ویرایش لیست تمام شده ({list_deadline(t).strftime('%H:%M')} ؛ یک ساعت قبل از شروع). برای تغییر به ادمین بگو.")
+    clean: list[str] = []
+    for p in players:
+        p = _clean_name(p, "آیدی بازیکن")
+        if p.lower() not in {x.lower() for x in clean}:
+            clean.append(p)
+    if not clean:
+        raise OncError("حداقل یک بازیکن بفرست.")
+    if len(clean) > MAX_LIST:
+        raise OncError(f"حداکثر {MAX_LIST} بازیکن.")
+    async with dbx.tx():
+        await dbx.execute("DELETE FROM onc_players WHERE team_id=?", team_id)
+        for p in clean:
+            await dbx.execute("INSERT INTO onc_players(team_id,player_id) VALUES(?,?)", team_id, p)
+        await audit(user_id, "CAPTAIN TEAM LIST", f"{row['team_name']}: {len(clean)}", row["tournament_id"])
+    return clean
+
+
+async def captain_matches(user_id: int, team_id: int) -> list[dict]:
+    """Matches of the captain's own team that still have no official result."""
+    await assert_captain(user_id, team_id)
+    rows = await dbx.fetchall(
+        "SELECT m.id FROM onc_matches m JOIN onc_rounds rd ON rd.id=m.round_id LEFT JOIN onc_results r ON r.match_id=m.id "
+        "WHERE (m.team_a=? OR m.team_b=?) AND rd.status='OPEN' AND (r.match_id IS NULL OR r.status<>'CONFIRMED') ORDER BY rd.start_at, m.id",
+        team_id, team_id)
+    return [await get_match(r["id"]) for r in rows]
+
+
+async def pending_for(match_id: int, team_id: int | None = None) -> dict | None:
+    sql, args = "SELECT * FROM onc_pending_results WHERE match_id=? AND status='PENDING'", [match_id]
+    if team_id:
+        sql += " AND team_id=?"; args.append(team_id)
+    return await dbx.fetchone(sql, *args)
+
+
+async def submit_result(user_id: int, team_id: int, match_id: int, ga: int, gb: int, winner: int | None = None) -> int:
+    """Captain submits a result for ONE OF HIS OWN matches. It stays PENDING until an admin approves it — never official on its own."""
+    row = await assert_captain(user_id, team_id)
+    ga, gb = _validate_goals(ga), _validate_goals(gb)
+    m = await get_match(match_id)
+    if not m or m["tournament_id"] != row["tournament_id"] or team_id not in (m["team_a"], m["team_b"]):
+        raise OncError("⛔ این بازی مربوط به تیم تو نیست.")
+    if row["status"] != "LIVE":
+        raise OncError("تورنمنت هنوز شروع نشده است.")
+    if m["round_status"] == "CONFIRMED" or m["rstatus"] == "CONFIRMED":
+        raise OncError("برای این بازی نتیجه‌ی رسمی ثبت شده است.")
+    if await pending_for(match_id, team_id):
+        raise OncError("نتیجه‌ی قبلی تو هنوز در انتظار تأیید ادمین است.")
+    win = await _resolve_winner(m, ga, gb, winner)
+    async with dbx.tx():
+        pid = await dbx.execute(
+            "INSERT INTO onc_pending_results(match_id,team_id,user_id,goals_a,goals_b,winner_team_id,created_at) VALUES(?,?,?,?,?,?,?)",
+            match_id, team_id, user_id, ga, gb, win, now())
+        await audit(user_id, "CAPTAIN RESULT SUBMITTED", f"{m['name_a']} 🆚 {m['name_b']}: {ga}-{gb}", m["tournament_id"])
+    return pid
+
+
+async def get_pending(pid: int) -> dict | None:
+    return await dbx.fetchone(
+        "SELECT p.*, m.team_a, m.team_b, m.round_id, m.tournament_id, a.name AS name_a, b.name AS name_b, t.name AS team_name, "
+        "rd.status AS round_status, rd.stage, rd.number "
+        "FROM onc_pending_results p JOIN onc_matches m ON m.id=p.match_id JOIN onc_teams a ON a.id=m.team_a JOIN onc_teams b ON b.id=m.team_b "
+        "JOIN onc_teams t ON t.id=p.team_id JOIN onc_rounds rd ON rd.id=m.round_id WHERE p.id=?", pid)
+
+
+async def pending_results(tid: int) -> list[dict]:
+    ids = await dbx.fetchall("SELECT p.id FROM onc_pending_results p JOIN onc_matches m ON m.id=p.match_id "
+                             "WHERE m.tournament_id=? AND p.status='PENDING' ORDER BY p.id", tid)
+    return [await get_pending(r["id"]) for r in ids]
+
+
+async def pending_count(tid: int) -> int:
+    return await dbx.scalar("SELECT COUNT(*) FROM onc_pending_results p JOIN onc_matches m ON m.id=p.match_id "
+                            "WHERE m.tournament_id=? AND p.status='PENDING'", tid) or 0
+
+
+async def approve_pending(admin: int, pid: int) -> dict:
+    """Admin approval makes the match result OFFICIAL (it counts in standings at once). The round is NOT published here —
+    the existing round confirmation / publication flow stays exactly as it was."""
+    require_admin(admin)
+    async with dbx.tx():
+        p = await get_pending(pid)
+        if not p or p["status"] != "PENDING":
+            raise OncError("این نتیجه قبلاً بررسی شده است.")
+        stale = p["round_status"] == "CONFIRMED"
+        if stale:
+            await dbx.execute("UPDATE onc_pending_results SET status='REJECTED', decided_at=?, decided_by=? WHERE id=?", now(), admin, pid)
+        else:
+          await dbx.execute(
+            "INSERT INTO onc_results(match_id,goals_a,goals_b,winner_team_id,status,updated_at,updated_by) VALUES(?,?,?,?, 'CONFIRMED',?,?) "
+            "ON CONFLICT(match_id) DO UPDATE SET goals_a=excluded.goals_a, goals_b=excluded.goals_b, winner_team_id=excluded.winner_team_id, "
+            "status='CONFIRMED', updated_at=excluded.updated_at, updated_by=excluded.updated_by",
+            p["match_id"], p["goals_a"], p["goals_b"], p["winner_team_id"], now(), admin)
+          await dbx.execute("UPDATE onc_pending_results SET status='APPROVED', decided_at=?, decided_by=? WHERE id=?", now(), admin, pid)
+          await dbx.execute("UPDATE onc_pending_results SET status='SUPERSEDED', decided_at=?, decided_by=? WHERE match_id=? AND status='PENDING'",
+                            now(), admin, p["match_id"])
+          await dbx.execute("UPDATE onc_tournaments SET status='LIVE' WHERE id=? AND status IN ('DRAFT','READY')", p["tournament_id"])
+          await audit(admin, "RESULT APPROVED", f"{p['name_a']} 🆚 {p['name_b']}: {p['goals_a']}-{p['goals_b']} (کاپیتان {p['team_name']})", p["tournament_id"])
+    if stale:
+        raise OncError("راند این بازی قبلاً تأیید شده؛ نتیجه رد شد. از ویرایش نتیجه استفاده کن.")
+    return p
+
+
+async def reject_pending(admin: int, pid: int) -> dict:
+    require_admin(admin)
+    async with dbx.tx():
+        p = await get_pending(pid)
+        if not p or p["status"] != "PENDING":
+            raise OncError("این نتیجه قبلاً بررسی شده است.")
+        await dbx.execute("UPDATE onc_pending_results SET status='REJECTED', decided_at=?, decided_by=? WHERE id=?", now(), admin, pid)
+        await audit(admin, "RESULT REJECTED", f"{p['name_a']} 🆚 {p['name_b']}: {p['goals_a']}-{p['goals_b']} (کاپیتان {p['team_name']})", p["tournament_id"])
+    return p
+
+
+# ---- viewer: live vs finished tournaments
+async def live_tournaments() -> list[dict]:
+    return await dbx.fetchall("SELECT * FROM onc_tournaments WHERE status='LIVE' ORDER BY id DESC")
+
+
+async def finished_tournaments() -> list[dict]:
+    return await dbx.fetchall("SELECT * FROM onc_tournaments WHERE status IN ('FINISHED','ARCHIVED') ORDER BY id DESC")

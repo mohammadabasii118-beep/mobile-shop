@@ -48,6 +48,8 @@ async def rounds_list(c: CallbackQuery, state: FSMContext):
             continue
         icon = "✅" if r["status"] == "CONFIRMED" else ("🟡" if p["completed"] else "⏳")
         rows.append([ob(f"{icon} {r['start_at'][11:]} · {await service.round_label(r)} ({ui.progress(p)})", f"onc:rd:{r['id']}")])
+    n_pending = await service.pending_count(t["id"])
+    rows.insert(0, [ob(f"⏳ نتایج در انتظار تایید ({n_pending})", f"onc:pl:{t['id']}")])
     await show(c, f"⚽ <b>نتایج</b> — {E(t['name'])}\n\n✅ تأییدشده · 🟡 کامل شده و منتظر تأیید · ⏳ در حال ثبت",
                okb(rows + [[ob("🔙 بازگشت", f"onc:t:{t['id']}")]]))
     await c.answer()
@@ -298,7 +300,7 @@ async def update_post(c: CallbackQuery, bot: Bot):
 async def standings_screen(c, t: dict) -> None:
     tables = await service.group_tables(t["id"])
     q = await service.qualification(t["id"])
-    text = f"📊 <b>جدول رده‌بندی</b> — {E(t['name'])}\n<i>فقط نتایج تأییدشده</i>\n\n" + (
+    text = f"📊 <b>GROUP STANDINGS</b> — {E(t['name'])}\n<i>Confirmed results only</i>\n\n" + (
         "\n\n".join(ui.standings_block(x) for x in tables) if tables else "No groups yet.")
     rows = []
     for x in tables:
