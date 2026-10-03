@@ -14,6 +14,9 @@ from . import buttons, emojis
 
 log = logging.getLogger("pclbot")
 
+# chats that can't render custom (Premium) emoji — e.g. the ONC news channel; requests to them are never converted
+EXEMPT_CHATS: set[str] = set()
+
 
 def convert_markup(markup: InlineKeyboardMarkup, premium: bool) -> InlineKeyboardMarkup:
     rows = []
@@ -32,7 +35,7 @@ def convert_markup(markup: InlineKeyboardMarkup, premium: bool) -> InlineKeyboar
 
 def convert(method, premium: bool):
     """A converted copy of the request, or None when nothing changes."""
-    if not hasattr(method, "parse_mode"):
+    if not hasattr(method, "parse_mode") or str(getattr(method, "chat_id", "")) in EXEMPT_CHATS:
         return None
     pm = method.parse_mode
     if not (isinstance(pm, Default) or pm == "HTML"):
