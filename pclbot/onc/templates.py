@@ -10,7 +10,7 @@ TYPES = ["SCHEDULE", "GROUP_TABLE", "ROUND_RESULTS", "QUALIFIED", "KO_MATCHES", 
 TYPE_LABEL = {"SCHEDULE": "برنامه بازی‌ها", "GROUP_TABLE": "جدول گروه", "ROUND_RESULTS": "نتایج راند",
               "QUALIFIED": "تیم‌های صعودکننده", "KO_MATCHES": "بازی‌های حذفی", "BRACKET": "جدول مرحله حذفی", "CHAMPION": "پوستر قهرمان"}
 THEME_FA = {"RED": "قرمز", "BLUE": "آبی", "GOLD": "طلایی"}
-ELEMENT_FA = {"brand": "نام رویداد", "title": "عنوان", "subtitle": "زیرعنوان", "page": "شماره صفحه", "logo": "لوگو", "team": "نام تیم",
+ELEMENT_FA = {"pcl_logo": "لوگوی PCL", "eyebrow": "برچسب انگلیسی", "footer": "فوتر", "brand": "نام رویداد", "title": "عنوان", "subtitle": "زیرعنوان", "page": "شماره صفحه", "logo": "لوگو", "team": "نام تیم",
               "stage": "نام مرحله", "rows": "ردیف‌ها", "col:slot": "ساعت و راند", "col:match": "ردیف بازی", "col:a": "تیم اول", "col:b": "تیم دوم",
               "col:score": "نتیجه", "col:group": "گروه", "col:pos": "رتبه", "col:team": "نام تیم", "col:P": "بازی", "col:W": "برد", "col:D": "مساوی",
               "col:L": "باخت", "col:GF": "گل زده", "col:GA": "گل خورده", "col:GD": "تفاضل", "col:PTS": "امتیاز"}
@@ -22,88 +22,105 @@ THEMES = {
 }
 COLORS = ["#ffffff", "#ffd24a", "#ff3b4e", "#3b9bff", "#45e08a", "#111111", "#b8c0cc"]
 ALIGNS = ["left", "center", "right"]
-FONT_CANDIDATES = [
-    ("DejaVu Bold", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
-    ("DejaVu", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
-    ("Liberation Bold", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
-    ("Serif Bold", "/usr/share/fonts/truetype/dejavu/DejaVuSerif-Bold.ttf"),
-    ("Mono Bold", "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"),
-]
+FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+# indexes are part of the template format (`font` in every style): keep the order
+FONT_FILES = [("Vazirmatn Black", "Vazirmatn-Black.ttf"), ("Vazirmatn ExtraBold", "Vazirmatn-ExtraBold.ttf"),
+              ("Vazirmatn Bold", "Vazirmatn-Bold.ttf"), ("Vazirmatn Medium", "Vazirmatn-Medium.ttf"),
+              ("Oswald Bold", "Oswald_700Bold.ttf"), ("Oswald SemiBold", "Oswald_600SemiBold.ttf"), ("Oswald Medium", "Oswald_500Medium.ttf")]
+F_BLACK, F_XBOLD, F_BOLD, F_MED, O_BOLD, O_SEMI, O_MED = range(7)
+SYSTEM_FALLBACK = ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]
+DESIGN_VERSION = 2
 
 
 def fonts() -> list[tuple[str, str]]:
+    """Bundled professional fonts first (stable indexes); a custom ONC_FONT is appended at the end."""
+    out = []
+    fallback = next((p for p in SYSTEM_FALLBACK if os.path.exists(p)), None)
+    for name, fn in FONT_FILES:
+        path = os.path.join(FONT_DIR, fn)
+        out.append((name, path if os.path.exists(path) else fallback))
     env = os.getenv("ONC_FONT")
-    out = [("Custom", env)] if env and os.path.exists(env) else []
-    return out + [(n, p) for n, p in FONT_CANDIDATES if os.path.exists(p)]
+    if env and os.path.exists(env):
+        out.append(("Custom", env))
+    return [(n, p) for n, p in out if p]
 
 
-def _el(x, y, size, color="#ffffff", align="center", max_w=900, min_=24, font=0, text=None):
+def _el(x, y, size, color="#ffffff", align="center", max_w=900, min_=24, font=F_BOLD, text=None, track=0):
     d = {"x": x, "y": y, "size": size, "min": min_, "color": color, "align": align, "max_w": max_w, "font": font}
     if text is not None:
         d["text"] = text
+    if track:
+        d["track"] = track
     return d
 
 
+EYEBROW = {"SCHEDULE": "MATCH SCHEDULE", "GROUP_TABLE": "GROUP STAGE", "ROUND_RESULTS": "ROUND RESULTS", "QUALIFIED": "QUALIFIED TEAMS",
+           "KO_MATCHES": "KNOCKOUT", "BRACKET": "KNOCKOUT BRACKET", "CHAMPION": "CHAMPION"}
+TITLE_FA = {"SCHEDULE": "برنامه بازی‌ها", "GROUP_TABLE": "GROUP STANDINGS", "ROUND_RESULTS": "نتایج", "QUALIFIED": "تیم‌های صعودکننده",
+            "KO_MATCHES": "مرحله حذفی", "BRACKET": "جدول مرحله حذفی", "CHAMPION": "قهرمان"}
+
+
 def default_config(type_: str, theme: str = "RED") -> dict:
+    """Design v2 — one visual identity for all seven graphics (header with PCL logo slot, title tag, glass rows, footer)."""
     th = THEMES[theme]
-    cfg: dict = {"w": 1080, "h": 1350, "theme": th, "elements": {}, "cols": {}}
+    gold, grey = th["gold"], "#b9c0cc"
+    cfg: dict = {"v": DESIGN_VERSION, "w": 1080, "h": 1350, "theme": th, "elements": {}, "cols": {}}
     el = cfg["elements"]
-    gold = th["gold"]
-    el["brand"] = _el(540, 95, 58, "#ffffff", text="ONE NIGHT CHAMPION", max_w=960, min_=30)
-    if type_ == "SCHEDULE":
-        el["title"] = _el(540, 185, 44, gold, text="برنامه بازی‌ها")
-        el["subtitle"] = _el(540, 245, 30, "#b8c0cc", min_=18)
-        el["page"] = _el(540, 1300, 26, "#b8c0cc", min_=16)
-        cfg["rows"] = {"start_y": 330, "row_h": 78, "gap": 10, "max_rows": 10}
-        cfg["cols"] = {"slot": _el(90, 0, 40, gold, "left", 900), "match": _el(540, 0, 36, "#ffffff", "center", 900, 20)}
-    elif type_ == "GROUP_TABLE":
-        el["title"] = _el(540, 185, 52, gold, text="جدول گروه")
-        el["subtitle"] = _el(540, 250, 36, "#ffffff", min_=20)
-        el["page"] = _el(540, 1300, 26, "#b8c0cc", min_=16)
-        cfg["rows"] = {"start_y": 400, "row_h": 84, "gap": 10, "max_rows": 9}
-        cfg["header_y"] = 340
-        cfg["show"] = ["pos", "team", "P", "W", "D", "L", "GF", "GA", "GD", "PTS"]
-        cfg["cols"] = {
-            "pos": _el(70, 0, 34, gold, "center", 70, 20), "team": _el(125, 0, 36, "#ffffff", "left", 330, 18),
-            "P": _el(520, 0, 32, "#ffffff", "center", 70, 20), "W": _el(595, 0, 32, "#ffffff", "center", 70, 20),
-            "D": _el(670, 0, 32, "#ffffff", "center", 70, 20), "L": _el(745, 0, 32, "#ffffff", "center", 70, 20),
-            "GF": _el(820, 0, 32, "#ffffff", "center", 70, 20), "GA": _el(895, 0, 32, "#ffffff", "center", 70, 20),
-            "GD": _el(970, 0, 32, "#ffffff", "center", 80, 20), "PTS": _el(1035, 0, 36, gold, "center", 80, 20)}
-    elif type_ == "ROUND_RESULTS":
-        el["title"] = _el(540, 195, 60, gold, text="نتایج")
-        el["subtitle"] = _el(540, 265, 40, "#ffffff", min_=20)
-        el["page"] = _el(540, 1300, 26, "#b8c0cc", min_=16)
-        cfg["rows"] = {"start_y": 360, "row_h": 92, "gap": 14, "max_rows": 8}
-        cfg["cols"] = {"a": _el(80, 0, 40, "#ffffff", "left", 380, 20), "score": _el(540, 0, 46, gold, "center", 200, 30),
-                       "b": _el(1000, 0, 40, "#ffffff", "right", 380, 20)}
-    elif type_ == "QUALIFIED":
-        el["title"] = _el(540, 195, 56, gold, text="تیم‌های صعودکننده")
-        el["subtitle"] = _el(540, 262, 32, "#b8c0cc", min_=18)
-        el["page"] = _el(540, 1300, 26, "#b8c0cc", min_=16)
-        cfg["rows"] = {"start_y": 350, "row_h": 80, "gap": 10, "max_rows": 10}
-        cfg["cols"] = {"group": _el(90, 0, 32, gold, "left", 260, 18), "pos": _el(420, 0, 34, "#ffffff", "center", 70, 20),
-                       "team": _el(480, 0, 40, "#ffffff", "left", 520, 20)}
-    elif type_ == "KO_MATCHES":
-        el["title"] = _el(540, 195, 56, gold, text="مرحله حذفی")
-        el["subtitle"] = _el(540, 265, 42, "#ffffff", min_=20)
-        el["page"] = _el(540, 1300, 26, "#b8c0cc", min_=16)
-        cfg["rows"] = {"start_y": 360, "row_h": 100, "gap": 16, "max_rows": 7}
-        cfg["cols"] = {"a": _el(80, 0, 42, "#ffffff", "left", 380, 20), "score": _el(540, 0, 44, gold, "center", 200, 28),
-                       "b": _el(1000, 0, 42, "#ffffff", "right", 380, 20)}
-    elif type_ == "BRACKET":
+    wide = type_ == "BRACKET"
+    if wide:
         cfg["w"], cfg["h"] = 1920, 1080
-        el["brand"] = _el(960, 70, 56, "#ffffff", text="ONE NIGHT CHAMPION", max_w=1500, min_=30)
-        el["title"] = _el(960, 140, 40, gold, text="جدول مرحله حذفی")
-        el["stage"] = _el(0, 0, 30, gold, "center", 380, 18)
-        el["team"] = _el(0, 0, 30, "#ffffff", "left", 330, 16)
-        cfg["bracket"] = {"top": 200, "bottom": 1020, "left": 60, "right": 1860}
+    # ---- shared header / footer (same on every graphic; PCL logo slot top-left) -----------------------------------
+    el["pcl_logo"] = {"x": 122, "y": 112, "size": 132} if not wide else {"x": 112, "y": 96, "size": 112}
+    bx = 214 if not wide else 190
+    el["brand"] = _el(bx, 92 if not wide else 72, 56 if not wide else 52, "#ffffff", "left", 800, 30, O_BOLD, "ONE NIGHT CHAMPION", track=3)
+    el["eyebrow"] = _el(bx, 150 if not wide else 124, 27, gold, "left", 700, 16, O_SEMI, EYEBROW[type_], track=6)
+    el["title"] = _el(540 if not wide else 1860, 268 if not wide else 96, 76 if not wide else 58, "#ffffff", "center" if not wide else "right",
+                      940, 36, F_BLACK, TITLE_FA[type_])
+    el["subtitle"] = _el(540, 350, 34, gold, "center", 940, 20, F_MED)
+    el["page"] = _el(1024, 1312, 26, grey, "right", 300, 16, F_MED)
+    el["footer"] = _el(56 if not wide else 60, 1312 if not wide else 1046, 26, grey, "left", 700, 16, O_MED, "@Onenightchampion", track=2)
+    if wide:
+        el.pop("subtitle")
+        el["page"] = _el(1860, 1046, 26, grey, "right", 300, 16, F_MED)
+    # ---- per type ---------------------------------------------------------------------------------------------------
+    c = lambda x, size, color="#ffffff", align="center", mw=100, font=O_MED, mn=18: _el(x, 0, size, color, align, mw, mn, font)
+    if type_ == "SCHEDULE":
+        cfg["rows"] = {"start_y": 438, "row_h": 78, "gap": 10, "max_rows": 9}
+        cfg["cols"] = {"slot": c(60, 44, gold, "left", 420, O_BOLD, 28), "match": c(540, 36, "#ffffff", "center", 420, F_BOLD, 20)}
+    elif type_ == "GROUP_TABLE":
+        cfg["rows"] = {"start_y": 492, "row_h": 84, "gap": 10, "max_rows": 8}
+        cfg["header_y"] = 452
+        cfg["show"] = ["pos", "team", "P", "W", "D", "L", "GF", "GA", "GD", "PTS"]
+        st = lambda x, mw=60: c(x, 34, "#ffffff", "center", mw, O_SEMI, 20)
+        cfg["cols"] = {"pos": c(100, 36, "#ffffff", "center", 60, O_BOLD, 22), "team": c(156, 36, "#ffffff", "left", 350, F_BOLD, 18),
+                       "P": st(548), "W": st(610), "D": st(672), "L": st(734), "GF": st(798), "GA": st(862), "GD": st(926),
+                       "PTS": c(996, 40, "#14080c", "center", 80, O_BOLD, 24)}
+    elif type_ == "ROUND_RESULTS":
+        cfg["rows"] = {"start_y": 438, "row_h": 100, "gap": 14, "max_rows": 7}
+        cfg["cols"] = {"a": c(100, 40, "#ffffff", "left", 330, F_BOLD, 20), "score": c(540, 54, gold, "center", 200, O_BOLD, 30),
+                       "b": c(980, 40, "#ffffff", "right", 330, F_BOLD, 20)}
+    elif type_ == "QUALIFIED":
+        cfg["rows"] = {"start_y": 438, "row_h": 84, "gap": 10, "max_rows": 9}
+        cfg["cols"] = {"group": c(92, 30, gold, "left", 240, F_XBOLD, 18), "pos": c(370, 40, "#ffffff", "center", 70, O_BOLD, 24),
+                       "team": c(430, 40, "#ffffff", "left", 540, F_BOLD, 20)}
+    elif type_ == "KO_MATCHES":
+        cfg["rows"] = {"start_y": 438, "row_h": 112, "gap": 16, "max_rows": 6}
+        cfg["cols"] = {"a": c(100, 42, "#ffffff", "left", 330, F_BOLD, 20), "score": c(540, 54, gold, "center", 200, O_BOLD, 30),
+                       "b": c(980, 42, "#ffffff", "right", 330, F_BOLD, 20)}
+    elif type_ == "BRACKET":
+        el["stage"] = _el(0, 0, 30, gold, "center", 400, 18, F_XBOLD)
+        el["team"] = _el(0, 0, 30, "#ffffff", "left", 330, 16, F_BOLD)
+        cfg["bracket"] = {"top": 230, "bottom": 1010, "left": 60, "right": 1860}
     elif type_ == "CHAMPION":
-        el["brand"] = _el(540, 120, 62, "#ffffff", text="ONE NIGHT CHAMPION", max_w=960, min_=30)
-        el["title"] = _el(540, 260, 76, gold, text="قهرمان")
-        el["logo"] = {"x": 540, "y": 620, "size": 420}
-        el["team"] = _el(540, 960, 96, "#ffffff", max_w=960, min_=40)
-        el["subtitle"] = _el(540, 1100, 36, "#b8c0cc", min_=20)
+        el["subtitle"]["y"] = 1176
+        el["title"] = _el(540, 330, 110, gold, "center", 940, 50, F_BLACK, "قهرمان")
+        el["logo"] = {"x": 540, "y": 700, "size": 440}
+        el["team"] = _el(540, 1050, 104, "#ffffff", "center", 960, 44, F_BLACK)
     return cfg
+
+
+def upgrade_text(old: dict, new: dict) -> dict:
+    return new
 
 
 def bg_dir() -> str:
@@ -120,6 +137,21 @@ async def ensure_defaults() -> None:
         for t in TYPES:
             await dbx.execute("INSERT INTO onc_templates(set_id,type,name,config,active) VALUES(?,?,?,?,1)",
                               sid, t, TYPE_LABEL[t], json.dumps(default_config(t, "RED")))
+
+
+async def upgrade_designs() -> int:
+    """One-time move of built-in/older templates to design v2 (positions of v1 don't fit the new layout).
+    Uploaded backgrounds, names and active flags are kept."""
+    n = 0
+    async with dbx.tx():
+        for r in await dbx.fetchall("SELECT * FROM onc_templates"):
+            cfg = json.loads(r["config"])
+            if cfg.get("v") == DESIGN_VERSION:
+                continue
+            theme = next((k for k, v in THEMES.items() if v["bg1"] == cfg.get("theme", {}).get("bg1")), "RED")
+            await dbx.execute("UPDATE onc_templates SET config=? WHERE id=?", json.dumps(default_config(r["type"], theme)), r["id"])
+            n += 1
+    return n
 
 
 async def sets() -> list[dict]:
@@ -241,8 +273,6 @@ def items(cfg: dict) -> list[str]:
     out += [f"col:{k}" for k in cfg.get("cols", {})]
     if "rows" in cfg:
         out.append("rows")
-    if "bracket" in cfg:
-        pass
     return out
 
 

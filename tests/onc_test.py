@@ -480,7 +480,7 @@ async def run():
         assert 'data["logo"]' not in head and 'data.get("logo")' not in head   # only the champion renderer touches a logo
         big = render.sample("ROUND_RESULTS"); big["rows"] = big["rows"] * 6          # 24 rows → pages
         pages = render.render("ROUND_RESULTS", templates.default_config("ROUND_RESULTS"), big)
-        assert len(pages) == 3, len(pages)
+        assert len(pages) == 4, len(pages)          # 24 rows at 7 per page
         cfg = templates.default_config("ROUND_RESULTS")
         long_name = {"subtitle": "x", "rows": [{"cells": ["PERSIAN GULF UNITED SPORTS CLUB OF TEHRAN", "3 - 1", "AZADI"]}]}
         render.render("ROUND_RESULTS", cfg, long_name)
@@ -489,15 +489,45 @@ async def run():
         txt, f = render.fit(dd, "PERSIAN GULF UNITED", cfg["cols"]["a"])
         assert f.size < cfg["cols"]["a"]["size"] and f.size >= cfg["cols"]["a"]["min"] and "…" not in txt
 
+        # ------------------------------------------------ design v2: fonts, shared identity, PCL logo slot
+        fl = templates.fonts()
+        assert [n for n, _ in fl][:7] == ["Vazirmatn Black", "Vazirmatn ExtraBold", "Vazirmatn Bold", "Vazirmatn Medium", "Oswald Bold", "Oswald SemiBold", "Oswald Medium"]
+        assert all(os.path.exists(pth) and "/fonts/" in pth for _, pth in fl), "bundled fonts"
+        for t_ in templates.TYPES:
+            c_ = templates.default_config(t_)
+            assert c_["v"] == 2 and "pcl_logo" in c_["elements"] and "footer" in c_["elements"] and "brand" in c_["elements"], t_   # every graphic has the PCL slot
+        # old (v1) templates are moved to the new design once; backgrounds / active flags survive
+        old = (await templates.templates_of((await templates.active_set())["id"]))[0]
+        v1 = dict(old["config"]); v1.pop("v", None); v1["elements"] = {"title": {"x": 1, "y": 2, "size": 3, "min": 1, "color": "#fff", "align": "center", "max_w": 9, "font": 0}}
+        await templates.save_config(old["id"], v1)
+        assert await templates.upgrade_designs() == 1 and (await templates.get_template(old["id"]))["config"]["v"] == 2
+        assert (await templates.get_template(old["id"]))["active"] == old["active"]
+        # PCL logo upload from the panel → drawn on every graphic (placeholder monogram until then)
+        from PIL import Image as _I
+        import io as _io
+        before = render.render("ROUND_RESULTS", templates.default_config("ROUND_RESULTS"), render.sample("ROUND_RESULTS"))[0]
+        await d.press("onc:gx"); await d.tap("لوگوی PCL"); await d.tap("آپلود لوگو")
+        await d.photo(png((20, 160, 220), 300))
+        assert "لوگوی PCL ذخیره شد" in d.text()
+        assert render.pcl_logo_path() and os.path.exists(render.pcl_logo_path())
+        after = render.render("ROUND_RESULTS", templates.default_config("ROUND_RESULTS"), render.sample("ROUND_RESULTS"))[0]
+        a_, b_ = _I.open(_io.BytesIO(before)).convert("RGB"), _I.open(_io.BytesIO(after)).convert("RGB")
+        px = (122, 112)                                                 # centre of the PCL slot
+        assert a_.getpixel(px) != b_.getpixel(px) and a_.getpixel((900, 700)) == b_.getpixel((900, 700)), "only the slot changed"
+        for t_ in templates.TYPES:                                       # all seven render with the logo and the new fonts
+            pages_ = render.render(t_, templates.default_config(t_), render.sample(t_))
+            assert pages_ and pages_[0][:4] == b"\x89PNG"
+        d.snap("PCL logo slot", ADMIN)
+
         # ------------------------------------------------ graphics management UI
         await d.press("onc:gx"); await d.tap("تمپلیت‌های ست فعال"); d.snap("Template set")
         sid = (await templates.active_set())["id"]
         tpl = (await templates.templates_of(sid))[2]
         await d.press(f"onc:xt:{tpl['id']}"); d.snap("Template page")
-        await d.tap("ویرایش موقعیت‌ها"); x0 = (await templates.get_template(tpl["id"]))["config"]["elements"]["brand"]["y"]
+        await d.tap("ویرایش موقعیت‌ها"); x0 = (await templates.get_template(tpl["id"]))["config"]["elements"]["pcl_logo"]["y"]
         await d.tap("گام 5px"); await d.tap("گام 10px"); await d.tap("پایین")
-        assert (await templates.get_template(tpl["id"]))["config"]["elements"]["brand"]["y"] == x0 + 25
-        await d.tap("رنگ"); await d.tap("اندازه فونت +"); d.snap("Position editor")
+        assert (await templates.get_template(tpl["id"]))["config"]["elements"]["pcl_logo"]["y"] == x0 + 25
+        await d.tap("بعدی"); await d.tap("رنگ"); await d.tap("اندازه فونت +"); d.snap("Position editor")
         await d.tap("پیش‌نمایش")
         assert S.log[-1][0] in ("SendPhoto",)
         await d.press(f"onc:xt:{tpl['id']}")

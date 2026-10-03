@@ -42,6 +42,10 @@ class TplSt(StatesGroup):
     set_name = State()
 
 
+class PclSt(StatesGroup):
+    logo = State()
+
+
 class TourSt(StatesGroup):
     edit = State()
 

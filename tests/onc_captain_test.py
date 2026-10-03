@@ -270,6 +270,8 @@ async def run():
             pass
         print("CAPTAIN OK")
     finally:
+        if os.getenv("RECORD"):
+            d.dump_frames(os.environ["RECORD"], "cap_")
         await d.close()
 
 

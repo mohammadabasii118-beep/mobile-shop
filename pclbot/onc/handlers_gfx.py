@@ -12,7 +12,7 @@ from ..utils import is_admin, show
 from . import publish, render, service, templates, ui
 from .handlers_admin import PANEL, alert
 from .service import OncError
-from .states import ChanSt, TplSt
+from .states import ChanSt, PclSt, TplSt
 from .ui import E, ob, okb
 
 router = Router()
@@ -31,7 +31,7 @@ async def gfx_menu(c: CallbackQuery, state: FSMContext):
     text = (f"🎨 <b>گرافیک</b>\n\nست تمپلیت فعال: <b>{E(s['name']) if s else '—'}</b>\n"
             + ("⚠️ تمپلیت فعال ندارد: " + ", ".join(miss) if miss else "✅ هر ۷ نوع گرافیک تمپلیت فعال دارند")
             + "\n\n<i>لوگوی تیم‌ها فقط روی پوستر قهرمان نمایش داده می‌شود.</i>")
-    rows = [[ob("🗂 ست‌های تمپلیت", "onc:xs")]]
+    rows = [[ob("🗂 ست‌های تمپلیت", "onc:xs")], [ob("🖼 لوگوی PCL (برندینگ)", "onc:pcl")]]
     if s:
         rows.append([ob("🎨 تمپلیت‌های ست فعال", f"onc:xsp:{s['id']}")])
     rows.append([ob("🔙 بازگشت", PANEL)])
@@ -260,7 +260,7 @@ async def editor_screen(c, tid: int, idx: int, step_i: int) -> None:
     st = templates.item_style(cfg, name)
     if name == "rows":
         info = f"start Y {st['start_y']} · ارتفاع ردیف {st['row_h']} · فاصله {st['gap']} · حداکثر ردیف هر صفحه {st['max_rows']}"
-    elif name == "logo":
+    elif name in ("logo", "pcl_logo"):
         info = f"x {st['x']} · y {st['y']} · اندازه {st['size']}"
     else:
         fl = templates.fonts()
@@ -276,7 +276,7 @@ async def editor_screen(c, tid: int, idx: int, step_i: int) -> None:
     if name == "rows":
         rows.append([ob("ارتفاع ردیف −", f"onc:xo:{tid}:{idx}:{step_i}:fs-"), ob("ارتفاع ردیف +", f"onc:xo:{tid}:{idx}:{step_i}:fs+")])
         rows.append([ob("حداکثر ردیف −", f"onc:xo:{tid}:{idx}:{step_i}:w-"), ob("حداکثر ردیف +", f"onc:xo:{tid}:{idx}:{step_i}:w+")])
-    elif name == "logo":
+    elif name in ("logo", "pcl_logo"):
         rows.append([ob("اندازه −", f"onc:xo:{tid}:{idx}:{step_i}:fs-"), ob("اندازه +", f"onc:xo:{tid}:{idx}:{step_i}:fs+")])
     else:
         rows.append([ob("اندازه فونت −", f"onc:xo:{tid}:{idx}:{step_i}:fs-"), ob("اندازه فونت +", f"onc:xo:{tid}:{idx}:{step_i}:fs+")])
@@ -374,3 +374,64 @@ async def channel_set_do(m: Message, state: FSMContext, bot: Bot):
     await service.audit(m.from_user.id, "SET CHANNEL", f"{chat.title} ({chat.id})")
     await state.clear()
     await channel_screen(m, bot, tested=True)
+
+
+# ----------------------------------------------------------------- PCL logo (branding slot present on every graphic)
+@router.callback_query(F.data == "onc:pcl")
+async def pcl_menu(c: CallbackQuery, state: FSMContext | None):
+    if state:
+        await state.clear()
+    cur = render.pcl_logo_path()
+    rows = [[ob("📤 آپلود لوگو", "onc:pclu")]] + ([[ob("🗑 حذف لوگو", "onc:pclx")]] if cur else []) + [[ob("👁 پیش‌نمایش", "onc:pclv")], [ob("🔙 بازگشت", "onc:gx")]]
+    await show(c, "🖼 <b>لوگوی PCL</b>\n\nاین لوگو (برندینگ مجموعه) در جای ثابت بالا-چپ <b>همه‌ی گرافیک‌ها</b> قرار می‌گیرد. "
+               "با لوگوی تیم‌ها فرق دارد؛ لوگوی تیم فقط روی پوستر قهرمان است.\n\nوضعیت: "
+               + ("✅ لوگوی PCL قرار داده شده" if cur else "⚪ هنوز آپلود نشده (به‌جایش «PCL» نمایش داده می‌شود)")
+               + "\n\nبهتر است PNG شفاف و مربعی باشد.", okb(rows))
+    await c.answer()
+
+
+@router.callback_query(F.data == "onc:pclu")
+async def pcl_ask(c: CallbackQuery, state: FSMContext):
+    await state.set_state(PclSt.logo)
+    await show(c, "📤 لوگوی PCL را بفرست (PNG شفاف؛ به‌صورت فایل/Document برای کیفیت کامل).", okb([[ob("❌ لغو", "onc:pcl")]]))
+    await c.answer()
+
+
+@router.message(PclSt.logo, F.photo | F.document)
+async def pcl_save(m: Message, state: FSMContext, bot: Bot):
+    if m.document and (m.document.mime_type or "").lower() not in ("image/png", "image/jpeg", "image/webp"):
+        return await m.answer("⚠️ فقط PNG/JPG/WEBP قبول است.")
+    fid = m.document.file_id if m.document else m.photo[-1].file_id
+    path = os.path.join(templates.bg_dir(), "pcl_logo.png")
+    tmp = path + ".tmp"
+    try:
+        await bot.download(fid, destination=tmp)
+        from PIL import Image
+        Image.open(tmp).convert("RGBA").save(path, "PNG")
+    except Exception:
+        return await m.answer("⚠️ این تصویر خوانده نشد. یک PNG معتبر بفرست.")
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    await service.audit(m.from_user.id, "PCL LOGO", "uploaded")
+    await state.clear()
+    await m.answer("✅ لوگوی PCL ذخیره شد.", reply_markup=okb([[ob("👁 پیش‌نمایش", "onc:pclv")], [ob("🔙 بازگشت", "onc:pcl")]]))
+
+
+@router.callback_query(F.data == "onc:pclx")
+async def pcl_remove(c: CallbackQuery):
+    p = render.pcl_logo_path()
+    if p and os.path.exists(p) and p.startswith(os.path.abspath(templates.bg_dir())):
+        os.remove(p)
+    await service.audit(c.from_user.id, "PCL LOGO", "removed")
+    await c.answer("حذف شد")
+    await pcl_menu(c, None)
+
+
+@router.callback_query(F.data == "onc:pclv")
+async def pcl_preview(c: CallbackQuery):
+    await c.answer("در حال ساخت…")
+    t = await templates.active_template("ROUND_RESULTS")
+    cfg = t["config"] if t else templates.default_config("ROUND_RESULTS")
+    page = render.render("ROUND_RESULTS", cfg, render.sample("ROUND_RESULTS"), t["bg_path"] if t else None)[0]
+    await c.message.answer_photo(BufferedInputFile(page, "preview.png"), caption="👁 پیش‌نمایش — جای لوگوی PCL بالا-چپ")

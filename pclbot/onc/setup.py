@@ -29,3 +29,4 @@ async def init() -> None:
     if backup:
         log.info("ONC: database backed up to %s before the first migration", backup)
     await templates.ensure_defaults()
+    await templates.upgrade_designs()

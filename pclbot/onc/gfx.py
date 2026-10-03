@@ -27,14 +27,15 @@ async def schedule(tid: int) -> list[bytes]:
         if not ms:
             continue
         lines.append({"kind": "slot", "text": f"{r['start_at'][11:]} · " + (f"راند {r['number']}" if r["stage"] == "GROUP" else algo.STAGE_NAME[r["stage"]])})
-        lines += [{"kind": "match", "text": f"{m['name_a']} × {m['name_b']}"} for m in ms]
+        lines += [{"kind": "match", "text": f"{m['name_a']} × {m['name_b']}", "a": m["name_a"], "b": m["name_b"]} for m in ms]
     return await _render("SCHEDULE", {"subtitle": f"{t['name']} · {service.fmt_date(t['start_date'])}", "rows": lines})
 
 
 async def group_table(tid: int, gid: int) -> list[bytes]:
     tbl = next(t for t in await service.group_tables(tid) if t["group"]["id"] == gid)
     rows = [{"pos": r["pos"], "team": r["name"], "P": r["P"], "W": r["W"], "D": r["D"], "L": r["L"], "GF": r["GF"], "GA": r["GA"],
-             "GD": f"{r['GD']:+d}" if r["GD"] else "0", "PTS": r["Pts"]} for r in tbl["rows"]]
+             "GD": f"{r['GD']:+d}" if r["GD"] else "0", "PTS": r["Pts"],
+             "qualified": bool(tbl["group"]["qualifiers"]) and r["pos"] <= tbl["group"]["qualifiers"]} for r in tbl["rows"]]
     return await _render("GROUP_TABLE", {"title": f"{ui_en_group(tbl['group']['name'])} — STANDINGS", "subtitle": (await service.get_tournament(tid))["name"], "rows": rows})
 
 

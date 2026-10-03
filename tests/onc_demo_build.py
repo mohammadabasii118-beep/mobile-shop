@@ -11,6 +11,25 @@ import re
 import sys
 
 FA = {
+    "ONC entry: live / other tournaments": "ورود به وان نایت چمپیون — مسابقات زنده / سایر مسابقات",
+    "Captains — empty": "کاپیتان/منیجر تیم — هنوز کسی تعیین نشده",
+    "Captains — two assigned": "کاپیتان/منیجر تیم — حداکثر ۲ نفر",
+    "Captain panel": "پنل کاپیتان — فقط تیم خودش",
+    "Captain: choose the match": "کاپیتان: انتخاب بازی تیم خودش",
+    "Captain: preview": "کاپیتان: پیش‌نمایش نتیجه",
+    "Captain: submitted": "کاپیتان: نتیجه ثبت شد — در انتظار تأیید (رسمی نیست)",
+    "Admin: instant approval request": "ادمین: درخواست فوری تأیید (✅ تایید / ❌ رد)",
+    "Admin: RESULTS → pending tab with a counter": "ادمین: نتایج ← ⏳ نتایج در انتظار تایید (با شمارنده)",
+    "Admin: pending list": "ادمین: لیست نتایج در انتظار تایید",
+    "Captain: team list": "کاپیتان: لیست تیم و مهلت ثبت",
+    "Captain: list preview": "کاپیتان: پیش‌نمایش لیست قبل از انتشار",
+    "Team list in the channel": "لیست تیم در کانال (فرمت دقیق)",
+    "Captain: deadline passed — view only": "بعد از مهلت (یک ساعت قبل از شروع) — فقط مشاهده",
+    "Standings graphic in the channel (English)": "گرافیک جدول در کانال — عنوان‌ها انگلیسی",
+    "Live tournaments": "مسابقات زنده",
+    "Tournament menu": "منوی یک تورنمنت",
+    "Other (finished) tournaments": "سایر مسابقات (تمام‌شده)",
+    "PCL logo slot": "جای ثابت لوگوی PCL",
     "Main menu — two sections": "منوی اصلی — دو بخش مستقل",
     "TRANSFER opens the existing Transfer menu": "بخش TRANSFER همان منوی قبلی ربات را باز می‌کند",
     "وان نایت چمپیون viewer panel": "پنل کاربر ONE NIGHT CHAMPION (فقط بیننده)",
@@ -70,7 +89,11 @@ def b64(path):
 
 
 def main(rec):
-    frames = json.load(open(os.path.join(rec, "frames.json")))
+    frames = []
+    for name in ("frames.json", "cap_frames.json"):          # main scenario first, then the captain / approval scenario
+        path = os.path.join(rec, name)
+        if os.path.exists(path):
+            frames += json.load(open(path))
     data = []
     for i, f in enumerate(frames):
         msgs = []

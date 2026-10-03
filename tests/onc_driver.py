@@ -249,3 +249,17 @@ class Driver:
 
     async def state(self, uid: int = ADMIN):
         return await self.dp.fsm.get_context(self.bot, chat_id=uid, user_id=uid).get_state()
+
+    def dump_frames(self, out: str, prefix: str = "") -> None:
+        """Writes the recorded demo frames (images + frames.json) into `out` (used by tests with RECORD=dir)."""
+        import json
+        os.makedirs(out, exist_ok=True)
+        meta = []
+        for i, f in enumerate(self.frames):
+            for j, m in enumerate(f["messages"]):
+                if m["photo"]:
+                    name = f"{prefix}f{i:02d}_{j}.png"
+                    open(os.path.join(out, name), "wb").write(m["photo"])
+                    m["photo"] = name
+            meta.append(f)
+        json.dump(meta, open(os.path.join(out, f"{prefix}frames.json"), "w", encoding="utf-8"), ensure_ascii=False)

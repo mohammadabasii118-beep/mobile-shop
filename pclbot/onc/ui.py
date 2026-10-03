@@ -41,7 +41,7 @@ AUDIT_FA = {
     "REMOVE CHANNEL": "حذف کانال", "SETTING auto_standings": "تنظیم انتشار خودکار جدول", "ADD TEMPLATE SET": "ساخت ست تمپلیت",
     "ACTIVATE TEMPLATE SET": "فعال‌سازی ست تمپلیت", "DUPLICATE TEMPLATE SET": "کپی ست تمپلیت", "DELETE TEMPLATE SET": "حذف ست تمپلیت",
     "ADD TEMPLATE": "افزودن تمپلیت", "ACTIVATE TEMPLATE": "فعال‌سازی تمپلیت", "DEACTIVATE TEMPLATE": "غیرفعال‌سازی تمپلیت",
-    "DELETE TEMPLATE": "حذف تمپلیت", "TEMPLATE BACKGROUND": "پس‌زمینه تمپلیت",
+    "DELETE TEMPLATE": "حذف تمپلیت", "TEMPLATE BACKGROUND": "پس‌زمینه تمپلیت", "PCL LOGO": "لوگوی PCL",
     "ADD CAPTAIN": "افزودن کاپیتان", "REMOVE CAPTAIN": "حذف کاپیتان", "CAPTAIN TEAM LIST": "ثبت لیست تیم (کاپیتان)",
     "CAPTAIN RESULT SUBMITTED": "ارسال نتیجه (کاپیتان)", "RESULT APPROVED": "تأیید نتیجه", "RESULT REJECTED": "رد نتیجه",
 }
