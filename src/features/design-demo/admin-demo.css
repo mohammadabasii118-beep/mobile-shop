@@ -1,0 +1,24 @@
+/* Admin shell for the CaseLine admin demo (DESIGN.md §7). Builds on design-demo.css tokens (.fd). */
+.fd .ad { display: grid; min-height: 100vh; grid-template-columns: minmax(0, 1fr); } .fd .ad > * { min-width: 0; } @media (min-width: 1024px) { .fd .ad { grid-template-columns: 240px minmax(0, 1fr); } }
+.fd .ad-side { background: var(--s1); border-inline-end: 1px solid var(--hair); display: flex; flex-direction: column; } @media (min-width: 1024px) { .fd .ad-side { position: sticky; top: 0; height: 100vh; } }
+.fd .ad-brand { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; }
+.fd .ad-nav { display: flex; gap: 2px; overflow-x: auto; padding: 0 12px 10px; scrollbar-width: none; border-block-end: 1px solid var(--hair); } .fd .ad-nav::-webkit-scrollbar { display: none; }
+@media (min-width: 1024px) { .fd .ad-nav { flex-direction: column; overflow: visible; padding: 8px 12px; border: 0; flex: 1; } }
+.fd .ad-nav .grp { display: none; font-size: 11px; color: var(--subtle); padding: 14px 12px 4px; font-weight: 600; } @media (min-width: 1024px) { .fd .ad-nav .grp { display: block; } }
+.fd .ad-nav button { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 6px 12px; border-radius: var(--r-md); font-size: 13px; font-weight: 500; color: var(--muted); white-space: nowrap; text-align: start; width: auto; } @media (min-width: 1024px) { .fd .ad-nav button { width: 100%; } }
+.fd .ad-nav button:hover { color: var(--ink); } .fd .ad-nav button[aria-current] { background: var(--s2); color: var(--ink); } .fd .ad-nav .pill-n { margin-inline-start: auto; background: var(--s3); border-radius: 9px; font-size: 11px; padding: 0 7px; color: var(--ink); }
+.fd .ad-user { display: none; padding: 12px 16px; border-block-start: 1px solid var(--hair); align-items: center; gap: 10px; font-size: 13px; } @media (min-width: 1024px) { .fd .ad-user { display: flex; } } .fd .ad-user small { color: var(--muted); display: block; font-size: 11px; line-height: 1.4; }
+.fd .ad-top { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: rgba(12, 12, 12, .88); backdrop-filter: blur(12px); border-block-end: 1px solid var(--hair); } @media (min-width: 1024px) { .fd .ad-top { padding-inline: 32px; } }
+.fd .ad-main { padding: 20px 16px 48px; max-width: 1440px; width: 100%; display: flex; flex-direction: column; gap: 20px; } @media (min-width: 810px) { .fd .ad-main { padding: 28px 24px 64px; } } @media (min-width: 1024px) { .fd .ad-main { padding-inline: 32px; } }
+.fd .ad-tbl td .nm { display: flex; align-items: center; gap: 10px; min-width: 220px; } .fd .ad-tbl td .th { width: 36px; height: 36px; border-radius: var(--r-md); background: var(--s2); flex: none; }
+.fd .ad-tbl td .nm span { overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+.fd .ad-tbl .sel { appearance: none; background: var(--s1); border: 1px solid var(--hair); border-radius: var(--pill); color: var(--ink); font: inherit; font-size: 12px; min-height: 32px; padding: 0 12px; }
+.fd .meter { width: 90px; height: 6px; border-radius: 6px; background: var(--s3); overflow: hidden; display: inline-block; vertical-align: middle; } .fd .meter i { display: block; height: 100%; border-radius: 6px; }
+.fd .rv { background: var(--s1); border: 1px solid var(--hair); border-radius: var(--r-lg); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.fd .rvs { display: grid; gap: 12px; } @media (min-width: 810px) { .fd .rvs { grid-template-columns: 1fr 1fr; } }
+.fd .seg { display: inline-flex; background: var(--s1); border: 1px solid var(--hair); border-radius: var(--pill); padding: 2px; } .fd .seg button { padding: 5px 14px; border-radius: var(--pill); font-size: 12px; font-weight: 600; color: var(--muted); min-height: 32px; } .fd .seg button[aria-pressed='true'] { background: var(--s3); color: var(--ink); }
+.fd .toast-wrap { position: fixed; inset-inline: 0; bottom: 24px; display: flex; justify-content: center; z-index: 90; pointer-events: none; padding-inline: 16px; }
+.fd .edit-grid { display: grid; gap: 16px; } @media (min-width: 810px) { .fd .edit-grid { grid-template-columns: 1.4fr 1fr; } }
+.fd .modal.wide { max-width: 760px; } .fd .kv { display: flex; justify-content: space-between; gap: 12px; padding-block: 8px; border-block-end: 1px solid var(--hair-soft); font-size: 13px; } .fd .kv span:first-child { color: var(--muted); }
+.fd .row-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.fd .empty { text-align: center; padding: 48px 16px; color: var(--muted); } .fd .empty .circ { width: 56px; height: 56px; border-radius: 50%; background: var(--s2); display: grid; place-items: center; margin: 0 auto 12px; color: var(--ink); }
