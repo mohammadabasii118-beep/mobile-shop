@@ -93,7 +93,12 @@ describe('Telegram: admin entry in the menu + product management', () => {
     await say(ADMIN, 'hello'); expect(labels()).toContain('🛠 پنل مدیریت');
     // admin panel itself
     await tap(ADMIN, 'adm:home');
-    expect(last().payload.text).toContain('پنل مدیریت'); expect(labels()).toContain('📦 محصولات');
+    expect(last().payload.text).toContain('پنل مدیریت');
+    expect(labels()).toEqual(expect.arrayContaining(['📊 داشبورد', '💰 فروش و مالی', '📦 محصولات و منوی خرید', '🛰 سرویس‌ها و سرورها', '⚙️ تنظیمات و ابزارها', '🎫 پشتیبانی']));
+    expect(labels()).not.toContain('📦 محصولات'); // leaf items live inside their group
+    await tap(ADMIN, 'adm:g:cat'); expect(labels()).toEqual(expect.arrayContaining(['📦 محصولات', '🗂 دسته‌بندی منوی خرید']));
+    await tap(ADMIN, 'adm:g:fin'); expect(cbs()).toEqual(expect.arrayContaining(['adm:pays', 'adm:orders', 'adm:coupons']));
+    await tap(ADMIN, 'adm:g:nope'); expect(last().payload.text).toContain('نامعتبر');
   });
 
   it('bulk add via bot: bad paste keeps the step (retry), corrected paste creates everything', async () => {

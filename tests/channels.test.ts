@@ -155,7 +155,7 @@ describe('Telegram bot: new-user notification + join gate', () => {
   });
 
   it('admin manages channels from the bot (add / test / toggle / delete) and non-admins cannot', async () => {
-    await tap(ADMIN, 'adm:home');
+    await tap(ADMIN, 'adm:g:set');
     expect(last().payload.reply_markup.inline_keyboard.flat().map((b: any) => b.callback_data)).toContain('ch:l');
     await tap(ADMIN, 'ch:l'); expect(String(last().payload.text)).toContain('هنوز کانالی اضافه نشده');
     await tap(ADMIN, 'ch:n'); await say(ADMIN, '@noadmin');

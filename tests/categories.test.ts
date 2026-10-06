@@ -129,6 +129,8 @@ describe('Telegram buy menu with categories', () => {
 
   it('admin manages categories in the bot; non-admins are blocked', async () => {
     await tap(ADMIN, 'adm:home');
+    expect(btns().map((b) => b.callback_data)).toContain('adm:g:cat');
+    await tap(ADMIN, 'adm:g:cat');
     expect(btns().map((b) => b.callback_data)).toContain('ct:l:root');
     await tap(ADMIN, 'ct:l:root');
     await tap(ADMIN, 'ct:n:root');

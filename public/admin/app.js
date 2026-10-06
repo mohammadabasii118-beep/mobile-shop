@@ -21,10 +21,12 @@ let themeBtn;
 
 /* ---------- routing: #/route?query ; filters/search/page live in the URL ---------- */
 const NAV = [
-  ['dashboard', 'داشبورد', 'dashboard', 'stats.view'], ['users', 'کاربران', 'users', 'users.view'], ['products', 'محصولات', 'box', 'products.manage'], ['categories', 'دسته‌بندی منو', 'folder', 'products.manage'],
-  ['orders', 'سفارش‌ها', 'receipt', 'users.view'], ['payments', 'پرداخت‌ها', 'card', 'payments.view'], ['services', 'سرویس‌های VPN', 'shield', 'vpn.view'],
-  ['coupons', 'کدهای تخفیف', 'ticket', 'coupons.manage'], ['support', 'پشتیبانی', 'headset', 'support.reply'], ['notifications', 'اعلان‌ها', 'bell', 'stats.view'],
-  ['panels', 'پنل‌ها و inbound', 'server', 'panels.manage'], ['texts', 'متن‌های ربات', 'edit', 'texts.manage'], ['channels', 'کانال‌های اجباری', 'bell', 'settings.manage'], ['settings', 'تنظیمات', 'settings', 'settings.manage'], ['audit', 'Audit Logs', 'audit', 'audit.view'],
+  ['dashboard', 'داشبورد', 'dashboard', 'stats.view', ''],
+  ['orders', 'سفارش‌ها', 'receipt', 'users.view', 'فروش و مالی'], ['payments', 'پرداخت‌ها', 'card', 'payments.view', 'فروش و مالی'], ['coupons', 'کدهای تخفیف', 'ticket', 'coupons.manage', 'فروش و مالی'],
+  ['users', 'کاربران', 'users', 'users.view', 'مشتریان'], ['support', 'پشتیبانی', 'headset', 'support.reply', 'مشتریان'], ['notifications', 'اعلان‌ها', 'bell', 'stats.view', 'مشتریان'],
+  ['products', 'محصولات', 'box', 'products.manage', 'محصولات و منو'], ['categories', 'دسته‌بندی منو', 'folder', 'products.manage', 'محصولات و منو'],
+  ['services', 'سرویس‌های VPN', 'shield', 'vpn.view', 'سرویس‌ها و سرورها'], ['panels', 'پنل‌ها و inbound', 'server', 'panels.manage', 'سرویس‌ها و سرورها'],
+  ['texts', 'متن‌های ربات', 'edit', 'texts.manage', 'تنظیمات و ابزارها'], ['channels', 'کانال‌های اجباری', 'bell', 'settings.manage', 'تنظیمات و ابزارها'], ['settings', 'تنظیمات', 'settings', 'settings.manage', 'تنظیمات و ابزارها'], ['audit', 'Audit Logs', 'audit', 'audit.view', 'تنظیمات و ابزارها'],
 ];
 const PAGES = { dashboard: P.dashboard, users: P.users, products: P.products, categories: P.categories, orders: P.orders, payments: P.payments, services: P.services, coupons: P.coupons, support: P.support, notifications: P.notifications, settings: P.settings, panels: P.panels, texts: P.texts, channels: P.channels, audit: P.audit };
 const parse = () => { const raw = location.hash.replace(/^#\/?/, ''); const [route, qs = ''] = raw.split('?'); return { route: route || 'dashboard', q: new URLSearchParams(qs) }; };
@@ -49,10 +51,23 @@ async function refreshBadges() {
   } catch { /* badges are best-effort */ }
 }
 
+/** Sidebar: related pages grouped under small headings; groups with no permitted page are hidden. */
+function navItems() {
+  const out = [];
+  let last = null;
+  for (const [r, label, ico, perm, group] of NAV) {
+    if (!ctx.me.permissions.includes(perm)) continue;
+    if (group && group !== last) out.push(h('div', { class: 'nav-group', text: group }));
+    last = group;
+    out.push(h('a', { href: `#/${r}`, 'data-route': r }, icon(ico), h('span', { text: label })));
+  }
+  return out;
+}
+
 function shell() {
   const side = h('aside', { class: 'sidebar', id: 'sidebar', 'aria-label': 'منوی اصلی' },
     h('div', { class: 'logo' }, h('div', { class: 'brand-mark' }, icon('shield')), h('div', null, 'پنل VPN', h('small', { text: 'مدیریت فروش و سرویس' }))),
-    h('nav', { class: 'nav' }, NAV.filter(([, , , perm]) => ctx.me.permissions.includes(perm)).map(([r, label, ico]) => h('a', { href: `#/${r}`, 'data-route': r }, icon(ico), h('span', { text: label })))),
+    h('nav', { class: 'nav' }, navItems()),
     h('div', { class: 'side-foot' }, h('div', { text: `نقش: ${ctx.me.role}` }), h('div', { class: 'ltr mono', text: `ID ${ctx.me.telegramId}` })));
   const scrim = h('div', { class: 'scrim' });
   const closeNav = () => { side.classList.remove('open'); scrim.classList.remove('show'); };

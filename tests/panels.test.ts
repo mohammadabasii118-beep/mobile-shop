@@ -186,10 +186,13 @@ describe('Telegram: panels and inbounds management', () => {
 
   it('menu entry is super-admin only; a product admin cannot reach it by crafted callbacks', async () => {
     await say(ADMIN, '/admin');
-    expect(cbs()).toContain('pn:l');
+    expect(cbs()).toContain('adm:g:srv');
+    await tap(ADMIN, 'adm:g:srv'); expect(cbs()).toContain('pn:l');
     await prisma.admin.create({ data: { telegramId: 9200n, role: 'PRODUCT_ADMIN' } });
     await say(9200, '/admin');
-    expect(cbs()).not.toContain('pn:l');
+    expect(cbs()).not.toContain('adm:g:srv');
+    await tap(9200, 'adm:g:srv');
+    expect(last().payload.text).toContain('دسترسی');
     await tap(9200, 'pn:l');
     expect(last().payload.text).toContain('دسترسی');
     await tap(9200, 'pn:new');

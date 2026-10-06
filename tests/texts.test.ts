@@ -104,6 +104,8 @@ describe('Telegram: custom texts + admin editor', () => {
 
   it('admin edits a text in the bot with preview; validation errors keep the step; reset works; permission enforced', async () => {
     await tap(ADMIN, 'adm:home');
+    expect(cbs()).toContain('adm:g:set');
+    await tap(ADMIN, 'adm:g:set');
     expect(cbs()).toContain('tx:l');
     await tap(ADMIN, 'tx:l'); expect(labels()).toEqual(expect.arrayContaining(['منو و خوش‌آمد', 'اعلان‌ها']));
     await tap(ADMIN, 'tx:g:0'); expect(cbs()).toContain('tx:v:welcome');

@@ -32,28 +32,40 @@ const PAGE = 8;
 export function adminHandlers() {
   const c = new Composer<Ctx>();
 
+  /** The admin menu is grouped: related tools live together; groups/items the admin has no permission for are hidden. */
+  const GROUPS: { id: string; title: string; hint: string; items: [Permission, string, string][] }[] = [
+    { id: 'fin', title: '💰 فروش و مالی', hint: 'پرداخت‌ها، سفارش‌ها و کدهای تخفیف', items: [['payments.view', '💳 پرداخت‌ها', 'adm:pays'], ['users.view', '🧾 سفارش‌ها و کاربران', 'adm:orders'], ['coupons.manage', '🎁 کدهای تخفیف', 'adm:coupons']] },
+    { id: 'cat', title: '📦 محصولات و منوی خرید', hint: 'پلن‌های قابل فروش و دسته‌بندی منو', items: [['products.manage', '📦 محصولات', 'adm:products'], ['products.manage', '🗂 دسته‌بندی منوی خرید', 'ct:l:root']] },
+    { id: 'srv', title: '🛰 سرویس‌ها و سرورها', hint: 'سرویس‌های مشتریان و پنل‌های X-UI', items: [['vpn.view', '🛰 سرویس‌های VPN', 'vl:0'], ['panels.manage', '🖥 پنل‌ها و inboundها', 'pn:l']] },
+    { id: 'set', title: '⚙️ تنظیمات و ابزارها', hint: 'متن‌ها، کانال‌های اجباری، تنظیمات و گزارش تغییرات', items: [['texts.manage', '✏️ ویرایش متن‌های ربات', 'tx:l'], ['settings.manage', '📢 کانال‌های اجباری', 'ch:l'], ['settings.manage', '⚙️ تنظیمات', 'adm:settings'], ['audit.view', '🧾 Audit Log', 'adm:audit']] },
+  ];
+
+  async function visibleItems(ctx: Ctx, g: (typeof GROUPS)[number]) {
+    const out: Button[][] = [];
+    for (const [perm, text, data] of g.items) if (await hasPermission(BigInt(ctx.from!.id), perm)) out.push([{ text, data }]);
+    return out;
+  }
+
+  async function groupView(ctx: Ctx, id: string) {
+    const g = GROUPS.find((x) => x.id === id);
+    if (!g) throw new AppError('VALIDATION', 'بخش نامعتبر');
+    const rows = await visibleItems(ctx, g);
+    if (!rows.length) throw new ForbiddenError();
+    ctx.session.step = undefined;
+    await show(ctx, `${g.title}\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n${g.hint}`, [...rows, back('adm:home')]);
+  }
+
   async function panel(ctx: Ctx) {
     const a = await getAdmin(BigInt(ctx.from!.id));
     if (!a) throw new ForbiddenError();
     ctx.session.step = undefined;
     const rows: Button[][] = [];
-    const add = async (perm: Permission, btn: Button) => { if (await hasPermission(BigInt(ctx.from!.id), perm)) rows.push([btn]); };
-    await add('stats.view', { text: '📊 داشبورد', data: 'adm:dash' });
-    await add('payments.view', { text: '💳 پرداخت‌ها', data: 'adm:pays' });
-    await add('vpn.view', { text: '🛰 سرویس‌های VPN', data: 'vl:0' });
-    await add('products.manage', { text: '📦 محصولات', data: 'adm:products' });
-    await add('products.manage', { text: '🗂 دسته‌بندی منوی خرید', data: 'ct:l:root' });
-    await add('texts.manage', { text: '✏️ ویرایش متن‌های ربات', data: 'tx:l' });
-    await add('panels.manage', { text: '🖥 پنل‌ها و inboundها', data: 'pn:l' });
-    await add('settings.manage', { text: '📢 کانال‌های اجباری', data: 'ch:l' });
-    await add('products.manage', { text: '🎁 کدهای تخفیف', data: 'adm:coupons' });
-    await add('users.view', { text: '👥 کاربران / سفارش‌ها', data: 'adm:orders' });
-    await add('support.reply', { text: '🎫 پشتیبانی', data: 'adm:tickets' });
-    await add('settings.manage', { text: '⚙️ تنظیمات', data: 'adm:settings' });
-    await add('audit.view', { text: '🧾 Audit Log', data: 'adm:audit' });
+    if (await hasPermission(BigInt(ctx.from!.id), 'stats.view')) rows.push([{ text: '📊 داشبورد', data: 'adm:dash' }]);
+    for (const g of GROUPS) if ((await visibleItems(ctx, g)).length) rows.push([{ text: g.title, data: `adm:g:${g.id}` }]);
+    if (await hasPermission(BigInt(ctx.from!.id), 'support.reply')) rows.push([{ text: '🎫 پشتیبانی', data: 'adm:tickets' }]);
     if (panelEnabled()) rows.push([{ text: '🖥 ورود به پنل وب', data: 'adm:web' }]);
     rows.push([{ text: '🏠 منوی کاربر', data: 'menu:main' }]);
-    await show(ctx, `🛠 پنل مدیریت (${a.role})`, rows);
+    await show(ctx, `🛠 پنل مدیریت (${a.role})\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\nیک بخش را انتخاب کنید:`, rows);
   }
 
   async function dashboard(ctx: Ctx) {
@@ -76,7 +88,7 @@ export function adminHandlers() {
       const h = panelHealth.get(p.code);
       return [{ text: `${!p.isActive ? '⚪' : h ? (h.ok ? '🟢' : '🔴') : '🖥'} ${p.name} · ${p.code}`, data: `pn:v:${p.code}` }];
     });
-    await show(ctx, `🖥 پنل‌های X-UI\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\nهر محصول به یک پنل و یک inbound وصل می‌شود؛ پس می‌توانید چند سرور داشته باشید و روی هر کدام محصول جدا بفروشید.${ps.length ? '' : '\n\nهنوز پنلی ثبت نشده است.'}`, [...rows, [{ text: '➕ افزودن پنل', data: 'pn:new' }], back('adm:home')]);
+    await show(ctx, `🖥 پنل‌های X-UI\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\nهر محصول به یک پنل و یک inbound وصل می‌شود؛ پس می‌توانید چند سرور داشته باشید و روی هر کدام محصول جدا بفروشید.${ps.length ? '' : '\n\nهنوز پنلی ثبت نشده است.'}`, [...rows, [{ text: '➕ افزودن پنل', data: 'pn:new' }], back('adm:g:srv')]);
   }
 
   function panelText(p: PanelView) {
@@ -182,7 +194,7 @@ export function adminHandlers() {
     if (page > 0) nav.push({ text: '◀️', data: `vl:${page - 1}` });
     if (list.length > PAGE) nav.push({ text: '▶️', data: `vl:${page + 1}` });
     if (nav.length) rows.push(nav);
-    rows.push(back('adm:home'));
+    rows.push(back('adm:g:srv'));
     await show(ctx, '🛰 سرویس‌های VPN', rows);
   }
 
@@ -199,7 +211,7 @@ export function adminHandlers() {
       ...toggleKeys.map((k): Button[] => [{ text: `🔀 ${k}`, data: `st:t:${k}` }]),
       ...editKeys.map((k): Button[] => [{ text: `✏️ ${k}`, data: `st:e:${k}` }]),
       [{ text: '🔌 تست اتصال X-UI', data: 'st:xui' }],
-      back('adm:home'),
+      back('adm:g:set'),
     ]);
   }
 
@@ -214,6 +226,7 @@ export function adminHandlers() {
       if (ns === 'adm') {
         switch (a) {
           case 'home': return panel(ctx);
+          case 'g': return await groupView(ctx, b);
           case 'web': {
             if (!panelEnabled()) throw new AppError('VALIDATION', 'پنل وب پیکربندی نشده است');
             const url = loginUrl(createLoginToken(BigInt(ctx.from!.id)));
@@ -221,21 +234,21 @@ export function adminHandlers() {
             return ctx.reply(`🖥 ورود به پنل مدیریت\n\nاین لینک یک‌بارمصرف است و ۵ دقیقه اعتبار دارد:\n${url}`, { link_preview_options: { is_disabled: true } });
           }
           case 'dash': return dashboard(ctx);
-          case 'pays': await need(ctx, 'payments.view'); return show(ctx, '💳 پرداخت‌ها', [...FILTERS.map(([f, t]): Button[] => [{ text: t, data: `pl:${f}:0` }]), back('adm:home')]);
+          case 'pays': await need(ctx, 'payments.view'); return show(ctx, '💳 پرداخت‌ها', [...FILTERS.map(([f, t]): Button[] => [{ text: t, data: `pl:${f}:0` }]), back('adm:g:fin')]);
           case 'products': {
             await need(ctx, 'products.manage');
             const ps = await listAllProducts();
-            return show(ctx, `📦 محصولات (${ps.length})`, [[{ text: '➕ محصول جدید', data: 'pr:new' }, { text: '📥 افزودن گروهی', data: 'pr:bulk' }], ...ps.map((p): Button[] => [{ text: `${p.isActive ? '🟢' : '⚪'} ${p.name} · ${p.price}`, data: `pr:v:${p.id}` }]), back('adm:home')]);
+            return show(ctx, `📦 محصولات (${ps.length})`, [[{ text: '➕ محصول جدید', data: 'pr:new' }, { text: '📥 افزودن گروهی', data: 'pr:bulk' }], ...ps.map((p): Button[] => [{ text: `${p.isActive ? '🟢' : '⚪'} ${p.name} · ${p.price}`, data: `pr:v:${p.id}` }]), back('adm:g:cat')]);
           }
           case 'coupons': {
             await need(ctx, 'coupons.manage');
             const cs = await listCoupons();
-            return show(ctx, `🎁 کدهای تخفیف\n\n${cs.map((x) => `${x.code} ${x.type === 'PERCENT' ? x.value + '%' : x.value} (${x.usedCount}/${x.maxUses ?? '∞'})`).join('\n') || '—'}`, [[{ text: '➕ کد جدید', data: 'cp:new' }], back('adm:home')]);
+            return show(ctx, `🎁 کدهای تخفیف\n\n${cs.map((x) => `${x.code} ${x.type === 'PERCENT' ? x.value + '%' : x.value} (${x.usedCount}/${x.maxUses ?? '∞'})`).join('\n') || '—'}`, [[{ text: '➕ کد جدید', data: 'cp:new' }], back('adm:g:fin')]);
           }
           case 'orders': {
             await need(ctx, 'users.view');
             const os = await prisma.order.findMany({ orderBy: { createdAt: 'desc' }, take: 12, include: { user: true } });
-            return show(ctx, `🧾 آخرین سفارش‌ها\n\n${os.map((o) => `${o.orderNumber} · ${o.user.telegramId} · ${o.finalAmount} · ${o.status}`).join('\n') || '—'}`, [back('adm:home')]);
+            return show(ctx, `🧾 آخرین سفارش‌ها\n\n${os.map((o) => `${o.orderNumber} · ${o.user.telegramId} · ${o.finalAmount} · ${o.status}`).join('\n') || '—'}`, [back('adm:g:fin')]);
           }
           case 'tickets': {
             await need(ctx, 'support.reply');
@@ -246,7 +259,7 @@ export function adminHandlers() {
           case 'audit': {
             await need(ctx, 'audit.view');
             const logs = await prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' }, take: 15 });
-            return show(ctx, `🧾 Audit Log\n\n${logs.map((l) => `${fmtDt(l.createdAt)} ${l.actor} ${l.action} ${l.targetId?.slice(-6) ?? ''}`).join('\n')}`, [back('adm:home')]);
+            return show(ctx, `🧾 Audit Log\n\n${logs.map((l) => `${fmtDt(l.createdAt)} ${l.actor} ${l.action} ${l.targetId?.slice(-6) ?? ''}`).join('\n')}`, [back('adm:g:set')]);
           }
         }
       }
@@ -462,7 +475,7 @@ export function adminHandlers() {
           return show(ctx, `📢 کانال‌های اجباری\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\nتا کاربر عضو «همه‌ی کانال‌های فعال» نشود نمی‌تواند از ربات استفاده کند (ادمین‌ها معاف‌اند).\nربات باید در هر کانال «ادمین» باشد.${chans.length ? '' : '\n\nهنوز کانالی اضافه نشده؛ پس عضویت اجباری خاموش است.'}`, [
             ...chans.map((c): Button[] => [{ text: `${c.isActive ? '🟢' : '⚪'} ${c.title}${c.username ? ` (@${c.username})` : ''}`, data: `ch:v:${c.id}` }]),
             [{ text: '➕ افزودن کانال', data: 'ch:n' }],
-            back('adm:home'),
+            back('adm:g:set'),
           ]);
         }
         if (a === 'n') {
@@ -484,7 +497,7 @@ export function adminHandlers() {
         await need(ctx, 'texts.manage');
         const items = await listTexts();
         const groups = [...new Set(items.map((x) => x.group))];
-        if (a === 'l') return show(ctx, '✏️ ویرایش متن‌های ربات\nکدام بخش؟', [...groups.map((g, n): Button[] => [{ text: g, data: `tx:g:${n}` }]), back('adm:home')]);
+        if (a === 'l') return show(ctx, '✏️ ویرایش متن‌های ربات\nکدام بخش؟', [...groups.map((g, n): Button[] => [{ text: g, data: `tx:g:${n}` }]), back('adm:g:set')]);
         if (a === 'g') {
           const g = groups[Number(b)];
           if (!g) throw new AppError('NOT_FOUND', 'بخش یافت نشد');
@@ -516,7 +529,7 @@ export function adminHandlers() {
             ...kids.map((t): Button[] => [{ text: `${label(t)} (${t.activeProductCount}/${t.productCount})`, data: `ct:v:${t.id}` }]),
             [{ text: '➕ دسته‌ی جدید', data: `ct:n:${rootKey(pid)}` }],
             ...(here ? [[{ text: '⚙️ تنظیمات این دسته', data: `ct:v:${here.id}` }]] : []),
-            back(here ? `ct:l:${rootKey(here.parentId)}` : 'adm:home'),
+            back(here ? `ct:l:${rootKey(here.parentId)}` : 'adm:g:cat'),
           ]);
         }
         if (a === 'n') {
