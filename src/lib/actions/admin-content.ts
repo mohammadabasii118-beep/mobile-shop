@@ -66,7 +66,7 @@ export async function moveBanner(id: number, dir: -1 | 1): Promise<AState> {
 
 /* ═════════ تنظیمات ═════════ */
 const GROUPS: Record<string, { keys: string[]; flags?: string[]; ints?: string[] }> = {
-  general: { keys: ['store_name', 'tagline', 'phone', 'email', 'address', 'footer_about', 'instagram', 'telegram'] },
+  general: { keys: ['store_name', 'store_name_en', 'tagline', 'phone', 'email', 'address', 'footer_about', 'instagram', 'telegram'] },
   announce: { keys: ['announcements'] },
   shipping: { keys: [], ints: ['shipping_cost', 'free_shipping_min'] },
   payment: { keys: ['checkout_note'], flags: ['pay_cod', 'pay_online'] },

@@ -224,8 +224,8 @@ function open() {
   return d;
 }
 
-const g = globalThis as unknown as { __voltaDb?: Database.Database };
-export const db: Database.Database = g.__voltaDb ?? (g.__voltaDb = open());
+const g = globalThis as unknown as { __caselineDb?: Database.Database };
+export const db: Database.Database = g.__caselineDb ?? (g.__caselineDb = open());
 
 export function all<T = Record<string, unknown>>(sql: string, ...params: unknown[]): T[] {
   return db.prepare(sql).all(...params) as T[];

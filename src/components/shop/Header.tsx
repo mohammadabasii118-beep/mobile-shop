@@ -22,6 +22,7 @@ export default function Header({ settings, categories, userName }: { settings: S
             <Link className="logo" href="/" aria-label={`${settings.store_name}، صفحه اصلی`}>
               {settings.store_name}
               <i />
+              {settings.store_name_en && <small className="logo-en" dir="ltr">{settings.store_name_en}</small>}
             </Link>
             <SearchBox />
             <HeaderActions loggedIn={!!userName} />

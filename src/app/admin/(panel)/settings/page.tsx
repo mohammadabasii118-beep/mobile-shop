@@ -18,6 +18,7 @@ export default async function SettingsPage() {
           <ActionForm action={saveSettings.bind(null, 'general')}>
             <div className="ad-grid2">
               <div className="fld"><label htmlFor="s1">نام فروشگاه</label><input id="s1" className="input" name="store_name" defaultValue={s.store_name} required /></div>
+              <div className="fld"><label htmlFor="s1e">نام لاتین (کنار لوگو)</label><input id="s1e" className="input" name="store_name_en" dir="ltr" defaultValue={s.store_name_en} /></div>
               <div className="fld"><label htmlFor="s2">شعار کوتاه</label><input id="s2" className="input" name="tagline" defaultValue={s.tagline} /></div>
               <div className="fld"><label htmlFor="s3">تلفن تماس</label><input id="s3" className="input" name="phone" defaultValue={s.phone} /></div>
               <div className="fld"><label htmlFor="s4">ایمیل</label><input id="s4" className="input" name="email" dir="ltr" defaultValue={s.email} /></div>
