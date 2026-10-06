@@ -1,0 +1,6 @@
+node_modules
+.next
+data
+archive
+.git
+*.zip

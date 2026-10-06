@@ -1,47 +1,44 @@
 # CLAUDE.md — فروشگاه ولتا (لوازم جانبی موبایل)
 
-فروشگاه اینترنتی فارسی (RTL) برای لوازم جانبی موبایل. قیمت‌ها به تومان.
+فروشگاه اینترنتی فارسی (RTL) با پنل مدیریت. قیمت‌ها به تومان (عدد صحیح).
 
 ## قانون اصلی: DESIGN.md منبع واحد طراحی است
 
 قبل از **هر** تغییر UI (کامپوننت، صفحه، استایل، متن رابط):
 
-1. `DESIGN.md` را بخوان (حداقل بخش‌های مرتبط با تغییر).
+1. `DESIGN.md` را بخوان (حداقل بخش‌های مرتبط؛ بخش ۱۸ تصمیم‌های اجرایی است).
 2. قوانین آن را رعایت کن (tokenها، Do/Don't، RTL، Accessibility، Motion).
 3. اگر تصمیم جدیدی لازم است که در `DESIGN.md` نیست، **اول `DESIGN.md` را به‌روز کن**، سپس کد بنویس. در پیام commit ذکر کن.
-4. هیچ رنگ/اندازه/radius/سایه‌ی hard-code در کامپوننت‌ها نگذار؛ فقط tokenها (`src/styles/tokens.css` ← از `DESIGN.md`).
+4. رنگ/اندازه/radius/سایه فقط از CSS variableهای `src/app/globals.css` (بلوک tokens). هیچ hex در کامپوننت‌ها (به‌جز نمونه‌ی رنگ محصول از دیتابیس).
 5. اگر کد و `DESIGN.md` اختلاف دارند، `DESIGN.md` برنده است، مگر اینکه کاربر صریحاً تغییرش دهد.
 
-## زبان و جهت
+## فناوری
 
-- `lang="fa" dir="rtl"` در ریشه. فونت: **Vazirmatn**.
-- فقط logical properties (`ms-*`, `me-*`, `ps-*`, `pe-*`, `start-*`, `end-*`, `text-start`). از `left/right/ml/mr/pl/pr/text-left` استفاده نکن.
-- متن UI فارسی؛ نام برند و مدل محصول لاتین (داخل `<bdi>` در جمله‌ی فارسی).
-- ارقام فارسی در UI، لاتین در URL/SKU/DB. قیمت فقط با util مرکزی `lib/format.ts` فرمت شود.
-- تاریخ شمسی در UI، میلادی در DB.
+Next.js 16 (App Router، Server Components + Server Actions) · React 19 · TypeScript strict · CSS خالص با tokens (بدون Tailwind) · lucide-react · SQLite با `better-sqlite3` (`src/lib/db.ts`، همه‌ی schema همان‌جاست) · فونت Vazirmatn از `@fontsource-variable` (self-hosted).
 
-## فناوری (پیشنهادی، در انتظار تأیید)
+## دستورها
 
-Next.js (App Router) · TypeScript strict · Tailwind CSS · shadcn/ui (سفارشی‌شده با tokenها) · lucide-react · Framer Motion (فقط hero/drawer/modal/carousel) · معماری component-based.
+`npm run dev` · `npm run build` · `npm start` · `npm run seed` (`-- --empty` / `seed:reset`) · `npm run typecheck` · `npm run smoke` (روی سرور در حال اجرا).
+ادمین seed: `admin` / `admin123`. هر تغییر کد را با `npx tsc --noEmit` و `npx next build` بررسی کن.
 
-## ساختار مسیرها
+## ساختار و قراردادها
 
-`/` · `/shop` · `/category/[slug]` · `/product/[slug]` · `/search` · `/cart` · `/checkout` · `/account` · `/wishlist` · `/admin` (مدیریت: محصولات، دسته‌ها، سفارش‌ها، کاربران، موجودی، تخفیف‌ها، کد تخفیف، بنرها، برندها، پرداخت‌ها، گزارش‌ها، تنظیمات).
+- `src/app/(shop)` سایت، `src/app/admin/(panel)` پنل (guard در layout با `requireAdmin()`)، `src/app/admin/login` ورود.
+- **Server Action مدیریتی** حتماً با `await assertAdmin()` شروع شود (فایل‌های `src/lib/actions/admin-*.ts`). Route Handlerهای مدیریتی هم همین‌طور.
+- فرمت پول/تاریخ/ارقام فقط با `src/lib/format.ts`. ارقام فارسی در UI، لاتین در DB و URL. تاریخ UI شمسی (`Intl` با `fa-IR-u-ca-persian`)، DB میلادی UTC.
+- قیمت سفارش **هرگز** از کلاینت نیامده؛ `priceCart`/`placeOrder` در `src/lib/orders.ts` از DB محاسبه می‌کند.
+- محصول متغیر: `variations.attrs` JSON با کلید slug ویژگی (`phone-brand`, `phone-model`, `color`). ویژگی فرزند (مدل) با `attributes.parent_attribute_id` و `attribute_terms.parent_term_id` به والد (برند) وصل است؛ ترکیب‌ها فقط با `generateCombos` (`src/lib/variations.ts`) ساخته شود. slugهای پایه در `ATTR` ثابت‌اند و حذف نمی‌شوند.
+- تصویر محصول: مسیر `/uploads/...` (آپلود مدیر، ذخیره در `data/uploads`) یا `art:p-xxx[@#hex]` (SVG نمونه، `Pic` نمایش می‌دهد).
+- فقط logical properties (`inline-start/end`، `padding-inline`)؛ `left/right/ml/mr` ممنوع. متن لاتین داخل جمله‌ی فارسی: `<bdi>`.
+- هر لیست: حالت loading/empty/error. دسترسی‌پذیری (DESIGN.md §۱۳) جزو «تمام‌شده» است.
+- در SQL از نام‌های رزرو (`all`, `out`, …) به‌عنوان alias استفاده نکن؛ کوئری‌ها پارامتری باشند.
+- بعد از تغییر UI با viewport ۳۲۰/۳۹۰/۷۶۸/۱۴۴۰ و تم تیره بررسی کن؛ اسکرول افقی نباید وجود داشته باشد.
 
-ادمین از همان tokenها استفاده می‌کند ولی چیدمان متراکم دارد (بخش ۱۰ در `DESIGN.md`).
+## وضعیت
 
-## وضعیت فعلی
+کامل و تست‌شده: سایت (Home با اسلایدر، shop، category، product متغیر، search، cart، checkout، account، wishlist)، پنل (داشبورد، محصولات، ویژگی‌ها، دسته/برند، موجودی، سفارش، پرداخت، تخفیف، کوپن، نظر، کاربر، بنر، گزارش، تنظیمات).
+کارهای بعدی: درگاه پرداخت واقعی (`src/lib/payments.ts`)، پیامک، آدرس‌های ذخیره‌شده.
 
-- فاز ۱ (فعلی): بررسی design system، `DESIGN.md`، دموی HTML ایستا در `demo/index.html` (Home + Product Card). **هنوز پروژه‌ی Next.js ساخته نشده**؛ منتظر تأیید کاربر روی ظاهر و stack.
-- قالب قابل استفاده‌ی مجدد: `template/` (HTML/CSS/JS ایستا) و `volta-template.zip`.
-- فاز ۲: scaffold پروژه، `tokens.css`، primitives، Home و ProductCard واقعی.
-- فاز ۳: shop/category/product/search/cart/checkout/account/wishlist.
-- فاز ۴: admin.
+`archive/` نسخه‌ی قدیمی دموی ایستا است؛ تغییرش نده.
 
-## روش کار
-
-- تغییرات کوچک و متمرکز؛ قبل از اتمام lint/typecheck/build را اجرا کن.
-- برای هر لیست: حالت‌های loading، empty، error.
-- برای UI، با viewport موبایل (۳۹۰px) و دسکتاپ (۱۴۴۰px)، RTL، و تم روشن/تیره چک کن.
-- دسترسی‌پذیری (DESIGN.md §۱۳) بخشی از «تمام‌شده» است.
-- کار روی branch مشخص‌شده انجام شود؛ بدون درخواست کاربر PR نساز.
+بدون درخواست کاربر PR نساز. کار روی branch مشخص‌شده انجام شود.
