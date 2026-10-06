@@ -25,6 +25,8 @@ export class FakeXui {
   /** after a successful addClient, answer the next N requests with 503 (panel dies mid-provisioning) */
   failAfterAddClient = 0;
   private failCountdown = 0;
+  /** answer unauthenticated API calls with HTTP 200 + the HTML login page (what an expired session looks like behind some setups) */
+  unauthHtml = false;
   logins = 0;
   addClientCalls = 0;
 
@@ -88,6 +90,7 @@ export class FakeXui {
         if (body.get('username') === this.username && body.get('password') === this.password) return send(null, { 'set-cookie': '3x-ui=sess-ok; Path=/; HttpOnly' });
         return fail('wrong username or password');
       }
+      if (!this.authed(req) && this.unauthHtml) { res.writeHead(200, { 'content-type': 'text/html' }); return res.end('<html><body>login</body></html>'); }
       if (!this.authed(req)) { res.writeHead(404); return res.end('404 page not found'); }
       if (this.failCountdown > 0) { this.failCountdown--; res.writeHead(503); return res.end('down'); }
       if (this.failNext > 0) { this.failNext--; res.writeHead(503); return res.end('down'); }

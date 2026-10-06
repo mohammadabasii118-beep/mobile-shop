@@ -74,15 +74,13 @@ describe('X-UI over HTTPS / wrong scheme diagnostics', () => {
     });
     return srv;
   }
-  it('self-signed panel: rejected by default with a clear hint; accepted only with XUI_TLS_INSECURE', async () => {
+  it('self-signed panel: rejected by default with a clear hint; accepted only with the per-panel insecure flag', async () => {
     const port = await listen(tlsPanel());
-    const strict = new XuiClient({ baseUrl: `https://127.0.0.1:${port}`, username: 'a', password: 'b', timeoutMs: 3000 });
-    await expect(strict.listInbounds()).rejects.toThrow(/certificate is not trusted.*XUI_TLS_INSECURE/);
-    process.env.XUI_TLS_INSECURE = 'true'; resetEnvCache();
-    const lax = new XuiClient({ baseUrl: `https://127.0.0.1:${port}`, username: 'a', password: 'b', timeoutMs: 3000, fetchImpl: xuiFetch() });
+    const strict = new XuiClient({ baseUrl: `https://127.0.0.1:${port}`, username: 'a', password: 'b', timeoutMs: 3000, fetchImpl: xuiFetch(false) });
+    await expect(strict.listInbounds()).rejects.toThrow(/certificate is not trusted/);
+    const lax = new XuiClient({ baseUrl: `https://127.0.0.1:${port}`, username: 'a', password: 'b', timeoutMs: 3000, fetchImpl: xuiFetch(true) });
     expect((await lax.listInbounds()).length).toBe(1);
   });
-  it('xuiFetch is undefined unless explicitly enabled', () => { resetEnvCache(); expect(xuiFetch()).toBeUndefined(); });
   it('http:// to a TLS port (HPE_* parse error) tells the user to switch to https://', async () => {
     const port = await listen(net.createServer((c) => { c.once('data', () => c.end(Buffer.from([0x15, 0x03, 0x01, 0x00, 0x02, 0x02, 0x0a]))); }));
     const c = new XuiClient({ baseUrl: `http://127.0.0.1:${port}`, username: 'a', password: 'b', timeoutMs: 3000 });

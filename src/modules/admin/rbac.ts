@@ -8,11 +8,11 @@ export type Permission =
   | 'vpn.view' | 'vpn.manage' | 'vpn.delete'
   | 'products.manage' | 'coupons.manage'
   | 'support.reply' | 'users.view'
-  | 'settings.manage' | 'audit.view' | 'stats.view' | 'admins.manage' | 'texts.manage';
+  | 'settings.manage' | 'audit.view' | 'stats.view' | 'admins.manage' | 'texts.manage' | 'panels.manage';
 
 const ALL: Permission[] = [
   'payments.view', 'payments.review', 'vpn.view', 'vpn.manage', 'vpn.delete', 'products.manage',
-  'coupons.manage', 'support.reply', 'users.view', 'settings.manage', 'audit.view', 'stats.view', 'admins.manage', 'texts.manage',
+  'coupons.manage', 'support.reply', 'users.view', 'settings.manage', 'audit.view', 'stats.view', 'admins.manage', 'texts.manage', 'panels.manage',
 ];
 
 export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {

@@ -33,6 +33,8 @@ const schema = z.object({
   CRYPTO_ENABLED: bool(false),
   BANK_WEBHOOK_SECRET: str(),
   PANEL_SESSION_SECRET: str(),
+  /** Encrypts panel credentials stored in the DB. Keep it stable; falls back to PANEL_SESSION_SECRET / BOT_TOKEN. */
+  SECRETS_KEY: str(),
   /** Reverse-proxy for the Telegram Bot API, e.g. https://tg-proxy.example.com (no trailing /bot) */
   TELEGRAM_API_ROOT: str(),
   /** http(s):// or socks5:// proxy used for ALL Telegram traffic (for servers where api.telegram.org is blocked) */

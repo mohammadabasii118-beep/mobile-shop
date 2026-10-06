@@ -126,7 +126,7 @@ export function products(ctx, root) {
         { label: 'نام', render: (p) => h('div', null, h('div', { class: 'cell-main', text: p.name }), h('div', { class: 'cell-sub', text: p.description || '' })) },
         { label: 'قیمت', cls: 'num', render: (p) => money(p.price) }, { label: 'حجم', cls: 'num', render: (p) => `${num(p.trafficGB)} GB` }, { label: 'مدت', cls: 'num', render: (p) => `${num(p.durationDays)} روز` },
         { label: 'دسته', render: (p) => (p.categoryId && catById.get(p.categoryId) ? h('span', { class: 'badge plain', text: catById.get(p.categoryId).path }) : h('span', { class: 'muted', text: 'صفحه‌ی اول' })) },
-        { label: 'Protocol', render: (p) => h('span', { class: 'badge plain brand', text: p.protocol }) }, { label: 'Inbound', cls: 'num', render: (p) => ltr('#' + p.xuiInboundId, 'mono') },
+        { label: 'Protocol', render: (p) => h('span', { class: 'badge plain brand', text: p.protocol }) }, { label: 'پنل · Inbound', render: (p) => h('span', null, ltr(p.xuiProviderId, 'mono'), ' · ', ltr('#' + p.xuiInboundId, 'mono')) },
         { label: 'ترتیب', cls: 'num', render: (p) => num(p.sortOrder) },
         { label: 'وضعیت', render: (p) => h('span', { class: `badge ${p.isActive ? 'ok' : ''}`, text: p.isActive ? 'فعال' : 'غیرفعال' }) },
         { label: '', render: (p) => h('div', { class: 'actions' },
@@ -138,23 +138,28 @@ export function products(ctx, root) {
   }
   reload();
 }
-function bulkProductsForm(done) {
+function bulkProductsForm(done, pre) {
   const text = h('textarea', { class: 'textarea ltr', dir: 'auto', style: 'min-height:200px;font-family:var(--mono);font-size:13px', placeholder: 'اقتصادی ۵۰ گیگ | 30 | 50 | 250000\nویژه ۱۰۰ گیگ | 60 | 100 | 450000\nویژه ۲۰۰ گیگ | 90 | 200 | 800000 | 25 | VLESS | توضیح', 'aria-label': 'لیست محصولات' });
-  const inbound = h('input', { class: 'input', type: 'number', inputmode: 'numeric', placeholder: 'مثلاً ۲۳', 'aria-label': 'Inbound پیش‌فرض' });
-  const proto = h('select', { class: 'select', 'aria-label': 'پروتکل پیش‌فرض' }, ['VLESS', 'VMESS', 'TROJAN', 'SHADOWSOCKS'].map((x) => h('option', { value: x }, x)));
+  const inbound = h('input', { class: 'input', type: 'number', inputmode: 'numeric', placeholder: 'مثلاً ۲۳', 'aria-label': 'Inbound پیش‌فرض', value: pre?.inbound ?? '' });
+  const panelSel = h('select', { class: 'select', 'aria-label': 'پنل' });
+  loadPanelOptions().then((ps) => ps.forEach((x) => panelSel.append(h('option', { value: x.code, selected: x.code === pre?.panel }, `${x.name} (${x.code})`))));
+  const proto = h('select', { class: 'select', 'aria-label': 'پروتکل پیش‌فرض' }, ['VLESS', 'VMESS', 'TROJAN', 'SHADOWSOCKS'].map((x) => h('option', { value: x, selected: x === pre?.protocol }, x)));
   const cat = h('input', { class: 'input', placeholder: 'مثلاً: ماهانه ▸ حجمی (اگر نبود ساخته می‌شود)', 'aria-label': 'دسته‌بندی' });
   const err = h('pre', { class: 'form-error', hidden: true, style: 'white-space:pre-wrap;margin:0;font-family:inherit' });
   const ok = button('ثبت همه', { kind: 'primary', onClick: async () => {
     err.hidden = true;
     try {
-      const r = await api('/products/bulk', { method: 'POST', body: { text: text.value, inbound: inbound.value ? Number(inbound.value) : null, protocol: proto.value, category: cat.value.trim() || null } });
+      const r = await api('/products/bulk', { method: 'POST', body: { text: text.value, panel: panelSel.value || null, inbound: inbound.value ? Number(inbound.value) : null, protocol: proto.value, category: cat.value.trim() || null } });
       toast(`${num(r.created)} محصول ثبت شد`); m.close(); done();
     } catch (e) { err.hidden = false; err.textContent = errMsg(e); }
   } });
   const m = modal({ title: 'افزودن گروهی محصولات', body: h('div', { class: 'stack' },
     h('div', { class: 'callout' }, icon('info'), h('div', null, 'هر محصول یک خط: ', h('b', { class: 'ltr', text: 'نام | روز | حجم GB | قیمت | [inbound] | [پروتکل] | [توضیح]' }), '. اگر inbound یکی است، پایین فقط یک‌بار تعیینش کنید. اگر یک خط خطا داشته باشد هیچ‌کدام ثبت نمی‌شود.')),
-    h('div', { class: 'form-grid' }, h('div', { class: 'field' }, h('label', { text: 'Inbound پیش‌فرض' }), inbound), h('div', { class: 'field' }, h('label', { text: 'پروتکل پیش‌فرض' }), proto), h('div', { class: 'field full' }, h('label', { text: 'دسته‌بندی پیش‌فرض (اختیاری)' }), cat)),
+    h('div', { class: 'form-grid' }, h('div', { class: 'field full' }, h('label', { text: 'پنل' }), panelSel), h('div', { class: 'field' }, h('label', { text: 'Inbound پیش‌فرض' }), inbound), h('div', { class: 'field' }, h('label', { text: 'پروتکل پیش‌فرض' }), proto), h('div', { class: 'field full' }, h('label', { text: 'دسته‌بندی پیش‌فرض (اختیاری)' }), cat)),
     h('div', { class: 'field' }, h('label', { text: 'لیست محصولات' }), text), err), footer: [ok, button('انصراف', { onClick: () => m.close() })] });
+}
+async function loadPanelOptions() {
+  try { return (await api('/panels/options')).items; } catch { return [{ code: 'default', name: 'پنل اصلی' }]; }
 }
 async function loadCategories() {
   try { return (await api('/categories')).items; } catch { return []; }
@@ -166,17 +171,33 @@ function productForm(p, done) {
   const catSel = h('select', { class: 'select', id: 'pf-category', 'aria-label': 'دسته‌بندی' }, h('option', { value: '' }, '🏠 بدون دسته (صفحه‌ی اول)'));
   loadCategories().then((cs) => cs.forEach((c) => catSel.append(h('option', { value: c.id, selected: p?.categoryId === c.id }, catLabel(c)))));
   const proto = h('select', { class: 'select', id: 'pf-protocol' }, ['VLESS', 'VMESS', 'TROJAN', 'SHADOWSOCKS'].map((x) => h('option', { value: x, selected: p?.protocol === x }, x)));
+  const panelSel = h('select', { class: 'select', id: 'pf-panel', 'aria-label': 'پنل X-UI' });
+  const pickSel = h('select', { class: 'select', id: 'pf-pick', 'aria-label': 'انتخاب inbound از پنل' }, h('option', { value: '' }, 'انتخاب از لیست پنل…'));
+  const idInput = () => form.querySelector('[name=xuiInboundId]');
+  const loadInbounds = async () => {
+    clear(pickSel); pickSel.append(h('option', { value: '' }, 'در حال خواندن inboundها…'));
+    try {
+      const { items } = await api(`/panels/${encodeURIComponent(panelSel.value)}/inbounds`);
+      clear(pickSel); pickSel.append(h('option', { value: '' }, `انتخاب از لیست پنل (${num(items.length)} inbound)…`));
+      items.forEach((i) => pickSel.append(h('option', { value: i.id, disabled: !i.enable || !['vless', 'vmess', 'trojan', 'shadowsocks'].includes(i.protocol), selected: panelSel.value === (p?.xuiProviderId || 'default') && i.id === p?.xuiInboundId }, `#${i.id} · ${i.remark || '—'} · ${i.protocol}:${i.port}${i.enable ? '' : ' (غیرفعال)'}`)));
+      pickSel._items = items;
+    } catch { clear(pickSel); pickSel.append(h('option', { value: '' }, 'خواندن لیست ممکن نشد — شماره را دستی بنویسید')); }
+  };
+  pickSel.addEventListener('change', () => { const i = (pickSel._items || []).find((x) => String(x.id) === pickSel.value); if (!i) return; idInput().value = i.id; const up = i.protocol.toUpperCase(); if ([...proto.options].some((o) => o.value === up)) proto.value = up; });
+  panelSel.addEventListener('change', loadInbounds);
+  loadPanelOptions().then((ps) => { ps.forEach((x) => panelSel.append(h('option', { value: x.code, selected: x.code === (p?.xuiProviderId || 'default') }, `${x.name} (${x.code})`))); loadInbounds(); });
   const active = h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(p ? p.isActive : true), 'aria-label': 'فعال' });
   active.addEventListener('click', () => active.setAttribute('aria-checked', String(active.getAttribute('aria-checked') !== 'true')));
   const form = h('form', { class: 'form-grid', novalidate: true },
     h('div', { class: 'full' }, f('نام محصول', 'name', 'text', p?.name || '')), h('div', { class: 'full' }, f('توضیح (اختیاری)', 'description', 'text', p?.description || '')),
     f('قیمت (تومان)', 'price', 'number', p?.price ?? '', 'عدد صحیح'), f('حجم (GB)', 'trafficGB', 'number', p?.trafficGB ?? ''), f('مدت (روز)', 'durationDays', 'number', p?.durationDays ?? ''),
-    f('Inbound ID در X-UI', 'xuiInboundId', 'number', p?.xuiInboundId ?? '', 'شناسه inbound در پنل'), h('div', { class: 'field' }, h('label', { for: 'pf-protocol', text: 'Protocol' }), proto), f('ترتیب نمایش', 'sortOrder', 'number', p?.sortOrder ?? 0),
+    h('div', { class: 'field' }, h('label', { for: 'pf-panel', text: 'پنل X-UI' }), panelSel), h('div', { class: 'field' }, h('label', { for: 'pf-pick', text: 'Inbound از لیست پنل' }), pickSel),
+    f('Inbound ID در X-UI', 'xuiInboundId', 'number', p?.xuiInboundId ?? '', 'با انتخاب از لیست بالا خودکار پر می‌شود'), h('div', { class: 'field' }, h('label', { for: 'pf-protocol', text: 'Protocol' }), proto), f('ترتیب نمایش', 'sortOrder', 'number', p?.sortOrder ?? 0),
     h('div', { class: 'field' }, h('label', { text: 'دسته‌بندی در منوی خرید' }), catSel), h('div', { class: 'field' }, h('label', { text: 'وضعیت' }), h('div', { class: 'row' }, active, h('span', { class: 'muted', text: 'قابل خرید' }))), h('div', { class: 'full form-error', hidden: true, id: 'pf-err' }));
   const save = button(p ? 'ذخیره تغییرات' : 'ایجاد محصول', { kind: 'primary', onClick: async () => {
     const v = (n) => form.querySelector(`[name=${n}]`).value.trim();
     const err = form.querySelector('#pf-err');
-    const body = { name: v('name'), description: v('description') || null, price: Number(v('price')), trafficGB: Number(v('trafficGB')), durationDays: Number(v('durationDays')), xuiInboundId: Number(v('xuiInboundId')), sortOrder: Number(v('sortOrder') || 0), protocol: proto.value, isActive: active.getAttribute('aria-checked') === 'true', categoryId: catSel.value || null };
+    const body = { name: v('name'), description: v('description') || null, price: Number(v('price')), trafficGB: Number(v('trafficGB')), durationDays: Number(v('durationDays')), xuiInboundId: Number(v('xuiInboundId')), xuiProviderId: panelSel.value || 'default', sortOrder: Number(v('sortOrder') || 0), protocol: proto.value, isActive: active.getAttribute('aria-checked') === 'true', categoryId: catSel.value || null };
     const bad = !body.name ? 'نام محصول را وارد کنید' : ['price', 'trafficGB', 'durationDays', 'xuiInboundId'].find((k) => !Number.isInteger(body[k]) || body[k] < (k === 'price' ? 0 : 1)) ? 'قیمت، حجم، مدت و Inbound باید عدد صحیح معتبر باشند' : '';
     if (bad) { err.hidden = false; err.textContent = bad; return; }
     try { await api(p ? `/products/${p.id}` : '/products', { method: p ? 'PATCH' : 'POST', body }); toast(p ? 'تغییرات ذخیره شد' : 'محصول ساخته شد'); m.close(); done(); }
@@ -467,9 +488,13 @@ export async function settings(ctx, root) {
     const b = button('ذخیره', { size: 'sm', onClick: async () => { await save(key, inp.value.trim()); } });
     return h('div', { class: 'row between', style: 'padding:12px 0;border-bottom:1px solid var(--border)' }, h('div', null, h('div', { class: 'cell-main', text: label }), o.hint ? h('div', { class: 'cell-sub', text: o.hint }) : null), h('div', { class: 'row', style: 'gap:6px;flex-wrap:nowrap' }, inp, b)); };
   const section = (title, sub, ...rows) => h('div', { class: 'card' }, h('div', { class: 'card-h' }, h('div', null, h('h3', { text: title }), h('div', { class: 'cell-sub', text: sub }))), h('div', { class: 'card-b', style: 'padding-block:4px' }, rows));
-  const xuiBox = h('div', { class: 'row between', style: 'padding:12px 0' });
-  const checkXui = async () => { clear(xuiBox); xuiBox.append(h('span', { class: 'row' }, h('span', { class: 'spinner sm' }), 'در حال بررسی اتصال…'));
-    try { const r = await api('/xui/status'); clear(xuiBox); xuiBox.append(h('div', null, h('div', { class: 'row' }, h('span', { class: `badge ${r.ok ? 'ok' : 'err'}`, text: r.ok ? 'متصل' : 'خطا' }), h('span', { class: 'cell-main', text: `Provider: ${r.provider}` })), h('div', { class: 'cell-sub', text: r.detail })), button('تست مجدد', { ico: 'refresh', onClick: checkXui })); } catch (e) { clear(xuiBox); xuiBox.append(errorState(errMsg(e), checkXui)); } };
+  const xuiBox = h('div', { style: 'padding:6px 0' });
+  const checkXui = async () => { clear(xuiBox); xuiBox.append(h('span', { class: 'row' }, h('span', { class: 'spinner sm' }), 'در حال بررسی اتصال پنل‌ها…'));
+    try { const r = await api('/xui/status'); clear(xuiBox);
+      if (!r.panels.length) xuiBox.append(h('div', { class: 'muted', text: 'هیچ پنلی ثبت نشده است. از بخش «پنل‌ها و inbound» اضافه کنید.' }));
+      r.panels.forEach((x) => xuiBox.append(h('div', { class: 'row between', style: 'padding:8px 0;border-bottom:1px solid var(--border)' }, h('div', null, h('div', { class: 'row' }, h('span', { class: `badge ${x.ok ? 'ok' : 'err'}`, text: x.ok ? 'متصل' : 'خطا' }), h('span', { class: 'cell-main', text: x.name }), ltr(x.code, 'mono')), h('div', { class: 'cell-sub', text: x.detail })), h('span', { class: 'muted', text: `${num(x.ms)}ms` }))));
+      xuiBox.append(h('div', { style: 'padding-top:10px' }, button('تست مجدد', { ico: 'refresh', onClick: checkXui })));
+    } catch (e) { clear(xuiBox); xuiBox.append(errorState(errMsg(e), checkXui)); } };
   const rt = d.runtime;
   const info = (label, ok, okText, noText) => h('div', { class: 'row between', style: 'padding:10px 0;border-bottom:1px solid var(--border)' }, h('span', { text: label }), h('span', { class: `badge ${ok ? 'ok' : 'warn'}`, text: ok ? okText : noText }));
   clear(wrap);
@@ -479,7 +504,7 @@ export async function settings(ctx, root) {
       choice('verification.provider', 'منبع تأیید', [['ledger', 'لجر تراکنش‌های بانکی'], ['none', 'هیچ (همه به بررسی دستی)']]), toggle('verification.allowReceiptOnlyAutoApprove', 'تأیید خودکار فقط با رسید', 'پیشنهاد نمی‌شود؛ بدون تأیید بانکی ریسک دارد'),
       choice('risk.highAction', 'رفتار در ریسک بالا', [['MANUAL_REVIEW', 'بررسی دستی'], ['REJECT', 'رد خودکار']]), text('risk.mediumAt', 'آستانه ریسک متوسط', { num: true }), text('risk.highAt', 'آستانه ریسک بالا', { num: true }), text('risk.maxSubmissions24h', 'حداکثر ارسال رسید در ۲۴ ساعت', { num: true })),
     section('Provisioning و اعلان‌ها', 'تلاش مجدد خودکار و یادآوری انقضا', toggle('notify.newUser', 'اعلان کاربر جدید به ادمین', 'هر کس برای اولین بار ربات را استارت کند، پیام می‌آید'), text('provisioning.maxRetries', 'حداکثر تلاش مجدد', { num: true }), text('provisioning.backoffSeconds', 'فاصله تلاش‌ها (ثانیه)', { ltr: true, hint: 'مثال: 60,300,900' }), text('notify.expiryDays', 'یادآوری انقضا (روز مانده)', { ltr: true, hint: 'مثال: 3,1' }), text('orders.expireMinutes', 'انقضای سفارش پرداخت‌نشده (دقیقه)', { num: true })),
-    section('اتصال X-UI', 'اعتبارنامه‌ها فقط در env سرور نگه‌داری می‌شوند و در پنل نمایش داده نمی‌شوند', xuiBox, info('Provider', rt.vpnProvider === 'xui', 'X-UI واقعی', rt.vpnProvider), info('احراز هویت', rt.xuiAuth !== 'none', rt.xuiAuth === 'api-token' ? 'API Token' : 'نام کاربری/رمز', 'تنظیم نشده'), info('لینک Subscription', rt.xuiSubscription, 'فعال', 'غیرفعال (XUI_SUB_BASE_URL)')),
+    section('وضعیت اتصال پنل‌های X-UI', 'برای افزودن/ویرایش پنل از بخش «پنل‌ها و inbound» استفاده کنید', xuiBox, info('Provider', rt.vpnProvider === 'xui', 'X-UI واقعی', rt.vpnProvider)),
     section('سیستم', 'وضعیت اجزای محیطی', info('Webhook تراکنش‌های بانکی', rt.bankWebhook, 'پیکربندی شده', 'پیکربندی نشده — تأیید خودکار ممکن نیست'), info('پرداخت کریپتو', false, '', 'غیرفعال تا اتصال تأییدکننده‌ی زنجیره'), info('محیط اجرا', rt.nodeEnv === 'production', 'Production', rt.nodeEnv)));
   checkXui();
 }
@@ -625,4 +650,78 @@ function channelForm(done) {
     try { const c = await api('/channels', { method: 'POST', body: { ref: ref.value.trim(), inviteUrl: invite.value.trim() || null } }); toast(`«${c.title}» اضافه شد`); m.close(); done(); } catch (e) { err.hidden = false; err.textContent = errMsg(e); }
   } });
   const m = modal({ title: 'افزودن کانال اجباری', body: h('div', { class: 'stack' }, h('div', { class: 'callout warn' }, icon('alert'), h('div', { text: 'ابتدا ربات را در کانال «ادمین» کنید؛ در غیر این‌صورت اضافه نمی‌شود.' })), h('div', { class: 'field' }, h('label', { text: 'آدرس یا شناسه کانال' }), ref), h('div', { class: 'field' }, h('label', { text: 'لینک دعوت (اختیاری)' }), invite), err), footer: [ok, button('انصراف', { onClick: () => m.close() })] });
+}
+
+/* ================================== Panels =================================== */
+export function panels(ctx, root) {
+  const nb = button('افزودن پنل', { kind: 'primary', ico: 'plus', onClick: () => panelForm(null, reload) });
+  root.append(pageHead('پنل‌ها و inbound', 'چند سرور X-UI را وصل کنید و هر محصول را به یک پنل و inbound مشخص ببندید', nb));
+  root.append(h('div', { class: 'callout' }, icon('info'), h('div', { text: 'نام کاربری و رمز پنل‌ها رمزنگاری‌شده ذخیره می‌شوند و هرگز در این صفحه نمایش داده نمی‌شوند. پیش از ذخیره، اتصال تست می‌شود.' })));
+  const card = h('div', { class: 'card' }); root.append(card);
+  async function reload() {
+    clear(card); card.append(h('div', { class: 'table-wrap' }, h('table', { class: 'table' }, skeletonRows(6, 3))));
+    try {
+      const { items } = await api('/panels'); clear(card);
+      if (!items.length) return void card.append(emptyState('هنوز پنلی ثبت نشده', 'اولین پنل X-UI را اضافه کنید.', 'server', button('افزودن پنل', { kind: 'primary', ico: 'plus', onClick: () => panelForm(null, reload) })));
+      card.append(table([
+        { label: 'پنل', cls: 'wrap', render: (p) => h('div', null, h('div', { class: 'cell-main', text: p.name }), h('div', { class: 'cell-sub' }, ltr(p.code, 'mono'), ' · ', ltr(p.baseUrl.replace(/^https?:\/\//, '')))) },
+        { label: 'ورود', render: (p) => h('span', { class: 'badge plain', text: p.auth === 'token' ? 'توکن API' : p.auth === 'password' ? 'کاربر/رمز' : '—' }) },
+        { label: 'وضعیت', render: (p) => !p.isActive ? h('span', { class: 'badge', text: 'غیرفعال' }) : p.health ? h('span', { class: `badge ${p.health.ok ? 'ok' : 'err'}`, title: p.health.detail, text: p.health.ok ? `متصل · ${num(p.health.ms)}ms` : 'خطا' }) : h('span', { class: 'muted', text: 'تست نشده' }) },
+        { label: 'محصول', cls: 'num', render: (p) => num(p.products) }, { label: 'سرویس', cls: 'num', render: (p) => num(p.services) },
+        { label: '', render: (p) => h('div', { class: 'actions' },
+          button('تست', { size: 'sm', onClick: async () => { try { const r = await api(`/panels/${p.code}/test`, { method: 'POST' }); toast(r.ok ? `متصل (${r.ms}ms) — ${r.detail}` : `خطا: ${r.detail}`, r.ok ? 'ok' : 'err'); reload(); } catch (e) { toast(errMsg(e), 'err'); } } }),
+          button('inboundها', { size: 'sm', onClick: () => inboundsDrawer(p) }),
+          p.source === 'db' ? button('', { size: 'sm', kind: 'ghost', ico: 'edit', title: 'ویرایش', onClick: () => panelForm(p, reload) }) : null,
+          p.source === 'db' ? button('', { size: 'sm', kind: 'ghost', ico: p.isActive ? 'pause' : 'play', title: p.isActive ? 'غیرفعال‌سازی' : 'فعال‌سازی', onClick: async () => { try { await api(`/panels/${p.id}/active`, { method: 'POST', body: { isActive: !p.isActive } }); reload(); } catch (e) { toast(errMsg(e), 'err'); } } }) : null,
+          p.source === 'db' ? button('', { size: 'sm', kind: 'ghost', ico: 'trash', title: 'حذف', onClick: async () => { if (!(await confirmDialog({ title: 'حذف پنل', message: `«${p.name}» حذف شود؟ فقط وقتی هیچ محصول و سرویسی روی آن نباشد حذف می‌شود.`, confirmLabel: 'حذف', kind: 'danger' }))) return; try { await api(`/panels/${p.id}`, { method: 'DELETE' }); toast('پنل حذف شد'); reload(); } catch (e) { toast(errMsg(e), 'err'); } } }) : null) },
+      ], items));
+      if (items.some((p) => p.source === 'env')) card.append(h('div', { class: 'card-b muted', text: 'پنل «default» از تنظیمات سرور (.env) خوانده می‌شود و از اینجا قابل ویرایش نیست.' }));
+    } catch (e) { clear(card); card.append(errorState(errMsg(e), reload)); }
+  }
+  reload();
+}
+
+function inboundsDrawer(p) {
+  const body = h('div', { class: 'drawer-b' }, skeletonBlock(220));
+  drawer({ title: `inboundهای ${p.name}`, sub: p.code, body });
+  (async () => {
+    try {
+      const { items } = await api(`/panels/${p.code}/inbounds`); clear(body);
+      if (!items.length) return void body.append(emptyState('inbound ای در این پنل نیست', 'ابتدا در خود پنل X-UI یک inbound بسازید.', 'server'));
+      body.append(table([
+        { label: '#', cls: 'num', render: (i) => ltr(String(i.id), 'mono') }, { label: 'نام', render: (i) => i.remark || '—' },
+        { label: 'پروتکل', render: (i) => h('span', { class: 'badge plain brand', text: i.protocol }) }, { label: 'پورت', cls: 'num', render: (i) => num(i.port) },
+        { label: 'وضعیت', render: (i) => h('span', { class: `badge ${i.enable ? 'ok' : ''}`, text: i.enable ? 'فعال' : 'غیرفعال' }) },
+        { label: '', render: (i) => ['vless', 'vmess', 'trojan', 'shadowsocks'].includes(i.protocol) && i.enable ? button('ساخت محصول', { size: 'sm', ico: 'plus', onClick: () => bulkProductsForm(() => toast('ثبت شد'), { panel: p.code, inbound: i.id, protocol: i.protocol.toUpperCase() }) }) : h('span', { class: 'muted', text: 'قابل فروش نیست' }) },
+      ], items));
+    } catch (e) { clear(body); body.append(errorState(errMsg(e))); }
+  })();
+}
+
+function panelForm(p, done) {
+  const f = (label, name, o = {}) => h('div', { class: `field ${o.full ? 'full' : ''}` }, h('label', { for: `pn-${name}`, text: label }), h('input', { class: `input ${o.ltr === false ? '' : 'ltr'}`, dir: o.ltr === false ? false : 'ltr', id: `pn-${name}`, name, type: o.type || 'text', value: o.val ?? '', placeholder: o.ph || '', autocomplete: 'off' }), o.hint ? h('div', { class: 'hint', text: o.hint }) : null);
+  const tls = h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(!!p?.tlsInsecure), 'aria-label': 'گواهی خودامضا' });
+  tls.addEventListener('click', () => tls.setAttribute('aria-checked', String(tls.getAttribute('aria-checked') !== 'true')));
+  const form = h('form', { class: 'form-grid', novalidate: true },
+    f('نام پنل', 'name', { full: true, ltr: false, val: p?.name, ph: 'مثلاً: آلمان ۱' }),
+    f('آدرس پنل (با مسیر)', 'baseUrl', { full: true, val: p?.baseUrl, ph: 'https://1.2.3.4:2053/مسیر-پنل' }),
+    f('نام کاربری', 'username', { ph: p ? 'بدون تغییر' : 'admin' }), f('رمز عبور', 'password', { type: 'password', ph: p ? 'بدون تغییر' : '', hint: p ? 'خالی = بدون تغییر' : '' }),
+    f('یا توکن API', 'apiToken', { full: true, type: 'password', ph: p?.auth === 'token' ? 'بدون تغییر' : 'اختیاری؛ جایگزین کاربر/رمز' }),
+    f('آدرس Subscription', 'subBaseUrl', { full: true, val: p?.subBaseUrl || '', ph: 'https://sub.example.com:2096/sub  (اختیاری)' }),
+    f('هاست داخل لینک‌ها', 'publicHost', { full: true, val: p?.publicHost || '', ph: 'example.com  (اختیاری)' }),
+    h('div', { class: 'field full' }, h('div', { class: 'row' }, tls, h('span', { text: 'گواهی TLS خودامضا را بپذیر' })), h('div', { class: 'hint', text: 'فقط وقتی پنل با https و گواهی خودامضا کار می‌کند.' })),
+    h('div', { class: 'full form-error', hidden: true, id: 'pn-err' }));
+  const save = button(p ? 'ذخیره و تست اتصال' : 'تست اتصال و افزودن', { kind: 'primary', onClick: async () => {
+    const err = form.querySelector('#pn-err'); err.hidden = true;
+    const v = (n) => form.querySelector(`[name=${n}]`).value.trim();
+    const body = { name: v('name'), baseUrl: v('baseUrl'), tlsInsecure: tls.getAttribute('aria-checked') === 'true', subBaseUrl: v('subBaseUrl'), publicHost: v('publicHost') };
+    if (v('username')) body.username = v('username');
+    if (form.querySelector('[name=password]').value) body.password = form.querySelector('[name=password]').value;
+    if (v('apiToken')) body.apiToken = v('apiToken');
+    save.disabled = true;
+    try { await api(p ? `/panels/${p.id}` : '/panels', { method: p ? 'PATCH' : 'POST', body }); toast(p ? 'ذخیره شد' : 'پنل اضافه شد'); m.close(); done(); }
+    catch (e) { err.hidden = false; err.textContent = errMsg(e); } finally { save.disabled = false; }
+  } });
+  const m = modal({ title: p ? `ویرایش ${p.name}` : 'افزودن پنل X-UI', body: form, footer: [save, button('انصراف', { onClick: () => m.close() })] });
+  form.addEventListener('submit', (e) => e.preventDefault());
 }

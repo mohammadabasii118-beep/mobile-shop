@@ -464,3 +464,21 @@ model RequiredChannel {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+/// An additional 3x-ui panel managed from the bot/web admin. The code "default" is the panel configured via XUI_* env vars.
+model Panel {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  name           String
+  baseUrl        String
+  username       String?
+  passwordEnc    String?
+  apiTokenEnc    String?
+  subBaseUrl     String?
+  publicHost     String?
+  tlsInsecure    Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}

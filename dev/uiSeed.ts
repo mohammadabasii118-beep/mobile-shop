@@ -28,6 +28,8 @@ async function main() {
   const panel = await new FakeXui().start();
   setVpnProvider(new XuiVpnProvider({ client: new XuiClient({ baseUrl: panel.url, username: 'admin', password: 'secret' }), publicHost: 'vpn.example.com', subBaseUrl: 'https://sub.example.com/sub/' }));
   setSender(async () => undefined);
+  const { createPanel } = await import('../src/modules/panels/service');
+  await createPanel('seed', { name: 'آلمان ۱', baseUrl: panel.url, username: 'admin', password: 'secret', subBaseUrl: 'https://sub.example.com/sub' });
   await setSetting('card.number', '6037991122334455'); await setSetting('card.holder', 'علی رضایی'); await setSetting('card.bank', 'ملت'); await setSetting('card.enabled', 'true');
   const p1 = await createProduct('seed', { name: 'اقتصادی ۵۰ گیگ', description: 'مناسب استفاده روزمره', durationDays: 30, trafficGB: 50, price: 250000, xuiInboundId: 1, protocol: 'VLESS', sortOrder: 1 });
   const p2 = await createProduct('seed', { name: 'ویژه ۱۰۰ گیگ', durationDays: 60, trafficGB: 100, price: 450000, xuiInboundId: 1, protocol: 'VLESS', sortOrder: 2 });

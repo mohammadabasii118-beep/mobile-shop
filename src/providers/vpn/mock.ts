@@ -20,6 +20,9 @@ export class MockVpnProvider implements VpnProvider {
     const i = this.inbounds.get(id);
     return i ? { id, enable: i.enable, protocol: i.protocol, port: 443 } : null;
   }
+  async listInbounds() {
+    return [...this.inbounds.entries()].map(([id, i]) => ({ id, enable: i.enable, protocol: i.protocol, port: 443 }));
+  }
   async createService(req: CreateServiceRequest) {
     this.maybeFail();
     const ib = this.inbounds.get(req.inboundId);

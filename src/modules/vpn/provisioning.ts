@@ -6,7 +6,7 @@ import { addDays, gbToBytes } from '../../utils/misc';
 import { audit } from '../admin/audit';
 import { getNumber, getNumberList } from '../settings/service';
 import { notifyAdmins, notifyUser } from '../notifications/service';
-import { getVpnProvider } from '../../providers/vpn';
+import { vpnFor } from '../../providers/vpn';
 import { ProviderError, ServiceRef } from '../../providers/vpn/types';
 import * as T from '../notifications/templates';
 import { linkRemark, slugify } from '../../utils/names';
@@ -70,7 +70,7 @@ export async function runProvisioning(orderId: string, opts: { force?: boolean }
 }
 
 async function doCreate(order: Order, product: Product, telegramId: bigint) {
-  const provider = getVpnProvider();
+  const provider = await vpnFor(product.xuiProviderId);
   const email = clientEmail(telegramId, order.orderNumber, order.serviceName);
   let svc = await prisma.vpnService.findUnique({ where: { orderId: order.id } });
   const trafficLimit = gbToBytes(product.trafficGB);
@@ -130,9 +130,9 @@ export const deliveryButtons = (s: Pick<VpnService, 'id' | 'subscriptionUrl'>) =
 ];
 
 async function doRenew(taskId: string, order: Order, product: Product) {
-  const provider = getVpnProvider();
   const t = await prisma.provisioningTask.findUniqueOrThrow({ where: { id: taskId } });
   const svc = await prisma.vpnService.findUniqueOrThrow({ where: { id: order.renewalOfServiceId! } });
+  const provider = await vpnFor(svc.provider);
   // Absolute targets are computed ONCE and persisted => a retry never extends twice.
   let targetExpiry = t.targetExpiresAt;
   let targetLimit = t.targetTrafficLimit;

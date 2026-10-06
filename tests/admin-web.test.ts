@@ -8,6 +8,7 @@ import { createLoginToken, signSession } from '../src/admin-web/auth';
 import { addLedgerTx, makeOrder, makeProduct, makeUser, resetDb, setup, submit } from './helpers';
 import { approvePayment } from '../src/modules/payments/service';
 import { createTicket } from '../src/modules/support/service';
+import { FakeXui } from '../dev/fakeXui';
 
 let web: http.Server;
 let base: string;
@@ -230,7 +231,7 @@ describe('web panel: products, coupons, services, settings, support, audit', () 
     expect(JSON.stringify(s)).not.toMatch(/BOT_TOKEN|XUI_PASSWORD|PANEL_SESSION/);
     const log = await prisma.auditLog.findMany({ where: { action: 'setting.change' } });
     expect(JSON.stringify(log)).not.toContain('6037991122334466');
-    expect((await call(c, 'GET', '/xui/status')).json).toMatchObject({ provider: 'mock', ok: true });
+    expect((await call(c, 'GET', '/xui/status')).json).toMatchObject({ panels: [] });
   });
   it('support: list, detail, admin reply notifies the user, close', async () => {
     const c = await login();
@@ -262,5 +263,29 @@ describe('web panel: products, coupons, services, settings, support, audit', () 
     expect((await call(c, 'GET', '/audit?q=%25%27%3B--')).status).toBe(200); // hostile search string is just text
     expect((await call(c, 'GET', '/notifications')).json).toHaveProperty('counts');
     expect((await call(c, 'GET', '/users/' + users[0].id)).json.orders).toHaveLength(1);
+  });
+});
+
+describe('web panel: multi-panel management API', () => {
+  it('CRUD + test + inbounds; secrets are write-only; only super admin manages panels; product admin can read options', async () => {
+    const fake = await new FakeXui().start();
+    try {
+      const c = await login();
+      const bad = await call(c, 'POST', '/panels', { name: 'P', baseUrl: fake.url, username: 'admin', password: 'WRONG' });
+      expect(bad.status).toBe(400); expect(bad.json.message).toContain('اتصال');
+      const made = await call(c, 'POST', '/panels', { name: 'Berlin', baseUrl: fake.url, username: 'admin', password: 'secret' });
+      expect(made.status).toBe(200); expect(made.json.code).toBe('berlin');
+      const list = await call(c, 'GET', '/panels');
+      expect(JSON.stringify(list.json)).not.toMatch(/secret|passwordEnc/);
+      expect(list.json.items[0]).toMatchObject({ code: 'berlin', auth: 'password', products: 0, source: 'db' });
+      expect((await call(c, 'POST', '/panels/berlin/test')).json).toMatchObject({ ok: true });
+      expect((await call(c, 'PATCH', `/panels/${made.json.id}`, { name: 'Berlin 2' })).status).toBe(200);
+      await prisma.admin.create({ data: { telegramId: 9300n, role: 'PRODUCT_ADMIN' } });
+      const pa = await login(9300n);
+      expect((await call(pa, 'GET', '/panels')).status).toBe(403);
+      expect((await call(pa, 'POST', '/panels', { name: 'x', baseUrl: fake.url })).status).toBe(403);
+      expect((await call(pa, 'GET', '/panels/options')).json.items).toEqual([{ code: 'berlin', name: 'Berlin 2' }]);
+      expect((await call(c, 'DELETE', `/panels/${made.json.id}`)).status).toBe(200);
+    } finally { await fake.stop(); }
   });
 });

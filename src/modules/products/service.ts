@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { prisma } from '../../db/client';
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import { audit } from '../admin/audit';
-import { getVpnProvider } from '../../providers/vpn';
+import { vpnFor } from '../../providers/vpn';
+import { assertPanel } from '../panels/service';
 
 const F = {
   name: z.string().trim().min(1).max(80),
@@ -46,11 +47,11 @@ export async function getProduct(id: string) {
  * The inbound must exist (and be enabled) on the real panel — a typo here is what makes every paid order fail provisioning.
  * If the panel itself is unreachable we do not block the admin (provisioning retries/alerts cover that case).
  */
-export async function assertInbound(id: number) {
+export async function assertInbound(panel: string, id: number) {
   let info;
-  try { info = await getVpnProvider().getInbound(id); } catch { return; }
-  if (!info) throw new ValidationError(`inbound شماره ${id} در پنل X-UI پیدا نشد. شماره را از لیست inboundهای پنل بردارید.`);
-  if (!info.enable) throw new ValidationError(`inbound شماره ${id} در پنل غیرفعال است. اول آن را در پنل فعال کنید.`);
+  try { info = await (await vpnFor(panel)).getInbound(id); } catch { return; }
+  if (!info) throw new ValidationError(`inbound شماره ${id} در پنل «${panel}» پیدا نشد. شماره را از لیست inboundهای همان پنل بردارید.`);
+  if (!info.enable) throw new ValidationError(`inbound شماره ${id} در پنل «${panel}» غیرفعال است. اول آن را در پنل فعال کنید.`);
 }
 
 async function assertCategory(id: string) {
@@ -59,7 +60,7 @@ async function assertCategory(id: string) {
 
 export async function createProduct(actor: string, input: ProductInput, opts: { verifyInbound?: boolean } = {}) {
   const data = productInput.parse(input);
-  if (opts.verifyInbound !== false) await assertInbound(data.xuiInboundId);
+  if (opts.verifyInbound !== false) { await assertPanel(data.xuiProviderId); await assertInbound(data.xuiProviderId, data.xuiInboundId); }
   if (data.categoryId) await assertCategory(data.categoryId);
   const p = await prisma.product.create({ data });
   await audit({ actor, action: 'product.create', target: 'Product', targetId: p.id, metadata: data });
@@ -69,7 +70,13 @@ export async function createProduct(actor: string, input: ProductInput, opts: { 
 export async function updateProduct(actor: string, id: string, patch: Partial<ProductInput>, opts: { verifyInbound?: boolean } = {}) {
   const before = await getProduct(id);
   const data = productPatch.parse(patch);
-  if (data.xuiInboundId !== undefined && data.xuiInboundId !== before.xuiInboundId && opts.verifyInbound !== false) await assertInbound(data.xuiInboundId);
+  if ((data.xuiInboundId !== undefined || data.xuiProviderId !== undefined) && opts.verifyInbound !== false) {
+    const panel = data.xuiProviderId ?? before.xuiProviderId, inbound = data.xuiInboundId ?? before.xuiInboundId;
+    if (panel !== before.xuiProviderId || inbound !== before.xuiInboundId) {
+      if (panel !== before.xuiProviderId) await assertPanel(panel);
+      await assertInbound(panel, inbound);
+    }
+  }
   if (data.categoryId) await assertCategory(data.categoryId);
   const p = await prisma.product.update({ where: { id }, data });
   await audit({
@@ -97,12 +104,12 @@ const num = (s: string) =>
   Number(s.replace(/[۰-۹]/g, (c) => String(FA_DIGITS.indexOf(c))).replace(/[٠-٩]/g, (c) => String(AR_DIGITS.indexOf(c))).replace(/[,٬،\s]/g, ''));
 
 const PROTOCOLS = ['VLESS', 'VMESS', 'TROJAN', 'SHADOWSOCKS'] as const;
-export interface BulkDefaults { inbound?: number; protocol?: Protocol; category?: string }
+export interface BulkDefaults { inbound?: number; protocol?: Protocol; category?: string; panel?: string }
 type ParsedProduct = ProductInput & { categoryPath?: string };
 
 /**
  * One product per line:  name | days | GB | price | [inbound] | [protocol] | [description]
- * Directive lines (`inbound=23 protocol=VLESS`, `category=ماهانه ▸ حجمی`) set defaults for the lines below.
+ * Directive lines (`panel=germany inbound=23 protocol=VLESS`, `category=ماهانه ▸ حجمی`) set defaults for the lines below.
  * `category=` creates the menu path if it does not exist; `category=-` goes back to the root.
  * Persian digits and thousands separators are accepted. Lines starting with # are comments.
  */
@@ -116,9 +123,10 @@ export function parseProductLines(text: string, defaults: BulkDefaults = {}) {
     if (!line || line.startsWith('#')) return;
     const cat = line.match(/^(?:category|دسته)\s*=\s*(.*)$/i);
     if (cat) { def.category = cat[1].trim() === '-' ? undefined : cat[1].trim() || undefined; return; }
-    if (/^(inbound|protocol)\s*=/i.test(line)) {
-      for (const m of line.matchAll(/(inbound|protocol)\s*=\s*(\S+)/gi)) {
-        if (m[1].toLowerCase() === 'inbound') {
+    if (/^(inbound|protocol|panel)\s*=/i.test(line)) {
+      for (const m of line.matchAll(/(inbound|protocol|panel)\s*=\s*(\S+)/gi)) {
+        if (m[1].toLowerCase() === 'panel') def.panel = m[2].toLowerCase();
+        else if (m[1].toLowerCase() === 'inbound') {
           const n = num(m[2]);
           if (!Number.isInteger(n) || n < 1) errors.push(`${at}: شماره inbound نامعتبر است`); else def.inbound = n;
         } else if ((PROTOCOLS as readonly string[]).includes(m[2].toUpperCase())) def.protocol = m[2].toUpperCase() as Protocol;
@@ -136,7 +144,7 @@ export function parseProductLines(text: string, defaults: BulkDefaults = {}) {
     if (inboundId === undefined) return void errors.push(`${at}: inbound مشخص نشده (در خط یا با inbound=شماره بالای لیست)`);
     const parsed = productInput.safeParse({
       name, description: description || undefined, durationDays: num(days), trafficGB: num(gb), price: num(price),
-      xuiInboundId: inboundId, protocol: proto,
+      xuiInboundId: inboundId, protocol: proto, ...(def.panel ? { xuiProviderId: def.panel } : {}),
     });
     if (!parsed.success) {
       const labels: Record<string, string> = { name: 'نام', durationDays: 'روز', trafficGB: 'حجم', price: 'قیمت', xuiInboundId: 'inbound' };
@@ -152,13 +160,14 @@ export function parseProductLines(text: string, defaults: BulkDefaults = {}) {
 export async function createProductsBulk(actor: string, text: string, defaults: BulkDefaults = {}) {
   const { items, errors } = parseProductLines(text, defaults);
   if (!items.length && !errors.length) throw new ValidationError('هیچ محصولی در متن پیدا نشد');
-  const existing = await prisma.product.findMany({ select: { name: true, durationDays: true, trafficGB: true, price: true, xuiInboundId: true } });
-  const key = (p: { name: string; durationDays: number; trafficGB: number; price: number; xuiInboundId: number }) => `${p.name}|${p.durationDays}|${p.trafficGB}|${p.price}|${p.xuiInboundId}`;
+  const existing = await prisma.product.findMany({ select: { name: true, durationDays: true, trafficGB: true, price: true, xuiInboundId: true, xuiProviderId: true } });
+  const key = (p: { name: string; durationDays: number; trafficGB: number; price: number; xuiInboundId: number; xuiProviderId?: string }) => `${p.name}|${p.durationDays}|${p.trafficGB}|${p.price}|${p.xuiProviderId ?? 'default'}|${p.xuiInboundId}`;
   const seen = new Set(existing.map(key));
   const out = [...errors];
   items.forEach((p, n) => { if (seen.has(key(p as any))) out.push(`محصول ${n + 1} («${p.name}»): تکراری است`); seen.add(key(p as any)); });
   if (out.length) throw new ValidationError(`هیچ محصولی ثبت نشد:\n${out.slice(0, 10).join('\n')}${out.length > 10 ? `\n… و ${out.length - 10} خطای دیگر` : ''}`);
-  for (const id of new Set(items.map((p) => p.xuiInboundId))) await assertInbound(id);
+  for (const code of new Set(items.map((p) => p.xuiProviderId ?? 'default'))) await assertPanel(code);
+  for (const pair of new Set(items.map((p) => `${p.xuiProviderId ?? 'default'}|${p.xuiInboundId}`))) { const [code, id] = pair.split('|'); await assertInbound(code, Number(id)); }
   const top = (await prisma.product.aggregate({ _max: { sortOrder: true } }))._max.sortOrder ?? 0;
   const { ensureCategoryPath } = await import('../categories/service');
   const catIds = new Map<string, string>();

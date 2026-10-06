@@ -37,6 +37,29 @@ describe('X-UI authentication', () => {
     expect((await p.healthCheck()).ok).toBe(true);
     expect(panel.logins).toBe(2);
   });
+  it('re-logins when an expired session is answered with HTTP 200 + HTML login page', async () => {
+    const p = mk();
+    await p.healthCheck();
+    const logins = panel.logins;
+    (p as any).o.client.cookie = '3x-ui=expired';
+    panel.unauthHtml = true;
+    expect((await p.healthCheck()).ok).toBe(true);
+    expect(panel.logins).toBe(logins + 1);
+    panel.unauthHtml = false;
+  });
+  it('non-JSON answer that persists after re-login is reported with a clear hint', async () => {
+    const f = (async () => new Response('<html>nginx</html>', { status: 200 })) as unknown as typeof fetch;
+    const c = new XuiClient({ baseUrl: 'http://x', apiToken: 'tok', fetchImpl: f });
+    await expect(c.listInbounds()).rejects.toThrow(/non-JSON/);
+  });
+  it('transient network resets are retried transparently', async () => {
+    let n = 0;
+    const real = fetch;
+    const flaky = (async (u: any, i: any) => { if (n++ < 2) throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNRESET' } }); return real(u, i); }) as unknown as typeof fetch;
+    const p = new XuiVpnProvider({ client: new XuiClient({ baseUrl: panel.url, username: 'admin', password: 'secret', fetchImpl: flaky }), publicHost: 'h' });
+    expect((await p.healthCheck()).ok).toBe(true);
+    expect(n).toBeGreaterThanOrEqual(3);
+  });
   it('unreachable panel => retryable ProviderError', async () => {
     const dead = new XuiVpnProvider({ client: new XuiClient({ baseUrl: 'http://127.0.0.1:1', username: 'a', password: 'b', timeoutMs: 500 }), publicHost: 'x' });
     await expect(dead.getInbound(1)).rejects.toMatchObject({ retryable: true });

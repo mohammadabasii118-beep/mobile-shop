@@ -15,7 +15,7 @@ import { audit } from '../modules/admin/audit';
 import { addChannel, deleteChannel, listChannels, setChannelActive, testChannel } from '../modules/channels/service';
 import { isTextKey, listTexts, previewText, resetText, setText, textDef } from '../modules/texts/service';
 import { categoryTree, createCategory, deleteCategory, getCategory, moveCategory, setProductCategory, splitIconName, updateCategory } from '../modules/categories/service';
-import { getVpnProvider } from '../providers/vpn';
+import { PanelView, createPanel, deletePanel, getPanel, isSupportedProtocol, listPanelInbounds, listPanels, panelHealth, parsePanelText, setPanelActive, testPanel, updatePanel } from '../modules/panels/service';
 import { serviceSummary } from '../modules/vpn/messages';
 import { Button } from '../modules/notifications/service';
 import { Ctx, back, show } from './ui';
@@ -44,6 +44,7 @@ export function adminHandlers() {
     await add('products.manage', { text: '📦 محصولات', data: 'adm:products' });
     await add('products.manage', { text: '🗂 دسته‌بندی منوی خرید', data: 'ct:l:root' });
     await add('texts.manage', { text: '✏️ ویرایش متن‌های ربات', data: 'tx:l' });
+    await add('panels.manage', { text: '🖥 پنل‌ها و inboundها', data: 'pn:l' });
     await add('settings.manage', { text: '📢 کانال‌های اجباری', data: 'ch:l' });
     await add('products.manage', { text: '🎁 کدهای تخفیف', data: 'adm:coupons' });
     await add('users.view', { text: '👥 کاربران / سفارش‌ها', data: 'adm:orders' });
@@ -64,6 +65,40 @@ export function adminHandlers() {
       `⏳ پرداخت‌های در انتظار: ${s.pendingPayments}`, `🤖 تأیید خودکار: ${s.autoApproved}`, `🔎 صف بررسی دستی: ${s.needsReview}`,
       `🟢 VPN فعال: ${s.activeVpn}`, `🔴 VPN منقضی: ${s.expiredVpn}`, `⚠️ خطای provisioning: ${s.provisioningErrors}`, `🎫 تیکت باز: ${s.openTickets}`,
     ].join('\n'), [back('adm:home')]);
+  }
+
+  const PROTO_ENUM: Record<string, string> = { vless: 'VLESS', vmess: 'VMESS', trojan: 'TROJAN', shadowsocks: 'SHADOWSOCKS' };
+  const ibLabel = (i: { id: number; remark?: string; protocol: string; port: number; enable: boolean }) => `${i.enable ? '' : '⛔ '}#${i.id} ${i.remark || '—'} · ${i.protocol}:${i.port}`;
+
+  async function panelsList(ctx: Ctx) {
+    const ps = await listPanels();
+    const rows = ps.map((p): Button[] => {
+      const h = panelHealth.get(p.code);
+      return [{ text: `${!p.isActive ? '⚪' : h ? (h.ok ? '🟢' : '🔴') : '🖥'} ${p.name} · ${p.code}`, data: `pn:v:${p.code}` }];
+    });
+    await show(ctx, `🖥 پنل‌های X-UI\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\nهر محصول به یک پنل و یک inbound وصل می‌شود؛ پس می‌توانید چند سرور داشته باشید و روی هر کدام محصول جدا بفروشید.${ps.length ? '' : '\n\nهنوز پنلی ثبت نشده است.'}`, [...rows, [{ text: '➕ افزودن پنل', data: 'pn:new' }], back('adm:home')]);
+  }
+
+  function panelText(p: PanelView) {
+    const h = panelHealth.get(p.code);
+    return [
+      `🖥 ${p.name}  (${p.code})`, '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈',
+      `🌐 ${p.baseUrl}`,
+      `🔐 ورود: ${p.auth === 'token' ? 'توکن API' : p.auth === 'password' ? 'کاربر و رمز' : 'تنظیم نشده'}${p.tlsInsecure ? ' · گواهی خودامضا مجاز' : ''}`,
+      p.subBaseUrl ? `📡 ساب: ${p.subBaseUrl}` : '📡 ساب: —  (مشتری کانفیگ مستقیم می‌گیرد)',
+      p.publicHost ? `🏷 هاست لینک‌ها: ${p.publicHost}` : '',
+      `وضعیت: ${!p.isActive ? '⚪ غیرفعال' : h ? (h.ok ? `🟢 متصل (${h.ms}ms)` : `🔴 ${h.detail}`) : '— (تست نشده)'}`,
+      `📦 محصول: ${p.products} · 🛰 سرویس: ${p.services}`,
+      p.source === 'env' ? '\nℹ️ این پنل از تنظیمات سرور (.env) خوانده می‌شود و از اینجا قابل ویرایش/حذف نیست.' : '',
+    ].filter(Boolean).join('\n');
+  }
+
+  async function panelView(ctx: Ctx, code: string) {
+    const p = await getPanel(code);
+    const rows: Button[][] = [[{ text: '🔌 تست اتصال', data: `pn:t:${code}` }, { text: '📋 inboundها', data: `pn:i:${code}` }]];
+    if (p.source === 'db') rows.push([{ text: '✏️ ویرایش', data: `pn:e:${code}` }, { text: p.isActive ? '⏸ غیرفعال' : '▶️ فعال', data: `pn:tg:${code}` }], [{ text: '🗑 حذف', data: `pn:d:${code}` }]);
+    rows.push(back('pn:l'));
+    await show(ctx, panelText(p), rows);
   }
 
   const FILTERS: [PaymentFilter, string][] = [['review', '🔎 نیازمند بررسی'], ['submitted', '📤 ارسال‌شده'], ['auto', '🤖 تأیید خودکار'], ['approved', '✅ تأییدشده'], ['rejected', '❌ ردشده'], ['pending', '⏳ در انتظار']];
@@ -171,7 +206,7 @@ export function adminHandlers() {
   c.on('callback_query:data', async (ctx, next) => {
     const d = ctx.callbackQuery.data;
     const [ns, a, b] = d.split(':');
-    const adminNs = ['adm', 'pl', 'ap', 'av', 'vl', 'pr', 'cp', 'st', 'at', 'ao', 'ct', 'tx', 'ch'];
+    const adminNs = ['adm', 'pl', 'ap', 'av', 'vl', 'pr', 'cp', 'st', 'at', 'ao', 'ct', 'tx', 'ch', 'pn'];
     if (!adminNs.includes(ns)) return next();
     try {
       // every admin callback re-checks authorization server-side (callback data is untrusted)
@@ -283,14 +318,14 @@ export function adminHandlers() {
             '📥 افزودن گروهی محصولات', '',
             'همه‌ی محصولات را در «یک پیام» بفرستید؛ هر محصول یک خط:',
             'نام | روز | حجم GB | قیمت تومان | [inbound] | [پروتکل] | [توضیح]', '',
-            'اگر inbound یکی است، یک‌بار بالای لیست بنویسید:', 'inbound=23', 'برای قرار دادن در دسته (اگر نبود ساخته می‌شود):', 'category=ماهانه ▸ حجمی', '',
+            'اگر inbound یکی است، یک‌بار بالای لیست بنویسید:', 'inbound=23', 'برای پنل غیر از پنل اصلی (کد پنل را از «🖥 پنل‌ها» ببینید):', 'panel=germany', 'برای قرار دادن در دسته (اگر نبود ساخته می‌شود):', 'category=ماهانه ▸ حجمی', '',
             'مثال:', 'inbound=23', 'اقتصادی ۵۰ گیگ | 30 | 50 | 250000', 'ویژه ۱۰۰ گیگ | 60 | 100 | 450,000', 'ویژه ۲۰۰ گیگ | 90 | 200 | 800000 | 25 | VLESS | مناسب خانواده', '',
             '• ارقام فارسی و جداکننده هزارگان مجازند.', '• اگر حتی یک خط خطا داشته باشد هیچ‌کدام ثبت نمی‌شود.', '• محصول کاملاً تکراری رد می‌شود (برای جلوگیری از ارسال دوباره).',
           ].join('\n'), [back('adm:products')]);
         }
         if (a === 'v') {
           const p = await getProduct(b);
-          return show(ctx, `📦 ${p.name}\n${p.description ? p.description + '\n' : ''}⏱ ${p.durationDays} روز · 📊 ${p.trafficGB} GB\n💰 قیمت: ${formatMoney(p.price)}\n🔌 inbound: ${p.xuiInboundId} · ${p.protocol}\n🔢 ترتیب: ${p.sortOrder}\nوضعیت: ${p.isActive ? '🟢 فعال' : '⚪ غیرفعال'}`, [
+          return show(ctx, `📦 ${p.name}\n${p.description ? p.description + '\n' : ''}⏱ ${p.durationDays} روز · 📊 ${p.trafficGB} GB\n💰 قیمت: ${formatMoney(p.price)}\n🖥 پنل: ${p.xuiProviderId} · 🔌 inbound: ${p.xuiInboundId} · ${p.protocol}\n🔢 ترتیب: ${p.sortOrder}\nوضعیت: ${p.isActive ? '🟢 فعال' : '⚪ غیرفعال'}`, [
             [{ text: '✏️ ویرایش', data: `pr:e:${p.id}` }, { text: '🗑 حذف', data: `pr:d:${p.id}` }],
             [{ text: '🗂 دسته‌بندی', data: `pr:c:${p.id}` }, { text: p.isActive ? '⏸ غیرفعال‌سازی' : '▶️ فعال‌سازی', data: `pr:tg:${p.id}` }],
             back('adm:products'),
@@ -300,7 +335,7 @@ export function adminHandlers() {
           await getProduct(b);
           return show(ctx, '✏️ کدام بخش را ویرایش کنیم؟', [
             ...Object.entries(PRODUCT_FIELDS).reduce<Button[][]>((rows, [f, label], n) => { if (n % 2 === 0) rows.push([]); rows[rows.length - 1].push({ text: label, data: `pr:f:${b}:${f}` }); return rows; }, []),
-            [{ text: '🔌 پروتکل', data: `pr:pt:${b}` }],
+            [{ text: '🖥 پنل و inbound', data: `pr:pi:${b}` }, { text: '🔌 پروتکل', data: `pr:pt:${b}` }],
             back(`pr:v:${b}`),
           ]);
         }
@@ -311,6 +346,30 @@ export function adminHandlers() {
           ctx.session.step = 'a_pfield'; ctx.session.data = { id: b, field };
           const cur = String((p as unknown as Record<string, unknown>)[field] ?? '');
           return show(ctx, `✏️ ${PRODUCT_FIELDS[field]}\nمقدار فعلی: ${cur || '—'}\n\nمقدار جدید را بفرستید${field === 'description' ? ' (برای پاک کردن: -)' : ''}:`, [back(`pr:e:${b}`)]);
+        }
+        if (a === 'pi') {
+          const cur = await getProduct(b);
+          const ps = (await listPanels()).filter((x) => x.isActive);
+          return show(ctx, `🖥 این محصول روی کدام پنل ساخته شود؟\nفعلی: ${cur.xuiProviderId} · inbound ${cur.xuiInboundId}`, [...ps.map((x, n): Button[] => [{ text: `${x.code === cur.xuiProviderId ? '✅ ' : ''}${x.name} (${x.code})`, data: `pr:pj:${b}:${n}` }]), back(`pr:e:${b}`)]);
+        }
+        if (a === 'pj') {
+          const x = (await listPanels()).filter((y) => y.isActive)[Number(d.split(':')[3])];
+          if (!x) throw new AppError('VALIDATION', 'پنل پیدا نشد؛ دوباره انتخاب کنید');
+          let ibs;
+          try { ibs = await listPanelInbounds(x.code); } catch (e: any) { throw new AppError('VALIDATION', `ارتباط با پنل «${x.name}» برقرار نشد:\n${String(e?.message ?? e)}`); }
+          ctx.session.data = { pickPanel: x.code };
+          const ok = ibs.filter((i) => i.enable && isSupportedProtocol(i.protocol));
+          return show(ctx, `🔌 inbound را از پنل «${x.name}» انتخاب کنید:${ok.length ? '' : '\n\nهیچ inbound فعال و پشتیبانی‌شده‌ای پیدا نشد.'}${ibs.length !== ok.length ? '\n(inboundهای غیرفعال یا پشتیبانی‌نشده مثل mixed/http نمایش داده نمی‌شوند)' : ''}`, [...ok.slice(0, 40).map((i): Button[] => [{ text: ibLabel(i), data: `pr:pk:${b}:${i.id}` }]), back(`pr:pi:${b}`)]);
+        }
+        if (a === 'pk') {
+          const code = ctx.session.data?.pickPanel as string | undefined;
+          if (!code) throw new AppError('VALIDATION', 'انتخاب منقضی شد؛ دوباره از «پنل و inbound» شروع کنید');
+          const id = Number(d.split(':')[3]);
+          const info = (await listPanelInbounds(code)).find((i) => i.id === id);
+          if (!info) throw new AppError('VALIDATION', 'این inbound دیگر در پنل نیست');
+          await updateProduct(actor(ctx), b, { xuiProviderId: code, xuiInboundId: id, ...(PROTO_ENUM[info.protocol] ? { protocol: PROTO_ENUM[info.protocol] as never } : {}) });
+          ctx.session.data = undefined;
+          return show(ctx, `✅ محصول روی پنل «${code}» ، inbound ${id} (${info.protocol}) تنظیم شد.`, [[{ text: '📦 مشاهده محصول', data: `pr:v:${b}` }]]);
         }
         if (a === 'pt') {
           await getProduct(b);
@@ -333,6 +392,68 @@ export function adminHandlers() {
         }
         if (a === 'tg') { const p = await getProduct(b); await updateProduct(actor(ctx), b, { isActive: !p.isActive }); return ctx.reply(p.isActive ? '⏸ غیرفعال شد.' : '▶️ فعال شد.'); }
         if (a === 'pc') { ctx.session.step = 'a_price'; ctx.session.data = { id: b }; return show(ctx, 'قیمت جدید (عدد):', [back(`pr:v:${b}`)]); }
+      }
+      if (ns === 'pn') {
+        await need(ctx, 'panels.manage');
+        if (a === 'l') return panelsList(ctx);
+        if (a === 'v') return panelView(ctx, b);
+        if (a === 'new') {
+          ctx.session.step = 'a_panel_add'; ctx.session.data = undefined;
+          return show(ctx, [
+            '🖥 افزودن پنل X-UI', '',
+            'یک پیام با این قالب بفرستید (هر خط یک مورد):', '',
+            'نام: آلمان',
+            'آدرس: https://1.2.3.4:2053/مسیر-پنل',
+            'کاربر: admin',
+            'رمز: ********',
+            'ساب: https://sub.example.com:2096/sub   (اختیاری)',
+            'هاست: example.com   (اختیاری؛ دامنه‌ی داخل لینک مشتری)',
+            'tls: نامعتبر   (اختیاری؛ اگر گواهی پنل خودامضاست)', '',
+            '• به‌جای کاربر/رمز می‌توانید «توکن: ...» بدهید.',
+            '• قبل از ذخیره، اتصال تست می‌شود؛ اگر وصل نشد ذخیره نمی‌شود و می‌توانید اصلاح‌شده دوباره بفرستید.',
+            '• پیام شما (که رمز دارد) بعد از خواندن از چت پاک می‌شود.',
+          ].join('\n'), [back('pn:l')]);
+        }
+        if (a === 't') {
+          const r = await testPanel(b);
+          await ctx.reply(r.ok ? `🟢 اتصال برقرار است (${r.ms}ms)\n${r.detail}` : `🔴 اتصال ناموفق (${r.ms}ms)\n${r.detail}`);
+          return panelView(ctx, b);
+        }
+        if (a === 'i') {
+          const p = await getPanel(b);
+          let ibs;
+          try { ibs = await listPanelInbounds(b); } catch (e: any) { throw new AppError('VALIDATION', `ارتباط با پنل «${p.name}» برقرار نشد:\n${String(e?.message ?? e)}`); }
+          return show(ctx, `📋 inboundهای «${p.name}» (${ibs.length})\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\nروی هر کدام بزنید تا برایش محصول بسازید.\n⛔ = غیرفعال${ibs.some((i) => !isSupportedProtocol(i.protocol)) ? '\n(پروتکل‌های mixed/http/socks پشتیبانی نمی‌شوند)' : ''}`, [...ibs.slice(0, 40).map((i): Button[] => [{ text: ibLabel(i), data: `pn:ib:${b}:${i.id}` }]), back(`pn:v:${b}`)]);
+        }
+        if (a === 'ib') {
+          const id = Number(d.split(':')[3]);
+          const i = (await listPanelInbounds(b)).find((x) => x.id === id);
+          if (!i) throw new AppError('VALIDATION', 'این inbound دیگر در پنل نیست');
+          const prods = (await listAllProducts()).filter((x) => x.xuiProviderId === b && x.xuiInboundId === id);
+          const okProto = isSupportedProtocol(i.protocol) && i.enable;
+          return show(ctx, `🔌 inbound #${i.id}\nنام: ${i.remark || '—'}\nپروتکل: ${i.protocol} · پورت ${i.port}\nوضعیت: ${i.enable ? '🟢 فعال' : '⛔ غیرفعال'}\n📦 محصولات روی آن: ${prods.length}${prods.length ? '\n' + prods.slice(0, 8).map((x) => `• ${x.name}`).join('\n') : ''}${okProto ? '' : '\n\n⚠️ برای فروش باید inbound فعال و از نوع vless/vmess/trojan/shadowsocks باشد.'}`, [...(okProto ? [[{ text: '➕ افزودن محصول روی این inbound', data: `pn:np:${b}:${id}` }]] : []), back(`pn:i:${b}`)]);
+        }
+        if (a === 'np') {
+          const id = Number(d.split(':')[3]);
+          const i = (await listPanelInbounds(b)).find((x) => x.id === id);
+          if (!i || !isSupportedProtocol(i.protocol)) throw new AppError('VALIDATION', 'این inbound قابل فروش نیست');
+          ctx.session.step = 'a_bulk'; ctx.session.data = { defaults: { panel: b, inbound: id, protocol: PROTO_ENUM[i.protocol] } };
+          return show(ctx, [
+            `📥 افزودن محصول روی «${b}» · inbound ${id}`, '',
+            'پنل و inbound از قبل تنظیم شده‌اند. هر محصول یک خط:', 'نام | روز | حجم GB | قیمت تومان', '',
+            'مثال:', 'اقتصادی ۵۰ گیگ | 30 | 50 | 250000', 'ویژه ۱۰۰ گیگ | 60 | 100 | 450,000', '',
+            'برای قرار دادن در دسته: خط اول  category=ماهانه ▸ حجمی',
+          ].join('\n'), [back(`pn:ib:${b}:${id}`)]);
+        }
+        const p = await getPanel(b);
+        if (p.source === 'env') throw new AppError('VALIDATION', 'این پنل از .env خوانده می‌شود؛ برای تغییر آن فایل .env را ویرایش کنید.');
+        if (a === 'e') {
+          ctx.session.step = 'a_panel_edit'; ctx.session.data = { id: p.id, code: b };
+          return show(ctx, `✏️ ویرایش «${p.name}»\n\nفقط خطوطی را بفرستید که می‌خواهید عوض شوند، مثلاً:\nآدرس: https://...\nرمز: ...\nنام: ...\nساب: -   (برای پاک کردن مقدار، «-» بگذارید)\n\nکلیدها: نام، آدرس، کاربر، رمز، توکن، ساب، هاست، tls`, [back(`pn:v:${b}`)]);
+        }
+        if (a === 'tg') { await setPanelActive(actor(ctx), p.id, !p.isActive); return panelView(ctx, b); }
+        if (a === 'd') return show(ctx, `⚠️ حذف پنل «${p.name}»؟\nفقط وقتی هیچ محصول و سرویسی روی آن نباشد حذف می‌شود.`, [[{ text: '🗑 بله، حذف شود', data: `pn:d2:${b}` }, { text: '↩️ انصراف', data: `pn:v:${b}` }]]);
+        if (a === 'd2') { await deletePanel(actor(ctx), p.id); return show(ctx, '🗑 پنل حذف شد.', [back('pn:l')]); }
       }
       if (ns === 'ch') {
         await need(ctx, 'settings.manage');
@@ -468,8 +589,9 @@ export function adminHandlers() {
           return show(ctx, `مقدار جدید برای ${b}:`, [back('adm:settings')]);
         }
         if (a === 'xui') {
-          const h = await getVpnProvider().healthCheck();
-          return show(ctx, `🔌 X-UI\nProvider: ${getVpnProvider().name}\nوضعیت: ${h.ok ? '🟢 متصل' : '🔴 خطا'}\n${h.detail}\nDefault inbound: ${(await getSetting('xui.defaultInboundId')) || '-'}`, [back('adm:settings')]);
+          const lines: string[] = [];
+          for (const p of (await listPanels()).filter((x) => x.isActive)) { const h = await testPanel(p.code); lines.push(`${h.ok ? '🟢' : '🔴'} ${p.name} (${p.code}) — ${h.detail}`); }
+          return show(ctx, `🔌 وضعیت پنل‌های X-UI\n\n${lines.join('\n') || 'هیچ پنلی تنظیم نشده'}`, [back('adm:settings')]);
         }
       }
       if (ns === 'at') {
@@ -516,6 +638,19 @@ export function adminHandlers() {
         ctx.session.step = undefined;
         return void (await ctx.reply(`✅ محصول «${p.name}» ساخته شد.`));
       }
+      if (step === 'a_panel_add' || step === 'a_panel_edit') {
+        await need(ctx, 'panels.manage');
+        await ctx.deleteMessage().catch(() => undefined); // the message contains the panel password
+        const fields = parsePanelText(text);
+        if (step === 'a_panel_add') {
+          const row = await createPanel(actor(ctx), fields as never);
+          ctx.session.step = undefined;
+          return void (await ctx.reply(`✅ پنل «${row.name}» (کد: ${row.code}) اضافه شد و اتصال تست شد.`, { reply_markup: { inline_keyboard: [[{ text: '📋 inboundها', callback_data: `pn:i:${row.code}` }, { text: '🖥 مشاهده', callback_data: `pn:v:${row.code}` }]] } }));
+        }
+        await updatePanel(actor(ctx), data.id, fields as never);
+        ctx.session.step = undefined;
+        return void (await ctx.reply('✅ ذخیره شد و اتصال با مشخصات جدید تست شد.', { reply_markup: { inline_keyboard: [[{ text: '🖥 مشاهده پنل', callback_data: `pn:v:${data.code}` }]] } }));
+      }
       if (step === 'a_chan_add') {
         await need(ctx, 'settings.manage');
         const c = await addChannel(actor(ctx), text);
@@ -555,7 +690,7 @@ export function adminHandlers() {
       }
       if (step === 'a_bulk') {
         await need(ctx, 'products.manage');
-        const created = await createProductsBulk(actor(ctx), text);
+        const created = await createProductsBulk(actor(ctx), text, data.defaults ?? {});
         ctx.session.step = undefined;
         return void (await ctx.reply(`✅ ${created.length} محصول ثبت شد:\n${created.map((c) => `• ${c.name} — ${formatMoney(c.price)}`).join('\n')}`));
       }
@@ -596,7 +731,7 @@ export function adminHandlers() {
       }
     } catch (e) {
       // validation errors on multi-line / field edits keep the step, so the admin can just resend a corrected text
-      const retry = e instanceof AppError && (e.code === 'VALIDATION' || e.code === 'CONFLICT') && ['a_bulk', 'a_pfield', 'a_cat_new', 'a_cat_rename', 'a_text', 'a_chan_add'].includes(step ?? '');
+      const retry = e instanceof AppError && (e.code === 'VALIDATION' || e.code === 'CONFLICT') && ['a_bulk', 'a_pfield', 'a_cat_new', 'a_cat_rename', 'a_text', 'a_chan_add', 'a_panel_add', 'a_panel_edit'].includes(step ?? '');
       if (!retry) ctx.session.step = undefined;
       return handleError(ctx, e, step === 'a_bulk' ? 'adm:products' : 'adm:home');
     }

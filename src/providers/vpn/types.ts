@@ -56,6 +56,7 @@ export interface VpnProvider {
   /** `remark` = name shown by client apps for the generated direct link (defaults to the client email). */
   getConfig(ref: ServiceRef & { subId: string; remark?: string }): Promise<ServiceConfig>;
   getInbound(inboundId: number): Promise<InboundInfo | null>;
+  listInbounds(): Promise<InboundInfo[]>;
   healthCheck(): Promise<{ ok: boolean; detail: string }>;
 }
 

@@ -79,7 +79,10 @@ Bot با long-polling کار می‌کند (دامنه/وب‌هوک تلگرا�
 **Backup:** `deploy/backup.sh` (pg_dump + volume رسیدها) را با cron روزانه اجرا و نسخه‌ها را خارج از سرور نگه دارید. Restore: `gunzip -c db_X.sql.gz | docker compose exec -T db psql -U vpn vpnbot`.
 
 ## ENV
-`DATABASE_URL BOT_TOKEN ADMIN_TELEGRAM_ID APP_URL PORT RECEIPT_DIR XUI_BASE_URL XUI_USERNAME XUI_PASSWORD XUI_API_TOKEN XUI_SUB_BASE_URL XUI_PUBLIC_HOST VPN_PROVIDER CARD_TO_CARD_ENABLED CARD_HOLDER CARD_NUMBER BANK_NAME PAYMENT_INSTRUCTIONS CRYPTO_ENABLED BANK_WEBHOOK_SECRET OCR_ENABLED` — جزئیات در `.env.example`. در production مقدار `VPN_PROVIDER=mock` رد می‌شود. اعتبارنامه‌های X-UI فقط در env سرور هستند (نه DB، نه تلگرام، نه لاگ).
+`DATABASE_URL BOT_TOKEN ADMIN_TELEGRAM_ID APP_URL PORT RECEIPT_DIR XUI_BASE_URL XUI_USERNAME XUI_PASSWORD XUI_API_TOKEN XUI_SUB_BASE_URL XUI_PUBLIC_HOST VPN_PROVIDER CARD_TO_CARD_ENABLED CARD_HOLDER CARD_NUMBER BANK_NAME PAYMENT_INSTRUCTIONS CRYPTO_ENABLED BANK_WEBHOOK_SECRET OCR_ENABLED` — جزئیات در `.env.example`. در production مقدار `VPN_PROVIDER=mock` رد می‌شود. اعتبارنامه‌ی پنل اصلی (`default`) در env سرور است. پنل‌های اضافه از داخل ربات/پنل وب (مجوز `panels.manage`، فقط SUPER_ADMIN) ثبت می‌شوند؛ رمز و توکن آن‌ها با `SECRETS_KEY` (AES-256-GCM) رمزنگاری در DB ذخیره می‌شود و هرگز نمایش/لاگ نمی‌شود.
+
+### چند پنل و چند inbound
+هر محصول به یک «پنل + inbound» وصل است (`xuiProviderId` + `xuiInboundId`). ساخت، تمدید، sync و حذف هر سرویس همیشه روی همان پنل انجام می‌شود. افزودن/ویرایش/تست پنل و دیدن inboundها: ربات `/admin` ← «🖥 پنل‌ها و inboundها» یا پنل وب ← «پنل‌ها و inbound». هنگام ساخت/ویرایش محصول، inbound روی همان پنل بررسی می‌شود. افزودن گروهی: خط `panel=کد-پنل` بالای لیست. سلامت هر پنل هر دقیقه بررسی می‌شود (هشدار بعد از دو شکست پیاپی + پیام بازگشت اتصال).
 
 ## نقش‌های ادمین
 `ADMIN_TELEGRAM_ID` = SUPER_ADMIN. بقیه از جدول `Admin` (نقش‌ها: SUPER_ADMIN, PAYMENT_ADMIN, VPN_ADMIN, SUPPORT_ADMIN, PRODUCT_ADMIN). مثال: `INSERT INTO "Admin"(id,"telegramId",role,"updatedAt") VALUES ('a1',123456,'PAYMENT_ADMIN',now());`

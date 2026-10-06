@@ -7,7 +7,7 @@ import { audit } from '../admin/audit';
 import { getNumberList } from '../settings/service';
 import { notifyUser } from '../notifications/service';
 import * as T from '../notifications/templates';
-import { getVpnProvider } from '../../providers/vpn';
+import { vpnFor } from '../../providers/vpn';
 import { refOf } from './provisioning';
 import { linkRemark, validateServiceName } from '../../utils/names';
 
@@ -32,7 +32,7 @@ export async function getServiceAdmin(id: string) {
 export async function syncService(id: string): Promise<VpnService | null> {
   const s = await prisma.vpnService.findUniqueOrThrow({ where: { id } });
   if (s.provisioningStatus !== 'SUCCESS' || s.status === 'CANCELLED') return s;
-  const st = await getVpnProvider().getServiceStatus(refOf(s));
+  const st = await (await vpnFor(s.provider)).getServiceStatus(refOf(s));
   if (!st) {
     logger.warn({ id }, 'service missing in panel during sync');
     return null;
@@ -50,8 +50,13 @@ export async function syncService(id: string): Promise<VpnService | null> {
 }
 
 export async function syncAllServices(): Promise<{ ok: number; failed: number }> {
-  const rows = await prisma.vpnService.findMany({ where: { provisioningStatus: 'SUCCESS', status: { in: ['ACTIVE', 'EXPIRED', 'SUSPENDED'] } }, select: { id: true } });
-  let ok = 0, failed = 0;
+  const all = await prisma.vpnService.findMany({ where: { provisioningStatus: 'SUCCESS', status: { in: ['ACTIVE', 'EXPIRED', 'SUSPENDED'] } }, select: { id: true, provider: true } });
+  // One cheap probe per panel: an unreachable panel must not stall the whole sync with per-service timeouts.
+  const { testPanel } = await import('../panels/service');
+  const down = new Set<string>();
+  for (const code of new Set(all.map((r) => r.provider))) if (!(await testPanel(code)).ok) down.add(code);
+  const rows = all.filter((r) => !down.has(r.provider));
+  let ok = 0, failed = down.size ? all.length - rows.length : 0;
   for (const r of rows) {
     try { await syncService(r.id); ok++; } catch (e: any) { failed++; logger.warn({ id: r.id, err: String(e?.message) }, 'sync failed'); }
   }
@@ -68,7 +73,7 @@ export async function processExpirations(now = new Date()): Promise<{ expired: n
     const left = s.expiresAt.getTime() - now.getTime();
     if (left <= 0) {
       await prisma.vpnService.update({ where: { id: s.id }, data: { status: 'EXPIRED', expiryNotified: { ...flags, expired: true } } });
-      try { await getVpnProvider().suspendService(refOf(s)); } catch { /* panel disables expired clients itself */ }
+      try { await (await vpnFor(s.provider)).suspendService(refOf(s)); } catch { /* panel disables expired clients itself */ }
       await audit({ actor: 'system', action: 'vpn.expire', target: 'VpnService', targetId: s.id });
       if (!flags.expired) {
         await notifyUser(s.userId, 'vpn_expired', await T.expired(s.product.name), {
@@ -106,21 +111,21 @@ async function mustBeProvisioned(id: string) {
 
 export async function suspendService(id: string, actor: string) {
   const s = await mustBeProvisioned(id);
-  await getVpnProvider().suspendService(refOf(s));
+  await (await vpnFor(s.provider)).suspendService(refOf(s));
   await prisma.vpnService.update({ where: { id }, data: { status: 'SUSPENDED' } });
   await audit({ actor, action: 'vpn.suspend', target: 'VpnService', targetId: id });
 }
 
 export async function resumeService(id: string, actor: string) {
   const s = await mustBeProvisioned(id);
-  await getVpnProvider().resumeService(refOf(s));
+  await (await vpnFor(s.provider)).resumeService(refOf(s));
   await prisma.vpnService.update({ where: { id }, data: { status: s.expiresAt.getTime() > Date.now() ? 'ACTIVE' : 'EXPIRED' } });
   await audit({ actor, action: 'vpn.resume', target: 'VpnService', targetId: id });
 }
 
 export async function deleteService(id: string, actor: string) {
   const s = await prisma.vpnService.findUniqueOrThrow({ where: { id } });
-  await getVpnProvider().deleteService(refOf(s));
+  await (await vpnFor(s.provider)).deleteService(refOf(s));
   await prisma.vpnService.update({ where: { id }, data: { status: 'CANCELLED' } });
   await audit({ actor, action: 'vpn.delete', target: 'VpnService', targetId: id, metadata: { externalId: s.externalId } });
 }
@@ -128,7 +133,7 @@ export async function deleteService(id: string, actor: string) {
 /** Re-fetch the real link from the panel (inbound settings may have changed). */
 export async function refreshConfig(id: string) {
   const s = await mustBeProvisioned(id);
-  const cfg = await getVpnProvider().getConfig({ ...refOf(s), subId: s.subId, remark: linkRemark(s.displayName, s.externalId) });
+  const cfg = await (await vpnFor(s.provider)).getConfig({ ...refOf(s), subId: s.subId, remark: linkRemark(s.displayName, s.externalId) });
   return prisma.vpnService.update({ where: { id }, data: { config: cfg.config, subscriptionUrl: cfg.subscriptionUrl ?? null } });
 }
 

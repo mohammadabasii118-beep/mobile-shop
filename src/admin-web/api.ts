@@ -14,7 +14,7 @@ import { adminRetry } from '../modules/vpn/provisioning';
 import { adminReply, closeTicket } from '../modules/support/service';
 import { SETTING_DEFAULTS, SettingKey, allSettings, setSetting } from '../modules/settings/service';
 import { flushPending } from '../modules/notifications/service';
-import { getVpnProvider } from '../providers/vpn';
+import { PanelView, createPanel, deletePanel, listPanelInbounds, listPanels, panelHealth, setPanelActive, testPanel, updatePanel } from '../modules/panels/service';
 import { categoryTree, createCategory, deleteCategory, moveCategory, updateCategory } from '../modules/categories/service';
 import { isTextKey, listTexts, previewText, resetText, setText } from '../modules/texts/service';
 import { addChannel, deleteChannel, listChannels, setChannelActive, testChannel } from '../modules/channels/service';
@@ -78,9 +78,15 @@ const receiptType = (b: Buffer) => (b[0] === 0xff && b[1] === 0xd8 ? 'image/jpeg
 
 const productBody = z.object({
   name: z.string().trim().min(1).max(80), description: z.string().trim().max(500).optional().nullable(),
-  durationDays: z.number().int(), trafficGB: z.number().int(), price: z.number().int(), xuiInboundId: z.number().int(),
+  durationDays: z.number().int(), trafficGB: z.number().int(), price: z.number().int(), xuiInboundId: z.number().int(), xuiProviderId: z.string().max(40).optional(),
   protocol: z.nativeEnum(Protocol), isActive: z.boolean().optional(), sortOrder: z.number().int().optional(),
   categoryId: z.string().nullable().optional(),
+});
+
+const panelBody = z.object({
+  code: z.string().max(40).optional(), name: z.string().min(1).max(60), baseUrl: z.string().min(1).max(300),
+  username: z.string().max(120).optional(), password: z.string().max(200).optional(), apiToken: z.string().max(400).optional(),
+  subBaseUrl: z.string().max(300).optional(), publicHost: z.string().max(200).optional(), tlsInsecure: z.boolean().optional(),
 });
 
 const confirmFor = (externalId: string) => `DELETE ${externalId.slice(-6)}`;
@@ -97,8 +103,8 @@ export const routes: Route[] = [
   {
     method: 'POST', re: /^\/products\/bulk$/, perm: 'products.manage',
     run: async (c) => {
-      const b = z.object({ text: z.string().min(1).max(20_000), inbound: z.number().int().min(1).optional().nullable(), protocol: z.nativeEnum(Protocol).optional().nullable(), category: z.string().max(120).optional().nullable() }).parse(c.body);
-      const created = await createProductsBulk(actor(c), b.text, { inbound: b.inbound ?? undefined, protocol: b.protocol ?? undefined, category: b.category?.trim() || undefined });
+      const b = z.object({ text: z.string().min(1).max(20_000), panel: z.string().max(40).optional().nullable(), inbound: z.number().int().min(1).optional().nullable(), protocol: z.nativeEnum(Protocol).optional().nullable(), category: z.string().max(120).optional().nullable() }).parse(c.body);
+      const created = await createProductsBulk(actor(c), b.text, { panel: b.panel?.trim().toLowerCase() || undefined, inbound: b.inbound ?? undefined, protocol: b.protocol ?? undefined, category: b.category?.trim() || undefined });
       return { created: created.length, items: created };
     },
   },
@@ -197,11 +203,21 @@ export const routes: Route[] = [
       const s = await allSettings();
       const editable = Object.fromEntries(Object.keys(SETTING_RULES).map((k) => [k, s[k as SettingKey]]));
       const e = env();
-      return { settings: editable, defaults: Object.keys(SETTING_DEFAULTS).length, runtime: { vpnProvider: getVpnProvider().name, xuiConfigured: !!e.XUI_BASE_URL, xuiAuth: e.XUI_API_TOKEN ? 'api-token' : e.XUI_USERNAME ? 'session' : 'none', xuiSubscription: !!e.XUI_SUB_BASE_URL, bankWebhook: !!e.BANK_WEBHOOK_SECRET, cryptoEnabled: false, nodeEnv: e.NODE_ENV } };
+      return { settings: editable, defaults: Object.keys(SETTING_DEFAULTS).length, runtime: { vpnProvider: e.VPN_PROVIDER, panels: (await listPanels()).length, bankWebhook: !!e.BANK_WEBHOOK_SECRET, cryptoEnabled: false, nodeEnv: e.NODE_ENV } };
     },
   },
   { method: 'PUT', re: /^\/settings$/, perm: 'settings.manage', run: putSetting },
-  { method: 'GET', re: /^\/xui\/status$/, perm: 'settings.manage', run: async () => ({ provider: getVpnProvider().name, ...(await getVpnProvider().healthCheck()) }) },
+  { method: 'GET', re: /^\/xui\/status$/, perm: 'settings.manage', run: async () => ({ panels: await Promise.all((await listPanels()).filter((p) => p.isActive).map(async (p) => ({ code: p.code, name: p.name, ...(await testPanel(p.code)) }))) }) },
+
+  // Multi-panel management. Secrets are write-only: they are never returned.
+  { method: 'GET', re: /^\/panels$/, perm: 'panels.manage', run: async () => ({ items: (await listPanels()).map((p) => ({ ...p, health: panelHealth.get(p.code) ?? null })) }) },
+  { method: 'GET', re: /^\/panels\/options$/, perm: 'products.manage', run: async () => ({ items: (await listPanels()).filter((p) => p.isActive).map((p: PanelView) => ({ code: p.code, name: p.name })) }) },
+  { method: 'POST', re: /^\/panels$/, perm: 'panels.manage', run: async (c) => { const r = await createPanel(actor(c), panelBody.parse(c.body) as any); return { id: r.id, code: r.code }; } },
+  { method: 'PATCH', re: /^\/panels\/([\w-]+)$/, perm: 'panels.manage', run: async (c) => { await updatePanel(actor(c), c.params[0], panelBody.partial().parse(c.body) as any); return { ok: true }; } },
+  { method: 'POST', re: /^\/panels\/([\w-]+)\/active$/, perm: 'panels.manage', run: async (c) => { await setPanelActive(actor(c), c.params[0], z.object({ isActive: z.boolean() }).parse(c.body).isActive); return { ok: true }; } },
+  { method: 'DELETE', re: /^\/panels\/([\w-]+)$/, perm: 'panels.manage', run: async (c) => { await deletePanel(actor(c), c.params[0]); return { ok: true }; } },
+  { method: 'POST', re: /^\/panels\/([\w-]+)\/test$/, perm: 'panels.manage', run: (c) => testPanel(c.params[0]) },
+  { method: 'GET', re: /^\/panels\/([\w-]+)\/inbounds$/, perm: 'products.manage', run: async (c) => ({ items: await listPanelInbounds(c.params[0]) }) },
 
   { method: 'GET', re: /^\/audit$/, perm: 'audit.view', run: (c) => Q.listAudit(str(c, 'q'), str(c, 'action'), page(c)) },
 ];

@@ -38,6 +38,7 @@ export async function runPreflight(source: NodeJS.ProcessEnv = process.env, opts
   add(env.BANK_WEBHOOK_SECRET && env.BANK_WEBHOOK_SECRET.length >= 24 ? 'PASS' : 'WARN', 'BANK_WEBHOOK_SECRET', 'without a bank-transaction feed nothing is auto-approved (all payments go to manual review)');
   add(env.APP_URL?.startsWith('https://') ? 'PASS' : 'WARN', 'APP_URL (admin panel link)', env.APP_URL ? (env.APP_URL.startsWith('https://') ? env.APP_URL : 'not https — panel login cookie will not be marked Secure; put a TLS proxy in front') : 'unset → /panel links point to localhost');
   add(env.PANEL_SESSION_SECRET || env.BOT_TOKEN ? 'PASS' : 'FAIL', 'PANEL_SESSION_SECRET', env.PANEL_SESSION_SECRET ? 'set' : 'derived from BOT_TOKEN (set an explicit secret for rotation)');
+  add(env.SECRETS_KEY ? 'PASS' : 'WARN', 'SECRETS_KEY', env.SECRETS_KEY ? 'set' : 'unset → panel passwords are encrypted with a key derived from PANEL_SESSION_SECRET/BOT_TOKEN; rotating that value would make saved panels unreadable. Set SECRETS_KEY once (openssl rand -hex 32)');
   add(!env.CRYPTO_ENABLED ? 'PASS' : 'WARN', 'CRYPTO_ENABLED', 'crypto stays disabled without a chain verifier');
 
   try {
@@ -69,7 +70,7 @@ export async function runPreflight(source: NodeJS.ProcessEnv = process.env, opts
     if (env.XUI_BASE_URL) {
       try {
         const { XuiClient } = await import('../providers/vpn/xui/client');
-        const list = await new XuiClient({ baseUrl: env.XUI_BASE_URL, username: env.XUI_USERNAME, password: env.XUI_PASSWORD, apiToken: env.XUI_API_TOKEN, fetchImpl: (await import('../providers/vpn/xui/net')).xuiFetch() }).listInbounds();
+        const list = await new XuiClient({ baseUrl: env.XUI_BASE_URL, username: env.XUI_USERNAME, password: env.XUI_PASSWORD, apiToken: env.XUI_API_TOKEN, fetchImpl: (await import('../providers/vpn/xui/net')).xuiFetch(env.XUI_TLS_INSECURE) }).listInbounds();
         add('PASS', 'X-UI auth + inbounds', `${list.length} inbound(s)`);
       } catch (e: any) { add('FAIL', 'X-UI auth + inbounds', String(e?.message)); }
     }

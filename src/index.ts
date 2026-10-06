@@ -4,7 +4,7 @@ import { logger } from './utils/logger';
 import { createBot, USER_COMMANDS } from './bot';
 import { createServer } from './server';
 import { startJobs } from './jobs/scheduler';
-import { getVpnProvider } from './providers/vpn';
+import { activePanelCodes, testPanel } from './modules/panels/service';
 import { createTesseractEngine } from './modules/payments/receipt';
 import { setPaymentDeps } from './modules/payments/service';
 
@@ -13,10 +13,11 @@ async function main() {
   if (!e.BOT_TOKEN) throw new Error('BOT_TOKEN is required');
   await prisma.$connect();
 
-  const vpn = getVpnProvider();
-  const health = await vpn.healthCheck();
-  logger.info({ provider: vpn.name, ok: health.ok, detail: health.detail }, 'VPN provider status');
-  if (!health.ok && e.NODE_ENV === 'production') logger.warn('X-UI is unreachable at startup; provisioning will retry automatically');
+  for (const code of await activePanelCodes()) {
+    const h = await testPanel(code);
+    logger.info({ panel: code, ok: h.ok, ms: h.ms, detail: h.detail }, 'X-UI panel status');
+    if (!h.ok && e.NODE_ENV === 'production') logger.warn({ panel: code }, 'X-UI panel is unreachable at startup; provisioning will retry automatically');
+  }
 
   if (e.OCR_ENABLED) {
     const ocr = await createTesseractEngine();

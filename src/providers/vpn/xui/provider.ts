@@ -51,6 +51,11 @@ export class XuiVpnProvider implements VpnProvider {
     return ib ? { id: ib.id, enable: ib.enable, protocol: ib.protocol, port: ib.port, remark: ib.remark } : null;
   }
 
+  async listInbounds(): Promise<InboundInfo[]> {
+    const list = await this.o.client.listInbounds();
+    return (list ?? []).map((ib) => ({ id: ib.id, enable: ib.enable, protocol: ib.protocol, port: ib.port, remark: ib.remark })).sort((a, b) => a.id - b.id);
+  }
+
   async createService(req: CreateServiceRequest) {
     const ib = await this.inboundOrThrow(req.inboundId, req.protocol);
     const existing = this.findClient(ib, req.email);
