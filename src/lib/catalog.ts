@@ -5,8 +5,8 @@ import type { Attribute, Badge, Banner, CardData, ProductAttr, ProductFull, Spec
 /* ───────── تنظیمات فروشگاه ───────── */
 
 export const SETTING_DEFAULTS: Record<string, string> = {
-  store_name: 'کیس لاین',
-  store_name_en: 'Caseline',
+  store_name: 'Caseline',
+  store_name_en: ''
   tagline: 'لوازم جانبی اصل موبایل',
   phone: '۰۲۱-۱۲۳۴۵۶۷۸',
   email: 'support@caseline.example',

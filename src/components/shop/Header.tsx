@@ -20,7 +20,7 @@ export default function Header({ settings, categories, userName }: { settings: S
           <div className="bar">
             <MobileMenu categories={top} storeName={settings.store_name} phone={settings.phone} />
             <Link className="logo" href="/" aria-label={`${settings.store_name}، صفحه اصلی`}>
-              {settings.store_name}
+              <bdi>{settings.store_name}</bdi>
               <i />
               {settings.store_name_en && <small className="logo-en" dir="ltr">{settings.store_name_en}</small>}
             </Link>

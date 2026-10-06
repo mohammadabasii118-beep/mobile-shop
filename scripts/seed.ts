@@ -65,7 +65,7 @@ db.transaction(() => {
   [['64gb', '۶۴ گیگابایت'], ['128gb', '۱۲۸ گیگابایت'], ['256gb', '۲۵۶ گیگابایت']].forEach(([s, n], i) => term('capacity', s, n, null, null, i));
 
   /* ───── تنظیمات ───── */
-  run("INSERT INTO settings (key, value) VALUES ('store_name', 'کیس لاین'), ('store_name_en', 'Caseline')");
+  run("INSERT INTO settings (key, value) VALUES ('store_name', 'Caseline')");
 
   if (empty) {
     run('INSERT INTO categories (slug, name, sort) VALUES (?,?,?)', 'accessories', 'لوازم جانبی', 1);
