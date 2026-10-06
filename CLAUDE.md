@@ -28,7 +28,7 @@ Next.js 16 (App Router، Server Components + Server Actions) · React 19 · Type
 - فرمت پول/تاریخ/ارقام فقط با `src/lib/format.ts`. ارقام فارسی در UI، لاتین در DB و URL. تاریخ UI شمسی (`Intl` با `fa-IR-u-ca-persian`)، DB میلادی UTC.
 - قیمت سفارش **هرگز** از کلاینت نیامده؛ `priceCart`/`placeOrder` در `src/lib/orders.ts` از DB محاسبه می‌کند.
 - محصول متغیر: `variations.attrs` JSON با کلید slug ویژگی (`phone-brand`, `phone-model`, `color`). ویژگی فرزند (مدل) با `attributes.parent_attribute_id` و `attribute_terms.parent_term_id` به والد (برند) وصل است؛ ترکیب‌ها فقط با `generateCombos` (`src/lib/variations.ts`) ساخته شود. slugهای پایه در `ATTR` ثابت‌اند و حذف نمی‌شوند.
-- تصویر محصول: مسیر `/uploads/...` (آپلود مدیر، ذخیره در `data/uploads`) یا `art:p-xxx[@#hex]` (SVG نمونه، `Pic` نمایش می‌دهد).
+- تصویر محصول: مسیر `/uploads/...webp` (آپلود مدیر؛ `src/lib/images.ts` خودکار AVIF+WebP در ۳ عرض می‌سازد، DESIGN.md §۱۸.۷؛ ذخیره در `data/uploads`) یا `art:p-xxx[@#hex]` (SVG نمونه، `Pic` نمایش می‌دهد).
 - فقط logical properties (`inline-start/end`، `padding-inline`)؛ `left/right/ml/mr` ممنوع. متن لاتین داخل جمله‌ی فارسی: `<bdi>`.
 - هر لیست: حالت loading/empty/error. دسترسی‌پذیری (DESIGN.md §۱۳) جزو «تمام‌شده» است.
 - در SQL از نام‌های رزرو (`all`, `out`, …) به‌عنوان alias استفاده نکن؛ کوئری‌ها پارامتری باشند.

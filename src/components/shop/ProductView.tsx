@@ -136,7 +136,7 @@ export default function ProductView({ header, ...p }: PVProps & { header: React.
       <div className={`gallery${thumbs.length ? ' multi' : ''}`}>
         <div className="g-main">
           {p.badge && <span className={`badge ${p.badge.cls}`}>{p.badge.label}</span>}
-          <Pic src={mainSrc} alt={p.name} eager />
+          <Pic src={mainSrc} alt={p.name} eager sizes="(max-width: 900px) 100vw, 560px" />
         </div>
         {thumbs.length > 0 && (
           <div className="thumbs" role="group" aria-label="تصاویر محصول">

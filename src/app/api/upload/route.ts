@@ -4,9 +4,10 @@ import path from 'node:path';
 import { NextResponse } from 'next/server';
 import { assertAdmin } from '@/lib/auth';
 import { DATA_DIR } from '@/lib/db';
+import { optimizeImage } from '@/lib/images';
 
 export const runtime = 'nodejs';
-const MAX = 6 * 1024 * 1024;
+const MAX = 12 * 1024 * 1024;
 
 function detect(b: Buffer): string | null {
   if (b.length < 12) return null;
@@ -29,15 +30,25 @@ export async function POST(req: Request) {
   if (!files.length) return NextResponse.json({ error: 'فایلی ارسال نشد' }, { status: 400 });
   const urls: string[] = [];
   for (const f of files.slice(0, 10)) {
-    if (f.size > MAX) return NextResponse.json({ error: `حجم «${f.name}» بیشتر از ۶ مگابایت است` }, { status: 413 });
+    if (f.size > MAX) return NextResponse.json({ error: `حجم «${f.name}» بیشتر از ۱۲ مگابایت است` }, { status: 413 });
     const buf = Buffer.from(await f.arrayBuffer());
     const ext = detect(buf);
     if (!ext) return NextResponse.json({ error: `«${f.name}» تصویر معتبر نیست (JPG، PNG، WebP، AVIF یا GIF)` }, { status: 415 });
     const d = new Date();
     const dir = path.join(DATA_DIR, 'uploads', String(d.getFullYear()), String(d.getMonth() + 1).padStart(2, '0'));
     fs.mkdirSync(dir, { recursive: true });
-    const name = `${crypto.randomBytes(8).toString('hex')}${ext}`;
-    fs.writeFileSync(path.join(dir, name), buf);
+    const id = crypto.randomBytes(8).toString('hex');
+    let name: string;
+    if (ext === '.gif') {
+      name = `${id}.gif`;
+      fs.writeFileSync(path.join(dir, name), buf);
+    } else {
+      try {
+        name = await optimizeImage(buf, dir, id);
+      } catch {
+        return NextResponse.json({ error: `«${f.name}» قابل پردازش نیست` }, { status: 415 });
+      }
+    }
     urls.push(`/uploads/${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${name}`);
   }
   return NextResponse.json({ urls });
