@@ -1,0 +1,66 @@
+{
+  "turnSeconds": 10,
+  "maxRounds": 100,
+  "startingDeck": ["soldier", "guard", "archer"],
+  "levelScale": { "hp": 0.1, "atk": 0.1, "shield": 0.1 },
+  "cards": [
+    { "id": "soldier", "name": "سرباز", "rarity": "common", "hp": 110, "atk": 18, "shield": 10 },
+    { "id": "guard", "name": "نگهبان", "rarity": "common", "hp": 130, "atk": 14, "shield": 20 },
+    { "id": "archer", "name": "کماندار", "rarity": "common", "hp": 90, "atk": 24, "shield": 0 },
+    { "id": "brute", "name": "گرزدار", "rarity": "common", "hp": 140, "atk": 20, "shield": 0 },
+    { "id": "scout", "name": "دیده‌بان", "rarity": "common", "hp": 100, "atk": 16, "shield": 15 },
+
+    { "id": "duelist", "name": "شمشیرزن دوگانه", "rarity": "rare", "hp": 100, "atk": 16, "shield": 10,
+      "ability": { "id": "double_strike", "params": { "attacks": 2 } },
+      "desc": "هر نوبت ۲ بار حمله می‌کند" },
+    { "id": "vampire", "name": "خون‌آشام", "rarity": "rare", "hp": 105, "atk": 20, "shield": 0,
+      "ability": { "id": "lifesteal", "params": { "percent": 50 } },
+      "desc": "نیمی از آسیبش را به‌عنوان جان پس می‌گیرد" },
+    { "id": "paladin", "name": "پالادین", "rarity": "rare", "hp": 120, "atk": 17, "shield": 15,
+      "ability": { "id": "armor_up", "params": { "amount": 8 } },
+      "desc": "هر نوبت ۸ شیلد می‌گیرد" },
+
+    { "id": "phoenix", "name": "ققنوس", "rarity": "epic", "hp": 130, "atk": 26, "shield": 15,
+      "ability": { "id": "revive", "params": { "hpPercent": 50 } },
+      "desc": "اگر بمیرد، یک بار با نصف جان زنده می‌شود" },
+    { "id": "warlord", "name": "سردار", "rarity": "epic", "hp": 140, "atk": 22, "shield": 20,
+      "ability": { "id": "double_strike", "params": { "attacks": 2 } },
+      "desc": "هر نوبت ۲ بار حمله می‌کند" },
+    { "id": "reaper", "name": "شبح مرگ", "rarity": "epic", "hp": 120, "atk": 30, "shield": 10,
+      "ability": { "id": "lifesteal", "params": { "percent": 80 } },
+      "desc": "۸۰٪ آسیبش را به‌عنوان جان پس می‌گیرد" }
+  ],
+  "upgrade": {
+    "maxLevel": 6,
+    "levels": [
+      { "copies": 2, "coins": 50 },
+      { "copies": 4, "coins": 150 },
+      { "copies": 8, "coins": 400 },
+      { "copies": 16, "coins": 1000 },
+      { "copies": 32, "coins": 2500 }
+    ]
+  },
+  "xpPerLevel": [100, 200, 350, 550, 800, 1100, 1500, 2000, 2600, 3300],
+  "box": {
+    "slots": 4,
+    "durationSeconds": 10800,
+    "coins": [40, 90],
+    "xp": [30, 60],
+    "cardChance": { "epic": 0.03, "rare": 0.17, "common": 0.5 },
+    "cardCountRange": [1, 1]
+  },
+  "solo": {
+    "stages": [
+      { "name": "مرحله ۱ — تازه‌کار", "ai": "random", "deck": [["soldier", 1], ["guard", 1], ["archer", 1]] },
+      { "name": "مرحله ۲ — نگهبان دروازه", "ai": "random", "deck": [["guard", 1], ["brute", 1], ["scout", 1]] },
+      { "name": "مرحله ۳ — شکارچی", "ai": "smart", "deck": [["archer", 2], ["scout", 2], ["soldier", 2]] },
+      { "name": "مرحله ۴ — دوئل", "ai": "smart", "deck": [["duelist", 1], ["guard", 2], ["brute", 2]] },
+      { "name": "مرحله ۵ — خون و شب", "ai": "smart", "deck": [["vampire", 2], ["paladin", 1], ["archer", 3]] },
+      { "name": "مرحله ۶ — سنگر آهنین", "ai": "smart", "deck": [["paladin", 3], ["guard", 4], ["duelist", 2]] },
+      { "name": "مرحله ۷ — خاکستر", "ai": "smart", "deck": [["phoenix", 1], ["vampire", 3], ["brute", 4]] },
+      { "name": "مرحله ۸ — جنگ‌سالار", "ai": "smart", "deck": [["warlord", 2], ["paladin", 4], ["duelist", 3]] },
+      { "name": "مرحله ۹ — درو", "ai": "smart", "deck": [["reaper", 3], ["phoenix", 3], ["warlord", 3]] },
+      { "name": "مرحله ۱۰ — افسانه", "ai": "smart", "deck": [["reaper", 5], ["phoenix", 5], ["warlord", 5]] }
+    ]
+  }
+}
