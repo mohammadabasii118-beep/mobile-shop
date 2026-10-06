@@ -56,7 +56,7 @@ function SearchField({ className }: { className?: string }) {
 }
 
 function AccountLink({ loggedIn }: { loggedIn?: boolean }) {
-  return <Link href="/account/orders" className={cn(iconBtn, "relative hidden lg:grid")} aria-label="حساب کاربری"><User className="size-[22px]" strokeWidth={1.7} />{loggedIn && <i className="absolute end-2 top-2 size-2 rounded-full bg-primary ring-2 ring-background" />}</Link>;
+  return <Link href="/account/orders" className={cn(iconBtn, "relative hidden md:grid")} aria-label="حساب کاربری"><User className="size-[22px]" strokeWidth={1.7} />{loggedIn && <i className="absolute end-2 top-2 size-2 rounded-full bg-primary ring-2 ring-background" />}</Link>;
 }
 
 /** Header 1: static, lives at the top of the page and scrolls away. */
@@ -71,21 +71,22 @@ export function TopHeader({ menu, info, links, mobileLinks, loggedIn, topBar }: 
       )}
       <Container>
         {/* desktop: wordmark · navigation · search · tools */}
-        <div className="hidden h-[76px] items-center gap-6 lg:flex">
+        <div className="hidden h-[76px] items-center gap-4 md:flex lg:gap-6">
           <Logo logo={info.logo} name={info.name} />
           <nav className="flex items-center" aria-label="منوی اصلی">
             <CategoryMenu menu={menu} />
             {links.map((l) => <Link key={l.link + l.label} href={l.link} className={navLink}>{l.label}</Link>)}
           </nav>
-          <div className="ms-auto w-full max-w-[340px]"><SearchField /></div>
+          <div className="ms-auto hidden w-full max-w-[340px] lg:block"><SearchField /></div>
+          <button data-search-btn className={cn(iconBtn, "ms-auto lg:hidden")} aria-label="جستجو"><Search className="size-[22px]" strokeWidth={1.7} /></button>
           <div className="flex items-center gap-0.5">
             <AccountLink loggedIn={loggedIn} />
-            <NightButton iconOnly className={cn(iconBtn, "hidden lg:grid")} />
+            <NightButton iconOnly className={cn(iconBtn, "hidden md:grid")} />
             <CartBtn />
           </div>
         </div>
         {/* mobile / tablet: menu · wordmark · cart, search below */}
-        <div className="lg:hidden">
+        <div className="md:hidden">
           <div className="flex h-14 items-center gap-2">
             <MobileMenu menu={menu} links={mobileLinks} loggedIn={loggedIn} logo={info.logo} name={info.name} />
             <Logo logo={info.logo} name={info.name} className="mx-auto" />
@@ -112,16 +113,16 @@ export function FloatingHeader({ menu, links, mobileLinks, loggedIn, info }: Hea
       className="pointer-events-none fixed inset-x-0 top-0 z-50 -translate-y-full border-b border-border bg-background/98 opacity-0 shadow-[0_10px_28px_-18px_rgb(20_32_27/0.4)] transition-[transform,opacity] duration-300 data-[show=true]:pointer-events-auto data-[show=true]:translate-y-0 data-[show=true]:opacity-100">
       <Container>
         <div className="flex h-14 items-center gap-3">
-          <MobileMenu menu={menu} links={mobileLinks} loggedIn={loggedIn} logo={info.logo} name={info.name} className="lg:hidden" />
-          <Logo className="max-lg:mx-auto lg:me-2" logo={info.logo} name={info.name} />
-          <nav className="hidden items-center lg:flex" aria-label="منوی اصلی">
+          <MobileMenu menu={menu} links={mobileLinks} loggedIn={loggedIn} logo={info.logo} name={info.name} className="md:hidden" />
+          <Logo className="max-md:mx-auto md:me-2" logo={info.logo} name={info.name} />
+          <nav className="hidden items-center md:flex" aria-label="منوی اصلی">
             <CategoryMenu menu={menu} />
             {links.map((l) => <Link key={l.link + l.label} href={l.link} className={navLink}>{l.label}</Link>)}
           </nav>
           <div className="ms-auto flex items-center gap-0.5">
             <button data-search-btn className={iconBtn} aria-label="جستجو"><Search className="size-[22px]" strokeWidth={1.7} /></button>
             <AccountLink loggedIn={loggedIn} />
-            <NightButton iconOnly className={cn(iconBtn, "hidden lg:grid")} />
+            <NightButton iconOnly className={cn(iconBtn, "hidden md:grid")} />
             <CartBtn />
           </div>
         </div>
@@ -151,13 +152,13 @@ export function BottomNav() {
   ];
   return (
     <>
-      <button data-chat-btn aria-label="گفتگوی آنلاین" className="chat-fab fixed bottom-24 start-4 z-[60] grid size-12 cursor-pointer place-items-center rounded-md lg:bottom-6">
+      <button data-chat-btn aria-label="گفتگوی آنلاین" className="chat-fab fixed bottom-24 start-4 z-[60] grid size-12 cursor-pointer place-items-center rounded-md md:bottom-6">
         <svg viewBox="0 0 24 24" className="size-6" fill="none" aria-hidden>
           <path d="M4 5.5h16v10H10l-4 3.5v-3.5H4v-10Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
           <circle cx="9" cy="10.5" r="1" fill="currentColor" /><circle cx="12" cy="10.5" r="1" fill="currentColor" /><circle cx="15" cy="10.5" r="1" fill="currentColor" />
         </svg>
       </button>
-      <nav aria-label="منوی اصلی" className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-background pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-8px_24px_-18px_rgb(20_32_27/0.45)] lg:hidden">
+      <nav aria-label="منوی اصلی" className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-background pb-[env(safe-area-inset-bottom,0px)] shadow-[0_-8px_24px_-18px_rgb(20_32_27/0.45)] md:hidden">
         {tabs.slice(0, 2).map(({ href, label, Icon }) => { const on = path.startsWith(href); return (
           <Link key={href} href={href} aria-current={on ? "page" : undefined} className={cn(item, on && "text-foreground")}>
             <span aria-hidden className={cn("absolute inset-x-5 top-0 h-0.5 bg-primary transition-opacity", on ? "opacity-100" : "opacity-0")} />

@@ -145,9 +145,9 @@ export function BuyBox({ p, opt, variants, inStock, maxQty, wholesale }: { p: Ca
 
 export function StickyBar({ p }: { p: CardProduct }) {
   return (
-    <div data-sticky-buy className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom,0px))] z-30 border-t border-border bg-background lg:bottom-0">
+    <div data-sticky-buy className="fixed inset-x-0 bottom-[calc(64px+env(safe-area-inset-bottom,0px))] z-30 border-t border-border bg-background md:bottom-0">
       <Container>
-        <div className="flex items-center gap-3 py-2.5 lg:py-3">
+        <div className="flex items-center gap-3 py-2.5 md:py-3">
           <Thumb p={p} className="hidden size-11 shrink-0 rounded-[8px] sm:block" />
           <div className="min-w-0 flex-1">
             <div className="hidden truncate text-[12px] sm:block"><span className="text-muted">شما در حال مشاهده هستید: </span><b>{p.name}</b></div>

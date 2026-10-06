@@ -13,7 +13,7 @@ export async function Footer() {
     { i: MapPin, t: `آدرس: ${info.address}`, href: undefined },
   ].filter((r) => r.t.trim());
   return (
-    <footer className="mt-10 border-t border-border bg-surface pb-24 lg:pb-0">
+    <footer className="mt-10 border-t border-border bg-surface pb-24 md:pb-0">
       <Container>
         <div className="grid gap-10 py-12 text-sm sm:grid-cols-2 lg:grid-cols-[1.4fr_0.7fr_1.1fr_0.8fr] lg:gap-14 lg:py-16">
           <div>

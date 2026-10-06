@@ -307,7 +307,7 @@ body {
 .night-tab { -webkit-tap-highlight-color: transparent; outline: none; transition: color .2s; }
 .night-tab:focus-visible { box-shadow: 0 0 0 2px var(--primary); }
 .night-tab svg { transition: fill .2s; }
-.night-tab[aria-pressed="true"] { color: var(--foreground); font-weight: 700; }
+.night-tab[aria-pressed="true"] { background: var(--surface-2); color: var(--foreground); font-weight: 700; }
 .night-tab[aria-pressed="true"] svg { fill: currentColor; }
 
 /* ───────── Admin panel motion (scoped to [data-admin-fx="on"]; switchable per admin, off for reduced-motion) ───────── */
@@ -359,4 +359,4 @@ body {
 }
 
 /* Product pages show a purchase bar on small screens; lift the chat button above it. */
-@media (max-width: 1023px) { body:has([data-sticky-buy]) .chat-fab { bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px)); } }
+@media (max-width: 767px) { body:has([data-sticky-buy]) .chat-fab { bottom: calc(9.5rem + env(safe-area-inset-bottom, 0px)); } }
