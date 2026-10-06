@@ -123,4 +123,4 @@ npm run demo          # شبیه‌ساز تلگرام در مرورگر: http:/
 - Crypto فقط معماری است و تا ثبت `ChainVerifier` واقعی غیرفعال می‌ماند.
 
 ### وقتی اتصال مستقیم به پنل فیلتر/کند است (ربات روی سرور خارج، پنل در ایران)
-از یک تونل SSH استفاده کنید: `deploy/panel-tunnel.service` (کلید اختصاصی با `restrict,port-forwarding,permitopen="127.0.0.1:<پورت پنل>"` در `authorized_keys` سرور پنل). سپس `XUI_BASE_URL=https://host.docker.internal:12020/<مسیر-پنل>` و حتماً `XUI_PUBLIC_HOST=<آی‌پی/دامنه‌ی واقعی>` را تنظیم کنید (چون هاست لینک‌ها از آدرس پنل گرفته می‌شود).
+اتصال خروجی از ایران معمولاً کار می‌کند ولی ورودی از خارج مسدود است؛ پس تونل SSH **معکوس** بسازید: سرور پنل با `deploy/panel-tunnel-iran.service` به سرور ربات وصل می‌شود (کلید اختصاصی با `restrict,port-forwarding,permitlisten="127.0.0.1:12020"` در `authorized_keys` سرور ربات) و روی سرور ربات `deploy/panel-relay-bot.service` (socat) آن را برای کانتینر باز می‌کند. سپس `XUI_BASE_URL=https://host.docker.internal:12020/<مسیر-پنل>` و حتماً `XUI_PUBLIC_HOST=<آی‌پی/دامنه‌ی واقعی>` را تنظیم کنید (هاست لینک‌ها از آدرس پنل گرفته می‌شود).

@@ -1,0 +1,14 @@
+# Runs on the SERVER THAT HOSTS THE PANEL (e.g. in Iran). It dials OUT to the bot server (outbound traffic works even when inbound
+# traffic from abroad is filtered) and exposes the local panel port on the bot server's loopback (127.0.0.1:12020).
+[Unit]
+Description=Reverse SSH tunnel: expose the local X-UI panel to the bot server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/ssh -N -i /root/.ssh/vps_tunnel -o StrictHostKeyChecking=accept-new -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=15 -R 127.0.0.1:12020:127.0.0.1:2020 root@BOT_SERVER_IP
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
