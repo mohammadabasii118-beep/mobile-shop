@@ -1,0 +1,123 @@
+"use client";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { ChevronDown, Headphones, LayoutGrid, Menu, PenLine, Smartphone, Sparkles, Store, User, Watch, X, Zap } from "lucide-react";
+import { NightButton } from "@/components/theme";
+import type { MenuCategory } from "@/lib/types";
+import { cn } from "@/lib/utils";
+
+const icons = { cases: Smartphone, airpods: Headphones, watch: Watch, electric: Zap, accessories: Sparkles } as const;
+const iconFor = (slug: string) => icons[slug as keyof typeof icons] ?? Sparkles;
+
+export function useCloseDetails() {
+  useEffect(() => {
+    const close = (e: Event) => {
+      document.querySelectorAll<HTMLDetailsElement>("details[data-menu][open]").forEach((d) => {
+        if (!d.contains(e.target as Node)) d.open = false;
+      });
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && close(e);
+    document.addEventListener("click", close);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("click", close); document.removeEventListener("keydown", esc); };
+  }, []);
+}
+
+/** Desktop mega menu: category list on the right, popular products for the hovered category on the left. */
+export function CategoryMenu({ menu }: { menu: MenuCategory[] }) {
+  useCloseDetails();
+  return (
+    <details data-menu className="group relative">
+      <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md bg-secondary px-4 py-2.5 text-[14px] font-semibold text-secondary-fg transition-opacity hover:opacity-90 [&::-webkit-details-marker]:hidden">
+        <LayoutGrid className="size-4" />دسته‌بندی‌ها<ChevronDown className="size-3.5 transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="mega border border-border bg-card absolute start-0 top-[calc(100%+0.8rem)] z-50 w-[min(92vw,560px)] rounded-[16px] p-5 shadow-lg">
+        <ul className="relative grid min-h-[250px] grid-cols-[210px_1fr] content-start gap-x-0 gap-y-1">
+          {menu.map((c) => (
+            <li key={c.slug} tabIndex={0} className="col-start-1">
+              <Link href={`/shop#${c.slug}`} className="mega-item flex items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium">
+                <span>{c.label}</span>{(() => { const I = iconFor(c.slug); return <I className="size-4 text-primary" />; })()}
+              </Link>
+              <div className="mega-panel absolute inset-y-0 end-0 hidden w-[calc(100%-210px)] flex-col border-s border-border ps-4">
+                <div className="flex flex-col gap-0.5">
+                  {c.subs.map((sb) => <Link key={sb.slug} href={`/shop#${sb.slug}`} className="rounded-md px-3 py-2.5 text-sm font-medium transition-colors hover:bg-surface-2 hover:text-primary">{sb.label}</Link>)}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </details>
+  );
+}
+
+/** Mobile menu: hamburger opens a glass side sheet — categories, then account / shop / blog / support and the night-mode switch. */
+export function MobileMenu({ menu, links = [], loggedIn, logo, name, className }: { menu: MenuCategory[]; links?: { label: string; link: string }[]; loggedIn?: boolean; logo?: string; name?: string; className?: string }) {
+  const [open, setOpen] = useState(false);
+  const [openCat, setOpenCat] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("keydown", esc);
+    const prev = document.body.style.overflow; document.body.style.overflow = "hidden";
+    return () => { document.removeEventListener("keydown", esc); document.body.style.overflow = prev; };
+  }, [open]);
+  const close = () => setOpen(false);
+  const row = "flex items-center justify-between gap-3 rounded-md px-3 py-2.5 text-[15px] font-semibold transition-colors hover:bg-surface-2";
+  const chip = "grid size-10 shrink-0 place-items-center rounded-md bg-surface-2 text-foreground";
+  // Rows under the divider come from /admin/menus → "موبایل"; if that menu is empty the four standard rows are used.
+  const extra = links.length ? links : [{ label: "ورود / ثبت‌نام", link: "/account" }, { label: "فروشگاه", link: "/shop" }, { label: "وبلاگ", link: "/blog" }, { label: "پشتیبانی", link: "/support" }];
+  const isAccount = (l: string) => l === "/account";
+  const extraIcon = (l: string) => (l.startsWith("/blog") ? PenLine : l.startsWith("/support") ? Headphones : l.startsWith("/shop") ? Store : Sparkles);
+  return (
+    <div className={className}>
+      <button type="button" aria-label="منو" aria-expanded={open} onClick={() => setOpen(true)} className="grid size-11 cursor-pointer place-items-center rounded-md border border-transparent text-foreground transition-colors duration-150 hover:border-border hover:bg-surface-2 hover:ring-primary/35"><Menu className="size-5" /></button>
+      {open && createPortal( // portal: the floating header is transformed, which would otherwise trap a fixed overlay
+        <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label="منوی سایت" data-mobile-menu>
+          <button type="button" aria-label="بستن منو" className="cl-fade-in absolute inset-0 cursor-default bg-black/50" onClick={close} />
+          <aside className="cl-slide-from-right absolute inset-y-0 right-0 flex w-[88vw] max-w-[390px] flex-col overflow-y-auto border-s border-border bg-background p-5 shadow-2xl">
+            <div className="flex items-center justify-between gap-3">
+              {logo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <Link href="/" onClick={close} aria-label={name ?? "CaseLine"}><img src={logo} alt={name ?? "CaseLine"} className="h-9 w-auto max-w-40 object-contain" /></Link>
+              ) : (
+                <Link href="/" onClick={close} aria-label="CaseLine" className="flex items-center gap-2 text-foreground"><span dir="ltr" className="text-[17px] font-extrabold leading-none tracking-[0.18em]">CASE<span className="font-medium text-primary">LINE</span></span></Link>
+              )}
+              <button type="button" aria-label="بستن" onClick={close} className="grid size-11 cursor-pointer place-items-center rounded-md border border-border-strong text-foreground transition-colors hover:bg-surface-2"><X className="size-5" /></button>
+            </div>
+            {menu.length > 0 && (
+              <>
+                <div className="mt-6 px-3 text-sm text-muted">دسته‌بندی‌ها</div>
+                <ul className="mt-2 space-y-1" data-mobile-cats>
+                  {menu.map((c) => { const I = iconFor(c.slug); const isOpen = openCat === c.slug; return (
+                    <li key={c.slug}>
+                      {c.subs.length ? (
+                        <button type="button" aria-expanded={isOpen} onClick={() => setOpenCat(isOpen ? null : c.slug)} className={cn(row, "w-full cursor-pointer")}>
+                          <span className={chip}><I className="size-5" /></span><span className="flex-1 text-start">{c.label}</span>
+                          <ChevronDown className={cn("size-4 shrink-0 text-muted transition-transform", isOpen && "rotate-180")} aria-hidden />
+                        </button>
+                      ) : (
+                        <Link href={`/shop#${c.slug}`} onClick={close} className={row}><span className={chip}><I className="size-5" /></span><span className="flex-1 text-start">{c.label}</span></Link>
+                      )}
+                      {c.subs.length > 0 && isOpen && (
+                        <div className="flex flex-wrap gap-1.5 px-3 pb-2 pe-16 pt-1" data-subcats>
+                          <Link href={`/shop#${c.slug}`} onClick={close} className="rounded-full bg-primary px-3 py-1.5 text-[12px] font-bold text-primary-fg">همه {c.label}</Link>
+                          {c.subs.map((sb) => <Link key={sb.slug} href={`/shop#${sb.slug}`} onClick={close} className="rounded-full border border-border bg-card px-3 py-1.5 text-[12px] font-medium hover:border-foreground">{sb.label}</Link>)}
+                        </div>
+                      )}
+                    </li>
+                  ); })}
+                </ul>
+              </>
+            )}
+            <div className="my-3 border-t border-border" />
+            <ul className="space-y-1">
+              {extra.map((l) => { const I = isAccount(l.link) ? User : extraIcon(l.link); return <li key={l.link + l.label}><Link href={isAccount(l.link) && loggedIn ? "/account/orders" : l.link} onClick={close} className={row}><span className={chip}><I className="size-5" /></span><span className="flex-1 text-start">{isAccount(l.link) && loggedIn ? "حساب کاربری" : l.label}</span></Link></li>; })}
+              <li><NightButton withSwitch className={cn(row, "w-full cursor-pointer")} /></li>
+            </ul>
+          </aside>
+        </div>, document.body)}
+    </div>
+  );
+}

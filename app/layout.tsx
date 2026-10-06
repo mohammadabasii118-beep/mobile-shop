@@ -1,53 +1,63 @@
-import type { Metadata } from "next";
-import { Vazirmatn } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
+import Script from "next/script";
+import arabicFont from "@fontsource-variable/noto-sans-arabic/files/noto-sans-arabic-arabic-wght-normal.woff2";
+import latinFont from "@fontsource-variable/noto-sans-arabic/files/noto-sans-arabic-latin-wght-normal.woff2";
+import displayFont from "@fontsource-variable/markazi-text/files/markazi-text-arabic-wght-normal.woff2";
 import "./globals.css";
-import SessionProviderWrapper from "@/components/SessionProviderWrapper";
-import { CartProvider } from "@/components/CartContext";
-import { CompareProvider } from "@/components/CompareContext";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import ThemeScript from "@/components/ThemeScript";
-import { getSiteSettings } from "@/lib/siteSettings";
+import { JsonLd } from "@/components/json-ld";
+import { themeScript } from "@/components/theme";
+import { getSiteInfo } from "@/lib/queries";
+import { abs, siteUrl } from "@/lib/seo";
 
-const vazir = Vazirmatn({ subsets: ["arabic"], variable: "--font-vazir", weight: ["400", "500", "600", "700", "800"] });
+const fontUrl = (f: { src: string } | string) => (typeof f === "string" ? f : f.src);
 
-const siteName = process.env.NEXT_PUBLIC_SITE_NAME || "کیس لاین";
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-
-// Real, admin-editable SEO metadata (Phase 6, /admin/settings) — falls back
-// to the same hardcoded defaults as before whenever an admin hasn't filled
-// a field in yet, so the site never regresses to blank/empty metadata.
 export async function generateMetadata(): Promise<Metadata> {
-  const site = await getSiteSettings();
-  const title = site.siteTitle || `${siteName} | فروشگاه قاب و اکسسوری موبایل`;
-  const description = site.siteDescription || "قاب، کاور و اکسسوری اصل موبایل با ارسال سریع و ضمانت اصالت کالا.";
+  const info = await getSiteInfo().catch(() => null);
+  const name = info?.name || "CaseLine";
+  const title = `${name} | ${info?.tagline || "فروشگاه لوازم جانبی موبایل"}`;
+  const description = "قاب، گلس، شارژر، کابل و هندزفری با تضمین سازگاری با مدل گوشی شما";
   return {
-    metadataBase: new URL(siteUrl),
-    title: { default: title, template: `%s | ${siteName}` },
-    description,
-    keywords: site.metaKeywords || undefined,
-    // eNamad (اینماد) domain-ownership verification; rendered server-side in <head>.
-    other: { enamad: "3332818" },
-    openGraph: { type: "website", locale: "fa_IR", siteName, title: siteName, description },
+    metadataBase: new URL(siteUrl()),
+    title, description,
+    applicationName: name,
+    // Icon set in admin (هویت سایت); otherwise the built-in CaseLine icon, so browser tabs never show a blank globe.
+    icons: info?.favicon ? { icon: info.favicon, shortcut: info.favicon, apple: info.favicon } : { icon: [{ url: "/favicon.svg", type: "image/svg+xml" }, { url: "/favicon.ico", sizes: "any" }], shortcut: "/favicon.ico", apple: "/apple-touch-icon.png" },
+    openGraph: { type: "website", siteName: name, locale: "fa_IR", title, description },
+    twitter: { card: "summary", title, description },
+    formatDetection: { telephone: false },
   };
 }
+export const viewport: Viewport = {
+  themeColor: [{ media: "(prefers-color-scheme: light)", color: "#f4f3ee" }, { media: "(prefers-color-scheme: dark)", color: "#0d1512" }],
+};
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Fonts: preloaded so Persian text renders in Noto Sans Arabic / Markazi Text from the first paint (no late swap → no layout shift).
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const info = await getSiteInfo().catch(() => null);
+  const same = [info?.telegram, info?.instagram].filter((u): u is string => !!u && /^https?:\/\//.test(u));
+  const org = info && {
+    "@context": "https://schema.org", "@type": "Organization", name: info.name, url: siteUrl(),
+    ...(info.logo ? { logo: abs(info.logo) } : {}), ...(info.email ? { email: info.email } : {}), ...(info.phone ? { telephone: info.phone } : {}),
+    ...(info.address ? { address: { "@type": "PostalAddress", streetAddress: info.address, addressCountry: "IR" } } : {}),
+    ...(same.length ? { sameAs: same } : {}),
+  };
+  const website = info && { "@context": "https://schema.org", "@type": "WebSite", name: info.name, url: siteUrl(), inLanguage: "fa-IR", potentialAction: { "@type": "SearchAction", target: { "@type": "EntryPoint", urlTemplate: `${siteUrl()}/shop?q={search_term_string}` }, "query-input": "required name=search_term_string" } };
   return (
-    <html lang="fa" dir="rtl" className={vazir.variable} suppressHydrationWarning>
+    <html lang="fa" dir="rtl" suppressHydrationWarning>
       <head>
-        <ThemeScript />
+        <meta name="enamad" content="3332818" />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <link rel="preload" href={fontUrl(arabicFont)} as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href={fontUrl(latinFont)} as="font" type="font/woff2" crossOrigin="anonymous" />
+        <link rel="preload" href={fontUrl(displayFont)} as="font" type="font/woff2" crossOrigin="anonymous" />
       </head>
-      <body className="font-vazir">
-        <SessionProviderWrapper>
-          <CartProvider>
-            <CompareProvider>
-              <Header />
-              <main>{children}</main>
-              <Footer />
-            </CompareProvider>
-          </CartProvider>
-        </SessionProviderWrapper>
+      <body>
+        <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:start-3 focus:top-3 focus:z-[200] focus:rounded-lg focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-fg">پرش به محتوای اصلی</a>
+        {children}
+        <JsonLd data={[org, website]} />
+        <Script src="/site.js" strategy="afterInteractive" />
       </body>
     </html>
   );

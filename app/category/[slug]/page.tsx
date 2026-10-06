@@ -1,79 +1,71 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getCategoryBySlug, getFilteredProducts } from "@/lib/products";
-import ProductCard from "@/components/ProductCard";
-import FilterSidebar from "@/components/FilterSidebar";
-import { getMyPhone } from "@/lib/actions/myPhone";
-import { isViewerWholesale, effectivePrice } from "@/lib/wholesalePricing";
-import { fa } from "@/lib/format";
+import { notFound, permanentRedirect } from "next/navigation";
+import { BottomNav } from "@/components/header";
+import { Header } from "@/components/site-header";
+import { Footer } from "@/components/footer";
+import { Container } from "@/components/ui";
+import { JsonLd } from "@/components/json-ld";
+import { ChipLinks, Crumbs, Pagination, ProductGrid, SeoText } from "@/components/listing";
+import { db } from "@/lib/db";
+import { abs, breadcrumbLd, buildMeta, clip, paths } from "@/lib/seo";
+import { resolveSlugRedirect } from "@/lib/server/redirects";
+import { queryShop } from "@/lib/shop-list";
+import { toFa } from "@/lib/utils";
 
-export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-  const params = await props.params;
-  const category = await getCategoryBySlug(params.slug);
-  if (!category) return {};
-  return {
-    title: category.name,
-    description: `خرید ${category.name} با ارسال سریع و ضمانت اصالت کالا از کیس لاین.`,
-    alternates: { canonical: `/category/${category.slug}` },
-  };
+export const dynamic = "force-dynamic";
+const SIZE = 24;
+type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ page?: string }> };
+
+async function load(slug: string) {
+  return db.category.findFirst({ where: { slug, isActive: true }, include: { parent: { select: { slug: true, name: true } }, children: { where: { isActive: true }, orderBy: { sortOrder: "asc" }, select: { slug: true, name: true } } } });
 }
 
-export default async function CategoryPage(
-  props: {
-    params: Promise<{ slug: string }>;
-    searchParams: Promise<{ sort?: string; discount?: string; cat?: string; myphone?: string }>;
-  }
-) {
-  const searchParams = await props.searchParams;
-  const params = await props.params;
-  const category = await getCategoryBySlug(params.slug);
-  if (!category) notFound();
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
+  const slug = decodeURIComponent((await params).slug);
+  const page = Math.max(1, Number((await searchParams).page) || 1);
+  const c = await load(slug);
+  if (!c) return { robots: { index: false } };
+  const list = await queryShop({ cat: slug, page: 1, size: 1 });
+  const title = (c.seoTitle || `خرید ${c.name} | ${c.parent ? c.parent.name + " | " : ""}CaseLine`) + (page > 1 ? ` — صفحه ${toFa(page)}` : "");
+  return buildMeta({ title, description: c.seoDescription || c.description || `مشاهده و خرید ${c.name} اورجینال با ضمانت سازگاری و ارسال سریع.`, path: page > 1 ? `${paths.category(c.slug)}?page=${page}` : paths.category(c.slug), canonical: page === 1 ? c.canonical : null, image: c.image, noindex: list.total === 0 });
+}
 
-  const baseIds = category.children.length ? category.children.map((c) => c.id) : [category.id];
-  const selectedCats = searchParams.cat?.split(",").filter(Boolean) || [];
-  const [myPhone, isWholesale] = await Promise.all([getMyPhone(), isViewerWholesale()]);
-  const wantsMyPhoneFilter = searchParams.myphone === "1" && !!myPhone?.phoneModelId;
-
-  const products = await getFilteredProducts(baseIds, {
-    sort: searchParams.sort,
-    onlyDiscount: searchParams.discount === "1",
-    categoryIds: selectedCats,
-    phoneModelId: wantsMyPhoneFilter ? myPhone!.phoneModelId! : undefined,
-  });
-
+export default async function CategoryPage({ params, searchParams }: Props) {
+  const slug = decodeURIComponent((await params).slug);
+  const page = Math.max(1, Number((await searchParams).page) || 1);
+  const c = await load(slug);
+  if (!c) { const to = await resolveSlugRedirect("category", slug); if (to) permanentRedirect(paths.category(to)); notFound(); }
+  const catMatch = { OR: [{ slug: c.slug }, { parent: { slug: c.slug } }] };
+  const [list, brands] = await Promise.all([
+    queryShop({ cat: c.slug, sort: "popular", page, size: SIZE }),
+    db.brand.findMany({ where: { isActive: true, OR: [{ products: { some: { isActive: true, category: catMatch } } }, { products: { some: { isActive: true, extraCategories: { some: { category: catMatch } } } } }, { extraProducts: { some: { product: { isActive: true, OR: [{ category: catMatch }, { extraCategories: { some: { category: catMatch } } }] } } } }] }, orderBy: { sortOrder: "asc" }, select: { slug: true, name: true }, take: 12 }),
+  ]);
+  if (page > list.pages && page > 1) notFound();
+  const crumbs = [{ name: "خانه", path: "/" }, { name: "فروشگاه", path: "/shop" }, ...(c.parent ? [{ name: c.parent.name, path: paths.category(c.parent.slug) }] : []), { name: c.name, path: paths.category(c.slug) }];
+  const ld = [
+    breadcrumbLd(crumbs),
+    { "@context": "https://schema.org", "@type": "CollectionPage", name: c.name, description: clip(c.seoDescription || c.description), url: abs(paths.category(c.slug)), inLanguage: "fa-IR",
+      mainEntity: { "@type": "ItemList", numberOfItems: list.total, itemListElement: list.items.map((p, i) => ({ "@type": "ListItem", position: (page - 1) * SIZE + i + 1, url: abs(paths.product(p.slug)) })) } },
+  ];
   return (
-    <div className="max-w-7xl mx-auto px-4 md:px-8 py-8">
-      <p className="text-sm muted mb-2">
-        <Link href="/" className="hover:underline">خانه</Link> ← {category.name}
-      </p>
-      <h1 className="text-2xl font-extrabold mb-6">{category.name}</h1>
-      <div className="flex flex-col md:flex-row gap-8">
-        <FilterSidebar
-          subcategories={category.children.map((c) => ({ id: c.id, slug: c.slug, name: c.name }))}
-          myPhoneLabel={myPhone ? `${myPhone.brandName || ""} ${myPhone.phoneModelName || ""}`.trim() : null}
-        />
-        <div className="flex-1">
-          <p className="text-sm muted mb-4">{fa(products.length)} محصول</p>
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-            {products.length ? (
-              products.map((p) => (
-                <ProductCard
-                  key={p.id}
-                  p={{
-                    id: p.id, slug: p.slug, name: p.name,
-                    price: effectivePrice(p.price, p.wholesalePrice, isWholesale),
-                    oldPrice: isWholesale && p.wholesalePrice != null ? null : p.oldPrice,
-                    images: p.images, isBestSeller: p.isBestSeller, isNew: p.isNew, isTrending: p.isTrending, hasVariants: p.hasVariants, avgRating: p.avgRating, reviewCount: p.reviewCount,
-                  }}
-                />
-              ))
-            ) : (
-              <p className="col-span-full text-center muted py-16">محصولی با این فیلتر یافت نشد</p>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+    <>
+      <Header />
+      <main id="main" tabIndex={-1} className="py-6">
+        <Container>
+          <JsonLd data={ld} />
+          <Crumbs items={[{ name: "خانه", href: "/" }, { name: "فروشگاه", href: "/shop" }, ...(c.parent ? [{ name: c.parent.name, href: paths.category(c.parent.slug) }] : []), { name: c.name }]} />
+          <h1 className="font-display text-[38px] leading-[1.15] sm:text-[52px]">{c.name}</h1>
+          {c.description && <p className="mt-2 max-w-3xl text-sm leading-7 text-muted">{c.description}</p>}
+          <p className="mt-1 text-xs text-muted">{toFa(list.total)} محصول</p>
+          <ChipLinks title="زیرمجموعه‌ها" items={c.children.map((x) => ({ label: x.name, href: paths.category(x.slug) }))} />
+          <div className="mt-5"><ProductGrid items={list.items} /></div>
+          <Pagination basePath={paths.category(c.slug)} page={page} pages={list.pages} />
+          <ChipLinks title="برندهای این دسته" items={brands.map((b) => ({ label: b.name, href: paths.brand(b.slug) }))} />
+          {page === 1 && <SeoText text={c.seoContent} />}
+        </Container>
+      </main>
+      <Footer />
+      <BottomNav />
+    </>
   );
 }

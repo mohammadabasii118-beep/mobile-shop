@@ -1,81 +1,53 @@
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { authOptions } from "@/lib/auth";
+import { ArrowDownLeft, ArrowUpRight, Wallet } from "lucide-react";
 import { db } from "@/lib/db";
-import { fmtToman, fa } from "@/lib/format";
+import { AccountShell } from "@/components/account-shell";
+import { requirePageUser } from "@/lib/server/auth/guard";
+import { WALLET_TYPE_LABEL, walletHistory } from "@/lib/server/finance/wallet";
+import { faDateTime, orderNo } from "@/lib/account-format";
+import { formatToman } from "@/lib/utils";
 
-export const metadata = { title: "کیف پول و باشگاه مشتریان" };
+export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "کیف پول | CaseLine", robots: { index: false } };
 
 export default async function WalletPage() {
-  const session = await getServerSession(authOptions);
-  if (!session) redirect("/login");
-  const userId = session.user.id as string;
-
-  const [user, walletTx, loyaltyTx] = await Promise.all([
-    db.user.findUnique({ where: { id: userId }, select: { walletBalance: true, loyaltyPoints: true } }),
-    db.walletTransaction.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 30 }),
-    db.loyaltyTransaction.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 30 }),
+  const user = await requirePageUser("/account/wallet");
+  const [w, pending] = await Promise.all([
+    walletHistory(user.id, 50),
+    db.refund.findMany({ where: { method: "wallet", status: "AWAITING_CUSTOMER", order: { userId: user.id } }, include: { order: { select: { number: true } } } }),
   ]);
-
   return (
-    <div className="max-w-2xl mx-auto px-4 md:px-8 py-10">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-2xl font-extrabold">کیف پول و باشگاه مشتریان</h1>
-        <Link href="/account" className="text-sm font-medium" style={{ color: "#404040" }}>بازگشت به حساب کاربری</Link>
+    <AccountShell active="wallet">
+      <div className="space-y-5">
+        <section className="rounded-[16px] border border-border bg-surface-2 p-5">
+          <div className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-[10px] bg-primary/12 text-primary"><Wallet className="size-5" /></span>
+            <div><div className="text-xs text-muted">موجودی کیف پول</div><div className="text-2xl font-extrabold text-primary">{formatToman(w.balance)}</div></div></div>
+          <p className="mt-3 text-[11px] leading-6 text-muted">اعتبار کیف پول از بازگشت وجه سفارش‌ها یا شارژ توسط پشتیبانی به‌دست می‌آید و هنگام پرداخت سفارش قابل استفاده است. این اعتبار جدا از امتیاز باشگاه است.</p>
+        </section>
+
+        {pending.length > 0 && (
+          <section className="rounded-[16px] border border-primary/40 bg-primary/5 p-4 text-[13px]">
+            <h2 className="mb-2 font-extrabold">بازگشت وجه در انتظار تأیید شما</h2>
+            {pending.map((r) => <p key={r.id} className="py-1">{formatToman(r.amount)} برای سفارش <b>#{orderNo(r.order.number)}</b> — <Link href={`/account/orders/${r.order.number}`} className="font-bold text-primary">مشاهده و تأیید</Link></p>)}
+          </section>
+        )}
+
+        <section>
+          <h2 className="mb-3 text-[15px] font-extrabold">تاریخچه تراکنش‌ها</h2>
+          {w.items.length === 0 ? <div className="rounded-[16px] border border-dashed border-primary/30 px-4 py-9 text-center text-xs text-muted">هنوز تراکنشی ثبت نشده است.</div> : (
+            <ul className="divide-y divide-border/60 rounded-[16px] border border-border">
+              {w.items.map((t) => (
+                <li key={t.id} className="flex items-center gap-3 px-4 py-3 text-[13px]">
+                  <span className={`grid size-9 shrink-0 place-items-center rounded-full ${t.direction === "in" ? "bg-success/15 text-success" : "bg-hot/10 text-hot"}`}>{t.direction === "in" ? <ArrowDownLeft className="size-4" /> : <ArrowUpRight className="size-4" />}</span>
+                  <span className="min-w-0 flex-1"><b className="block">{WALLET_TYPE_LABEL[t.type] ?? t.type}</b><span className="block truncate text-[11px] text-muted">{t.description}</span><span className="block text-[11px] text-muted">{faDateTime(t.createdAt)} · موجودی پس از تراکنش: {formatToman(t.balanceAfter)}</span></span>
+                  <b className={t.direction === "in" ? "text-success" : "text-hot"} dir="ltr">{t.direction === "in" ? "+" : "−"}{t.amount.toLocaleString("fa-IR")}</b>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
-
-      <div className="grid sm:grid-cols-2 gap-4 mb-10">
-        <div className="surface border line rounded-2xl p-5">
-          <p className="text-xs muted mb-1">موجودی کیف پول</p>
-          <p className="text-2xl font-extrabold">{fmtToman(user?.walletBalance || 0)}</p>
-          <p className="text-xs muted mt-2">
-            در حال حاضر امکان شارژ مستقیم کیف پول وجود ندارد — موجودی فقط از طریق بازگشت وجه سفارش (توسط مدیر) یا اصلاحیه‌ی دستی مدیر افزایش می‌یابد. از این موجودی می‌توانید هنگام تکمیل خرید (در صورت کافی‌بودن برای کل مبلغ سفارش) استفاده کنید.
-          </p>
-        </div>
-        <div className="surface border line rounded-2xl p-5">
-          <p className="text-xs muted mb-1">امتیاز باشگاه مشتریان</p>
-          <p className="text-2xl font-extrabold">{fa(user?.loyaltyPoints || 0)} امتیاز</p>
-          <p className="text-xs muted mt-2">به ازای هر ۱۰٬۰۰۰ تومان از سفارش‌های واقعاً پرداخت‌شده، ۱ امتیاز دریافت می‌کنید. در حال حاضر امکان تبدیل امتیاز به تخفیف هنوز فعال نشده است.</p>
-        </div>
-      </div>
-
-      <h2 className="text-lg font-bold mb-3">تراکنش‌های کیف پول</h2>
-      {walletTx.length === 0 ? (
-        <p className="muted text-sm mb-8">هنوز تراکنشی در کیف پول شما ثبت نشده است.</p>
-      ) : (
-        <div className="flex flex-col gap-2 mb-8">
-          {walletTx.map((t) => (
-            <div key={t.id} className="flex justify-between items-center surface2 rounded-xl p-3 text-sm">
-              <div>
-                <p>{t.reason}</p>
-                <p className="text-xs muted mt-0.5">{new Date(t.createdAt).toLocaleString("fa-IR")}</p>
-              </div>
-              <span className="font-bold" style={{ color: t.amount >= 0 ? "#2f6f4e" : "#a24e56" }}>
-                {t.amount >= 0 ? "+" : ""}
-                {fmtToman(t.amount)}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <h2 className="text-lg font-bold mb-3">تاریخچه‌ی امتیاز</h2>
-      {loyaltyTx.length === 0 ? (
-        <p className="muted text-sm">هنوز امتیازی دریافت نکرده‌اید.</p>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {loyaltyTx.map((t) => (
-            <div key={t.id} className="flex justify-between items-center surface2 rounded-xl p-3 text-sm">
-              <div>
-                <p>{t.reason}</p>
-                <p className="text-xs muted mt-0.5">{new Date(t.createdAt).toLocaleString("fa-IR")}</p>
-              </div>
-              <span className="font-bold" style={{ color: "#2f6f4e" }}>+{fa(t.points)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    </AccountShell>
   );
 }

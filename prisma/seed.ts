@@ -1,287 +1,195 @@
-import { PrismaClient } from "@prisma/client";
+/* Development seed. Demo credentials are printed at the end; never run with SEED_DEMO in production. */
+import "dotenv/config";
 import bcrypt from "bcryptjs";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "../lib/generated/prisma/client";
+import { syncRbac } from "./rbac";
+import { seedDemoOrders } from "./seed-demo-orders";
+import { blogPosts2, blogCats, catalog, phoneModels, shopCatOf, shopCats, shopSubOf } from "./seed-data";
 
-const db = new PrismaClient();
+const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 
-async function upsertCategory(name: string, slug: string, parentId?: string, imageUrl?: string) {
-  return db.category.upsert({
-    where: { slug },
-    update: {},
-    create: { name, slug, parentId, imageUrl },
-  });
+const slugify = (s: string) => s.trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-+|-+$/g, "");
+
+const DEMO_PHONES = ["09120000001", "09120000002", "09120000003", "09120000004", "09120000005", "09120000006"];
+
+/** The demo seed must never touch a database that holds real people: production marker, or any user outside the demo set. */
+async function assertSafeToSeed() {
+  const marker = await db.siteSetting.findUnique({ where: { key: "instance" } });
+  if ((marker?.value as { mode?: string } | null)?.mode === "production") throw new Error("Refusing to seed: this database is marked as a production instance (scripts/bootstrap-production.ts).");
+  const foreign = await db.user.count({ where: { phone: { notIn: DEMO_PHONES } } });
+  if (foreign > 0 && process.env.SEED_FORCE !== "1") throw new Error(`Refusing to seed: ${foreign} non-demo user(s) exist. This looks like a real or test database. (SEED_FORCE=1 overrides — never on production.)`);
 }
 
 async function main() {
-  // ---------- Admin user ----------
-  const adminPassword = await bcrypt.hash("Admin@12345", 10);
-  await db.user.upsert({
-    where: { email: "admin@caseline.ir" },
-    update: {},
-    create: {
-      name: "مدیر فروشگاه",
-      email: "admin@caseline.ir",
-      passwordHash: adminPassword,
-      role: "ADMIN",
-    },
-  });
+  if (process.env.NODE_ENV === "production" && !process.env.SEED_DEMO) throw new Error("Refusing to seed demo data in production (set SEED_DEMO=1 to override).");
 
-  // ---------- Categories (top-level + sub-categories) ----------
-  const tree: Record<string, { name: string; slug: string; children: { name: string; slug: string }[] }> = {
-    case: {
-      name: "قاب و کاور", slug: "case", children: [
-        { name: "آیفون", slug: "case-iphone" },
-        { name: "سامسونگ", slug: "case-samsung" },
-        { name: "شیائومی", slug: "case-xiaomi" },
-        { name: "هواوی", slug: "case-huawei" },
-        { name: "آنر", slug: "case-honor" },
-        { name: "سایر برندها", slug: "case-other" },
-        { name: "قاب فانتزی", slug: "case-fancy" },
-        { name: "قاب شفاف", slug: "case-clear" },
-        { name: "قاب ضدضربه", slug: "case-rugged" },
-        { name: "قاب مگ‌سیف", slug: "case-magsafe" },
-      ],
-    },
-    airpods: {
-      name: "کاور ایرپاد", slug: "airpods", children: [
-        { name: "AirPods", slug: "airpods-1" },
-        { name: "AirPods 2", slug: "airpods-2" },
-        { name: "AirPods 3", slug: "airpods-3" },
-        { name: "AirPods 4", slug: "airpods-4" },
-        { name: "AirPods Pro", slug: "airpods-pro" },
-        { name: "AirPods Pro 2", slug: "airpods-pro-2" },
-      ],
-    },
-    cable: {
-      name: "شارژ و کابل", slug: "cable", children: [
-        { name: "شارژر", slug: "cable-charger" },
-        { name: "کابل", slug: "cable-cable" },
-        { name: "Type-C", slug: "cable-typec" },
-        { name: "Lightning", slug: "cable-lightning" },
-        { name: "شارژر وایرلس", slug: "cable-wireless" },
-        { name: "شارژر فندکی", slug: "cable-car" },
-        { name: "پاوربانک", slug: "cable-powerbank" },
-        { name: "آداپتور", slug: "cable-adapter" },
-      ],
-    },
-    protector: {
-      name: "محافظ‌ها", slug: "protector", children: [
-        { name: "گلس", slug: "protector-glass" },
-        { name: "محافظ صفحه", slug: "protector-screen" },
-        { name: "محافظ لنز", slug: "protector-lens" },
-        { name: "محافظ Apple Watch", slug: "protector-watch" },
-        { name: "محافظ ایرپاد", slug: "protector-airpods" },
-      ],
-    },
-    holder: {
-      name: "هولدر و پایه", slug: "holder", children: [
-        { name: "هولدر خودرو", slug: "holder-car" },
-        { name: "هولدر رومیزی", slug: "holder-desk" },
-        { name: "پایه موبایل", slug: "holder-stand" },
-        { name: "هولدر مگنتی", slug: "holder-magnetic" },
-      ],
-    },
-    watch: {
-      name: "لوازم ساعت", slug: "watch", children: [
-        { name: "بند Apple Watch", slug: "watch-band" },
-        { name: "قاب Apple Watch", slug: "watch-case" },
-        { name: "محافظ صفحه", slug: "watch-protector" },
-        { name: "بند ساعت هوشمند", slug: "watch-smartband" },
-      ],
-    },
-    accessory: {
-      name: "اکسسوری", slug: "accessory", children: [
-        { name: "بند و استرپ", slug: "accessory-strap" },
-        { name: "آویز موبایل", slug: "accessory-charm" },
-        { name: "کیف", slug: "accessory-bag" },
-        { name: "اکسسوری فانتزی", slug: "accessory-fancy" },
-        { name: "محصولات ترند", slug: "accessory-trend" },
-      ],
-    },
+  await assertSafeToSeed();
+  await syncRbac(db);
+  const roleId = async (key: string) => (await db.role.findUniqueOrThrow({ where: { key } })).id;
+
+  /* demo users */
+  const demo = [
+    { phone: "09120000001", email: "admin@caseline.local", first: "مدیر", last: "سایت", password: "Admin@12345", role: "super_admin" },
+    { phone: "09120000002", email: "customer@caseline.local", first: "مشتری", last: "نمونه", password: "Customer@12345", role: "customer" },
+    { phone: "09120000006", email: "products@caseline.local", first: "مدیر", last: "محصول", password: "Manager@12345", role: "product_manager" },
+    { phone: "09120000003", email: "partner@caseline.local", first: "همکار", last: "نمونه", password: "Partner@12345", role: "wholesale_partner" },
+  ];
+  const users: Record<string, string> = {};
+  for (const u of demo) {
+    const passwordHash = await bcrypt.hash(u.password, 12);
+    const user = await db.user.upsert({
+      where: { phone: u.phone },
+      update: { passwordHash },
+      create: { phone: u.phone, email: u.email, passwordHash, firstName: u.first, lastName: u.last, displayName: `${u.first} ${u.last}`, phoneVerifiedAt: new Date() },
+    });
+    users[u.role] = user.id;
+    await db.userRole.upsert({ where: { userId_roleId: { userId: user.id, roleId: await roleId(u.role) } }, update: {}, create: { userId: user.id, roleId: await roleId(u.role) } });
+    if (u.role !== "super_admin") await db.userRole.upsert({ where: { userId_roleId: { userId: user.id, roleId: await roleId("customer") } }, update: {}, create: { userId: user.id, roleId: await roleId("customer") } });
+  }
+
+  /* wholesale tiers + partner profile */
+  const tiers = [
+    { key: "bronze", name: "برنز", discountPercent: 0, minOrder: 3_000_000, isActive: true },
+    { key: "silver", name: "نقره‌ای", discountPercent: 3, minOrder: 10_000_000, isActive: false },
+    { key: "gold", name: "طلایی", discountPercent: 6, minOrder: 25_000_000, isActive: false },
+  ];
+  for (const t of tiers) await db.wholesaleTier.upsert({ where: { key: t.key }, update: t, create: t });
+  const bronze = await db.wholesaleTier.findUniqueOrThrow({ where: { key: "bronze" } });
+  await db.wholesaleProfile.upsert({ where: { userId: users.wholesale_partner }, update: {}, create: { userId: users.wholesale_partner, tierId: bronze.id, storeName: "فروشگاه نمونه" } });
+
+  /* pending wholesale applications (real rows an admin can approve in the panel) */
+  const applicants = [
+    { phone: "09120000004", first: "علی", last: "رضایی", store: "موبایل‌کده رضایی", type: "physical_store", city: "تهران", instagram: "mobilekade_rezaei" },
+    { phone: "09120000005", first: "سارا", last: "محمدی", store: "کیف و قاب سارا", type: "instagram_shop", city: "اصفهان", instagram: "sara_cases" },
+  ];
+  for (const a of applicants) {
+    const user = await db.user.upsert({ where: { phone: a.phone }, update: {}, create: { phone: a.phone, firstName: a.first, lastName: a.last, displayName: `${a.first} ${a.last}`, phoneVerifiedAt: new Date() } });
+    await db.userRole.upsert({ where: { userId_roleId: { userId: user.id, roleId: await roleId("customer") } }, update: {}, create: { userId: user.id, roleId: await roleId("customer") } });
+    if (!(await db.wholesaleApplication.findFirst({ where: { phone: a.phone } })))
+      await db.wholesaleApplication.create({ data: { userId: user.id, name: `${a.first} ${a.last}`, phone: a.phone, storeName: a.store, businessType: a.type, instagram: a.instagram, city: a.city, address: `${a.city}، خیابان اصلی، پلاک ۱۲`, description: "فروش لوازم جانبی موبایل، حدود ۵۰ سفارش در ماه." } });
+  }
+
+  /* categories (tree from the storefront's shop categories) */
+  const icons: Record<string, number> = {};
+  let order = 0;
+  for (const c of shopCats) {
+    const top = await db.category.upsert({ where: { slug: c.slug }, update: { name: c.label, sortOrder: order }, create: { slug: c.slug, name: c.label, sortOrder: order } });
+    icons[c.slug] = top.id as unknown as number;
+    let so = 0;
+    for (const sub of c.subs) await db.category.upsert({ where: { slug: sub.slug }, update: { name: sub.label, parentId: top.id, sortOrder: so++ }, create: { slug: sub.slug, name: sub.label, parentId: top.id, sortOrder: so++ } });
+    order++;
+  }
+
+  /* brands + phone models */
+  const brandNames = ["Apple", "Samsung", "Xiaomi", "Anker", "Baseus", "JBL", "Huawei", "Nokia", "Honor", "Google", "OnePlus"];
+  for (const [i, name] of brandNames.entries()) await db.brand.upsert({ where: { slug: slugify(name) }, update: {}, create: { slug: slugify(name), name, sortOrder: i, description: `محصولات ${name} در کیس‌لاین` } });
+  const phoneList: [string, string][] = [];
+  for (const [brand, list] of Object.entries(phoneModels)) for (const m of list) phoneList.push([brand, m]);
+  for (const extra of [["Apple", "iPhone 16 Pro Max"], ["Apple", "iPhone 16 Pro"], ["Apple", "iPhone 16"], ["Apple", "iPhone 14 Pro"], ["Apple", "iPhone 12"], ["Samsung", "Galaxy S25 Ultra"], ["Samsung", "Galaxy S23"], ["Xiaomi", "Xiaomi 15"], ["Xiaomi", "Poco F5"]] as [string, string][]) phoneList.push(extra);
+  const seen = new Set<string>();
+  let po = 0;
+  for (const [brand, name] of phoneList) {
+    if (seen.has(name)) continue;
+    seen.add(name);
+    const b = await db.brand.findUniqueOrThrow({ where: { slug: slugify(brand) } });
+    await db.phoneModel.upsert({ where: { slug: slugify(name) }, update: {}, create: { slug: slugify(name), name, brandId: b.id, sortOrder: po++ } });
+  }
+  const phones = await db.phoneModel.findMany();
+
+  /* products */
+  const cats = await db.category.findMany();
+  const catBySlug = new Map(cats.map((c) => [c.slug, c.id]));
+  const brandBySlug = new Map((await db.brand.findMany()).map((b) => [b.slug, b.id]));
+  let n = 0;
+  for (const p of catalog) {
+    const top = shopCatOf(p), sub = shopSubOf(p);
+    const catId = catBySlug.get(sub && catBySlug.has(sub) ? sub : top)!;
+    const retail = p.oldPrice ?? p.price;
+    const slug = `${slugify(p.name)}-${p.id}`;
+    const data = {
+      name: p.name, categoryId: catId, brandId: brandBySlug.get(slugify(p.brand)) ?? null, badge: p.badge ?? null, isActive: true,
+      shortDescription: `${p.name}${p.compat ? ` مخصوص ${p.compat}` : ""} با ضمانت اصالت و ارسال سریع`,
+      description: `${p.name} یکی از پرطرفدارترین محصولات کیس‌لاین است. کیفیت ساخت بالا، سازگاری دقیق با مدل گوشی و ضمانت ۷ روزه بازگشت.`,
+      specifications: { "برند": p.brand, ...(p.compat ? { "سازگار با": p.compat } : {}), "ضمانت": "۷ روز بازگشت" },
+      retailPrice: retail, retailDiscount: retail - p.price, wholesalePrice: Math.round((p.price * 0.8) / 1000) * 1000, minWholesaleQty: 5,
+      ratingAvg: p.rating, ratingCount: p.reviews, soldCount: p.reviews * 3, visualKind: p.kind, visualHue: p.hue,
+    };
+    const prod = await db.product.upsert({ where: { slug }, update: data, create: { slug, sku: `CL-${p.id.toUpperCase()}`, ...data } });
+    if (p.img) {
+      await db.productImage.deleteMany({ where: { productId: prod.id } });
+      await db.productImage.create({ data: { productId: prod.id, url: p.img, alt: p.name, isPrimary: true } });
+    }
+    const variant = await db.productVariant.upsert({ where: { sku: `CL-${p.id.toUpperCase()}-STD` }, update: {}, create: { productId: prod.id, sku: `CL-${p.id.toUpperCase()}-STD`, name: "استاندارد" } });
+    const qty = p.id === "ap5" ? 0 : 3 + ((n * 7) % 58);
+    await db.inventory.upsert({ where: { variantId: variant.id }, update: {}, create: { variantId: variant.id, quantity: qty, lowStockThreshold: 5 } });
+    if (p.compat) {
+      const ph = phones.find((x) => x.name === p.compat);
+      if (ph) await db.productPhoneModel.upsert({ where: { productId_phoneModelId: { productId: prod.id, phoneModelId: ph.id } }, update: {}, create: { productId: prod.id, phoneModelId: ph.id } });
+    }
+    n++;
+  }
+
+  /* shipping, coupons, banners, homepage, menus, blog, settings */
+  for (const [i, s] of [
+    { key: "post", name: "پست پیشتاز", cost: 60_000, freeThreshold: 2_000_000, description: "تحویل ۲ تا ۴ روز کاری" },
+    { key: "courier", name: "پیک (تهران)", cost: 90_000, freeThreshold: 3_000_000, description: "تحویل همان روز" },
+    { key: "pickup", name: "تحویل حضوری", cost: 0, freeThreshold: null, description: "از فروشگاه" },
+  ].entries()) await db.shippingMethod.upsert({ where: { key: s.key }, update: {}, create: { ...s, sortOrder: i } });
+
+  await db.coupon.upsert({ where: { code: "CASE10" }, update: {}, create: { code: "CASE10", type: "percent", value: 10, minOrder: 200_000, maxDiscount: 300_000, perUserLimit: 1 } });
+  if ((await db.banner.count()) === 0) await db.banner.create({ data: { title: "داغ‌ترین کدهای تخفیف و پیشنهادهای ویژه", subtitle: "فقط و فقط در کانال تلگرام کیس‌لاین", buttonText: "ورود به کانال", buttonLink: "https://t.me/caseline_shop", placement: "home_telegram" } });
+
+  const sections = [
+    ["hero", "hero", "هیرو"], ["brands", "marquee", "برندها"], ["rail:iphone", "product_rail", "قاب آیفون"], ["rail:samsung", "product_rail", "قاب سامسونگ"],
+    ["categories", "categories", "دسته‌بندی‌ها"], ["rail:xiaomi", "product_rail", "قاب شیائومی"], ["rail:airpods", "product_rail", "لوازم جانبی ایرپاد"],
+    ["rail:watch", "product_rail", "لوازم جانبی اپل واچ"], ["rail:electric", "product_rail", "لوازم برقی"], ["newest", "newest", "تازه‌ترین محصولات"],
+    ["telegram", "banner", "کانال تلگرام"], ["blog", "blog", "آخرین وبلاگ‌ها"],
+  ];
+  for (const [i, [key, type, title]] of sections.entries()) await db.homepageSection.upsert({ where: { key }, update: {}, create: { key, type, title, sortOrder: i, config: key.startsWith("rail:") ? { categorySlug: key.slice(5), limit: 5 } : undefined } });
+
+  if ((await db.menuItem.count({ where: { menu: { in: ["main", "footer"] } } })) === 0) {
+    await db.menuItem.createMany({ data: [
+      { menu: "main", label: "فروشگاه", link: "/shop", sortOrder: 0 }, { menu: "main", label: "وبلاگ", link: "/blog", sortOrder: 1 }, { menu: "main", label: "پشتیبانی", link: "/support", sortOrder: 2 },
+      { menu: "footer", label: "محصولات", link: "/shop", sortOrder: 0 }, { menu: "footer", label: "بلاگ", link: "/blog", sortOrder: 1 }, { menu: "footer", label: "حساب کاربری", link: "/account", sortOrder: 2 },
+      { menu: "footer", label: "تماس با ما", link: "/support", sortOrder: 3 }, { menu: "footer", label: "پشتیبانی", link: "/support", sortOrder: 4 },
+    ] });
+  }
+
+  for (const c of blogCats) await db.blogCategory.upsert({ where: { slug: slugify(c) }, update: {}, create: { slug: slugify(c), name: c } });
+  const bc = new Map((await db.blogCategory.findMany()).map((c) => [c.name, c.id]));
+  for (const [i, b] of blogPosts2.entries()) {
+    await db.blogPost.upsert({
+      where: { slug: b.slug }, update: {},
+      create: { slug: b.slug, title: b.title, excerpt: b.excerpt, content: `${b.excerpt}\n\nدر این مطلب نکات مهم و کاربردی را مرور می‌کنیم تا انتخابی مطمئن داشته باشید.\n\nهمه محصولات کیس‌لاین اورجینال هستند و با ضمانت بازگشت ارسال می‌شوند.`, categoryId: bc.get(b.cat), tags: [b.cat], authorName: "تیم کیس‌لاین", isPublished: true, publishedAt: new Date(Date.now() - i * 86400000 * 3) },
+    });
+  }
+
+  const settings: Record<string, unknown> = {
+    site: { name: "CaseLine", tagline: "فروشگاه لوازم جانبی موبایل", phone: "021-12345678", email: "info@caseline.ir", address: "تهران، میدان ونک، خیابان ملاصدرا", hours: "هر روز ساعت ۸ صبح تا ۱۰ شب", telegram: "https://t.me/caseline_shop", instagram: "https://instagram.com/caseline", topBar: "در تلگرام | کد تخفیف خرید اول: CASE10", footerText: "در کیس‌لاین، لوازم جانبی موبایل را اورجینال، با ضمانت سازگاری با مدل گوشی و پرداخت مطمئن تهیه کنید." },
+    payment: { bankName: "بانک نمونه", accountHolder: "فروشگاه کیس‌لاین", cardNumber: "6037-0000-0000-0000", accountNumber: "0000000000", iban: "IR000000000000000000000000", description: "لطفاً مبلغ را به کارت زیر واریز و رسید را بارگذاری کنید." },
+    shipping: { freeThreshold: 2_000_000 },
+    general: { currency: "تومان", lowStockNotify: true },
+    loyalty: { enabled: true, amountPerPoint: 10000, earnOn: "payment", minOrderTotal: 0, redeemEnabled: true, pointValue: 100, minRedeemPoints: 100, maxRedeemPercent: 30 },
   };
+  for (const [key, value] of Object.entries(settings)) await db.siteSetting.upsert({ where: { key }, update: {}, create: { key, value: value as object } });
+  await db.sEOSetting.upsert({ where: { scope: "global" }, update: {}, create: { scope: "global", title: "CaseLine | فروشگاه لوازم جانبی موبایل", description: "قاب، گلس، شارژر، کابل و هندزفری اورجینال با ضمانت سازگاری با مدل گوشی شما", robots: "index,follow" } });
 
-  const topCategories: Record<string, string> = {};
-  for (const key of Object.keys(tree)) {
-    const t = tree[key];
-    const parent = await upsertCategory(t.name, t.slug);
-    topCategories[key] = parent.id;
-    for (const c of t.children) {
-      await upsertCategory(c.name, c.slug, parent.id);
-    }
+  /* accounts start empty: no placeholder money or points are stored as real data */
+  const cust = users.customer;
+  await db.wallet.upsert({ where: { userId: cust }, update: {}, create: { userId: cust } });
+  await db.loyaltyAccount.upsert({ where: { userId: cust }, update: {}, create: { userId: cust } });
+  if ((await db.address.count({ where: { userId: cust } })) === 0) await db.address.create({ data: { userId: cust, title: "خانه", receiver: "مشتری نمونه", phone: "09120000002", province: "تهران", city: "تهران", postalCode: "1234567890", address: "خیابان ولیعصر، پلاک ۱", isDefault: true } });
+
+  /* pending reviews for the moderation queue */
+  if ((await db.review.count()) === 0) {
+    for (const [i, p] of (await db.product.findMany({ take: 2, orderBy: { soldCount: "desc" } })).entries())
+      await db.review.create({ data: { productId: p.id, userId: cust, rating: 5 - i, body: i ? "کیفیت خوب بود ولی بسته‌بندی ساده‌تر از انتظارم بود." : "عالی بود، دقیقاً مطابق توضیحات و سازگار با گوشی من." } });
   }
 
-  // ---------- Brands & phone models ----------
-  const apple = await db.brand.upsert({ where: { slug: "apple" }, update: {}, create: { name: "اپل", slug: "apple" } });
-  const samsung = await db.brand.upsert({ where: { slug: "samsung" }, update: {}, create: { name: "سامسونگ", slug: "samsung" } });
-  const xiaomi = await db.brand.upsert({ where: { slug: "xiaomi" }, update: {}, create: { name: "شیائومی", slug: "xiaomi" } });
+  await seedDemoOrders(db);
 
-  const iphone15pm = await db.phoneModel.upsert({ where: { slug: "iphone-15-pro-max" }, update: { brandId: apple.id }, create: { name: "آیفون ۱۵ پرو مکس", slug: "iphone-15-pro-max", brandId: apple.id } });
-  const s24u = await db.phoneModel.upsert({ where: { slug: "galaxy-s24-ultra" }, update: { brandId: samsung.id }, create: { name: "گلکسی S24 اولترا", slug: "galaxy-s24-ultra", brandId: samsung.id } });
-  const mi14 = await db.phoneModel.upsert({ where: { slug: "xiaomi-14" }, update: { brandId: xiaomi.id }, create: { name: "شیائومی ۱۴", slug: "xiaomi-14", brandId: xiaomi.id } });
-  const iphone13 = await db.phoneModel.upsert({ where: { slug: "iphone-13" }, update: { brandId: apple.id }, create: { name: "آیفون ۱۳", slug: "iphone-13", brandId: apple.id } });
-  const iphone14 = await db.phoneModel.upsert({ where: { slug: "iphone-14" }, update: { brandId: apple.id }, create: { name: "آیفون ۱۴", slug: "iphone-14", brandId: apple.id } });
-  const a55 = await db.phoneModel.upsert({ where: { slug: "galaxy-a55" }, update: { brandId: samsung.id }, create: { name: "گلکسی A55", slug: "galaxy-a55", brandId: samsung.id } });
-
-  // ---------- Colors ----------
-  const pink = await db.color.upsert({ where: { slug: "pink" }, update: {}, create: { name: "صورتی", slug: "pink", hexCode: "#e8a0b4" } });
-  const black = await db.color.upsert({ where: { slug: "black" }, update: {}, create: { name: "مشکی", slug: "black", hexCode: "#1a1a1a" } });
-  const blue = await db.color.upsert({ where: { slug: "blue" }, update: {}, create: { name: "آبی", slug: "blue", hexCode: "#5b7fa6" } });
-
-  // ---------- Pricing rules (cost price band -> sell price) ----------
-  await db.pricingRule.createMany({
-    data: [
-      { minPrice: 100000, maxPrice: 200000, sellPrice: 298000 },
-      { minPrice: 201000, maxPrice: 300000, sellPrice: 398000 },
-      { minPrice: 301000, maxPrice: 400000, sellPrice: 498000 },
-      { minPrice: 401000, maxPrice: 500000, sellPrice: 598000 },
-    ],
-    skipDuplicates: true,
-  });
-
-  // ---------- Sample products ----------
-  const img = (seed: string) => `https://picsum.photos/seed/${seed}/800/1000`;
-  const products = [
-    { name: "قاب چرمی آیفون ۱۵ پرو مکس", slug: "leather-case-iphone-15-pro-max", cat: "case-magsafe", brand: apple.id, model: iphone15pm.id, price: 450000, old: 590000, best: true, desc: "قاب چرم طبیعی با پوشش محافظ لبه‌های دوربین، ضدضربه از ارتفاع ۲ متری." },
-    { name: "قاب سامسونگ گلکسی S24 اولترا", slug: "case-galaxy-s24-ultra", cat: "case-samsung", brand: samsung.id, model: s24u.id, price: 380000, isNew: true, desc: "قاب مات ضدلغزش با پوشش نانو ضدخط‌وخش." },
-    { name: "قاب شیائومی ۱۴ سری آینه‌ای", slug: "mirror-case-xiaomi-14", cat: "case-xiaomi", brand: xiaomi.id, model: mi14.id, price: 320000, old: 400000, trending: true, desc: "ترکیب فریم فلزی و پشت آینه‌ای، ضدضربه." },
-    { name: "کاور سیلیکونی ایرپاد پرو ۲", slug: "silicone-cover-airpods-pro-2", cat: "airpods-pro-2", price: 180000, best: true, desc: "سیلیکون نرم ضدضربه با جاخور کارابین." },
-    { name: "کابل شارژ فست چارج تایپ‌سی", slug: "fast-charge-cable-typec", cat: "cable-typec", price: 220000, old: 280000, isNew: true, desc: "کابل بافت‌دار ۱۲۰ وات، طول ۱٫۲ متر." },
-    { name: "شارژر دیواری ۶۵ وات GaN", slug: "gan-charger-65w", cat: "cable-charger", price: 650000, trending: true, desc: "فناوری GaN فشرده، دو پورت خروجی." },
-    { name: "پاوربانک ۲۰۰۰۰ فست شارژ", slug: "powerbank-20000", cat: "cable-powerbank", price: 890000, old: 1050000, best: true, desc: "ظرفیت ۲۰۰۰۰ میلی‌آمپر با نمایشگر دیجیتال." },
-    { name: "گلس محافظ صفحه سرامیکی", slug: "ceramic-glass-protector", cat: "protector-glass", price: 150000, old: 200000, best: true, desc: "انعطاف‌پذیر و مقاوم‌تر از شیشه معمولی." },
-    { name: "هولدر مغناطیسی خودرو", slug: "magnetic-car-holder", cat: "holder-magnetic", price: 290000, isNew: true, desc: "آهنربای نئودیمیوم قدرتمند، چرخش ۳۶۰ درجه." },
-    { name: "بند اپل واچ میلانیز", slug: "milanese-watch-band", cat: "watch-band", price: 480000, old: 600000, trending: true, desc: "استیل ضدزنگ با بافت میلانیز." },
-  ];
-
-  for (const p of products) {
-    const cat = await db.category.findUnique({ where: { slug: p.cat } });
-    if (!cat) continue;
-    await db.product.upsert({
-      where: { slug: p.slug },
-      update: {},
-      create: {
-        name: p.name,
-        slug: p.slug,
-        description: p.desc,
-        images: [img(p.slug), img(p.slug + "-2")],
-        price: p.price,
-        oldPrice: p.old,
-        stock: 50,
-        isActive: true,
-        isBestSeller: !!p.best,
-        isNew: !!p.isNew,
-        isTrending: !!p.trending,
-        categoryId: cat.id,
-        brandId: p.brand,
-        phoneModelId: p.model,
-      },
-    });
-  }
-
-  // ---------- Sample variable products (brand/model/color combinations) ----------
-  const silCat = await db.category.findUnique({ where: { slug: "case-fancy" } });
-  if (silCat) {
-    const silicone = await db.product.upsert({
-      where: { slug: "silicone-case-variable" },
-      update: { hasVariants: true },
-      create: {
-        name: "قاب سیلیکونی",
-        slug: "silicone-case-variable",
-        description: "قاب سیلیکونی نرم و مقاوم، مخصوص چند مدل گوشی محبوب. برند، مدل و رنگ دلخواه را انتخاب کنید.",
-        images: [img("silicone-case-variable"), img("silicone-case-variable-2")],
-        price: 220000, // starting/reference price; real pricing comes from each variant
-        stock: 0, // sold entirely through variants
-        isActive: true,
-        hasVariants: true,
-        categoryId: silCat.id,
-        brandId: apple.id,
-      },
-    });
-
-    const silVariants: { brandId: string; phoneModelId: string; colorId: string; price: number; stock: number }[] = [
-      { brandId: apple.id, phoneModelId: iphone13.id, colorId: pink.id, price: 220000, stock: 25 },
-      { brandId: apple.id, phoneModelId: iphone13.id, colorId: black.id, price: 220000, stock: 30 },
-      { brandId: apple.id, phoneModelId: iphone14.id, colorId: pink.id, price: 240000, stock: 0 }, // out of stock on purpose, for testing
-      { brandId: apple.id, phoneModelId: iphone14.id, colorId: black.id, price: 240000, stock: 18 },
-      { brandId: apple.id, phoneModelId: iphone14.id, colorId: blue.id, price: 240000, stock: 12 },
-      { brandId: samsung.id, phoneModelId: a55.id, colorId: black.id, price: 210000, stock: 20 },
-      { brandId: samsung.id, phoneModelId: a55.id, colorId: blue.id, price: 210000, stock: 15 },
-    ];
-    for (const v of silVariants) {
-      await db.productVariant.upsert({
-        where: { productId_brandId_phoneModelId_colorId: { productId: silicone.id, brandId: v.brandId, phoneModelId: v.phoneModelId, colorId: v.colorId } },
-        update: { price: v.price, stock: v.stock },
-        create: { productId: silicone.id, ...v, isActive: true },
-      });
-    }
-  }
-
-  // A second variable product that only varies by brand + model (no color)
-  // — demonstrates the flexible-dimensions requirement (e.g. glass protectors).
-  const glassCat = await db.category.findUnique({ where: { slug: "protector-glass" } });
-  if (glassCat) {
-    const glass = await db.product.upsert({
-      where: { slug: "glass-protector-variable" },
-      update: { hasVariants: true },
-      create: {
-        name: "گلس محافظ صفحه (چند مدل)",
-        slug: "glass-protector-variable",
-        description: "گلس سرامیکی نازک، سازگار با چند مدل گوشی. فقط کافیست برند و مدل گوشی خود را انتخاب کنید.",
-        images: [img("glass-protector-variable")],
-        price: 150000,
-        stock: 0,
-        isActive: true,
-        hasVariants: true,
-        categoryId: glassCat.id,
-      },
-    });
-    const glassVariants = [
-      { brandId: apple.id, phoneModelId: iphone13.id, price: 150000, stock: 40 },
-      { brandId: apple.id, phoneModelId: iphone14.id, price: 150000, stock: 35 },
-      { brandId: samsung.id, phoneModelId: a55.id, price: 140000, stock: 22 },
-    ];
-    for (const v of glassVariants) {
-      await db.productVariant.upsert({
-        where: { productId_brandId_phoneModelId_colorId: { productId: glass.id, brandId: v.brandId, phoneModelId: v.phoneModelId, colorId: null as any } },
-        update: { price: v.price, stock: v.stock },
-        create: { productId: glass.id, brandId: v.brandId, phoneModelId: v.phoneModelId, colorId: null, price: v.price, stock: v.stock, isActive: true },
-      });
-    }
-  }
-
-  // ---------- Homepage sections (order controls layout) ----------
-  const sections: { type: any; title?: string; order: number }[] = [
-    { type: "HERO", order: 0 },
-    { type: "CATEGORY_STRIP", order: 1 },
-    { type: "BEST_SELLERS", title: "پرفروش‌ترین‌ها", order: 2 },
-    { type: "BANNER", order: 3 },
-    { type: "NEW_ARRIVALS", title: "جدیدترین‌ها", order: 4 },
-    { type: "DISCOUNTED", title: "تخفیف‌های ویژه", order: 5 },
-    { type: "WHY_US", order: 6 },
-    { type: "TESTIMONIALS", order: 7 },
-  ];
-  for (const s of sections) {
-    const existing = await db.homepageSection.findFirst({ where: { type: s.type } });
-    if (!existing) await db.homepageSection.create({ data: s });
-  }
-
-  // ---------- Sample banner ----------
-  const bannerExists = await db.banner.findFirst();
-  if (!bannerExists) {
-    await db.banner.create({
-      data: { title: "ست کامل اکسسوری", subtitle: "هماهنگ، ظریف، همیشگی", linkUrl: "/category/accessory", order: 0 },
-    });
-  }
-
-  // ---------- Sample discount code ----------
-  await db.discount.upsert({
-    where: { code: "WELCOME10" },
-    update: {},
-    create: { code: "WELCOME10", type: "PERCENT", value: 10, isActive: true },
-  });
-
-  console.log("Seed complete. Admin login: admin@caseline.ir / Admin@12345");
+  console.log(`\nSeed OK: ${n} products.\nDemo logins (dev only):\n  admin     09120000001 / Admin@12345\n  customer  09120000002 / Customer@12345\n  partner   09120000003 / Partner@12345\n  product manager (limited) 09120000006 / Manager@12345`);
 }
 
-main()
-  .catch((e) => { console.error(e); process.exit(1); })
-  .finally(() => db.$disconnect());
+main().catch((e) => { console.error(e); process.exit(1); }).finally(() => db.$disconnect());
