@@ -543,3 +543,50 @@ section.sec.tight-top { padding-top: 0; }
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 @media print { .hdr, .utility, .bn, .foot, .toasts, .m-buybar, .no-print { display: none !important; } }
+
+/* ───────── ریل‌ها (ردیف‌های افقی صفحه اصلی) ───────── */
+.rail-ctl { display: none; gap: 8px; }
+@media (min-width: 640px) { .rail-ctl { display: flex; } }
+.arrow { width: 40px; height: 40px; border-radius: 50%; background: var(--studio); color: var(--ink); display: grid; place-items: center; transition: background .16s, transform .16s, opacity .16s; }
+.arrow:hover:not(:disabled) { background: var(--studio-deep); } .arrow:active:not(:disabled) { transform: scale(.92); } .arrow:disabled { opacity: .35; cursor: default; }
+.rail-track { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: var(--gutter); margin-inline: calc(var(--gutter) * -1); padding-inline: var(--gutter); padding-block: 2px 6px; scrollbar-width: none; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.rail-track::-webkit-scrollbar { display: none; }
+.rail-track > * { flex: none; scroll-snap-align: start; }
+.rail-track:focus-visible { box-shadow: none; outline: 2px solid var(--action); outline-offset: -2px; border-radius: var(--r-md); }
+.rail-bar { height: 3px; border-radius: 3px; background: var(--studio); margin-top: 14px; overflow: hidden; }
+.rail-bar i { display: block; height: 100%; width: 30%; background: var(--ink); border-radius: inherit; transition: width .12s; }
+.rail-track > .card { width: calc((100% - 24px) / 2.2); }
+.rail-track > .cat { width: 96px; padding-block: 16px 14px; }
+.rail-track > .cat .art { width: 56px; height: 56px; }
+.rev-card { background: var(--parchment); border-radius: var(--r-lg); padding: 22px; display: flex; flex-direction: column; gap: 14px; margin: 0; width: min(86%, 340px); }
+.rev-card blockquote { color: var(--ink); font-size: 15px; line-height: 1.95; }
+.rev-card figcaption { display: flex; align-items: center; gap: 12px; margin-top: auto; font-size: 13px; color: var(--mute); }
+.rev-card figcaption b { display: block; color: var(--ink); font-size: 14px; }
+@media (min-width: 640px) {
+  .rail-track { gap: 16px; }
+  .rail-track > .card { width: calc((100% - 32px) / 3); }
+  .rail-track > .cat { width: 112px; } .rail-track > .cat .art { width: 64px; height: 64px; }
+  .rev-card { width: calc((100% - 16px) / 2); }
+}
+@media (min-width: 1024px) {
+  .rail-track > .card { width: calc((100% - 60px) / 4); } .rail-track { gap: 20px; }
+  .rail-track > .cat { width: calc((100% - 7 * 20px) / 8); } .rail-track > .cat .art { width: 72px; height: 72px; }
+  .rev-card { width: calc((100% - 40px) / 3); }
+}
+.rail-dots { display: flex; justify-content: center; gap: 6px; margin-top: 16px; }
+.rail-dots button { position: relative; width: 7px; height: 7px; border-radius: 99px; background: var(--hairline-strong); padding: 0; transition: width .25s, background .25s; }
+.rail-dots button::before { content: ''; position: absolute; inset: -12px -4px; }
+.rail-dots button[aria-current='true'] { width: 22px; background: var(--ink); }
+/* ورود با انیمیشن هنگام رسیدن به بخش */
+.railsec.go .sh { animation: rise .5s cubic-bezier(.2, 0, 0, 1) backwards; }
+.railsec.go .rail-track > * { animation: rise .55s cubic-bezier(.2, 0, 0, 1) backwards; }
+.railsec.go .rail-track > *:nth-child(2) { animation-delay: 55ms; } .railsec.go .rail-track > *:nth-child(3) { animation-delay: 110ms; } .railsec.go .rail-track > *:nth-child(4) { animation-delay: 165ms; }
+.railsec.go .rail-track > *:nth-child(5) { animation-delay: 220ms; } .railsec.go .rail-track > *:nth-child(6) { animation-delay: 275ms; } .railsec.go .rail-track > *:nth-child(n+7) { animation-delay: 330ms; }
+/* نوار برندها */
+.marquee { overflow: hidden; direction: rtl; mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent); padding-block: 6px; }
+.mq { display: flex; gap: 12px; width: max-content; animation: mq 32s linear infinite; }
+.marquee:hover .mq, .marquee:focus-within .mq, .marquee:active .mq { animation-play-state: paused; }
+@keyframes mq { to { transform: translateX(50%); } }
+.bpill { height: 64px; min-width: 130px; padding-inline: 26px; border-radius: 18px; background: var(--studio); display: grid; place-items: center; font-weight: 800; font-size: 19px; letter-spacing: .02em; color: var(--mute); direction: ltr; transition: color .16s, background .16s; white-space: nowrap; }
+.bpill:hover { color: var(--ink); background: var(--studio-deep); }
+@media (prefers-reduced-motion: reduce) { .mq { animation: none !important; } .railsec.go .sh, .railsec.go .rail-track > * { animation: none !important; } }

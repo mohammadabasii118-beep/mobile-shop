@@ -1,9 +1,12 @@
 import Link from 'next/link';
-import { ArrowLeft, Headset, RotateCcw, ShieldCheck, Truck, Star, CheckCircle2 } from 'lucide-react';
+import { Headset, RotateCcw, ShieldCheck, Truck, Star, CheckCircle2 } from 'lucide-react';
 import { getBanners, getBrands, getCategories, getHomeReviews, getSettings, getStoreRating, listProducts } from '@/lib/catalog';
 import type { Banner } from '@/lib/types';
 import HeroSlider from '@/components/shop/HeroSlider';
 import ProductGrid from '@/components/shop/ProductGrid';
+import ProductCard from '@/components/shop/ProductCard';
+import RailSection from '@/components/shop/RailSection';
+import BrandMarquee from '@/components/shop/BrandMarquee';
 import Countdown from '@/components/shop/Countdown';
 import Pic from '@/components/shop/Pic';
 import { fa } from '@/lib/format';
@@ -20,8 +23,8 @@ export default function HomePage() {
   const hero = getBanners('hero');
   const promos = getBanners('promo').slice(0, 2);
   const cats = getCategories().filter((c) => !c.parent_id);
-  const featured = listProducts({ featured: true, limit: 8, sort: 'popular' }).items;
-  const fresh = listProducts({ limit: 4, sort: 'new' }).items;
+  const featured = listProducts({ featured: true, limit: 12, sort: 'popular' }).items;
+  const fresh = listProducts({ limit: 10, sort: 'new' }).items;
   const deals = listProducts({ onSale: true, limit: 3, sort: 'new' }).items;
   const brands = getBrands();
   const reviews = getHomeReviews();
@@ -39,27 +42,19 @@ export default function HomePage() {
         </div>
       </div>
 
-      <section className="sec">
-        <div className="wrap">
-          <div className="sh"><h2>خرید بر اساس دسته</h2><Link className="more" href="/shop">همه‌ی محصولات<ArrowLeft className="i" /></Link></div>
-          <div className="cat-grid">
-            {cats.map((c) => (
-              <Link key={c.id} className="cat" href={`/category/${c.slug}`}>
-                <Pic src={c.image || (c.art ? `art:${c.art}` : null)} className="art" />
-                <span>{c.name}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+      <RailSection title="خرید بر اساس دسته" href="/shop" linkLabel="همه‌ی محصولات">
+        {cats.map((c) => (
+          <Link key={c.id} className="cat" href={`/category/${c.slug}`}>
+            <Pic src={c.image || (c.art ? `art:${c.art}` : null)} className="art" />
+            <span>{c.name}</span>
+          </Link>
+        ))}
+      </RailSection>
 
       {featured.length > 0 && (
-        <section className="sec tight-top">
-          <div className="wrap">
-            <div className="sh"><div><h2>محصولات ویژه</h2><p className="sub">انتخاب تیم {s.store_name}، پرفروش‌ترین‌ها</p></div><Link className="more" href="/shop">مشاهده‌ی همه<ArrowLeft className="i" /></Link></div>
-            <ProductGrid items={featured} low={low} />
-          </div>
-        </section>
+        <RailSection title="محصولات ویژه" sub={`انتخاب تیم ${s.store_name}، پرفروش‌ترین‌ها`} href="/shop" className="tight-top">
+          {featured.map((p) => <ProductCard key={p.id} p={p} low={low} />)}
+        </RailSection>
       )}
 
       {deals.length > 0 && (
@@ -79,12 +74,11 @@ export default function HomePage() {
         </section>
       )}
 
-      <section className="sec">
-        <div className="wrap">
-          <div className="sh"><div><h2>جدیدترین محصولات</h2><p className="sub">تازه رسیده‌ها به انبار</p></div><Link className="more" href="/shop?sort=new">مشاهده‌ی همه<ArrowLeft className="i" /></Link></div>
-          <ProductGrid items={fresh} low={low} />
-        </div>
-      </section>
+      {fresh.length > 0 && (
+        <RailSection title="جدیدترین محصولات" sub="تازه رسیده‌ها به انبار" href="/shop?sort=new" className="tight-top">
+          {fresh.map((p) => <ProductCard key={p.id} p={p} low={low} />)}
+        </RailSection>
+      )}
 
       {promos.length > 0 && (
         <section className="sec tight-top">
@@ -100,16 +94,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {brands.length > 0 && (
-        <section className="sec tight-top">
-          <div className="wrap">
-            <div className="sh"><h2>برندهای معتبر</h2></div>
-            <div className="brands">
-              {brands.slice(0, 8).map((b) => <Link key={b.id} href={`/shop?brand=${b.slug}`}>{b.name}</Link>)}
-            </div>
-          </div>
-        </section>
-      )}
+      <BrandMarquee brands={brands.map((b) => ({ slug: b.slug, name: b.name }))} />
 
       <section className="sec tight-top">
         <div className="wrap ben">
@@ -121,22 +106,20 @@ export default function HomePage() {
       </section>
 
       {reviews.length > 0 && (
-        <section className="sec tight-top">
-          <div className="wrap">
-            <div className="sh"><div><h2>نظر مشتریان</h2>{rating.n > 0 && <p className="sub">میانگین امتیاز <b className="num" style={{ color: 'var(--ink)' }}>{fa(Math.round(rating.avg * 10) / 10)}</b> از ۵ بر پایه‌ی <span className="num">{fa(rating.n)}</span> نظر</p>}</div></div>
-            <div className="rev">
-              {reviews.slice(0, 3).map((r) => (
-                <figure key={r.id}>
-                  <div className="stars" role="img" aria-label={`امتیاز ${fa(r.rating)} از ۵`}>
-                    {[1, 2, 3, 4, 5].map((n) => <Star key={n} className={n > r.rating ? 'off' : ''} />)}
-                  </div>
-                  <blockquote>{r.body}</blockquote>
-                  <figcaption><span className="av">{r.author.slice(0, 1)}</span><div><b>{r.author}</b><span className="ok"><CheckCircle2 />خرید تأییدشده</span></div></figcaption>
-                </figure>
-              ))}
-            </div>
-          </div>
-        </section>
+        <RailSection
+          title="نظر مشتریان" autoplay dots className="tight-top"
+          sub={rating.n > 0 ? `میانگین امتیاز ${fa(Math.round(rating.avg * 10) / 10)} از ۵ بر پایه‌ی ${fa(rating.n)} نظر` : undefined}
+        >
+          {reviews.map((r) => (
+            <figure key={r.id} className="rev-card">
+              <div className="stars" role="img" aria-label={`امتیاز ${fa(r.rating)} از ۵`}>
+                {[1, 2, 3, 4, 5].map((n) => <Star key={n} className={n > r.rating ? 'off' : ''} />)}
+              </div>
+              <blockquote>{r.body}</blockquote>
+              <figcaption><span className="av">{r.author.slice(0, 1)}</span><div><b>{r.author}</b><span className="ok"><CheckCircle2 />خرید تأییدشده</span></div></figcaption>
+            </figure>
+          ))}
+        </RailSection>
       )}
     </>
   );
