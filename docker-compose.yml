@@ -24,6 +24,8 @@ services:
     environment:
       DATABASE_URL: postgresql://vpn:${POSTGRES_PASSWORD}@db:5432/vpnbot?schema=public
       NODE_ENV: production
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # lets the bot reach an SSH tunnel to the panel running on the host (deploy/panel-tunnel.service)
     ports:
       - "127.0.0.1:3000:3000"   # put a TLS reverse proxy (Caddy/nginx) in front for the bank webhook
     volumes:

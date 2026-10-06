@@ -1,0 +1,15 @@
+# SSH tunnel from this (foreign) server to an X-UI panel in Iran, for when direct TLS to the panel is filtered/throttled.
+# The panel is then reachable from the bot container at https://host.docker.internal:12020/<panel-path>  (set XUI_BASE_URL accordingly).
+# The tunnel listens only on the docker bridge address, never on the public interface.
+[Unit]
+Description=SSH tunnel to X-UI panel
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/ssh -N -i /root/.ssh/panel_tunnel -o StrictHostKeyChecking=accept-new -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ConnectTimeout=15 -L 172.17.0.1:12020:127.0.0.1:2020 root@PANEL_SERVER_IP
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -121,3 +121,6 @@ npm run demo          # شبیه‌ساز تلگرام در مرورگر: http:/
 - ارتباط واقعی با Telegram Bot API در تست‌ها شبیه‌سازی شده؛ قبل از production یک smoke test با توکن واقعی انجام دهید.
 - Dockerfile/systemd در محیط توسعه اجرا نشده‌اند. Rate-limit و jobها in-process (تک‌instance).
 - Crypto فقط معماری است و تا ثبت `ChainVerifier` واقعی غیرفعال می‌ماند.
+
+### وقتی اتصال مستقیم به پنل فیلتر/کند است (ربات روی سرور خارج، پنل در ایران)
+از یک تونل SSH استفاده کنید: `deploy/panel-tunnel.service` (کلید اختصاصی با `restrict,port-forwarding,permitopen="127.0.0.1:<پورت پنل>"` در `authorized_keys` سرور پنل). سپس `XUI_BASE_URL=https://host.docker.internal:12020/<مسیر-پنل>` و حتماً `XUI_PUBLIC_HOST=<آی‌پی/دامنه‌ی واقعی>` را تنظیم کنید (چون هاست لینک‌ها از آدرس پنل گرفته می‌شود).
