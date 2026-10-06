@@ -9,6 +9,7 @@
     "start": "next start",
     "seed": "tsx scripts/seed.ts",
     "seed:reset": "tsx scripts/seed.ts --reset",
+    "seed:chargers": "tsx scripts/add-chargers.ts",
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/smoke.mjs"
   },
