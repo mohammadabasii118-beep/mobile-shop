@@ -8,7 +8,7 @@ services:
       NEXT_PUBLIC_SITE_URL: ${SITE_URL:-http://localhost:3000}
       # SEED_ARGS: ""            # برای داده‌ی نمونه‌ی کامل، خالی بگذارید؛ پیش‌فرض: --empty
       # PAYMENT_MODE: test       # فقط برای آزمایش درگاه؛ در فروش واقعی تنظیم نکنید
-      # INSECURE_COOKIES: "1"    # فقط اگر پشت HTTPS نیستید
+      INSECURE_COOKIES: ${INSECURE_COOKIES:-0}   # روی 1 بگذارید فقط اگر هنوز HTTPS ندارید (وگرنه ورود کار نمی‌کند)
     volumes:
       - shop-data:/data
     restart: unless-stopped
