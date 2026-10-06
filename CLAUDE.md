@@ -33,6 +33,7 @@ Next.js (App Router) · TypeScript strict · Tailwind CSS · shadcn/ui (سفار
 ## وضعیت فعلی
 
 - فاز ۱ (فعلی): بررسی design system، `DESIGN.md`، دموی HTML ایستا در `demo/index.html` (Home + Product Card). **هنوز پروژه‌ی Next.js ساخته نشده**؛ منتظر تأیید کاربر روی ظاهر و stack.
+- قالب قابل استفاده‌ی مجدد: `template/` (HTML/CSS/JS ایستا) و `volta-template.zip`.
 - فاز ۲: scaffold پروژه، `tokens.css`، primitives، Home و ProductCard واقعی.
 - فاز ۳: shop/category/product/search/cart/checkout/account/wishlist.
 - فاز ۴: admin.

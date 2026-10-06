@@ -1,0 +1,27 @@
+/* Design tokens: mirror DESIGN.md. Change brand colors/radii here only. */
+:root{
+  --canvas:#fff; --studio:#f3f4f6; --studio-deep:#e8eaee; --parchment:#f7f7f9;
+  --hairline:#e3e5e9; --hairline-strong:#c9ccd3;
+  --ink:#111216; --on-ink:#fff; --body:#2b2d33; --mute:#6b6f7a; --stone:#9a9ea8;
+  --night:#0c0d10; --night-1:#14161a; --night-2:#1c1f24; --night-hairline:#2a2d34; --on-night:#f4f5f7; --on-night-mute:#9da1ab;
+  --action:#0a5cff; --action-soft:#e6efff; --charge:#d6ff3d; --on-charge:#111216;
+  --sale:#d30a1c; --sale-soft:#fdecee; --success:#0a7d48; --success-soft:#e3f5ec; --warning:#b86e00; --warning-soft:#fff3dc;
+  --frost:rgba(255,255,255,.8);
+  --r-xs:6px; --r-sm:10px; --r-md:14px; --r-lg:20px; --r-xl:28px;
+  --shadow-product:drop-shadow(0 22px 16px rgba(12,13,16,.26));
+  --shadow-float:0 12px 40px rgba(12,13,16,.16); --focus:0 0 0 3px rgba(10,92,255,.35);
+  --font:Vazirmatn,Tahoma,system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --canvas:#0c0d10; --studio:#1a1c21; --studio-deep:#23262c; --parchment:#14161a; --hairline:#2a2d34; --hairline-strong:#3b3f48;
+  --ink:#f4f5f7; --on-ink:#111216; --body:#d7d9de; --mute:#9da1ab; --stone:#6b6f7a;
+  --action:#4d8dff; --action-soft:#14233f; --sale:#ff5a68; --sale-soft:#2e1418; --success:#3ddc97; --success-soft:#10281d; --warning:#ffb340; --warning-soft:#2c2111;
+  --night:#050607; --night-1:#101216; --night-2:#181b20; --frost:rgba(12,13,16,.8); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --canvas:#0c0d10; --studio:#1a1c21; --studio-deep:#23262c; --parchment:#14161a; --hairline:#2a2d34; --hairline-strong:#3b3f48;
+  --ink:#f4f5f7; --on-ink:#111216; --body:#d7d9de; --mute:#9da1ab; --stone:#6b6f7a;
+  --action:#4d8dff; --action-soft:#14233f; --sale:#ff5a68; --sale-soft:#2e1418; --success:#3ddc97; --success-soft:#10281d; --warning:#ffb340; --warning-soft:#2c2111;
+  --night:#050607; --night-1:#101216; --night-2:#181b20; --frost:rgba(12,13,16,.8); color-scheme:dark}
+/* scope: dark tiles reuse the same components by re-pointing surface tokens */
+.on-night{--canvas:var(--night);--studio:var(--night-2);--studio-deep:#242830;--ink:#f4f5f7;--on-ink:#111216;--body:#d7d9de;--mute:#9da1ab;--stone:#6b6f7a;--hairline:var(--night-hairline);--sale:#ff5a68;--sale-soft:#2e1418;--success:#3ddc97;--warning:#ffb340;--warning-soft:#2c2111;background:var(--night);color:var(--on-night)}
+
