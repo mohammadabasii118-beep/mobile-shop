@@ -83,23 +83,23 @@ export class XuiClient {
     const text = res.status === 404 || res.status === 401 || res.status === 302 || res.status === 307 ? '' : await res.text().catch(() => '');
     let json: Envelope | null = null;
     try { json = text ? (JSON.parse(text) as Envelope) : null; } catch { json = null; }
-    return { res, json };
+    return { res, json, text };
   }
 
   async call<T = any>(method: 'GET' | 'POST', path: string, form?: Record<string, string>): Promise<T> {
     if (!this.o.apiToken && !this.cookie) await this.login();
-    let { res, json } = await this.exchange(method, path, form);
+    let { res, json, text } = await this.exchange(method, path, form);
     // An expired session shows up as 404/401/redirect (3x-ui hides the API) or as HTTP 200 with the HTML login page:
     // log in again once and repeat the call.
     const sessionLost = res.status === 404 || res.status === 401 || res.status === 302 || res.status === 307 || (res.status < 500 && !json);
     if (!this.o.apiToken && sessionLost) {
       this.cookie = undefined;
       await this.login();
-      ({ res, json } = await this.exchange(method, path, form));
+      ({ res, json, text } = await this.exchange(method, path, form));
     }
     if (res.status === 401 || res.status === 403) throw new ProviderError('X-UI rejected credentials/token', false);
     if (res.status >= 500) throw new ProviderError(`X-UI server error ${res.status}`, true);
-    if (!json) throw new ProviderError(`X-UI returned a non-JSON response (status ${res.status}) even after re-login: the panel address/path is wrong, a proxy/CDN is in front of the panel, or the session keeps expiring`, this.o.apiToken ? false : true);
+    if (!json) throw new ProviderError(`X-UI returned a non-JSON response (status ${res.status}, ${res.headers.get('content-type') ?? 'no content-type'}, GET ${path}) even after re-login — got: «${text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 90)}». Check the panel address/base path, or a proxy/CDN in front of it`, this.o.apiToken ? false : true);
     if (!json.success) throw new ProviderError(`X-UI error: ${String(json.msg ?? 'unknown').slice(0, 200)}`, false);
     return json.obj as T;
   }
