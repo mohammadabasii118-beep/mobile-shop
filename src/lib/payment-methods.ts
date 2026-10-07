@@ -46,3 +46,14 @@ export function payLabels(): Record<string, string> {
   return map;
 }
 export const orderPayCode = (o: { pay_code: string | null; payment_method: string }) => o.pay_code ?? o.payment_method;
+
+export type Receipt = { last4: string; note: string; image: string };
+/** اطلاعات واریز که مشتری ثبت کرده (payments.meta) */
+export function parseReceipt(meta: string | null): Receipt | null {
+  if (!meta) return null;
+  try {
+    const m = JSON.parse(meta) as Partial<Receipt>;
+    const r = { last4: String(m.last4 ?? ''), note: String(m.note ?? ''), image: /^[a-f0-9]{16}\.webp$/.test(String(m.image ?? '')) ? String(m.image) : '' };
+    return r.last4 || r.note || r.image ? r : null;
+  } catch { return null; }
+}

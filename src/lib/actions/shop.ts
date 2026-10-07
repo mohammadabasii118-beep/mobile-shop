@@ -1,8 +1,10 @@
 'use server';
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { get, run } from '../db';
+import { DATA_DIR, get, run } from '../db';
 import { getMethod } from '../payment-methods';
 import { createSession, destroySession, getUser, hashPassword, loginAllowed, loginFailed, loginOk, verifyPassword } from '../auth';
 import { isValidIranMobile, normDigits, normText } from '../format';
@@ -78,9 +80,12 @@ export async function submitCardReceipt(number: string, _p: FormState, fd: FormD
   const tracking = normDigits(s(fd, 'tracking')).replace(/\s/g, '').slice(0, 40);
   const last4 = normDigits(s(fd, 'last4')).replace(/\D/g, '');
   const note = normText(s(fd, 'note')).slice(0, 300);
-  if (tracking.length < 4) return { error: 'کد پیگیری یا شماره‌ی مرجع تراکنش را وارد کنید' };
+  const image = s(fd, 'image');
+  if (image && !(/^[a-f0-9]{16}\.webp$/.test(image) && fs.existsSync(path.join(DATA_DIR, 'receipts', image)))) return { error: 'عکس رسید معتبر نیست؛ دوباره آپلود کنید' };
+  if (!image && tracking.length < 4) return { error: 'کد پیگیری را وارد کنید یا عکس رسید را بفرستید' };
+  if (tracking && tracking.length < 4) return { error: 'کد پیگیری کوتاه است' };
   if (last4 && last4.length !== 4) return { error: 'چهار رقم آخر کارت باید دقیقاً ۴ رقم باشد' };
-  run("UPDATE payments SET ref = ?, meta = ? WHERE order_id = ? AND status = 'pending'", tracking, JSON.stringify({ last4, note, at: new Date().toISOString() }), o.id);
+  run("UPDATE payments SET ref = ?, meta = ? WHERE order_id = ? AND status = 'pending'", tracking || null, JSON.stringify({ last4, note, image, at: new Date().toISOString() }), o.id);
   redirect(`/checkout/success/${number}?receipt=1`);
 }
 

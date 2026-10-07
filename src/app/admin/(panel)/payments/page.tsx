@@ -1,8 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Paperclip } from 'lucide-react';
 import { all, get } from '@/lib/db';
 import { fa, faDigits, jdatetime, toman } from '@/lib/format';
-import { listMethods, payLabels } from '@/lib/payment-methods';
+import { listMethods, parseReceipt, payLabels } from '@/lib/payment-methods';
 import { Card, EmptyState, Kpi, PageHead, Pagination, Pill, qsLink, one } from '@/components/admin/ui';
 import { QuickAction } from '@/components/admin/client';
 import { setPaymentStatus } from '@/lib/actions/admin-sales';
@@ -53,7 +54,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
                 <td data-label="مشتری">{r.customer_name}</td>
                 <td data-label="روش">{labels[r.method] ?? r.method}</td>
                 <td data-label="زمان" className="mute">{jdatetime(r.created_at)}</td>
-                <td data-label="کد پیگیری" className="mute" dir="ltr" style={{ textAlign: 'right' }}>{r.ref ?? '—'}{receipt(r.meta) && <small className="mute" dir="auto" style={{ display: 'block' }}>{receipt(r.meta)}</small>}</td>
+                <td data-label="کد پیگیری" className="mute" dir="ltr" style={{ textAlign: 'right' }}>{r.ref ?? '—'}<ReceiptInfo meta={r.meta} /></td>
                 <td data-label="وضعیت"><Pill tone={tone}>{l}</Pill></td>
                 <td data-label="مبلغ" className="num-col">{toman(r.amount)}</td>
                 <td className="full"><div className="actions">
@@ -70,10 +71,14 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   );
 }
 
-function receipt(meta: string | null) {
-  if (!meta) return '';
-  try {
-    const m = JSON.parse(meta) as { last4?: string; note?: string };
-    return [m.last4 && `کارت …${faDigits(m.last4)}`, m.note].filter(Boolean).join(' · ');
-  } catch { return ''; }
+function ReceiptInfo({ meta }: { meta: string | null }) {
+  const r = parseReceipt(meta);
+  if (!r) return null;
+  const text = [r.last4 && `کارت …${faDigits(r.last4)}`, r.note].filter(Boolean).join(' · ');
+  return (
+    <small dir="auto" style={{ display: 'block' }}>
+      {text}{text && r.image ? ' · ' : ''}
+      {r.image && <a className="link" href={`/admin/receipts/${r.image}`} target="_blank" rel="noopener"><Paperclip className="i" style={{ width: 14, verticalAlign: '-2px' }} /> مشاهده‌ی رسید</a>}
+    </small>
+  );
 }

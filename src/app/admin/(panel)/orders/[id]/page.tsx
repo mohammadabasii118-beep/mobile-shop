@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { Phone } from 'lucide-react';
 import { all, get } from '@/lib/db';
 import { fa, faDigits, jdatetime, ORDER_STATUS, PAY_STATUS, toman } from '@/lib/format';
-import { payLabels } from '@/lib/payment-methods';
+import { parseReceipt, payLabels } from '@/lib/payment-methods';
 import { Card, Note, PageHead, Pill } from '@/components/admin/ui';
 import { ActionForm, PrintButton } from '@/components/admin/client';
 import { updateOrder } from '@/lib/actions/admin-sales';
@@ -65,7 +65,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
           <Card title="پرداخت‌ها" tight>
             {pays.map((p) => (
               <div className="list-rows row" key={p.id} style={{ display: 'flex' }}>
-                <span className="t"><b>{labels[p.method] ?? p.method}</b><small>{jdatetime(p.created_at)}{p.ref ? ` · کد پیگیری ${p.ref}` : ''}{receiptInfo(p.meta)}</small></span>
+                <span className="t"><b>{labels[p.method] ?? p.method}</b><small>{jdatetime(p.created_at)}{p.ref ? ` · کد پیگیری ${p.ref}` : ''}<ReceiptLine meta={p.meta} /></small></span>
                 <span className="num">{toman(p.amount)} تومان</span>
                 <Pill tone={p.status === 'success' ? 'success' : p.status === 'failed' ? 'danger' : p.status === 'refunded' ? 'muted' : 'warning'}>{{ success: 'موفق', failed: 'ناموفق', refunded: 'بازگشت', pending: 'در انتظار' }[p.status]}</Pill>
               </div>
@@ -100,10 +100,13 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
   );
 }
 
-function receiptInfo(meta: string | null) {
-  if (!meta) return '';
-  try {
-    const m = JSON.parse(meta) as { last4?: string; note?: string };
-    return `${m.last4 ? ` · کارت …${faDigits(m.last4)}` : ''}${m.note ? ` · ${m.note}` : ''}`;
-  } catch { return ''; }
+function ReceiptLine({ meta }: { meta: string | null }) {
+  const r = parseReceipt(meta);
+  if (!r) return null;
+  return (
+    <>
+      {r.last4 ? ` · کارت …${faDigits(r.last4)}` : ''}{r.note ? ` · ${r.note}` : ''}
+      {r.image && <> · <a className="link" href={`/admin/receipts/${r.image}`} target="_blank" rel="noopener">مشاهده‌ی رسید</a></>}
+    </>
+  );
 }
