@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Phone } from 'lucide-react';
 import { all, get } from '@/lib/db';
-import { fa, jdatetime, ORDER_STATUS, PAY_METHOD, PAY_STATUS, toman } from '@/lib/format';
+import { fa, faDigits, jdatetime, ORDER_STATUS, PAY_STATUS, toman } from '@/lib/format';
+import { payLabels } from '@/lib/payment-methods';
 import { Card, Note, PageHead, Pill } from '@/components/admin/ui';
 import { ActionForm, PrintButton } from '@/components/admin/client';
 import { updateOrder } from '@/lib/actions/admin-sales';
@@ -19,7 +20,8 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
   const o = get<O>('SELECT * FROM orders WHERE id = ?', id);
   if (!o) notFound();
   const items = all<{ id: number; product_id: number | null; name: string; variation_label: string; sku: string | null; price: number; qty: number; image: string | null }>('SELECT * FROM order_items WHERE order_id = ?', id);
-  const pays = all<{ id: number; method: string; amount: number; status: string; ref: string | null; created_at: string }>('SELECT * FROM payments WHERE order_id = ? ORDER BY id DESC', id);
+  const labels = payLabels();
+  const pays = all<{ id: number; method: string; amount: number; status: string; ref: string | null; meta: string | null; created_at: string }>('SELECT * FROM payments WHERE order_id = ? ORDER BY id DESC', id);
   const s = getSettings();
   const steps = ['pending', 'processing', 'shipped', 'delivered'];
   const idx = steps.indexOf(o.status);
@@ -63,7 +65,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
           <Card title="پرداخت‌ها" tight>
             {pays.map((p) => (
               <div className="list-rows row" key={p.id} style={{ display: 'flex' }}>
-                <span className="t"><b>{PAY_METHOD[p.method] ?? p.method}</b><small>{jdatetime(p.created_at)}{p.ref ? ` · کد پیگیری ${p.ref}` : ''}</small></span>
+                <span className="t"><b>{labels[p.method] ?? p.method}</b><small>{jdatetime(p.created_at)}{p.ref ? ` · کد پیگیری ${p.ref}` : ''}{receiptInfo(p.meta)}</small></span>
                 <span className="num">{toman(p.amount)} تومان</span>
                 <Pill tone={p.status === 'success' ? 'success' : p.status === 'failed' ? 'danger' : p.status === 'refunded' ? 'muted' : 'warning'}>{{ success: 'موفق', failed: 'ناموفق', refunded: 'بازگشت', pending: 'در انتظار' }[p.status]}</Pill>
               </div>
@@ -96,4 +98,12 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
       <p className="mute no-print" style={{ marginTop: 16, fontSize: 12.5 }}>فاکتور چاپی با نام {s.store_name} آماده است (دکمه‌ی «چاپ فاکتور»).</p>
     </>
   );
+}
+
+function receiptInfo(meta: string | null) {
+  if (!meta) return '';
+  try {
+    const m = JSON.parse(meta) as { last4?: string; note?: string };
+    return `${m.last4 ? ` · کارت …${faDigits(m.last4)}` : ''}${m.note ? ` · ${m.note}` : ''}`;
+  } catch { return ''; }
 }

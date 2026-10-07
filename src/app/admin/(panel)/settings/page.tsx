@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { getSettings } from '@/lib/catalog';
 import { getUser } from '@/lib/auth';
 import { Card, PageHead } from '@/components/admin/ui';
@@ -42,12 +43,10 @@ export default async function SettingsPage() {
             </div>
           </ActionForm>
         </Card>
-        <Card title="پرداخت" id="payment" desc="روش‌هایی که مشتری هنگام تسویه می‌بیند.">
+        <Card title="پرداخت" id="payment" desc="متن راهنمای تسویه. خود روش‌ها در بخش «روش‌های پرداخت» مدیریت می‌شوند.">
           <ActionForm action={saveSettings.bind(null, 'payment')}>
-            <label className="switch"><input type="checkbox" name="pay_online" value="1" defaultChecked={s.pay_online === '1'} /><span className="tr" /><span>پرداخت آنلاین (درگاه)</span></label>
-            <label className="switch"><input type="checkbox" name="pay_cod" value="1" defaultChecked={s.pay_cod === '1'} /><span className="tr" /><span>پرداخت در محل</span></label>
             <div className="fld"><label htmlFor="p1">متن راهنما در صفحه‌ی تسویه</label><textarea id="p1" className="textarea" name="checkout_note" defaultValue={s.checkout_note} style={{ minHeight: 64 }} /></div>
-            <p className="help mute" style={{ fontSize: 12.5 }}>درگاه آنلاین فعلاً آزمایشی است (پولی کسر نمی‌شود). برای اتصال به درگاه بانکی، راهنمای README را ببینید.</p>
+            <p className="help mute" style={{ fontSize: 12.5 }}>روشن/خاموش‌کردن روش‌ها و کارت‌به‌کارت: <Link className="link" href="/admin/payment-methods">روش‌های پرداخت</Link></p>
           </ActionForm>
         </Card>
         <Card title="موجودی" id="inventory">

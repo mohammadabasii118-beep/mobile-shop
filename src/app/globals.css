@@ -591,3 +591,9 @@ section.sec.tight-top { padding-top: 0; }
 .bpill { height: 64px; min-width: 130px; padding-inline: 26px; border-radius: 18px; background: var(--studio); display: grid; place-items: center; font-weight: 800; font-size: 19px; letter-spacing: .02em; color: var(--mute); direction: ltr; transition: color .16s, background .16s; white-space: nowrap; }
 .bpill:hover { color: var(--ink); background: var(--studio-deep); }
 @media (prefers-reduced-motion: reduce) { .mq { animation: none !important; } .railsec.go .sh, .railsec.go .rail-track > * { animation: none !important; } }
+
+/* ── پرداخت کارت‌به‌کارت (DESIGN.md §18.8) ── */
+.pay-card .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-block: 10px; border-block-end: 1px solid var(--hairline); }
+.pay-card .row:last-of-type { border-block-end: 0; }
+.pay-card .cardnum { font-size: clamp(17px, 5vw, 22px); letter-spacing: .08em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.pay-card .copy-row { display: flex; flex-wrap: wrap; gap: 8px; padding-block: 10px; }

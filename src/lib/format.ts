@@ -28,6 +28,11 @@ export function fa(n: number | string): string {
   return Number(n).toLocaleString('fa-IR');
 }
 
+/** ارقام فارسی بدون جداکننده‌ی هزارگان (کد پیگیری، ۴ رقم کارت) */
+export function faDigits(v: string | number): string {
+  return String(v).replace(/\d/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[Number(d)]);
+}
+
 /** قیمت به تومان بدون واحد */
 export function toman(n: number): string {
   return Math.round(n).toLocaleString('fa-IR');
@@ -97,4 +102,3 @@ export const PAY_STATUS: Record<string, { label: string; tone: string }> = {
   failed: { label: 'ناموفق', tone: 'danger' },
   refunded: { label: 'بازگشت وجه', tone: 'muted' },
 };
-export const PAY_METHOD: Record<string, string> = { cod: 'پرداخت در محل', online: 'پرداخت آنلاین' };

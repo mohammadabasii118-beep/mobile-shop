@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Download, Search } from 'lucide-react';
 import { all, get } from '@/lib/db';
-import { fa, jdatetime, normText, ORDER_STATUS, PAY_METHOD, PAY_STATUS, toman } from '@/lib/format';
+import { fa, jdatetime, normText, ORDER_STATUS, PAY_STATUS, toman } from '@/lib/format';
+import { orderPayCode, payLabels } from '@/lib/payment-methods';
 import { Card, EmptyState, PageHead, Pagination, Pill, qsLink, one } from '@/components/admin/ui';
 
 export const metadata: Metadata = { title: 'سفارش‌ها' };
@@ -18,8 +19,9 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   if (q) { where.push('(number LIKE ? OR customer_name LIKE ? OR phone LIKE ?)'); const l = `%${q}%`; args.push(l, l, l); }
   const W = where.length ? 'WHERE ' + where.join(' AND ') : '';
   const total = get<{ n: number }>(`SELECT COUNT(*) n FROM orders ${W}`, ...args)!.n;
-  const rows = all<{ id: number; number: string; customer_name: string; phone: string; status: string; payment_status: string; payment_method: string; total: number; created_at: string; items: number }>(
+  const rows = all<{ id: number; number: string; customer_name: string; phone: string; status: string; payment_status: string; payment_method: string; pay_code: string | null; total: number; created_at: string; items: number }>(
     `SELECT o.*, (SELECT COALESCE(SUM(qty),0) FROM order_items i WHERE i.order_id = o.id) items FROM orders o ${W} ORDER BY id DESC LIMIT ? OFFSET ?`, ...args, PER, (page - 1) * PER);
+  const labels = payLabels();
   const counts = Object.fromEntries(all<{ status: string; n: number }>('SELECT status, COUNT(*) n FROM orders GROUP BY status').map((r) => [r.status, r.n]));
   const totalAll = Object.values(counts).reduce((a, b) => a + b, 0);
   const href = (p: number) => qsLink('/admin/orders', sp, { page: String(p) });
@@ -50,7 +52,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                 <td data-label="مشتری"><b style={{ color: 'var(--ink)' }}>{o.customer_name}</b><small className="mute num" style={{ display: 'block' }}>{o.phone}</small></td>
                 <td data-label="زمان" className="mute">{jdatetime(o.created_at)}</td>
                 <td data-label="اقلام" className="num-col">{fa(o.items)}</td>
-                <td data-label="پرداخت"><Pill tone={PAY_STATUS[o.payment_status].tone}>{PAY_STATUS[o.payment_status].label}</Pill><small className="mute" style={{ display: 'block' }}>{PAY_METHOD[o.payment_method]}</small></td>
+                <td data-label="پرداخت"><Pill tone={PAY_STATUS[o.payment_status].tone}>{PAY_STATUS[o.payment_status].label}</Pill><small className="mute" style={{ display: 'block' }}>{labels[orderPayCode(o)] ?? orderPayCode(o)}</small></td>
                 <td data-label="وضعیت"><Pill tone={ORDER_STATUS[o.status].tone}>{ORDER_STATUS[o.status].label}</Pill></td>
                 <td data-label="مبلغ" className="num-col"><b>{toman(o.total)}</b> <small className="mute">تومان</small></td>
               </tr>))}</tbody>

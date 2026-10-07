@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { assertAdmin } from '@/lib/auth';
 import { all } from '@/lib/db';
-import { ORDER_STATUS, PAY_METHOD, PAY_STATUS, parseDbDate } from '@/lib/format';
+import { ORDER_STATUS, PAY_STATUS, parseDbDate } from '@/lib/format';
+import { orderPayCode, payLabels } from '@/lib/payment-methods';
 import { tehranDate } from '@/lib/stats';
 
 const esc = (v: unknown) => {
@@ -18,10 +19,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ kind: string }>
   let body = '';
   if (kind === 'orders') {
     const from = days ? tehranDate(-(days - 1)) : '1970-01-01';
-    const rows = all<{ number: string; created_at: string; customer_name: string; phone: string; province: string; city: string; address: string; status: string; payment_method: string; payment_status: string; subtotal: number; discount: number; shipping: number; total: number; coupon_code: string | null; tracking_code: string }>(
+    const labels = payLabels();
+    const rows = all<{ number: string; created_at: string; customer_name: string; phone: string; province: string; city: string; address: string; status: string; payment_method: string; pay_code: string | null; payment_status: string; subtotal: number; discount: number; shipping: number; total: number; coupon_code: string | null; tracking_code: string }>(
       "SELECT * FROM orders WHERE date(created_at, '+210 minutes') >= ? ORDER BY id DESC", from);
     body = csv(['شماره سفارش', 'تاریخ', 'مشتری', 'موبایل', 'استان', 'شهر', 'نشانی', 'وضعیت', 'روش پرداخت', 'وضعیت پرداخت', 'جمع کالاها', 'تخفیف', 'ارسال', 'مبلغ نهایی', 'کد تخفیف', 'کد رهگیری'],
-      rows.map((o) => [o.number, parseDbDate(o.created_at).toLocaleString('fa-IR-u-ca-persian', { timeZone: 'Asia/Tehran' }), o.customer_name, o.phone, o.province, o.city, o.address, ORDER_STATUS[o.status].label, PAY_METHOD[o.payment_method], PAY_STATUS[o.payment_status].label, o.subtotal, o.discount, o.shipping, o.total, o.coupon_code ?? '', o.tracking_code]));
+      rows.map((o) => [o.number, parseDbDate(o.created_at).toLocaleString('fa-IR-u-ca-persian', { timeZone: 'Asia/Tehran' }), o.customer_name, o.phone, o.province, o.city, o.address, ORDER_STATUS[o.status].label, labels[orderPayCode(o)] ?? orderPayCode(o), PAY_STATUS[o.payment_status].label, o.subtotal, o.discount, o.shipping, o.total, o.coupon_code ?? '', o.tracking_code]));
   } else if (kind === 'products') {
     const rows = all<{ name: string; sku: string | null; type: string; status: string; price: number; sale_price: number | null; stock: number; brand: string | null; cat: string | null }>(
       'SELECT p.name, p.sku, p.type, p.status, p.price, p.sale_price, p.stock, b.name brand, c.name cat FROM products p LEFT JOIN brands b ON b.id=p.brand_id LEFT JOIN categories c ON c.id=p.category_id ORDER BY p.id');

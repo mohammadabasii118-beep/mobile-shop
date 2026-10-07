@@ -193,6 +193,20 @@ CREATE TABLE IF NOT EXISTS payments (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS payment_methods (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT NOT NULL UNIQUE,
+  driver TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  enabled INTEGER NOT NULL DEFAULT 0,
+  sort INTEGER NOT NULL DEFAULT 0,
+  min_amount INTEGER NOT NULL DEFAULT 0,
+  max_amount INTEGER NOT NULL DEFAULT 0,
+  config TEXT NOT NULL DEFAULT '{}',
+  builtin INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS inventory_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -215,12 +229,31 @@ CREATE TABLE IF NOT EXISTS reviews (
 );
 `;
 
+/** ستون‌های افزوده‌شده بعد از انتشار اول + روش‌های پرداخت پیش‌فرض (بدون پاک‌کردن چیزی) */
+function migrate(d: Database.Database) {
+  const cols = (t: string) => (d.pragma(`table_info(${t})`) as { name: string }[]).map((c) => c.name);
+  if (!cols('orders').includes('pay_code')) d.exec('ALTER TABLE orders ADD COLUMN pay_code TEXT');
+  if (!cols('payments').includes('meta')) d.exec('ALTER TABLE payments ADD COLUMN meta TEXT');
+  const flag = (k: string, def: number) => {
+    const r = d.prepare('SELECT value FROM settings WHERE key = ?').get(k) as { value: string } | undefined;
+    return r ? (r.value === '1' ? 1 : 0) : def;
+  };
+  const ins = d.prepare('INSERT OR IGNORE INTO payment_methods (code, driver, title, description, enabled, sort, builtin) VALUES (?,?,?,?,?,?,1)');
+  ins.run('cod', 'cod', 'پرداخت در محل', 'مبلغ را هنگام تحویل بپردازید', flag('pay_cod', 1), 1);
+  ins.run('card', 'card', 'کارت به کارت', 'واریز به شماره کارت فروشگاه و ثبت کد پیگیری', 0, 2);
+  ins.run('snapp', 'snapp', 'اسنپ‌پی', 'خرید اقساطی با اسنپ‌پی', 0, 3);
+  ins.run('torob', 'torob', 'ترب‌پی', 'خرید اقساطی با ترب‌پی', 0, 4);
+  ins.run('bale', 'bale', 'بله‌پی', 'پرداخت با کیف پول بله', 0, 5);
+  ins.run('test', 'test', 'پرداخت آنلاین (آزمایشی)', 'درگاه شبیه‌ساز؛ پولی کسر نمی‌شود', flag('pay_online', 1), 9);
+}
+
 function open() {
   const d = new Database(path.join(DATA_DIR, 'shop.db'));
   d.pragma('journal_mode = WAL');
   d.pragma('foreign_keys = ON');
   d.pragma('busy_timeout = 5000');
   d.exec(SCHEMA);
+  migrate(d);
   return d;
 }
 

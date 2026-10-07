@@ -69,7 +69,7 @@ export function ordersByStatus(days: number) {
 export function byPaymentMethod(days: number) {
   const from = tehranDate(-(days - 1));
   return all<{ payment_method: string; n: number; revenue: number }>(
-    `SELECT payment_method, COUNT(*) n, COALESCE(SUM(total),0) revenue FROM orders WHERE ${NOT_LOST} AND date(created_at, '${TZ}') >= ? GROUP BY payment_method`, from);
+    `SELECT COALESCE(pay_code, payment_method) payment_method, COUNT(*) n, COALESCE(SUM(total),0) revenue FROM orders WHERE ${NOT_LOST} AND date(created_at, '${TZ}') >= ? GROUP BY COALESCE(pay_code, payment_method)`, from);
 }
 
 export function lowStockUnits(threshold: number, limit = 8) {

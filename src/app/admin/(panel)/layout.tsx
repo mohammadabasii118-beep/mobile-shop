@@ -20,6 +20,7 @@ export default async function PanelLayout({ children }: { children: React.ReactN
       title: 'فروش', items: [
         { href: '/admin/orders', label: 'سفارش‌ها', icon: 'orders', badge: pendingOrders, warn: true, keywords: 'خرید فاکتور ارسال' },
         { href: '/admin/payments', label: 'پرداخت‌ها', icon: 'payments', keywords: 'تراکنش درگاه' },
+        { href: '/admin/payment-methods', label: 'روش‌های پرداخت', icon: 'payments', keywords: 'درگاه کارت به کارت اسنپ پی ترب پی بله' },
         { href: '/admin/discounts', label: 'تخفیف‌ها', icon: 'discounts', keywords: 'حراج درصد' },
         { href: '/admin/coupons', label: 'کد تخفیف', icon: 'coupons', keywords: 'کوپن' },
       ],

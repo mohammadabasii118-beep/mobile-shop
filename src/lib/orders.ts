@@ -1,6 +1,8 @@
 import { all, get, run, tx } from './db';
 import { getSettings } from './catalog';
 import { effectivePrice } from './variations';
+import { DRIVERS } from './payment-drivers';
+import { getMethod, inRange, isUsable } from './payment-methods';
 import type { CartInput, CartLine } from './types';
 
 /** قیمت‌گذاری سبد از روی دیتابیس (هرگز به قیمت کلاینت اعتماد نمی‌کنیم) */
@@ -96,10 +98,10 @@ export function checkCoupon(codeRaw: string, subtotal: number): { ok: true; coup
 
 export type OrderForm = {
   name: string; phone: string; email: string; province: string; city: string; address: string; postal: string; note: string;
-  method: 'cod' | 'online'; coupon: string; userId: number | null;
+  method: string; coupon: string; userId: number | null;
 };
 
-export function placeOrder(input: CartInput[], f: OrderForm): { ok: true; number: string; method: string } | { ok: false; error: string } {
+export function placeOrder(input: CartInput[], f: OrderForm): { ok: true; number: string; method: string; driver: string } | { ok: false; error: string } {
   const lines = priceCart(input);
   if (!lines.length) return { ok: false, error: 'سبد خرید خالی است' };
   const bad = lines.find((l) => !l.ok || l.qty > l.stock);
@@ -116,6 +118,11 @@ export function placeOrder(input: CartInput[], f: OrderForm): { ok: true; number
   const ship = shippingFor(subtotal - discount).shipping;
   const total = subtotal - discount + ship;
 
+  const pm = getMethod(f.method);
+  if (!pm || !isUsable(pm)) return { ok: false, error: 'روش پرداخت انتخاب‌شده در دسترس نیست' };
+  if (!inRange(pm, total)) return { ok: false, error: `روش «${pm.title}» برای این مبلغ در دسترس نیست` };
+  const kind = DRIVERS[pm.driver].kind === 'cod' ? 'cod' : 'online';
+
   return tx(() => {
     // بازبینی موجودی داخل تراکنش
     for (const l of lines) {
@@ -125,9 +132,9 @@ export function placeOrder(input: CartInput[], f: OrderForm): { ok: true; number
       if (!cur || cur.stock < l.qty) throw new Error(`موجودی «${l.name}» کافی نیست`);
     }
     const info = run(
-      `INSERT INTO orders (user_id, customer_name, phone, email, province, city, address, postal_code, note, payment_method, subtotal, discount, shipping, total, coupon_code)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      f.userId, f.name, f.phone, f.email || null, f.province, f.city, f.address, f.postal, f.note, f.method, subtotal, discount, ship, total, couponCode);
+      `INSERT INTO orders (user_id, customer_name, phone, email, province, city, address, postal_code, note, payment_method, pay_code, subtotal, discount, shipping, total, coupon_code)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      f.userId, f.name, f.phone, f.email || null, f.province, f.city, f.address, f.postal, f.note, kind, pm.code, subtotal, discount, ship, total, couponCode);
     const id = Number(info.lastInsertRowid);
     const number = String(100000 + id);
     run('UPDATE orders SET number = ? WHERE id = ?', number, id);
@@ -140,8 +147,8 @@ export function placeOrder(input: CartInput[], f: OrderForm): { ok: true; number
       adjustStock(l.productId, l.variationId, -l.qty, `سفارش ${number}`);
     }
     if (couponCode) run('UPDATE coupons SET used = used + 1 WHERE UPPER(code) = ?', couponCode.toUpperCase());
-    run('INSERT INTO payments (order_id, method, amount, status) VALUES (?,?,?,?)', id, f.method, total, 'pending');
-    return { ok: true as const, number, method: f.method };
+    run('INSERT INTO payments (order_id, method, amount, status) VALUES (?,?,?,?)', id, pm.code, total, 'pending');
+    return { ok: true as const, number, method: pm.code, driver: pm.driver };
   });
 }
 

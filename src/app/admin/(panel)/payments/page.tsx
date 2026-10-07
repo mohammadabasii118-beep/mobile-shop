@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { all, get } from '@/lib/db';
-import { fa, jdatetime, PAY_METHOD, toman } from '@/lib/format';
+import { fa, faDigits, jdatetime, toman } from '@/lib/format';
+import { listMethods, payLabels } from '@/lib/payment-methods';
 import { Card, EmptyState, Kpi, PageHead, Pagination, Pill, qsLink, one } from '@/components/admin/ui';
 import { QuickAction } from '@/components/admin/client';
 import { setPaymentStatus } from '@/lib/actions/admin-sales';
@@ -16,10 +17,12 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
   const page = Math.max(1, Number(one(sp.page)) || 1);
   const where: string[] = []; const args: unknown[] = [];
   if (LABEL[status]) { where.push('p.status = ?'); args.push(status); }
-  if (method === 'cod' || method === 'online') { where.push('p.method = ?'); args.push(method); }
+  const methods = listMethods();
+  if (methods.some((m) => m.code === method)) { where.push('p.method = ?'); args.push(method); }
+  const labels = payLabels();
   const W = where.length ? 'WHERE ' + where.join(' AND ') : '';
   const total = get<{ n: number }>(`SELECT COUNT(*) n FROM payments p ${W}`, ...args)!.n;
-  const rows = all<{ id: number; order_id: number; number: string; customer_name: string; method: string; amount: number; status: string; ref: string | null; created_at: string }>(
+  const rows = all<{ id: number; order_id: number; number: string; customer_name: string; method: string; amount: number; status: string; ref: string | null; meta: string | null; created_at: string }>(
     `SELECT p.*, o.number, o.customer_name FROM payments p JOIN orders o ON o.id = p.order_id ${W} ORDER BY p.id DESC LIMIT ? OFFSET ?`, ...args, PER, (page - 1) * PER);
   const sum = (st: string) => get<{ s: number; n: number }>('SELECT COALESCE(SUM(amount),0) s, COUNT(*) n FROM payments WHERE status = ?', st)!;
   const ok = sum('success'), pend = sum('pending'), fail = sum('failed');
@@ -33,9 +36,13 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
         <Kpi label="ناموفق" value={fa(fail.n)} unit="تراکنش" />
       </div>
       <Card tight>
+        <nav className="ad-tabs" aria-label="روش پرداخت">
+          <Link href={qsLink('/admin/payments', sp, { method: null, page: null })} aria-current={!method ? 'page' : undefined}>همه‌ی روش‌ها</Link>
+          {methods.map((m) => <Link key={m.code} href={qsLink('/admin/payments', sp, { method: m.code, page: null })} aria-current={method === m.code ? 'page' : undefined}>{m.title}</Link>)}
+        </nav>
         <nav className="ad-tabs" aria-label="وضعیت پرداخت">
-          <Link href="/admin/payments" aria-current={!status ? 'page' : undefined}>همه</Link>
-          {Object.entries(LABEL).map(([k, [l]]) => <Link key={k} href={`/admin/payments?status=${k}`} aria-current={status === k ? 'page' : undefined}>{l}</Link>)}
+          <Link href={qsLink('/admin/payments', sp, { status: null, page: null })} aria-current={!status ? 'page' : undefined}>همه</Link>
+          {Object.entries(LABEL).map(([k, [l]]) => <Link key={k} href={qsLink('/admin/payments', sp, { status: k, page: null })} aria-current={status === k ? 'page' : undefined}>{l}</Link>)}
         </nav>
         {rows.length === 0 ? <EmptyState title="تراکنشی پیدا نشد" /> : (
           <div className="ad-tablewrap"><table className="ad-table cards">
@@ -44,9 +51,9 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
               <tr key={r.id}>
                 <td data-label="سفارش"><Link className="link num" href={`/admin/orders/${r.order_id}`}>{fa(r.number)}</Link></td>
                 <td data-label="مشتری">{r.customer_name}</td>
-                <td data-label="روش">{PAY_METHOD[r.method]}</td>
+                <td data-label="روش">{labels[r.method] ?? r.method}</td>
                 <td data-label="زمان" className="mute">{jdatetime(r.created_at)}</td>
-                <td data-label="کد پیگیری" className="mute" dir="ltr" style={{ textAlign: 'right' }}>{r.ref ?? '—'}</td>
+                <td data-label="کد پیگیری" className="mute" dir="ltr" style={{ textAlign: 'right' }}>{r.ref ?? '—'}{receipt(r.meta) && <small className="mute" dir="auto" style={{ display: 'block' }}>{receipt(r.meta)}</small>}</td>
                 <td data-label="وضعیت"><Pill tone={tone}>{l}</Pill></td>
                 <td data-label="مبلغ" className="num-col">{toman(r.amount)}</td>
                 <td className="full"><div className="actions">
@@ -61,4 +68,12 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Pro
       </Card>
     </>
   );
+}
+
+function receipt(meta: string | null) {
+  if (!meta) return '';
+  try {
+    const m = JSON.parse(meta) as { last4?: string; note?: string };
+    return [m.last4 && `کارت …${faDigits(m.last4)}`, m.note].filter(Boolean).join(' · ');
+  } catch { return ''; }
 }
