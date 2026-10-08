@@ -17,7 +17,7 @@ import { CryptoPaymentProvider } from '../../providers/payments/crypto';
 import { LedgerVerificationProvider, NullVerificationProvider } from '../../providers/payments/ledgerVerification';
 import { PaymentProvider, PaymentVerificationProvider, VerificationOutcome } from '../../providers/payments/types';
 import { runProvisioning } from '../vpn/provisioning';
-import { PARTNER_AUTO_ACTOR, partnerAutoApproveVerdict } from '../partners/service';
+import { PARTNER_AUTO_ACTOR, PARTNER_REASON_FA, partnerAutoApproveVerdict } from '../partners/service';
 
 interface Deps {
   verifiers: Record<string, PaymentVerificationProvider>;
@@ -188,6 +188,7 @@ export async function processPayment(paymentId: string): Promise<Decision> {
   else decision = 'NEEDS_REVIEW';
 
   // Trusted-partner exception (opt-in, narrow): see partnerAutoApproveVerdict.
+  let partnerNote: string | undefined;
   if (decision === 'NEEDS_REVIEW') {
     const v = await partnerAutoApproveVerdict({ userId: payment.userId, paymentId, amount: order.finalAmount, verification: outcome.result, risk });
     if (v.ok) {
@@ -196,7 +197,7 @@ export async function processPayment(paymentId: string): Promise<Decision> {
         await notifyAdmins('partner_auto_approved', `🤝 سفارش همکار خودکار تأیید شد\nسفارش: ${order.orderNumber}\nمبلغ: ${formatMoney(order.finalAmount)}\n⚠️ تأیید بانکی انجام نشد (${outcome.result}) — در صورت نیاز واریز را کنترل کنید.`, { roles: ['PAYMENT_ADMIN'], buttons: [[{ text: '🔎 مشاهده', data: `ap:v:${paymentId}` }]], dedupeKey: `partner_auto:${paymentId}` });
         return 'AUTO_APPROVE';
       }
-    }
+    } else partnerNote = v.reason;
   }
   if (decision === 'AUTO_APPROVE') {
     const r = await approvePayment(paymentId, { actor: 'auto', auto: true, bankTransactionId: outcome.bankTransactionId });
@@ -207,11 +208,11 @@ export async function processPayment(paymentId: string): Promise<Decision> {
     await rejectPayment(paymentId, { actor: 'auto', reason: `ریسک بالا: ${risk.factors.map((f) => f.code).join(', ')}` });
     return 'REJECT';
   }
-  await markNeedsReview(paymentId, risk, outcome);
+  await markNeedsReview(paymentId, risk, outcome, partnerNote);
   return 'NEEDS_REVIEW';
 }
 
-async function markNeedsReview(paymentId: string, risk: RiskResult, outcome: VerificationOutcome) {
+async function markNeedsReview(paymentId: string, risk: RiskResult, outcome: VerificationOutcome, partnerNote?: string) {
   const res = await prisma.$transaction(async (tx) => {
     const p = await tx.payment.findUniqueOrThrow({ where: { id: paymentId } });
     const r = await tx.payment.updateMany({ where: { id: paymentId, status: 'SUBMITTED' }, data: { status: 'NEEDS_REVIEW' } });
@@ -220,10 +221,10 @@ async function markNeedsReview(paymentId: string, risk: RiskResult, outcome: Ver
   });
   if (!res) return;
   const p = await prisma.payment.findUniqueOrThrow({ where: { id: paymentId }, include: { order: true } });
-  await audit({ actor: 'system', action: 'payment.needs_review', target: 'Payment', targetId: paymentId, metadata: { risk, verification: outcome.result, reason: outcome.reason } });
+  await audit({ actor: 'system', action: 'payment.needs_review', target: 'Payment', targetId: paymentId, metadata: { risk, verification: outcome.result, reason: outcome.reason, ...(partnerNote ? { partnerAutoApprove: partnerNote } : {}) } });
   await notifyAdmins(
     risk.level === 'HIGH' ? 'high_risk_payment' : 'payment_needs_review',
-    `${risk.level === 'HIGH' ? '🚨 پرداخت پرریسک' : '🔎 پرداخت نیازمند بررسی'}\nسفارش: ${p.order.orderNumber}\nمبلغ: ${formatMoney(p.amount)}\nریسک: ${risk.level} (${risk.score})\nنتیجه تأیید: ${outcome.result}${outcome.reason ? ` — ${outcome.reason}` : ''}`,
+    `${risk.level === 'HIGH' ? '🚨 پرداخت پرریسک' : '🔎 پرداخت نیازمند بررسی'}\nسفارش: ${p.order.orderNumber}\nمبلغ: ${formatMoney(p.amount)}\nریسک: ${risk.level} (${risk.score})\nنتیجه تأیید: ${outcome.result}${outcome.reason ? ` — ${outcome.reason}` : ''}${partnerNote && PARTNER_REASON_FA[partnerNote] ? `\n🤝 تأیید خودکار همکار انجام نشد: ${PARTNER_REASON_FA[partnerNote]}` : ''}`,
     { roles: ['PAYMENT_ADMIN'], buttons: [[{ text: '🔎 مشاهده', data: `ap:v:${paymentId}` }]], dedupeKey: `needs_review:${paymentId}:${outcome.result}` },
   );
   await notifyUser(p.userId, 'payment_review', await T.paymentReview(p.order.orderNumber), { dedupeKey: `user_review:${paymentId}`, html: true, buttons: [[{ text: '📍 پیگیری سفارش', data: `ov:${p.orderId}` }]] });

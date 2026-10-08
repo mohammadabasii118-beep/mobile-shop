@@ -32,7 +32,7 @@ export const SETTING_DEFAULTS = {
   'partner.stackCoupons': () => 'false', // may partners also use discount coupons?
   'partner.reapplyDays': () => '3', // wait before re-applying after a rejection
   'partner.autoApproveOrders': () => 'false', // approve an approved partner's payment without admin review (see partnerAutoApproveVerdict for the safeguards)
-  'partner.autoApproveMinOrders': () => '1', // partner must already have this many approved payments (first orders are reviewed by a human)
+  'partner.autoApproveMinOrders': () => '0', // partner must already have this many approved payments (0 = trusted from the first order; raise it to review the first orders by hand)
   'partner.autoApproveDailyMax': () => '10', // at most this many auto-approvals per partner per 24h
   'partner.autoApproveMaxAmount': () => '0', // orders above this amount (toman) always go to review; 0 = no limit
 } as const;

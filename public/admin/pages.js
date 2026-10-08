@@ -757,7 +757,7 @@ export function partners(ctx, root) {
         h('div', { class: 'card-b', style: 'padding-block:4px' },
           h('div', { class: 'callout warn', style: 'margin:12px 0' }, icon('alert'), h('div', { text: 'این گزینه ریسک مالی دارد: رسید همکار بدون تطبیق با تراکنش بانکی پذیرفته می‌شود. پرداخت‌های پرریسک، تکراری، با مبلغ ناهمخوان یا مشکوک همچنان به بررسی دستی می‌روند. هر تأیید خودکار برای ادمین‌ها اعلان می‌شود.' })),
           toggle('partner.autoApproveOrders', 'تأیید خودکار پرداخت همکاران فعال باشد', 'پیش‌فرض خاموش است'),
-          numeric('partner.autoApproveMinOrders', 'حداقل پرداخت تأییدشده‌ی قبلی', 'همکار جدید ابتدا چند سفارش را دستی تأیید می‌گیرد تا معتمد شود', 'پرداخت'),
+          numeric('partner.autoApproveMinOrders', 'حداقل پرداخت تأییدشده‌ی قبلی', '۰ = از همان سفارش اول؛ عدد بیشتر یعنی همکار جدید ابتدا آن تعداد سفارش را دستی تأیید می‌گیرد', 'پرداخت'),
           numeric('partner.autoApproveDailyMax', 'سقف تأیید خودکار در ۲۴ ساعت', 'برای هر همکار؛ بیشتر از آن به بررسی دستی می‌رود', 'مورد'),
           numeric('partner.autoApproveMaxAmount', 'سقف مبلغ هر سفارش', 'بالاتر از این مبلغ همیشه دستی بررسی می‌شود؛ ۰ یعنی بدون سقف', 'تومان')));
     } catch (e) { clear(settingsCard); settingsCard.append(errorState(errMsg(e), loadSettings)); }

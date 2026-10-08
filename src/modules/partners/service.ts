@@ -58,9 +58,9 @@ export async function partnerAutoApproveVerdict(
   const p = await prisma.partner.findUnique({ where: { userId: i.userId } });
   if (!p || p.status !== 'APPROVED') return { ok: false, reason: 'not_partner' };
   if (i.verification === 'REJECTED') return { ok: false, reason: 'bank_contradicts' };
-  if (i.risk.level === 'HIGH') return { ok: false, reason: 'high_risk' };
-  const hard = i.risk.factors.find((f) => HARD_RISK.includes(f.code));
+  const hard = i.risk.factors.find((f) => HARD_RISK.includes(f.code)); // most specific reason first (shown to the admin)
   if (hard) return { ok: false, reason: hard.code };
+  if (i.risk.level === 'HIGH') return { ok: false, reason: 'high_risk' };
   const max = await getNumber('partner.autoApproveMaxAmount');
   if (max > 0 && i.amount > max) return { ok: false, reason: 'over_amount_cap' };
   const prior = await prisma.payment.count({ where: { userId: i.userId, status: 'APPROVED', id: { not: i.paymentId } } });
@@ -70,6 +70,20 @@ export async function partnerAutoApproveVerdict(
   return { ok: true };
 }
 export const PARTNER_AUTO_ACTOR = 'auto:partner';
+
+/** Why an eligible-looking partner payment still went to manual review (shown to admins). 'off' / 'not_partner' are not interesting. */
+export const PARTNER_REASON_FA: Record<string, string> = {
+  bank_contradicts: 'بانک پرداخت را رد کرده است (مبلغ/تراکنش نمی‌خواند)',
+  high_risk: 'ریسک پرداخت بالاست',
+  duplicate_tracking: 'کد پیگیری تکراری است',
+  duplicate_receipt: 'عکس رسید تکراری است',
+  amount_mismatch: 'مبلغ رسید با مبلغ سفارش نمی‌خواند',
+  payment_time_before_order: 'زمان پرداخت قبل از ثبت سفارش است',
+  repeated_submissions: 'تعداد ارسال رسید در ۲۴ ساعت زیاد است',
+  over_amount_cap: 'مبلغ از «سقف مبلغ تأیید خودکار» بیشتر است',
+  not_enough_history: 'همکار هنوز به تعداد لازم پرداخت تأییدشده ندارد',
+  daily_limit: 'سقف تأیید خودکار روزانه‌ی این همکار پر شده است',
+};
 
 export const getPartner = (userId: string) => prisma.partner.findUnique({ where: { userId } });
 

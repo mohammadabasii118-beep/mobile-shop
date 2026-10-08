@@ -131,8 +131,25 @@ describe('auto-approve partner orders (opt-in, narrow)', () => {
     expect(pay.status).toBe('NEEDS_REVIEW');
   });
 
-  it('on: the first order is reviewed by a human; after that the partner is trusted and payments are approved automatically, audited and announced', async () => {
+  it('on with the defaults: works from the very first partner order', async () => {
     await setSetting('partner.autoApproveOrders', 'true');
+    const { u, p } = await partnerWithProduct();
+    const { pay } = await buy(u, p);
+    expect(pay).toMatchObject({ status: 'APPROVED', autoApproved: true, reviewedBy: 'auto:partner' });
+  });
+
+  it('when it does NOT apply, the admin review notice says why', async () => {
+    await setSetting('partner.autoApproveOrders', 'true');
+    const { u, p } = await partnerWithProduct();
+    await buy(u, p, '222222222');
+    sent.length = 0;
+    expect((await buy(u, p, '222222222')).pay.status).toBe('NEEDS_REVIEW');
+    expect(sent.some((m) => m.text.includes('تأیید خودکار همکار انجام نشد') && m.text.includes('کد پیگیری تکراری'))).toBe(true);
+    expect((await prisma.auditLog.findFirst({ where: { action: 'payment.needs_review' }, orderBy: { createdAt: 'desc' } }))?.metadata).toMatchObject({ partnerAutoApprove: 'duplicate_tracking' });
+  });
+
+  it('with "minimum approved payments" = 1 the first order is reviewed by a human; after that the partner is trusted and payments are approved automatically, audited and announced', async () => {
+    await setSetting('partner.autoApproveOrders', 'true'); await setSetting('partner.autoApproveMinOrders', '1');
     const { u, p } = await partnerWithProduct();
     const first = await buy(u, p);
     expect(first.pay.status).toBe('NEEDS_REVIEW'); // no history yet
@@ -146,7 +163,7 @@ describe('auto-approve partner orders (opt-in, narrow)', () => {
   });
 
   it('never for non-partners, suspended partners, or when the partner programme is off', async () => {
-    await setSetting('partner.autoApproveOrders', 'true'); await setSetting('partner.autoApproveMinOrders', '0');
+    await setSetting('partner.autoApproveOrders', 'true');
     const plain = await make(100000);
     expect((await buy(plain.u, plain.p)).pay.status).toBe('NEEDS_REVIEW');
     const { u, p } = await partnerWithProduct();
@@ -158,7 +175,7 @@ describe('auto-approve partner orders (opt-in, narrow)', () => {
   });
 
   it('risk always wins: a reused tracking code, a mismatching amount, an over-limit amount or the daily limit send it to review', async () => {
-    await setSetting('partner.autoApproveOrders', 'true'); await setSetting('partner.autoApproveMinOrders', '0');
+    await setSetting('partner.autoApproveOrders', 'true');
     const { u, p } = await partnerWithProduct();
     const ok = await buy(u, p, '111111111');
     expect(ok.pay.status).toBe('APPROVED');
