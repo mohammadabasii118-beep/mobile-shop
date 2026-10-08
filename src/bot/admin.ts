@@ -12,7 +12,7 @@ import { adminRetry } from '../modules/vpn/provisioning';
 import { adminReply, closeTicket, listOpenTickets } from '../modules/support/service';
 import { SETTING_DEFAULTS, SettingKey, allSettings, getSetting, setSetting } from '../modules/settings/service';
 import { audit } from '../modules/admin/audit';
-import { PARTNER_STATUS_FA, PartnerFilter, approvePartner, getPartnerById, listPartners, partnerCounts, partnerLabel, partnerStats, rejectPartner, setPartnerPercent, setPartnerSuspended } from '../modules/partners/service';
+import { PARTNER_STATUS_FA, PartnerFilter, validatePartnerSetting, approvePartner, getPartnerById, listPartners, partnerCounts, partnerLabel, partnerStats, rejectPartner, setPartnerPercent, setPartnerSuspended } from '../modules/partners/service';
 import { addChannel, deleteChannel, listChannels, setChannelActive, testChannel } from '../modules/channels/service';
 import { isTextKey, listTexts, previewText, resetText, setText, textDef } from '../modules/texts/service';
 import { categoryTree, createCategory, deleteCategory, getCategory, moveCategory, setProductCategory, splitIconName, updateCategory } from '../modules/categories/service';
@@ -766,11 +766,10 @@ export function adminHandlers() {
       if (step === 'a_partner_cfg') {
         await need(ctx, 'partners.manage');
         if (!PCFG_KEYS.includes(data.key)) throw new AppError('VALIDATION', 'کلید نامعتبر');
-        const n = Number(text.replace(/[۰-۹]/g, (c) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c))).replace(/[%٪\s]/g, ''));
-        const max = data.key === 'partner.reapplyDays' ? 365 : 100;
-        if (!Number.isInteger(n) || n < (data.key === 'partner.reapplyDays' ? 0 : 0) || n > max) throw new AppError('VALIDATION', `عدد صحیح بین ۰ تا ${max} بفرستید`);
-        await setSetting(data.key, String(n));
-        await audit({ actor: actor(ctx), action: 'setting.change', target: 'Setting', targetId: data.key, metadata: { value: String(n) } });
+        const n = text.replace(/[۰-۹]/g, (c) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c))).replace(/[%٪\s]/g, '');
+        const v = await validatePartnerSetting(data.key, n);
+        await setSetting(data.key, v);
+        await audit({ actor: actor(ctx), action: 'setting.change', target: 'Setting', targetId: data.key, metadata: { value: v } });
         ctx.session.step = undefined;
         await ctx.reply('✅ ذخیره شد.');
         return partnerCfg(ctx);

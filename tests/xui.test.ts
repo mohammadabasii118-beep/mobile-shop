@@ -60,6 +60,41 @@ describe('X-UI authentication', () => {
     expect((await p.healthCheck()).ok).toBe(true);
     expect(n).toBeGreaterThanOrEqual(3);
   });
+  describe('writes are never re-sent unless the request provably did not apply', () => {
+    const json = (o: unknown, headers: Record<string, string> = {}) => new Response(JSON.stringify(o), { status: 200, headers: { 'content-type': 'application/json', ...headers } });
+    const stub = (onPost: (n: number) => Response | Promise<Response>) => {
+      const calls = { posts: 0, logins: 0 };
+      const f = (async (url: any, init: any) => {
+        if (String(url).endsWith('/login')) { calls.logins++; return json({ success: true }, { 'set-cookie': '3x-ui=ok; Path=/' }); }
+        if (init.method === 'POST') return onPost(++calls.posts);
+        return json({ success: true, obj: [] });
+      }) as unknown as typeof fetch;
+      return { calls, client: new XuiClient({ baseUrl: 'http://x', username: 'a', password: 'b', fetchImpl: f }) };
+    };
+    it('an empty 200 answer to a write is NOT treated as an expired session (it may have been applied)', async () => {
+      const { calls, client } = stub(() => new Response('', { status: 200 }));
+      await expect(client.addClient(1, { email: 'x' })).rejects.toThrow(/non-JSON/);
+      expect(calls.posts).toBe(1);
+    });
+    it('the HTML login page for a write means "not applied": log in again and send it once more', async () => {
+      const { calls, client } = stub((n) => (n === 1 ? new Response('<html>login</html>', { status: 200, headers: { 'content-type': 'text/html' } }) : json({ success: true })));
+      await client.addClient(1, { email: 'x' });
+      expect(calls.posts).toBe(2); expect(calls.logins).toBe(2);
+    });
+    it('connection reset on a write is not retried; connect-phase failures are', async () => {
+      let n = 0;
+      const reset = new XuiClient({ baseUrl: 'http://x', apiToken: 't', retries: 2, fetchImpl: (async () => { n++; throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNRESET' } }); }) as any });
+      await expect(reset.addClient(1, {})).rejects.toThrow(/unreachable/); expect(n).toBe(1);
+      n = 0;
+      const refused = new XuiClient({ baseUrl: 'http://x', apiToken: 't', retries: 2, fetchImpl: (async () => { n++; throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNREFUSED' } }); }) as any });
+      await expect(refused.addClient(1, {})).rejects.toThrow(/unreachable/); expect(n).toBe(3);
+    });
+  });
+  it('a wrong password is reported as an auth error — not as "inbound not found"', async () => {
+    const bad = mk({ password: 'WRONG-pass' });
+    await expect(bad.getInbound(1)).rejects.toThrow(/login failed/);
+    expect(await mk().getInbound(999)).toBeNull(); // the panel's own "not found" still maps to null
+  });
   it('unreachable panel => retryable ProviderError', async () => {
     const dead = new XuiVpnProvider({ client: new XuiClient({ baseUrl: 'http://127.0.0.1:1', username: 'a', password: 'b', timeoutMs: 500 }), publicHost: 'x' });
     await expect(dead.getInbound(1)).rejects.toMatchObject({ retryable: true });

@@ -14,7 +14,7 @@ import { adminRetry } from '../modules/vpn/provisioning';
 import { adminReply, closeTicket } from '../modules/support/service';
 import { SETTING_DEFAULTS, SettingKey, allSettings, setSetting } from '../modules/settings/service';
 import { flushPending } from '../modules/notifications/service';
-import { PartnerFilter, approvePartner, getPartnerById, listPartners, partnerCounts, partnerStats, rejectPartner, setPartnerPercent, setPartnerSuspended } from '../modules/partners/service';
+import { PartnerFilter, validatePartnerSetting, approvePartner, getPartnerById, listPartners, partnerCounts, partnerStats, rejectPartner, setPartnerPercent, setPartnerSuspended } from '../modules/partners/service';
 import { PanelView, createPanel, deletePanel, listPanelInbounds, listPanels, panelHealth, setPanelActive, testPanel, updatePanel } from '../modules/panels/service';
 import { categoryTree, createCategory, deleteCategory, moveCategory, updateCategory } from '../modules/categories/service';
 import { isTextKey, listTexts, previewText, resetText, setText } from '../modules/texts/service';
@@ -90,11 +90,7 @@ const panelBody = z.object({
   subBaseUrl: z.string().max(300).optional(), publicHost: z.string().max(200).optional(), tlsInsecure: z.boolean().optional(),
 });
 
-const PARTNER_RULES: Record<string, z.ZodType<string>> = {
-  'partner.enabled': bool, 'partner.autoApprove': bool, 'partner.stackCoupons': bool,
-  'partner.defaultDiscount': int(0, 100), 'partner.maxDiscount': int(0, 100), 'partner.reapplyDays': int(0, 365),
-};
-const PARTNER_KEYS = Object.keys(PARTNER_RULES) as SettingKey[];
+const PARTNER_KEYS = ['partner.enabled', 'partner.autoApprove', 'partner.stackCoupons', 'partner.defaultDiscount', 'partner.maxDiscount', 'partner.reapplyDays'] as SettingKey[];
 
 const confirmFor = (externalId: string) => `DELETE ${externalId.slice(-6)}`;
 
@@ -239,7 +235,7 @@ export const routes: Route[] = [
     method: 'PUT', re: /^\/partners\/settings$/, perm: 'partners.manage',
     run: async (c) => {
       const b = z.object({ key: z.enum(PARTNER_KEYS as [SettingKey, ...SettingKey[]]), value: z.string() }).parse(c.body);
-      const v = PARTNER_RULES[b.key].parse(b.value.trim());
+      const v = await validatePartnerSetting(b.key, b.value.trim());
       await setSetting(b.key, v);
       await audit({ actor: actor(c), action: 'setting.change', target: 'Setting', targetId: b.key, metadata: { value: v } });
       return { ok: true };

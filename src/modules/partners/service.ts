@@ -24,6 +24,21 @@ export async function partnerDiscountFor(userId: string, amount: number, db: Db 
   return { percent, amount: Math.min(amount, Math.floor((amount * percent) / 100)) };
 }
 
+/** Cross-field check for the partner settings (used by the bot and the web panel). Returns the normalised value. */
+export async function validatePartnerSetting(key: string, raw: string): Promise<string> {
+  const n = Number(raw);
+  if (key === 'partner.enabled' || key === 'partner.autoApprove' || key === 'partner.stackCoupons') {
+    if (raw !== 'true' && raw !== 'false') throw new ValidationError('مقدار باید true یا false باشد');
+    return raw;
+  }
+  const max = key === 'partner.reapplyDays' ? 365 : 100;
+  if (!['partner.defaultDiscount', 'partner.maxDiscount', 'partner.reapplyDays'].includes(key)) throw new ValidationError('تنظیم نامعتبر');
+  if (!/^\d+$/.test(raw) || n > max) throw new ValidationError(`عدد صحیح بین ۰ تا ${max} وارد کنید`);
+  if (key === 'partner.defaultDiscount' && n > (await getNumber('partner.maxDiscount'))) throw new ValidationError('درصد پیش‌فرض نمی‌تواند از «سقف تخفیف» بیشتر باشد');
+  if (key === 'partner.maxDiscount' && n < (await getNumber('partner.defaultDiscount'))) throw new ValidationError('سقف تخفیف نمی‌تواند از «درصد پیش‌فرض» کمتر باشد؛ اول درصد پیش‌فرض را کم کنید');
+  return String(n);
+}
+
 export const getPartner = (userId: string) => prisma.partner.findUnique({ where: { userId } });
 
 export async function partnerStats(userId: string) {
@@ -52,9 +67,16 @@ export async function applyForPartner(userId: string, note?: string) {
   const existing = await getPartner(userId);
   const block = await applyBlockReason(existing);
   if (block) throw new ConflictError(block);
-  const row = existing
-    ? await prisma.partner.update({ where: { userId }, data: { status: 'PENDING', note: clean, adminNote: null, requestedAt: new Date(), decidedAt: null, decidedBy: null, discountPercent: 0 } })
-    : await prisma.partner.create({ data: { userId, note: clean } });
+  let row: Partner;
+  if (existing) {
+    // only a REJECTED row may be re-opened; a concurrent double-tap loses the conditional write
+    const r = await prisma.partner.updateMany({ where: { userId, status: 'REJECTED' }, data: { status: 'PENDING', note: clean, adminNote: null, requestedAt: new Date(), decidedAt: null, decidedBy: null, discountPercent: 0 } });
+    if (r.count !== 1) throw new ConflictError('درخواست شما قبلاً ثبت شده است');
+    row = await prisma.partner.findUniqueOrThrow({ where: { userId } });
+  } else {
+    try { row = await prisma.partner.create({ data: { userId, note: clean } }); }
+    catch (e: any) { if (e?.code === 'P2002') throw new ConflictError('درخواست شما قبلاً ثبت شده است'); throw e; }
+  }
   await audit({ actor: `user:${userId}`, action: 'partner.apply', target: 'Partner', targetId: row.id });
   if (await getBool('partner.autoApprove')) {
     return { partner: await approvePartner('system', row.id), auto: true };
@@ -89,9 +111,16 @@ const pctOk = async (n: number) => {
 /** Approve (or re-activate) with a percentage — defaults to the global default. Idempotent for an already approved partner. */
 export async function approvePartner(actor: string, id: string, percent?: number) {
   const before = await getPartnerById(id);
-  const pct = await pctOk(percent ?? (await getNumber('partner.defaultDiscount')));
+  // A stale button (another admin already decided) must not override the current state.
+  if (before.status === 'SUSPENDED') throw new ConflictError('این همکار معلق است؛ از «فعال‌سازی دوباره» استفاده کنید');
+  if (before.status === 'APPROVED' && percent === undefined) return before; // "approve with the default" never resets a custom %
+  const fallback = Math.min(await getNumber('partner.defaultDiscount'), await getNumber('partner.maxDiscount'));
+  const pct = await pctOk(percent ?? fallback);
   if (before.status === 'APPROVED' && before.discountPercent === pct) return before;
-  const row = await prisma.partner.update({ where: { id }, data: { status: 'APPROVED', discountPercent: pct, adminNote: null, decidedAt: new Date(), decidedBy: actor } });
+  // conditional write: loses cleanly if someone changed the status in between
+  const done = await prisma.partner.updateMany({ where: { id, status: before.status }, data: { status: 'APPROVED', discountPercent: pct, adminNote: null, decidedAt: new Date(), decidedBy: actor } });
+  if (done.count !== 1) throw new ConflictError('وضعیت این درخواست همین الان تغییر کرد؛ صفحه را دوباره باز کنید');
+  const row = await getPartnerById(id);
   await audit({ actor, action: 'partner.approve', target: 'Partner', targetId: id, metadata: { percent: pct } });
   if (before.status !== 'APPROVED') {
     const T = await loadTexts();
@@ -106,7 +135,10 @@ export async function rejectPartner(actor: string, id: string, reason: string) {
   const before = await getPartnerById(id);
   const why = reason.trim().slice(0, 300) || 'نامشخص';
   if (before.status === 'REJECTED') return before;
-  const row = await prisma.partner.update({ where: { id }, data: { status: 'REJECTED', discountPercent: 0, adminNote: why, decidedAt: new Date(), decidedBy: actor } });
+  if (before.status !== 'PENDING') throw new ConflictError('این درخواست قبلاً بررسی شده است؛ برای همکار فعلی از «تعلیق» استفاده کنید');
+  const done = await prisma.partner.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'REJECTED', discountPercent: 0, adminNote: why, decidedAt: new Date(), decidedBy: actor } });
+  if (done.count !== 1) throw new ConflictError('وضعیت این درخواست همین الان تغییر کرد؛ صفحه را دوباره باز کنید');
+  const row = await getPartnerById(id);
   await audit({ actor, action: 'partner.reject', target: 'Partner', targetId: id, metadata: { reason: why } });
   await notifyUser(before.userId, 'partner_rejected', (await loadTexts()).html('partner.rejected', { reason: why }), { html: true, dedupeKey: `partner_no:${id}:${row.decidedAt!.getTime()}` });
   return row;

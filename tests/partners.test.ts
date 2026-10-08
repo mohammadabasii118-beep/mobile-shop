@@ -73,6 +73,46 @@ describe('partner service', () => {
   });
 });
 
+describe('stale buttons, races and settings cross-checks', () => {
+  it('a stale ✅/❌ cannot override a decision another admin already made', async () => {
+    const { u } = await make();
+    await applyForPartner(u.id);
+    const id = (await partnerOf(u.id)).id;
+    await approvePartner('adminA', id, 35);
+    await expect(rejectPartner('adminB', id, 'late')).rejects.toThrow(/قبلاً بررسی شده/);
+    expect(await partnerOf(u.id)).toMatchObject({ status: 'APPROVED', discountPercent: 35 });
+    await approvePartner('adminB', id); // "approve with default" on an approved partner is a no-op: the custom 35% survives
+    expect((await partnerOf(u.id)).discountPercent).toBe(35);
+    await setPartnerSuspended('adminA', id, true);
+    await expect(approvePartner('adminB', id)).rejects.toThrow(/معلق/); // an old ✅ must not lift a suspension
+    expect((await partnerOf(u.id)).status).toBe('SUSPENDED');
+  });
+  it('double submit: exactly one application and one admin notification', async () => {
+    const { u } = await make();
+    const r = await Promise.allSettled([applyForPartner(u.id, 'a'), applyForPartner(u.id, 'b')]);
+    expect(r.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
+    expect(r.find((x) => x.status === 'rejected')).toMatchObject({ reason: { code: 'CONFLICT' } });
+    expect(await prisma.partner.count()).toBe(1);
+    expect(new Set(sent.filter((m) => m.text.includes('درخواست همکاری جدید')).map((m) => String(m.chatId))).size).toBe(sent.filter((m) => m.text.includes('درخواست همکاری جدید')).length);
+  });
+  it('default % above the cap: validated on save, and approval still works if it ever happens', async () => {
+    const { validatePartnerSetting } = await import('../src/modules/partners/service');
+    await setSetting('partner.maxDiscount', '30'); await setSetting('partner.defaultDiscount', '20');
+    await expect(validatePartnerSetting('partner.defaultDiscount', '50')).rejects.toThrow(/نمی‌تواند از «سقف تخفیف» بیشتر/);
+    await expect(validatePartnerSetting('partner.maxDiscount', '10')).rejects.toThrow(/نمی‌تواند از «درصد پیش‌فرض» کمتر/);
+    await expect(validatePartnerSetting('partner.maxDiscount', 'abc')).rejects.toThrow(/عدد صحیح/);
+    await expect(validatePartnerSetting('partner.maxDiscount', '101')).rejects.toThrow(/عدد صحیح/);
+    await expect(validatePartnerSetting('card.number', '1')).rejects.toThrow(/نامعتبر/);
+    expect(await validatePartnerSetting('partner.reapplyDays', '7')).toBe('7');
+    await setSetting('partner.defaultDiscount', '50'); // forced inconsistency (e.g. edited in the DB)
+    await setSetting('partner.autoApprove', 'true');
+    const { u } = await make();
+    const r = await applyForPartner(u.id);
+    expect(r.auto).toBe(true);
+    expect((await partnerOf(u.id)).discountPercent).toBe(30); // capped, not stuck half-applied
+  });
+});
+
 describe('pricing', () => {
   it('approved partner gets the % on every order; amounts are stored; payment amount = final price', async () => {
     const { u, p } = await make(250000);
@@ -232,6 +272,7 @@ describe('web panel API', () => {
     expect((await call(c, 'GET', '/partners?status=REJECTED')).json.items).toHaveLength(1);
     expect((await call(c, 'GET', '/partners/settings')).json).toMatchObject({ 'partner.enabled': 'true', 'partner.defaultDiscount': '20' });
     expect((await call(c, 'PUT', '/partners/settings', { key: 'partner.maxDiscount', value: '150' })).status).toBe(400);
+    expect((await call(c, 'PUT', '/partners/settings', { key: 'partner.maxDiscount', value: '10' })).json.message).toContain('کمتر'); // below the 20% default
     expect((await call(c, 'PUT', '/partners/settings', { key: 'card.number', value: '1' })).status).toBe(400); // only partner keys
     expect((await call(c, 'PUT', '/partners/settings', { key: 'partner.maxDiscount', value: '45' })).status).toBe(200);
     await prisma.admin.createMany({ data: [{ telegramId: 9501n, role: 'PRODUCT_ADMIN' }, { telegramId: 9502n, role: 'PAYMENT_ADMIN' }] });

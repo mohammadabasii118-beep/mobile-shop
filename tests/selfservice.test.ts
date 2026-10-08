@@ -4,6 +4,7 @@ import { FakeXui } from '../dev/fakeXui';
 import { createBot } from '../src/bot';
 import { XuiClient } from '../src/providers/vpn/xui/client';
 import { XuiVpnProvider } from '../src/providers/vpn/xui/provider';
+import { ProviderError } from '../src/providers/vpn/types';
 import { setVpnProvider } from '../src/providers/vpn';
 import { approvePayment } from '../src/modules/payments/service';
 import { adminRenew, deleteServiceByUser, listUserServices, resumeService, rotateServiceLink, suspendService } from '../src/modules/vpn/service';
@@ -13,10 +14,11 @@ import { makeOrder, makeProduct, makeUser, resetDb, setup, submit } from './help
 let panel: FakeXui;
 beforeAll(async () => { panel = await new FakeXui().start(); });
 afterAll(async () => { await panel.stop(); });
+let prov: XuiVpnProvider;
 beforeEach(async () => {
   await resetDb(); setup();
   panel.inbounds.get(1)!.settings.clients = []; panel.inbounds.get(1)!.traffic = {};
-  setVpnProvider(new XuiVpnProvider({ client: new XuiClient({ baseUrl: panel.url, username: 'admin', password: 'secret', timeoutMs: 2000 }), publicHost: 'vpn.example.com', subBaseUrl: 'https://sub.example.com:2096/sub/' }));
+  setVpnProvider(prov = new XuiVpnProvider({ client: new XuiClient({ baseUrl: panel.url, username: 'admin', password: 'secret', timeoutMs: 2000 }), publicHost: 'vpn.example.com', subBaseUrl: 'https://sub.example.com:2096/sub/' }));
 });
 
 async function bought(telegramId?: number) {
@@ -68,19 +70,53 @@ describe('customer: change link', () => {
   });
 });
 
+describe('customer: failure handling', () => {
+  it('double-tap on "change link" rotates once', async () => {
+    const { u, svc } = await bought();
+    const r = await Promise.allSettled([rotateServiceLink(u.id, svc.id), rotateServiceLink(u.id, svc.id)]);
+    expect(r.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
+    expect(await prisma.auditLog.count({ where: { action: 'vpn.rotate_link', targetId: svc.id } })).toBe(1);
+  });
+  it('if re-reading the link fails after the panel accepted the change, the DB already has the new identity and the link is re-fetched on demand', async () => {
+    const { u, svc } = await bought();
+    const real = prov.getConfig.bind(prov);
+    prov.getConfig = (async () => { throw new ProviderError('timeout', true); }) as any;
+    await expect(rotateServiceLink(u.id, svc.id)).rejects.toThrow(/timeout/);
+    prov.getConfig = real;
+    const after = panelClient(svc.externalId);
+    const row = await prisma.vpnService.findUniqueOrThrow({ where: { id: svc.id } });
+    expect(row).toMatchObject({ uuid: after.id, subId: after.subId, config: null, subscriptionUrl: null }); // consistent with the panel, link to be re-read
+    const { refreshConfig } = await import('../src/modules/vpn/service');
+    const healed = await refreshConfig(svc.id);
+    expect(healed.config).toContain(after.id); expect(healed.subscriptionUrl).toContain(after.subId);
+  });
+  it('a paid renewal that arrives after the customer deleted the service fails loudly (no silent success, no client resurrected)', async () => {
+    const { u, p, svc } = await bought();
+    const ren = await makeOrder(u.id, p.id, { renewalOfServiceId: svc.id } as any);
+    const pay = await submit(u.id, ren.id, { trackingCode: '987654321' });
+    await prisma.vpnService.update({ where: { id: svc.id }, data: { status: 'CANCELLED' } });
+    await approvePayment(pay.id, { actor: 'admin' });
+    const task = await prisma.provisioningTask.findUniqueOrThrow({ where: { orderId: ren.id } });
+    expect(task.status).toBe('FAILED'); expect(task.lastError).toContain('service was deleted');
+  });
+});
+
 describe('customer: delete service', () => {
   it('removes the client from the panel, cancels, hides it from the list; owner only; not while a renewal is open', async () => {
     const { u, p, svc } = await bought();
     const stranger = await makeUser();
     await expect(deleteServiceByUser(stranger.id, svc.id)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(panel.clientCount()).toBe(1);
-    await makeOrder(u.id, p.id, { renewalOfServiceId: svc.id } as any); // unpaid renewal in flight
-    await expect(deleteServiceByUser(u.id, svc.id)).rejects.toThrow(/تمدید در جریان/);
-    await prisma.order.updateMany({ where: { renewalOfServiceId: svc.id }, data: { status: 'CANCELLED' } });
+    const ren = await makeOrder(u.id, p.id, { renewalOfServiceId: svc.id } as any); // unpaid renewal: must NOT block, it is cancelled with the service
+    await prisma.order.update({ where: { id: ren.id }, data: { status: 'PAYMENT_SUBMITTED' } }); // …but a renewal that carries money does block
+    await expect(deleteServiceByUser(u.id, svc.id)).rejects.toThrow(/تمدید پرداخت‌شده/);
+    expect(panel.clientCount()).toBe(1);
+    await prisma.order.update({ where: { id: ren.id }, data: { status: 'PENDING_PAYMENT' } });
     await deleteServiceByUser(u.id, svc.id);
     expect(panel.clientCount()).toBe(0);
     expect((await prisma.vpnService.findUniqueOrThrow({ where: { id: svc.id } })).status).toBe('CANCELLED');
     expect(await listUserServices(u.id)).toHaveLength(0);
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: ren.id } })).status).toBe('CANCELLED');
     expect(await prisma.auditLog.count({ where: { action: 'vpn.delete', actor: `user:${u.id}` } })).toBe(1);
     await expect(deleteServiceByUser(u.id, svc.id)).rejects.toThrow(); // second time: nothing to delete
   });

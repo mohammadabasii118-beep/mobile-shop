@@ -4,6 +4,7 @@ import { prisma } from '../../db/client';
 import { NotFoundError, ValidationError } from '../../utils/errors';
 import { audit } from '../admin/audit';
 import { vpnFor } from '../../providers/vpn';
+import { ProviderError } from '../../providers/vpn/types';
 import { assertPanel } from '../panels/service';
 
 const F = {
@@ -49,7 +50,12 @@ export async function getProduct(id: string) {
  */
 export async function assertInbound(panel: string, id: number) {
   let info;
-  try { info = await (await vpnFor(panel)).getInbound(id); } catch { return; }
+  try { info = await (await vpnFor(panel)).getInbound(id); } catch (e: any) {
+    // an unreachable panel must not block the admin (provisioning retries cover it) — but a wrong password, an
+    // unreadable secret or a deleted panel is a permanent problem the admin has to hear about now.
+    if (e instanceof ProviderError && e.retryable) return;
+    throw new ValidationError(`ارتباط با پنل «${panel}» ممکن نیست: ${String(e?.message ?? e).slice(0, 160)}`);
+  }
   if (!info) throw new ValidationError(`inbound شماره ${id} در پنل «${panel}» پیدا نشد. شماره را از لیست inboundهای همان پنل بردارید.`);
   if (!info.enable) throw new ValidationError(`inbound شماره ${id} در پنل «${panel}» غیرفعال است. اول آن را در پنل فعال کنید.`);
 }

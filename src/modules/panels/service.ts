@@ -43,22 +43,25 @@ const authOf = (r: { apiTokenEnc?: string | null; passwordEnc?: string | null })
 
 export async function listPanels(): Promise<PanelView[]> {
   const rows = await prisma.panel.findMany({ orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }] });
-  const count = async (code: string) => ({
-    products: await prisma.product.count({ where: { xuiProviderId: code } }),
-    services: await prisma.vpnService.count({ where: { provider: code } }),
-  });
+  const [pc, sc] = await Promise.all([
+    prisma.product.groupBy({ by: ['xuiProviderId'], _count: true }),
+    prisma.vpnService.groupBy({ by: ['provider'], _count: true }),
+  ]);
+  const prodBy = new Map(pc.map((r) => [r.xuiProviderId, r._count]));
+  const svcBy = new Map(sc.map((r) => [r.provider, r._count]));
+  const count = (code: string) => ({ products: prodBy.get(code) ?? 0, services: svcBy.get(code) ?? 0 });
   const out: PanelView[] = [];
   const env = envPanelConfig();
   if (env && !rows.some((r) => r.code === DEFAULT_PANEL)) {
     out.push({
       id: 'env', code: DEFAULT_PANEL, name: 'پنل اصلی (از تنظیمات سرور)', baseUrl: env.baseUrl, auth: env.apiToken ? 'token' : env.username ? 'password' : 'none',
-      subBaseUrl: env.subBaseUrl ?? null, publicHost: env.publicHost ?? null, tlsInsecure: !!env.tlsInsecure, isActive: true, source: 'env', ...(await count(DEFAULT_PANEL)),
+      subBaseUrl: env.subBaseUrl ?? null, publicHost: env.publicHost ?? null, tlsInsecure: !!env.tlsInsecure, isActive: true, source: 'env', ...count(DEFAULT_PANEL),
     });
   }
   for (const r of rows) {
     out.push({
       id: r.id, code: r.code, name: r.name, baseUrl: r.baseUrl, auth: authOf(r), subBaseUrl: r.subBaseUrl, publicHost: r.publicHost,
-      tlsInsecure: r.tlsInsecure, isActive: r.isActive, source: 'db', ...(await count(r.code)),
+      tlsInsecure: r.tlsInsecure, isActive: r.isActive, source: 'db', ...count(r.code),
     });
   }
   return out;
@@ -165,7 +168,8 @@ export async function updatePanel(actor: string, id: string, patch: PanelInput |
       username: ('username' in data ? (data.username as string | null) : row.username),
       password: d.password ?? (row.passwordEnc ? decryptSecret(row.passwordEnc) : null),
       apiToken: 'apiTokenEnc' in data ? (d.apiToken || null) : (row.apiTokenEnc ? decryptSecret(row.apiTokenEnc) : null),
-      subBaseUrl: row.subBaseUrl, publicHost: (data.publicHost as string | null) ?? row.publicHost,
+      subBaseUrl: 'subBaseUrl' in data ? (data.subBaseUrl as string | null) : row.subBaseUrl,
+      publicHost: 'publicHost' in data ? (data.publicHost as string | null) : row.publicHost,
       tlsInsecure: ('tlsInsecure' in data ? (data.tlsInsecure as boolean) : row.tlsInsecure),
     };
     const t = await testConfig(merged);
@@ -231,7 +235,8 @@ export function parsePanelText(text: string): Record<string, string | boolean> {
     if (!line) continue;
     const m = /^([^:：]+)[:：]\s*(.*)$/.exec(line);
     if (!m) throw new ValidationError(`خط «${line.slice(0, 40)}» فرمت «کلید: مقدار» ندارد`);
-    const key = KEYS[m[1].trim().toLowerCase()];
+    const k = m[1].trim().toLowerCase();
+    const key = Object.hasOwn(KEYS, k) ? KEYS[k] : undefined;
     if (!key) throw new ValidationError(`کلید «${m[1].trim()}» شناخته نشد. کلیدهای مجاز: نام، آدرس، کاربر، رمز، توکن، ساب، هاست، کد، tls`);
     const v = m[2].trim();
     out[key] = key === 'tlsInsecure' ? YES.test(v) : v === '-' ? '' : v;

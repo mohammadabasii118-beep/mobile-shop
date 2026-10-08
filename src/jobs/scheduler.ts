@@ -5,7 +5,7 @@ import { reverifyPending } from '../modules/payments/service';
 import { flushPending } from '../modules/notifications/service';
 import { expireStaleOrders } from '../modules/orders/service';
 import { getNumber } from '../modules/settings/service';
-import { activePanelCodes, getPanel, testPanel } from '../modules/panels/service';
+import { listPanels, testPanel } from '../modules/panels/service';
 import { notifyAdmins } from '../modules/notifications/service';
 
 interface Job { name: string; everyMs: number; run: () => Promise<unknown> }
@@ -15,21 +15,23 @@ const panelFails = new Map<string, number>();
 const panelAlerted = new Set<string>();
 
 export async function checkPanels() {
-  for (const code of await activePanelCodes()) {
-    const r = await testPanel(code);
-    const name = await getPanel(code).then((p) => p.name).catch(() => code);
+  const active = (await listPanels()).filter((p) => p.isActive);
+  // forget state of panels that were deleted/deactivated meanwhile (no stale alerts, no missing recovery notice later)
+  for (const code of [...panelFails.keys(), ...panelAlerted]) if (!active.some((p) => p.code === code)) { panelFails.delete(code); panelAlerted.delete(code); }
+  await Promise.all(active.map(async (p) => {
+    const r = await testPanel(p.code); // probed in parallel: one dead panel cannot delay the others
     if (r.ok) {
-      panelFails.delete(code);
-      if (panelAlerted.delete(code)) await notifyAdmins('xui_recovered', `🟢 پنل «${name}» دوباره متصل شد.`, { roles: ['VPN_ADMIN'] });
-      continue;
+      panelFails.delete(p.code);
+      if (panelAlerted.delete(p.code)) await notifyAdmins('xui_recovered', `🟢 پنل «${p.name}» دوباره متصل شد.`, { roles: ['VPN_ADMIN'] });
+      return;
     }
-    const n = (panelFails.get(code) ?? 0) + 1;
-    panelFails.set(code, n);
-    if (n >= 2 && !panelAlerted.has(code)) {
-      panelAlerted.add(code);
-      await notifyAdmins('xui_unavailable', `🔌 پنل «${name}» در دسترس نیست: ${r.detail}`, { roles: ['VPN_ADMIN'] });
+    const n = (panelFails.get(p.code) ?? 0) + 1;
+    panelFails.set(p.code, n);
+    if (n >= 2 && !panelAlerted.has(p.code)) {
+      panelAlerted.add(p.code);
+      await notifyAdmins('xui_unavailable', `🔌 پنل «${p.name}» در دسترس نیست: ${r.detail}`, { roles: ['VPN_ADMIN'] });
     }
-  }
+  }));
 }
 export const jobs: Job[] = [
   { name: 'provisioning-retry', everyMs: 30_000, run: retryDueProvisioning },

@@ -74,6 +74,14 @@ describe('panel CRUD', () => {
     await updatePanel('t', p.id, { baseUrl: B.url });
     expect((await prisma.panel.findUniqueOrThrow({ where: { id: p.id } })).baseUrl).toBe(B.url);
   });
+  it('clearing an optional field saves exactly what was tested; counts come from one grouped query', async () => {
+    const p = await createPanel('t', creds(A, { name: 'A', publicHost: 'old.example.com', subBaseUrl: 'https://sub.example.com/sub' }));
+    await updatePanel('t', p.id, { publicHost: '', subBaseUrl: '' });
+    expect(await prisma.panel.findUniqueOrThrow({ where: { id: p.id } })).toMatchObject({ publicHost: null, subBaseUrl: null });
+    await createProduct('t', { name: 'p1', durationDays: 30, trafficGB: 10, price: 1000, xuiInboundId: 1, xuiProviderId: p.code });
+    await createProduct('t', { name: 'p2', durationDays: 30, trafficGB: 10, price: 1000, xuiInboundId: 1, xuiProviderId: p.code });
+    expect((await listPanels()).find((x) => x.code === p.code)).toMatchObject({ products: 2, services: 0 });
+  });
   it('lists inbounds of the right panel', async () => {
     const a = await createPanel('t', creds(A, { name: 'A' })), b = await createPanel('t', creds(B, { name: 'B' }));
     expect((await listPanelInbounds(a.code)).map((i) => i.id)).toEqual([1]);
@@ -92,6 +100,7 @@ describe('panel CRUD', () => {
   it('parses the key: value admin message (persian + english keys, - clears)', () => {
     expect(parsePanelText('نام: آلمان\nآدرس: https://1.2.3.4:2053/x\nکاربر: admin\nرمز: p:w\nساب: -\ntls: نامعتبر')).toEqual({ name: 'آلمان', baseUrl: 'https://1.2.3.4:2053/x', username: 'admin', password: 'p:w', subBaseUrl: '', tlsInsecure: true });
     expect(() => parsePanelText('foo: 1')).toThrow(/شناخته نشد/);
+    for (const k of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) expect(() => parsePanelText(`${k}: x`), k).toThrow(/شناخته نشد/);
     expect(() => parsePanelText('بدون دونقطه')).toThrow(/فرمت/);
   });
 });
@@ -103,6 +112,11 @@ describe('products are bound to a panel + inbound', () => {
     await expect(createProduct('t', { ...base, xuiInboundId: 7, xuiProviderId: a.code })).rejects.toThrow(/پیدا نشد/); // 7 only exists on B
     await expect(createProduct('t', { ...base, xuiInboundId: 7, xuiProviderId: b.code })).rejects.toThrow(/غیرفعال/);
     await expect(createProduct('t', { ...base, xuiInboundId: 1, xuiProviderId: 'nope' })).rejects.toThrow(/وجود ندارد/);
+    // a permanently broken panel (password changed) must be reported, not silently accepted
+    setVpnProvider(undefined); // drop cached sessions
+    A.password = 'changed-on-panel';
+    await expect(createProduct('t', { ...base, xuiInboundId: 1, xuiProviderId: a.code })).rejects.toThrow(/ارتباط با پنل/);
+    A.password = 'secret';
     const made = await createProductsBulk('t', `panel=${b.code}\ninbound=1\nB-plan | 30 | 20 | 50000`);
     expect(made[0]).toMatchObject({ xuiProviderId: b.code, xuiInboundId: 1 });
     const moved = await updateProduct('t', made[0].id, { xuiProviderId: a.code });
@@ -164,6 +178,15 @@ describe('health alerts', () => {
     expect(count()).toBe(n); // no repeat spam
     A.failNext = 0; await checkPanels();
     expect(sent.some((m) => /دوباره متصل شد/.test(m.text))).toBe(true);
+    // alert state follows the panel: deactivate while alerted, re-enable, fail again → a fresh alert (nothing stale)
+    const row = await prisma.panel.findFirstOrThrow();
+    A.failNext = 4; await checkPanels(); await checkPanels();
+    const before = count();
+    await setPanelActive('t', row.id, false); await checkPanels();
+    await setPanelActive('t', row.id, true);
+    A.failNext = 4; await checkPanels(); await checkPanels();
+    expect(count()).toBeGreaterThan(before);
+    A.failNext = 0;
     wiped();
   });
 });

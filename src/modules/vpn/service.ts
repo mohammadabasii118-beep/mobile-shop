@@ -173,33 +173,44 @@ export async function renameService(userId: string, id: string, rawName: string 
 /* --------------------------- customer self-service --------------------------- */
 
 const ROTATE_COOLDOWN_MS = 10 * 60_000;
-const OPEN_ORDER = ['PENDING_PAYMENT', 'PAYMENT_SUBMITTED', 'PAYMENT_REVIEW', 'PAID', 'PROVISIONING'] as const;
+// Renewals that already carry money (or are being fulfilled) block self-delete; an unpaid one is simply cancelled with it.
+const PAID_RENEWAL = ['PAYMENT_SUBMITTED', 'PAYMENT_REVIEW', 'PAID', 'PROVISIONING'] as const;
+const inflight = new Set<string>(); // a double-tap must not rotate twice (single bot process)
 
 /**
  * "Change link": new uuid/password + new subscription id on the SAME client (traffic, expiry and name are kept).
  * Every old link/config stops working at once — for when a link leaked or was shared.
+ * The new identifiers are written to the DB right after the panel accepted them; only then is the link re-read, so a failure
+ * afterwards leaves the DB pointing at the real (new) credentials and the link can simply be re-fetched.
  */
 export async function rotateServiceLink(userId: string, id: string) {
   const s = await getServiceForUser(userId, id);
   if (s.provisioningStatus !== 'SUCCESS' || s.status !== 'ACTIVE') throw new ConflictError('تغییر لینک فقط برای سرویس فعال ممکن است.');
-  const recent = await prisma.auditLog.findFirst({ where: { action: 'vpn.rotate_link', targetId: s.id, createdAt: { gt: new Date(Date.now() - ROTATE_COOLDOWN_MS) } }, select: { id: true } });
-  if (recent) throw new ConflictError('لینک همین چند دقیقه‌ی پیش تغییر کرده است؛ کمی بعد دوباره تلاش کنید.');
-  const credential = credentialFor(s.protocol);
-  const subId = subIdGen();
-  const provider = await vpnFor(s.provider);
-  await provider.rotateLink(refOf(s), { credential, subId });
-  const cfg = await provider.getConfig({ ...refOf({ ...s, uuid: credential }), subId, remark: linkRemark(s.displayName, s.externalId) });
-  const updated = await prisma.vpnService.update({ where: { id: s.id }, data: { uuid: credential, clientId: credential, subId, config: cfg.config, subscriptionUrl: cfg.subscriptionUrl ?? null } });
-  await audit({ actor: `user:${userId}`, action: 'vpn.rotate_link', target: 'VpnService', targetId: s.id, metadata: { externalId: s.externalId } });
-  return updated;
+  if (inflight.has(s.id)) throw new ConflictError('تغییر لینک در حال انجام است؛ چند لحظه صبر کنید.');
+  inflight.add(s.id);
+  try {
+    const recent = await prisma.auditLog.findFirst({ where: { action: 'vpn.rotate_link', targetId: s.id, createdAt: { gt: new Date(Date.now() - ROTATE_COOLDOWN_MS) } }, select: { id: true } });
+    if (recent) throw new ConflictError('لینک همین چند دقیقه‌ی پیش تغییر کرده است؛ کمی بعد دوباره تلاش کنید.');
+    const credential = credentialFor(s.protocol);
+    const subId = subIdGen();
+    const provider = await vpnFor(s.provider);
+    await provider.rotateLink(refOf(s), { credential, subId });
+    await prisma.vpnService.update({ where: { id: s.id }, data: { uuid: credential, clientId: credential, subId, config: null, subscriptionUrl: null } });
+    await audit({ actor: `user:${userId}`, action: 'vpn.rotate_link', target: 'VpnService', targetId: s.id, metadata: { externalId: s.externalId } });
+    return await refreshConfig(s.id); // if this fails the user can press "get link" again: it re-reads from the panel
+  } finally { inflight.delete(s.id); }
 }
 
 /** The customer deletes their own service: the client is removed from the panel for good (no refund, no undo). */
 export async function deleteServiceByUser(userId: string, id: string) {
   const s = await getServiceForUser(userId, id);
   if (s.provisioningStatus !== 'SUCCESS' || (s.status !== 'ACTIVE' && s.status !== 'EXPIRED')) throw new ConflictError('این سرویس را نمی‌توان حذف کرد؛ با پشتیبانی تماس بگیرید.');
-  const open = await prisma.order.count({ where: { renewalOfServiceId: s.id, status: { in: [...OPEN_ORDER] } } });
-  if (open) throw new ConflictError('برای این سرویس یک تمدید در جریان است؛ بعد از پایان آن می‌توانید حذفش کنید.');
+  const paid = await prisma.order.count({ where: { renewalOfServiceId: s.id, status: { in: [...PAID_RENEWAL] } } });
+  if (paid) throw new ConflictError('برای این سرویس یک تمدید پرداخت‌شده در جریان است؛ بعد از پایان آن می‌توانید حذفش کنید.');
+  const { cancelOrder } = await import('../orders/service');
+  for (const o of await prisma.order.findMany({ where: { renewalOfServiceId: s.id, status: 'PENDING_PAYMENT' }, select: { id: true } })) {
+    await cancelOrder(userId, o.id).catch(() => undefined); // an unpaid renewal of a service that is being deleted is moot
+  }
   await deleteService(s.id, `user:${userId}`);
   return s;
 }

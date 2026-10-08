@@ -132,6 +132,7 @@ export const deliveryButtons = (s: Pick<VpnService, 'id' | 'subscriptionUrl'>) =
 async function doRenew(taskId: string, order: Order, product: Product) {
   const t = await prisma.provisioningTask.findUniqueOrThrow({ where: { id: taskId } });
   const svc = await prisma.vpnService.findUniqueOrThrow({ where: { id: order.renewalOfServiceId! } });
+  if (svc.status === 'CANCELLED') throw new ProviderError('service was deleted before the renewal could be applied — refund or re-create manually', false);
   const provider = await vpnFor(svc.provider);
   // Absolute targets are computed ONCE and persisted => a retry never extends twice.
   let targetExpiry = t.targetExpiresAt;

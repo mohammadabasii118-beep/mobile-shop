@@ -6,7 +6,7 @@ import { menuLevel } from '../modules/categories/service';
 import { cancelOrder, createOrder, getOrderForUser, listUserOrders, setOrderServiceName } from '../modules/orders/service';
 import { isPaymentMethodEnabled, startPayment, submitReceipt } from '../modules/payments/service';
 import { accountSummary } from '../modules/users/service';
-import { deleteServiceByUser, getServiceForUser, listUserServices, renameService, rotateServiceLink } from '../modules/vpn/service';
+import { deleteServiceByUser, getServiceForUser, listUserServices, refreshConfig, renameService, rotateServiceLink } from '../modules/vpn/service';
 import { deliveryButtons } from '../modules/vpn/provisioning';
 import { serviceLabel } from '../utils/names';
 import { createTicket, getTicketForUser, listUserTickets, userReply } from '../modules/support/service';
@@ -313,7 +313,9 @@ export function userHandlers(fetchFile: FileFetcher) {
   });
 
   async function serviceCallbacks(ctx: Ctx, a: string, id: string) {
-    const s = await getServiceForUser(ctx.dbUser.id, id); // ownership enforced for every action
+    let s = await getServiceForUser(ctx.dbUser.id, id); // ownership enforced for every action
+    // after a link change that could not re-read the panel, the link is fetched again on first use
+    if (!s.config && s.provisioningStatus === 'SUCCESS' && s.status === 'ACTIVE' && ['link', 'cfg', 'qr'].includes(a)) s = { ...(await refreshConfig(s.id)), product: s.product };
     if (a === 'v') {
       const rows: Button[][] = [];
       let note = '';
