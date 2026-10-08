@@ -115,8 +115,9 @@ export function adminHandlers() {
   }
 
   /* ------------------------------ partners ------------------------------ */
-  const PCFG_TOGGLE: Record<string, string> = { 'partner.enabled': 'برنامه‌ی همکاری فعال', 'partner.autoApprove': 'تأیید خودکار درخواست‌ها', 'partner.stackCoupons': 'جمع شدن کد تخفیف با تخفیف همکار' };
-  const PCFG_EDIT: Record<string, string> = { 'partner.defaultDiscount': 'درصد تخفیف پیش‌فرض (هنگام تأیید)', 'partner.maxDiscount': 'سقف تخفیف هر همکار', 'partner.reapplyDays': 'روز انتظار بعد از رد شدن' };
+  const PCFG_TOGGLE: Record<string, string> = { 'partner.enabled': 'برنامه‌ی همکاری فعال', 'partner.autoApprove': 'تأیید خودکار درخواست‌ها', 'partner.stackCoupons': 'جمع شدن کد تخفیف با تخفیف همکار', 'partner.autoApproveOrders': '⚡ تأیید خودکار پرداخت همکاران' };
+  const PCFG_EDIT: Record<string, string> = { 'partner.defaultDiscount': 'درصد تخفیف پیش‌فرض (هنگام تأیید)', 'partner.maxDiscount': 'سقف تخفیف هر همکار', 'partner.reapplyDays': 'روز انتظار بعد از رد شدن', 'partner.autoApproveMinOrders': 'حداقل پرداخت تأییدشده‌ی قبلی برای تأیید خودکار', 'partner.autoApproveDailyMax': 'سقف تأیید خودکار در ۲۴ ساعت (برای هر همکار)', 'partner.autoApproveMaxAmount': 'سقف مبلغ تأیید خودکار (تومان؛ ۰ = بدون سقف)' };
+  const PCFG_UNIT: Record<string, string> = { 'partner.defaultDiscount': '٪', 'partner.maxDiscount': '٪', 'partner.reapplyDays': ' روز', 'partner.autoApproveMinOrders': ' پرداخت', 'partner.autoApproveDailyMax': ' مورد', 'partner.autoApproveMaxAmount': ' تومان' };
   const PCFG_KEYS = [...Object.keys(PCFG_TOGGLE), ...Object.keys(PCFG_EDIT)] as SettingKey[];
 
   async function partnersHome(ctx: Ctx) {
@@ -165,7 +166,7 @@ export function adminHandlers() {
   async function partnerCfg(ctx: Ctx) {
     ctx.session.step = undefined;
     const s = await allSettings();
-    await show(ctx, `⚙️ تنظیمات همکاری\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n${Object.entries(PCFG_EDIT).map(([k, l]) => `${l}: ${s[k as SettingKey]}${k === 'partner.reapplyDays' ? ' روز' : '٪'}`).join('\n')}`, [
+    await show(ctx, `⚙️ تنظیمات همکاری\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n${Object.entries(PCFG_EDIT).map(([k, l]) => `${l}: ${s[k as SettingKey]}${PCFG_UNIT[k] ?? ''}`).join('\n')}${s['partner.autoApproveOrders'] === 'true' ? '\n\n⚠️ تأیید خودکار روشن است: پرداخت همکاران معتمد بدون تأیید بانکی پذیرفته می‌شود (پرریسک‌ها و موارد مشکوک همچنان بررسی دستی می‌شوند).' : ''}`, [
       ...Object.entries(PCFG_TOGGLE).map(([k, l]): Button[] => [{ text: `${s[k as SettingKey] === 'true' ? '🟢' : '⚪'} ${l}`, data: `pa:t:${k}` }]),
       ...Object.entries(PCFG_EDIT).map(([k, l]): Button[] => [{ text: `✏️ ${l}`, data: `pa:e:${k}` }]),
       back('pa:h'),
@@ -766,7 +767,7 @@ export function adminHandlers() {
       if (step === 'a_partner_cfg') {
         await need(ctx, 'partners.manage');
         if (!PCFG_KEYS.includes(data.key)) throw new AppError('VALIDATION', 'کلید نامعتبر');
-        const n = text.replace(/[۰-۹]/g, (c) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c))).replace(/[%٪\s]/g, '');
+        const n = text.replace(/[۰-۹]/g, (c) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c))).replace(/[%٪,٬،\s]/g, '');
         const v = await validatePartnerSetting(data.key, n);
         await setSetting(data.key, v);
         await audit({ actor: actor(ctx), action: 'setting.change', target: 'Setting', targetId: data.key, metadata: { value: v } });

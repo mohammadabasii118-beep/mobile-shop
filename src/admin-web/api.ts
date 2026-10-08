@@ -90,7 +90,7 @@ const panelBody = z.object({
   subBaseUrl: z.string().max(300).optional(), publicHost: z.string().max(200).optional(), tlsInsecure: z.boolean().optional(),
 });
 
-const PARTNER_KEYS = ['partner.enabled', 'partner.autoApprove', 'partner.stackCoupons', 'partner.defaultDiscount', 'partner.maxDiscount', 'partner.reapplyDays'] as SettingKey[];
+const PARTNER_KEYS = ['partner.enabled', 'partner.autoApprove', 'partner.stackCoupons', 'partner.defaultDiscount', 'partner.maxDiscount', 'partner.reapplyDays', 'partner.autoApproveOrders', 'partner.autoApproveMinOrders', 'partner.autoApproveDailyMax', 'partner.autoApproveMaxAmount'] as SettingKey[];
 
 const confirmFor = (externalId: string) => `DELETE ${externalId.slice(-6)}`;
 

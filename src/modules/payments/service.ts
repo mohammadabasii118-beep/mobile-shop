@@ -17,6 +17,7 @@ import { CryptoPaymentProvider } from '../../providers/payments/crypto';
 import { LedgerVerificationProvider, NullVerificationProvider } from '../../providers/payments/ledgerVerification';
 import { PaymentProvider, PaymentVerificationProvider, VerificationOutcome } from '../../providers/payments/types';
 import { runProvisioning } from '../vpn/provisioning';
+import { PARTNER_AUTO_ACTOR, partnerAutoApproveVerdict } from '../partners/service';
 
 interface Deps {
   verifiers: Record<string, PaymentVerificationProvider>;
@@ -186,6 +187,17 @@ export async function processPayment(paymentId: string): Promise<Decision> {
   else if (outcome.result !== 'VERIFIED' && receiptOnlyOk && risk.level === 'LOW') decision = 'AUTO_APPROVE';
   else decision = 'NEEDS_REVIEW';
 
+  // Trusted-partner exception (opt-in, narrow): see partnerAutoApproveVerdict.
+  if (decision === 'NEEDS_REVIEW') {
+    const v = await partnerAutoApproveVerdict({ userId: payment.userId, paymentId, amount: order.finalAmount, verification: outcome.result, risk });
+    if (v.ok) {
+      const r = await approvePayment(paymentId, { actor: PARTNER_AUTO_ACTOR, auto: true, bankTransactionId: outcome.bankTransactionId });
+      if (r.changed) {
+        await notifyAdmins('partner_auto_approved', `🤝 سفارش همکار خودکار تأیید شد\nسفارش: ${order.orderNumber}\nمبلغ: ${formatMoney(order.finalAmount)}\n⚠️ تأیید بانکی انجام نشد (${outcome.result}) — در صورت نیاز واریز را کنترل کنید.`, { roles: ['PAYMENT_ADMIN'], buttons: [[{ text: '🔎 مشاهده', data: `ap:v:${paymentId}` }]], dedupeKey: `partner_auto:${paymentId}` });
+        return 'AUTO_APPROVE';
+      }
+    }
+  }
   if (decision === 'AUTO_APPROVE') {
     const r = await approvePayment(paymentId, { actor: 'auto', auto: true, bankTransactionId: outcome.bankTransactionId });
     if (r.changed) return 'AUTO_APPROVE';

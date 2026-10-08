@@ -27,17 +27,49 @@ export async function partnerDiscountFor(userId: string, amount: number, db: Db 
 /** Cross-field check for the partner settings (used by the bot and the web panel). Returns the normalised value. */
 export async function validatePartnerSetting(key: string, raw: string): Promise<string> {
   const n = Number(raw);
-  if (key === 'partner.enabled' || key === 'partner.autoApprove' || key === 'partner.stackCoupons') {
+  if (key === 'partner.enabled' || key === 'partner.autoApprove' || key === 'partner.stackCoupons' || key === 'partner.autoApproveOrders') {
     if (raw !== 'true' && raw !== 'false') throw new ValidationError('مقدار باید true یا false باشد');
     return raw;
   }
-  const max = key === 'partner.reapplyDays' ? 365 : 100;
-  if (!['partner.defaultDiscount', 'partner.maxDiscount', 'partner.reapplyDays'].includes(key)) throw new ValidationError('تنظیم نامعتبر');
+  const LIMITS: Record<string, number> = { 'partner.defaultDiscount': 100, 'partner.maxDiscount': 100, 'partner.reapplyDays': 365, 'partner.autoApproveMinOrders': 1000, 'partner.autoApproveDailyMax': 1000, 'partner.autoApproveMaxAmount': 2_000_000_000 };
+  if (!(key in LIMITS)) throw new ValidationError('تنظیم نامعتبر');
+  const max = LIMITS[key];
   if (!/^\d+$/.test(raw) || n > max) throw new ValidationError(`عدد صحیح بین ۰ تا ${max} وارد کنید`);
   if (key === 'partner.defaultDiscount' && n > (await getNumber('partner.maxDiscount'))) throw new ValidationError('درصد پیش‌فرض نمی‌تواند از «سقف تخفیف» بیشتر باشد');
   if (key === 'partner.maxDiscount' && n < (await getNumber('partner.defaultDiscount'))) throw new ValidationError('سقف تخفیف نمی‌تواند از «درصد پیش‌فرض» کمتر باشد؛ اول درصد پیش‌فرض را کم کنید');
   return String(n);
 }
+
+/** Risk factors that always force a human review, even for a trusted partner. */
+const HARD_RISK = ['duplicate_tracking', 'duplicate_receipt', 'amount_mismatch', 'payment_time_before_order', 'repeated_submissions'];
+
+/**
+ * "Auto-approve partner orders": lets a trusted partner's payment through WITHOUT a bank-ledger match.
+ * It is opt-in (off by default) and deliberately narrow — every condition must hold:
+ *  - the partner is APPROVED (not pending/suspended) and the programme + option are on;
+ *  - the bank did not explicitly contradict the payment, and the risk engine sees no duplicate / amount / timing problem (HIGH risk never passes);
+ *  - the partner already has `autoApproveMinOrders` approved payments (new partners start with human review);
+ *  - the order is within `autoApproveMaxAmount` (0 = no limit) and the partner is under `autoApproveDailyMax` auto-approvals in 24h.
+ */
+export async function partnerAutoApproveVerdict(
+  i: { userId: string; paymentId: string; amount: number; verification: string; risk: { level: string; factors: { code: string }[] } },
+): Promise<{ ok: boolean; reason?: string }> {
+  if (!(await partnerEnabled()) || !(await getBool('partner.autoApproveOrders'))) return { ok: false, reason: 'off' };
+  const p = await prisma.partner.findUnique({ where: { userId: i.userId } });
+  if (!p || p.status !== 'APPROVED') return { ok: false, reason: 'not_partner' };
+  if (i.verification === 'REJECTED') return { ok: false, reason: 'bank_contradicts' };
+  if (i.risk.level === 'HIGH') return { ok: false, reason: 'high_risk' };
+  const hard = i.risk.factors.find((f) => HARD_RISK.includes(f.code));
+  if (hard) return { ok: false, reason: hard.code };
+  const max = await getNumber('partner.autoApproveMaxAmount');
+  if (max > 0 && i.amount > max) return { ok: false, reason: 'over_amount_cap' };
+  const prior = await prisma.payment.count({ where: { userId: i.userId, status: 'APPROVED', id: { not: i.paymentId } } });
+  if (prior < (await getNumber('partner.autoApproveMinOrders'))) return { ok: false, reason: 'not_enough_history' };
+  const today = await prisma.payment.count({ where: { userId: i.userId, status: 'APPROVED', reviewedBy: PARTNER_AUTO_ACTOR, reviewedAt: { gte: new Date(Date.now() - 86_400_000) } } });
+  if (today >= (await getNumber('partner.autoApproveDailyMax'))) return { ok: false, reason: 'daily_limit' };
+  return { ok: true };
+}
+export const PARTNER_AUTO_ACTOR = 'auto:partner';
 
 export const getPartner = (userId: string) => prisma.partner.findUnique({ where: { userId } });
 

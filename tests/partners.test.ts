@@ -113,6 +113,75 @@ describe('stale buttons, races and settings cross-checks', () => {
   });
 });
 
+describe('auto-approve partner orders (opt-in, narrow)', () => {
+  const trk = () => String(Math.floor(Math.random() * 9e8) + 1e8);
+  async function partnerWithProduct(percent = 10) {
+    const { u, p } = await make(100000);
+    await applyForPartner(u.id); await approvePartner('a', (await partnerOf(u.id)).id, percent);
+    return { u, p };
+  }
+  const buy = async (u: { id: string }, p: { id: string }, tracking = trk()) => { const o = await makeOrder(u.id, p.id); return { o, pay: await submit(u.id, o.id, { trackingCode: tracking }) }; };
+  /** one human-approved payment = the partner becomes "trusted" */
+  const trust = async (u: { id: string }, p: { id: string }) => { const { pay } = await buy(u, p); expect(pay.status).toBe('NEEDS_REVIEW'); await approvePayment(pay.id, { actor: 'admin:1' }); };
+
+  it('off by default: a partner payment without a bank match still waits for a human', async () => {
+    const { u, p } = await partnerWithProduct();
+    await trust(u, p);
+    const { pay } = await buy(u, p);
+    expect(pay.status).toBe('NEEDS_REVIEW');
+  });
+
+  it('on: the first order is reviewed by a human; after that the partner is trusted and payments are approved automatically, audited and announced', async () => {
+    await setSetting('partner.autoApproveOrders', 'true');
+    const { u, p } = await partnerWithProduct();
+    const first = await buy(u, p);
+    expect(first.pay.status).toBe('NEEDS_REVIEW'); // no history yet
+    await approvePayment(first.pay.id, { actor: 'admin:1' });
+    sent.length = 0;
+    const { o, pay } = await buy(u, p);
+    expect(pay).toMatchObject({ status: 'APPROVED', autoApproved: true, reviewedBy: 'auto:partner' });
+    expect((await prisma.order.findUniqueOrThrow({ where: { id: o.id } })).status).toBe('FULFILLED'); // service really provisioned
+    expect(sent.some((m) => m.text.includes('سفارش همکار خودکار تأیید شد') && m.text.includes('تأیید بانکی انجام نشد'))).toBe(true);
+    expect(await prisma.auditLog.count({ where: { action: 'payment.auto_approve', actor: 'auto:partner' } })).toBeGreaterThan(0);
+  });
+
+  it('never for non-partners, suspended partners, or when the partner programme is off', async () => {
+    await setSetting('partner.autoApproveOrders', 'true'); await setSetting('partner.autoApproveMinOrders', '0');
+    const plain = await make(100000);
+    expect((await buy(plain.u, plain.p)).pay.status).toBe('NEEDS_REVIEW');
+    const { u, p } = await partnerWithProduct();
+    await setPartnerSuspended('a', (await partnerOf(u.id)).id, true);
+    expect((await buy(u, p)).pay.status).toBe('NEEDS_REVIEW');
+    await setPartnerSuspended('a', (await partnerOf(u.id)).id, false);
+    await setSetting('partner.enabled', 'false');
+    expect((await buy(u, p)).pay.status).toBe('NEEDS_REVIEW');
+  });
+
+  it('risk always wins: a reused tracking code, a mismatching amount, an over-limit amount or the daily limit send it to review', async () => {
+    await setSetting('partner.autoApproveOrders', 'true'); await setSetting('partner.autoApproveMinOrders', '0');
+    const { u, p } = await partnerWithProduct();
+    const ok = await buy(u, p, '111111111');
+    expect(ok.pay.status).toBe('APPROVED');
+    expect((await buy(u, p, '111111111')).pay.status).toBe('NEEDS_REVIEW'); // duplicate tracking code
+    const o = await makeOrder(u.id, p.id);
+    const wrong = await submit(u.id, o.id, { trackingCode: trk(), caption: 'مبلغ: 5,000 تومان' });
+    expect(wrong.status).toBe('NEEDS_REVIEW'); // receipt amount ≠ order amount
+    await setSetting('partner.autoApproveMaxAmount', '50000');
+    expect((await buy(u, p)).pay.status).toBe('NEEDS_REVIEW'); // 90,000 > cap
+    await setSetting('partner.autoApproveMaxAmount', '0'); await setSetting('partner.autoApproveDailyMax', '1');
+    expect((await buy(u, p)).pay.status).toBe('NEEDS_REVIEW'); // one auto-approval already used today
+  });
+
+  it('settings validation for the new keys', async () => {
+    const { validatePartnerSetting } = await import('../src/modules/partners/service');
+    expect(await validatePartnerSetting('partner.autoApproveOrders', 'true')).toBe('true');
+    expect(await validatePartnerSetting('partner.autoApproveMaxAmount', '1500000')).toBe('1500000');
+    await expect(validatePartnerSetting('partner.autoApproveOrders', 'yes')).rejects.toThrow();
+    await expect(validatePartnerSetting('partner.autoApproveDailyMax', '-1')).rejects.toThrow(/عدد صحیح/);
+    await expect(validatePartnerSetting('partner.autoApproveMinOrders', '1e3')).rejects.toThrow(/عدد صحیح/);
+  });
+});
+
 describe('pricing', () => {
   it('approved partner gets the % on every order; amounts are stored; payment amount = final price', async () => {
     const { u, p } = await make(250000);
@@ -227,6 +296,8 @@ describe('Telegram: partner button and admin screens', () => {
     await tap(ADMIN, `pa:re:${id}`); expect((await partnerOf(u.id)).status).toBe('APPROVED');
     await tap(ADMIN, 'pa:cfg'); expect(cbs()).toEqual(expect.arrayContaining(['pa:t:partner.autoApprove', 'pa:e:partner.maxDiscount']));
     await tap(ADMIN, 'pa:t:partner.autoApprove'); expect((await prisma.setting.findUnique({ where: { key: 'partner.autoApprove' } }))?.value).toBe('true');
+    await tap(ADMIN, 'pa:t:partner.autoApproveOrders'); expect(last().payload.text).toContain('تأیید خودکار روشن است'); expect((await prisma.setting.findUnique({ where: { key: 'partner.autoApproveOrders' } }))?.value).toBe('true');
+    await tap(ADMIN, 'pa:e:partner.autoApproveMaxAmount'); await say(ADMIN, '۱٬۵۰۰٬۰۰۰'); expect((await prisma.setting.findUnique({ where: { key: 'partner.autoApproveMaxAmount' } }))?.value).toBe('1500000');
     await tap(ADMIN, 'pa:t:evil.key'); expect(last().payload.text).toContain('نامعتبر');
     await tap(ADMIN, 'pa:e:partner.maxDiscount'); await say(ADMIN, '500'); expect(last().payload.text).toContain('عدد صحیح بین');
     await say(ADMIN, '٪۴۰'); expect((await prisma.setting.findUnique({ where: { key: 'partner.maxDiscount' } }))?.value).toBe('40');

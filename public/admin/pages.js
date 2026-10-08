@@ -752,7 +752,14 @@ export function partners(ctx, root) {
           numeric('partner.defaultDiscount', 'درصد تخفیف پیش‌فرض', 'هنگام تأیید پیشنهاد می‌شود', '٪'),
           numeric('partner.maxDiscount', 'سقف تخفیف هر همکار', 'هیچ همکاری بیشتر از این درصد تخفیف نمی‌گیرد', '٪'),
           toggle('partner.stackCoupons', 'همکار بتواند کد تخفیف هم استفاده کند', 'اگر خاموش باشد، کد تخفیف همراه با تخفیف همکاری پذیرفته نمی‌شود'),
-          numeric('partner.reapplyDays', 'انتظار برای درخواست دوباره', 'بعد از رد شدن، کاربر چند روز باید صبر کند', 'روز')));
+          numeric('partner.reapplyDays', 'انتظار برای درخواست دوباره', 'بعد از رد شدن، کاربر چند روز باید صبر کند', 'روز')),
+        h('div', { class: 'card-h' }, h('div', null, h('h3', { text: 'تأیید خودکار پرداخت همکاران' }), h('div', { class: 'cell-sub', text: 'پرداخت همکار بدون تأیید بانکی و بدون بررسی دستی پذیرفته می‌شود' }))),
+        h('div', { class: 'card-b', style: 'padding-block:4px' },
+          h('div', { class: 'callout warn', style: 'margin:12px 0' }, icon('alert'), h('div', { text: 'این گزینه ریسک مالی دارد: رسید همکار بدون تطبیق با تراکنش بانکی پذیرفته می‌شود. پرداخت‌های پرریسک، تکراری، با مبلغ ناهمخوان یا مشکوک همچنان به بررسی دستی می‌روند. هر تأیید خودکار برای ادمین‌ها اعلان می‌شود.' })),
+          toggle('partner.autoApproveOrders', 'تأیید خودکار پرداخت همکاران فعال باشد', 'پیش‌فرض خاموش است'),
+          numeric('partner.autoApproveMinOrders', 'حداقل پرداخت تأییدشده‌ی قبلی', 'همکار جدید ابتدا چند سفارش را دستی تأیید می‌گیرد تا معتمد شود', 'پرداخت'),
+          numeric('partner.autoApproveDailyMax', 'سقف تأیید خودکار در ۲۴ ساعت', 'برای هر همکار؛ بیشتر از آن به بررسی دستی می‌رود', 'مورد'),
+          numeric('partner.autoApproveMaxAmount', 'سقف مبلغ هر سفارش', 'بالاتر از این مبلغ همیشه دستی بررسی می‌شود؛ ۰ یعنی بدون سقف', 'تومان')));
     } catch (e) { clear(settingsCard); settingsCard.append(errorState(errMsg(e), loadSettings)); }
   }
 
