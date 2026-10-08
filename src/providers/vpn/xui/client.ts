@@ -56,8 +56,10 @@ export class XuiClient {
         }
         const timeout = e?.name === 'TimeoutError' || /TIMEOUT/.test(code);
         last = new ProviderError(`X-UI unreachable: ${timeout ? 'timeout' : (code || e?.message || 'network error')}`, true);
-        // A timed-out write may have been applied: only reads are re-sent after a timeout.
-        if (timeout && method !== 'GET' && auth) break; // (login is safe to repeat)
+        // A write may already have been applied when the connection broke mid-flight: re-send it only when the error proves
+        // the request never left (connect-phase failures). Reads and the login are always safe to repeat.
+        const safeToResend = method === 'GET' || !auth;
+        if (!safeToResend && !/ECONNREFUSED|ENOTFOUND|EAI_AGAIN|CONNECT_TIMEOUT|EHOSTUNREACH|ENETUNREACH/.test(code)) break;
       }
     }
     throw last!;
@@ -91,7 +93,9 @@ export class XuiClient {
     let { res, json, text } = await this.exchange(method, path, form);
     // An expired session shows up as 404/401/redirect (3x-ui hides the API) or as HTTP 200 with the HTML login page:
     // log in again once and repeat the call.
-    const sessionLost = res.status === 404 || res.status === 401 || res.status === 302 || res.status === 307 || (res.status < 500 && !json);
+    // (A write is only repeated when the answer is clearly the login page — never for an empty/odd body, which may mean "applied".)
+    const html = /text\/html/i.test(res.headers.get('content-type') ?? '') || /^\s*<(!doctype|html)/i.test(text);
+    const sessionLost = res.status === 404 || res.status === 401 || res.status === 302 || res.status === 307 || (res.status < 500 && !json && (method === 'GET' || html));
     if (!this.o.apiToken && sessionLost) {
       this.cookie = undefined;
       await this.login();
@@ -107,7 +111,8 @@ export class XuiClient {
   listInbounds() { return this.call<RawInbound[]>('GET', '/panel/api/inbounds/list'); }
   async getInbound(id: number): Promise<RawInbound | null> {
     try { return (await this.call<RawInbound>('GET', `/panel/api/inbounds/get/${id}`)) ?? null; }
-    catch (e: any) { if (e instanceof ProviderError && !e.retryable) return null; throw e; }
+    // Only the panel's own "not found" answer means the inbound is missing; auth/path/TLS problems must surface as errors.
+    catch (e: any) { if (e instanceof ProviderError && !e.retryable && e.message.startsWith('X-UI error:')) return null; throw e; }
   }
   addClient(inboundId: number, client: Record<string, unknown>) {
     return this.call('POST', '/panel/api/inbounds/addClient', { id: String(inboundId), settings: JSON.stringify({ clients: [client] }) });
