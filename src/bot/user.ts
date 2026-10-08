@@ -6,7 +6,8 @@ import { menuLevel } from '../modules/categories/service';
 import { cancelOrder, createOrder, getOrderForUser, listUserOrders, setOrderServiceName } from '../modules/orders/service';
 import { isPaymentMethodEnabled, startPayment, submitReceipt } from '../modules/payments/service';
 import { accountSummary } from '../modules/users/service';
-import { getServiceForUser, listUserServices, renameService } from '../modules/vpn/service';
+import { deleteServiceByUser, getServiceForUser, listUserServices, renameService, rotateServiceLink } from '../modules/vpn/service';
+import { deliveryButtons } from '../modules/vpn/provisioning';
 import { serviceLabel } from '../utils/names';
 import { createTicket, getTicketForUser, listUserTickets, userReply } from '../modules/support/service';
 import { validateCoupon } from '../modules/coupons/service';
@@ -284,10 +285,11 @@ export function userHandlers(fetchFile: FileFetcher) {
             ? [{ text: '📡 لینک اشتراک', data: `sv:link:${s.id}` }, { text: '⚙️ کانفیگ مستقیم', data: `sv:cfg:${s.id}` }]
             : [{ text: '🔗 لینک', data: `sv:link:${s.id}` }, { text: '⚙️ Config', data: `sv:cfg:${s.id}` }],
           [{ text: '📱 QR', data: `sv:qr:${s.id}` }, { text: '🔄 تمدید', data: `sv:renew:${s.id}` }],
+          [{ text: '🔁 تغییر لینک', data: `sv:rot:${s.id}` }, { text: '🗑 حذف سرویس', data: `sv:del:${s.id}` }],
         );
       } else if (s.status === 'EXPIRED') {
         note = `\n${RULE}\n⛔ ${b('این سرویس منقضی شده است')}\nبا تمدید، همان لینک قبلی دوباره فعال می‌شود.`;
-        rows.push([{ text: '🔄 تمدید سرویس', data: `sv:renew:${s.id}` }]);
+        rows.push([{ text: '🔄 تمدید سرویس', data: `sv:renew:${s.id}` }, { text: '🗑 حذف سرویس', data: `sv:del:${s.id}` }]);
       } else if (s.status === 'SUSPENDED') {
         note = `\n${RULE}\n⏸ ${b('این سرویس موقتاً معلق شده است')}\nبرای اطلاع از دلیل و رفع مشکل با پشتیبانی در ارتباط باشید.`;
         rows.push([{ text: '🎫 تماس با پشتیبانی', data: 'menu:support' }]);
@@ -306,6 +308,25 @@ export function userHandlers(fetchFile: FileFetcher) {
       const payload = s.subscriptionUrl ?? s.config; // the subscription link is preferred; falls back to the direct config
       const png = await QRCode.toBuffer(payload, { width: 512, margin: 2 });
       return ctx.replyWithPhoto(new InputFile(png, 'qr.png'), { caption: `📱 QR ${s.subscriptionUrl ? 'لینک اشتراک' : 'کانفیگ'} · ${serviceLabel(s.displayName, s.externalId)}\nبا برنامه V2Ray/Hiddify اسکن کنید.` });
+    }
+    if (a === 'rot') {
+      return show(ctx, `${header('🔁', 'تغییر لینک', serviceLabel(s.displayName, s.externalId))}\nبا تأیید، یک لینک و کانفیگ کاملاً جدید ساخته می‌شود و ${b('همه‌ی لینک‌ها و کانفیگ‌های قبلی از کار می‌افتند')}.\n${i('حجم، تاریخ انقضا و نام سرویس تغییری نمی‌کند. بعد از تغییر باید لینک جدید را روی دستگاه‌هایتان دوباره اضافه کنید.')}`, [
+        [{ text: '✅ بله، لینک تغییر کند', data: `sv:rot2:${s.id}` }, { text: '↩️ انصراف', data: `sv:v:${s.id}` }],
+      ], H);
+    }
+    if (a === 'rot2') {
+      const n = await rotateServiceLink(ctx.dbUser.id, s.id);
+      const link = n.subscriptionUrl ?? n.config ?? '';
+      return show(ctx, `${ok('لینک جدید ساخته شد')}\n${i('لینک‌های قبلی دیگر کار نمی‌کنند.')}\n\n${link ? `${n.subscriptionUrl ? '📡' : '🔗'} ${b(n.subscriptionUrl ? 'لینک اشتراک جدید' : 'لینک جدید')}\n${code(link)}\n${i('برای کپی روی لینک بزنید.')}` : ''}`, [...deliveryButtons(n), nav('menu:services')], H);
+    }
+    if (a === 'del') {
+      return show(ctx, `${header('🗑', 'حذف سرویس', serviceLabel(s.displayName, s.externalId))}\n⚠️ ${b('این کار قابل بازگشت نیست.')}\nسرویس برای همیشه حذف می‌شود و حجم و زمان باقی‌مانده سوخته می‌شود؛ ${b('وجهی بازگردانده نمی‌شود')}.\n\nمطمئن هستید؟`, [
+        [{ text: '🗑 بله، حذف شود', data: `sv:del2:${s.id}` }, { text: '↩️ انصراف', data: `sv:v:${s.id}` }],
+      ], H);
+    }
+    if (a === 'del2') {
+      await deleteServiceByUser(ctx.dbUser.id, s.id);
+      return show(ctx, `${ok('سرویس حذف شد')}\n${i('اگر دوباره نیاز داشتید، از منوی خرید سرویس جدید بگیرید.')}`, [nav('menu:services')], H);
     }
     if (a === 'renew') {
       const ps = (await listActiveProducts()).filter((p) => p.xuiInboundId === s.inboundId && p.xuiProviderId === s.provider);

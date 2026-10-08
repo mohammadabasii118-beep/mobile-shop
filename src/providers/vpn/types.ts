@@ -51,6 +51,8 @@ export interface VpnProvider {
   suspendService(ref: ServiceRef): Promise<void>;
   resumeService(ref: ServiceRef): Promise<void>;
   deleteService(ref: ServiceRef): Promise<void>;
+  /** Replace the client's credential (uuid/password) and subscription id so the old links stop working. Idempotent. */
+  rotateLink(ref: ServiceRef, next: { credential: string; subId: string }): Promise<void>;
   getServiceStatus(ref: ServiceRef): Promise<ServiceStatus | null>;
   getTraffic(ref: ServiceRef): Promise<{ up: bigint; down: bigint; used: bigint; total: bigint } | null>;
   /** `remark` = name shown by client apps for the generated direct link (defaults to the client email). */

@@ -43,6 +43,12 @@ export class MockVpnProvider implements VpnProvider {
   }
   async suspendService(ref: ServiceRef) { this.maybeFail(); const c = this.clients.get(ref.email); if (c) c.enabled = false; }
   async resumeService(ref: ServiceRef) { this.maybeFail(); const c = this.clients.get(ref.email); if (c) c.enabled = true; }
+  async rotateLink(ref: ServiceRef, next: { credential: string; subId: string }) {
+    this.maybeFail();
+    const c = this.clients.get(ref.email);
+    if (!c) throw new ProviderError('missing client', false);
+    c.credential = next.credential; c.subId = next.subId;
+  }
   async deleteService(ref: ServiceRef) { this.clients.delete(ref.email); }
   async getServiceStatus(ref: ServiceRef) { const c = this.clients.get(ref.email); return c ? this.st(c) : null; }
   async getTraffic(ref: ServiceRef) { const c = this.clients.get(ref.email); return c ? { up: c.up, down: c.down, used: c.up + c.down, total: c.trafficLimitBytes } : null; }

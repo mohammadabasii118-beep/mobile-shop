@@ -15,6 +15,9 @@ const PROTO: Record<Protocol, string> = { VLESS: 'vless', VMESS: 'vmess', TROJAN
 export const clientKey = (protocol: Protocol, credential: string, email: string) =>
   protocol === 'TROJAN' ? credential : protocol === 'SHADOWSOCKS' ? email : credential;
 
+/** The credential the PANEL really has for this client (the DB copy can lag behind after a link rotation). */
+const panelCredential = (protocol: Protocol, c: Record<string, any>): string => String((protocol === 'TROJAN' || protocol === 'SHADOWSOCKS' ? c.password : c.id) ?? '');
+
 export class XuiVpnProvider implements VpnProvider {
   readonly name = 'xui';
   constructor(private o: XuiProviderOptions) {}
@@ -102,7 +105,7 @@ export class XuiVpnProvider implements VpnProvider {
     const c = this.findClient(ib, req.email);
     if (!c) throw new ProviderError('client to renew does not exist in panel', false);
     const updated = { ...c, totalGB: Number(req.trafficLimitBytes), expiryTime: req.expiresAt.getTime(), enable: true };
-    await this.o.client.updateClient(req.inboundId, clientKey(req.protocol, req.credential, req.email), updated);
+    await this.o.client.updateClient(req.inboundId, clientKey(req.protocol, panelCredential(req.protocol, c) || req.credential, req.email), updated);
     const s = await this.status(req);
     if (!s.exists || s.expiresAt?.getTime() !== req.expiresAt.getTime()) throw new ProviderError('renewal not reflected in panel', true);
     return s;
@@ -112,15 +115,27 @@ export class XuiVpnProvider implements VpnProvider {
     const ib = await this.inboundOrThrow(ref.inboundId);
     const c = this.findClient(ib, ref.email);
     if (!c) throw new ProviderError('client does not exist in panel', false);
-    await this.o.client.updateClient(ref.inboundId, clientKey(ref.protocol, ref.credential, ref.email), { ...c, enable });
+    await this.o.client.updateClient(ref.inboundId, clientKey(ref.protocol, panelCredential(ref.protocol, c) || ref.credential, ref.email), { ...c, enable });
   }
   suspendService(ref: ServiceRef) { return this.setEnabled(ref, false); }
   resumeService(ref: ServiceRef) { return this.setEnabled(ref, true); }
 
   async deleteService(ref: ServiceRef) {
     const ib = await this.o.client.getInbound(ref.inboundId);
-    if (!ib || !this.findClient(ib, ref.email)) return; // already gone
-    await this.o.client.delClient(ref.inboundId, clientKey(ref.protocol, ref.credential, ref.email));
+    const c = ib ? this.findClient(ib, ref.email) : undefined;
+    if (!c) return; // already gone
+    await this.o.client.delClient(ref.inboundId, clientKey(ref.protocol, panelCredential(ref.protocol, c) || ref.credential, ref.email));
+  }
+
+  async rotateLink(ref: ServiceRef, next: { credential: string; subId: string }) {
+    const ib = await this.inboundOrThrow(ref.inboundId, ref.protocol);
+    const c = this.findClient(ib, ref.email);
+    if (!c) throw new ProviderError('client does not exist in panel', false);
+    const credField = ref.protocol === 'TROJAN' || ref.protocol === 'SHADOWSOCKS' ? 'password' : 'id';
+    if (c[credField] === next.credential && c.subId === next.subId) return; // a previous attempt already applied it
+    await this.o.client.updateClient(ref.inboundId, clientKey(ref.protocol, panelCredential(ref.protocol, c) || ref.credential, ref.email), { ...c, [credField]: next.credential, subId: next.subId });
+    const after = this.findClient(await this.inboundOrThrow(ref.inboundId, ref.protocol), ref.email);
+    if (!after || after[credField] !== next.credential || after.subId !== next.subId) throw new ProviderError('link change not reflected in panel', true);
   }
 
   async getServiceStatus(ref: ServiceRef) {

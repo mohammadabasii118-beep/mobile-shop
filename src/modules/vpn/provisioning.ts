@@ -15,8 +15,8 @@ export const refOf = (s: Pick<VpnService, 'inboundId' | 'externalId' | 'uuid' | 
   inboundId: s.inboundId, email: s.externalId, credential: s.uuid, protocol: s.protocol,
 });
 
-const credentialFor = (p: Protocol) => (p === 'VLESS' || p === 'VMESS' ? randomUUID() : randomBytes(18).toString('base64url'));
-const subIdGen = () => randomBytes(8).toString('hex');
+export const credentialFor = (p: Protocol) => (p === 'VLESS' || p === 'VMESS' ? randomUUID() : randomBytes(18).toString('base64url'));
+export const subIdGen = () => randomBytes(8).toString('hex');
 
 /**
  * Automatic client name `tg_<telegramId>_<order>` (searchable in X-UI), plus `_<slug>` when the customer chose a name

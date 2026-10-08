@@ -8,11 +8,11 @@ import { getNumberList } from '../settings/service';
 import { notifyUser } from '../notifications/service';
 import * as T from '../notifications/templates';
 import { vpnFor } from '../../providers/vpn';
-import { refOf } from './provisioning';
+import { credentialFor, refOf, subIdGen } from './provisioning';
 import { linkRemark, validateServiceName } from '../../utils/names';
 
 export const listUserServices = (userId: string) =>
-  prisma.vpnService.findMany({ where: { userId, provisioningStatus: 'SUCCESS' }, orderBy: { createdAt: 'desc' }, include: { product: true } });
+  prisma.vpnService.findMany({ where: { userId, provisioningStatus: 'SUCCESS', status: { not: 'CANCELLED' } }, orderBy: { createdAt: 'desc' }, include: { product: true } });
 
 /** Ownership-checked fetch. */
 export async function getServiceForUser(userId: string, id: string) {
@@ -168,4 +168,38 @@ export async function renameService(userId: string, id: string, rawName: string 
     try { await refreshConfig(id); } catch (e: any) { logger.warn({ id, err: String(e?.message) }, 'rename: config refresh failed (name saved)'); }
   }
   return prisma.vpnService.findUniqueOrThrow({ where: { id }, include: { product: true } });
+}
+
+/* --------------------------- customer self-service --------------------------- */
+
+const ROTATE_COOLDOWN_MS = 10 * 60_000;
+const OPEN_ORDER = ['PENDING_PAYMENT', 'PAYMENT_SUBMITTED', 'PAYMENT_REVIEW', 'PAID', 'PROVISIONING'] as const;
+
+/**
+ * "Change link": new uuid/password + new subscription id on the SAME client (traffic, expiry and name are kept).
+ * Every old link/config stops working at once — for when a link leaked or was shared.
+ */
+export async function rotateServiceLink(userId: string, id: string) {
+  const s = await getServiceForUser(userId, id);
+  if (s.provisioningStatus !== 'SUCCESS' || s.status !== 'ACTIVE') throw new ConflictError('تغییر لینک فقط برای سرویس فعال ممکن است.');
+  const recent = await prisma.auditLog.findFirst({ where: { action: 'vpn.rotate_link', targetId: s.id, createdAt: { gt: new Date(Date.now() - ROTATE_COOLDOWN_MS) } }, select: { id: true } });
+  if (recent) throw new ConflictError('لینک همین چند دقیقه‌ی پیش تغییر کرده است؛ کمی بعد دوباره تلاش کنید.');
+  const credential = credentialFor(s.protocol);
+  const subId = subIdGen();
+  const provider = await vpnFor(s.provider);
+  await provider.rotateLink(refOf(s), { credential, subId });
+  const cfg = await provider.getConfig({ ...refOf({ ...s, uuid: credential }), subId, remark: linkRemark(s.displayName, s.externalId) });
+  const updated = await prisma.vpnService.update({ where: { id: s.id }, data: { uuid: credential, clientId: credential, subId, config: cfg.config, subscriptionUrl: cfg.subscriptionUrl ?? null } });
+  await audit({ actor: `user:${userId}`, action: 'vpn.rotate_link', target: 'VpnService', targetId: s.id, metadata: { externalId: s.externalId } });
+  return updated;
+}
+
+/** The customer deletes their own service: the client is removed from the panel for good (no refund, no undo). */
+export async function deleteServiceByUser(userId: string, id: string) {
+  const s = await getServiceForUser(userId, id);
+  if (s.provisioningStatus !== 'SUCCESS' || (s.status !== 'ACTIVE' && s.status !== 'EXPIRED')) throw new ConflictError('این سرویس را نمی‌توان حذف کرد؛ با پشتیبانی تماس بگیرید.');
+  const open = await prisma.order.count({ where: { renewalOfServiceId: s.id, status: { in: [...OPEN_ORDER] } } });
+  if (open) throw new ConflictError('برای این سرویس یک تمدید در جریان است؛ بعد از پایان آن می‌توانید حذفش کنید.');
+  await deleteService(s.id, `user:${userId}`);
+  return s;
 }
