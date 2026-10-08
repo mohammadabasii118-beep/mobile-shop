@@ -81,7 +81,7 @@ describe('Telegram: admin entry in the menu + product management', () => {
 
   it('the management button exists ONLY in admins\' menu; non-admins cannot open it by crafted callback', async () => {
     await say(USER, '/start');
-    expect(labels()).not.toContain('🛠 پنل مدیریت'); expect(labels()).toHaveLength(7);
+    expect(labels()).not.toContain('🛠 پنل مدیریت'); expect(labels()).toHaveLength(8);
     await say(ADMIN, '/start');
     expect(labels()).toContain('🛠 پنل مدیریت'); expect(cbs()).toContain('adm:home');
     await tap(USER, 'adm:home');

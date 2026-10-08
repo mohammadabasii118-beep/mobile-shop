@@ -725,3 +725,85 @@ function panelForm(p, done) {
   const m = modal({ title: p ? `ویرایش ${p.name}` : 'افزودن پنل X-UI', body: form, footer: [save, button('انصراف', { onClick: () => m.close() })] });
   form.addEventListener('submit', (e) => e.preventDefault());
 }
+
+/* ================================= Partners ================================== */
+const PARTNER_ST = { PENDING: ['در انتظار', 'warn'], APPROVED: ['همکار', 'ok'], REJECTED: ['ردشده', 'err'], SUSPENDED: ['معلق', ''] };
+export function partners(ctx, root) {
+  root.append(pageHead('همکاری‌ها', 'درخواست‌های همکاری را تأیید کنید و درصد تخفیف هر همکار را مشخص کنید'));
+  const settingsCard = h('div', { class: 'card' });
+  const listCard = h('div', { class: 'card' });
+  root.append(settingsCard, listCard);
+
+  async function loadSettings() {
+    clear(settingsCard); settingsCard.append(h('div', { class: 'card-b' }, skeletonBlock(120)));
+    try {
+      const S = await api('/partners/settings'); clear(settingsCard);
+      const save = async (key, value) => { try { await api('/partners/settings', { method: 'PUT', body: { key, value: String(value) } }); S[key] = String(value); toast('ذخیره شد'); return true; } catch (e) { toast(errMsg(e), 'err'); return false; } };
+      const row = (label, hint, control) => h('div', { class: 'row between', style: 'padding:12px 0;border-bottom:1px solid var(--border)' }, h('div', null, h('div', { class: 'cell-main', text: label }), hint ? h('div', { class: 'cell-sub', text: hint }) : null), control);
+      const toggle = (key, label, hint) => { const sw = h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(S[key] === 'true'), 'aria-label': label });
+        sw.addEventListener('click', async () => { const next = sw.getAttribute('aria-checked') !== 'true'; sw.setAttribute('aria-checked', String(next)); if (!(await save(key, next))) sw.setAttribute('aria-checked', String(!next)); });
+        return row(label, hint, sw); };
+      const numeric = (key, label, hint, unit) => { const inp = h('input', { class: 'input', type: 'number', inputmode: 'numeric', value: S[key], style: 'width:110px;flex:none', 'aria-label': label });
+        return row(label, hint, h('div', { class: 'row', style: 'gap:6px;flex-wrap:nowrap' }, inp, h('span', { class: 'muted', text: unit }), button('ذخیره', { size: 'sm', onClick: () => save(key, inp.value.trim()) }))); };
+      settingsCard.append(h('div', { class: 'card-h' }, h('div', null, h('h3', { text: 'تنظیمات همکاری' }), h('div', { class: 'cell-sub', text: 'اعمال می‌شود روی همه‌ی همکاران' }))),
+        h('div', { class: 'card-b', style: 'padding-block:4px' },
+          toggle('partner.enabled', 'برنامه‌ی همکاری فعال باشد', 'اگر خاموش شود دکمه‌ی «همکاری» در ربات نمایش داده نمی‌شود و تخفیف همکاری اعمال نمی‌شود'),
+          toggle('partner.autoApprove', 'تأیید خودکار درخواست‌ها', 'درخواست‌ها بدون بررسی شما با درصد پیش‌فرض تأیید می‌شوند'),
+          numeric('partner.defaultDiscount', 'درصد تخفیف پیش‌فرض', 'هنگام تأیید پیشنهاد می‌شود', '٪'),
+          numeric('partner.maxDiscount', 'سقف تخفیف هر همکار', 'هیچ همکاری بیشتر از این درصد تخفیف نمی‌گیرد', '٪'),
+          toggle('partner.stackCoupons', 'همکار بتواند کد تخفیف هم استفاده کند', 'اگر خاموش باشد، کد تخفیف همراه با تخفیف همکاری پذیرفته نمی‌شود'),
+          numeric('partner.reapplyDays', 'انتظار برای درخواست دوباره', 'بعد از رد شدن، کاربر چند روز باید صبر کند', 'روز')));
+    } catch (e) { clear(settingsCard); settingsCard.append(errorState(errMsg(e), loadSettings)); }
+  }
+
+  const bar = h('div', { class: 'toolbar' }); const body = h('div'); const foot = h('div');
+  listCard.append(bar, body, foot);
+  const filters = [['', 'همه'], ['PENDING', 'در انتظار'], ['APPROVED', 'همکاران'], ['SUSPENDED', 'معلق'], ['REJECTED', 'ردشده']];
+  const seg = h('div', { class: 'seg-wrap' }); bar.append(seg);
+  const renderSeg = () => { clear(seg); seg.append(segmented(filters, ctx.query().get('status') || '', (v) => { ctx.setQuery({ status: v, page: '' }); renderSeg(); loadList(); })); };
+  renderSeg();
+
+  async function loadList() {
+    clear(body); clear(foot); body.append(h('div', { class: 'table-wrap' }, h('table', { class: 'table' }, skeletonRows(6, 4))));
+    try {
+      const q = ctx.query(); const pg = Number(q.get('page') || 1);
+      const r = await api(`/partners?status=${encodeURIComponent(q.get('status') || '')}&page=${pg}`); clear(body);
+      if (!r.items.length) return void body.append(emptyState('موردی نیست', q.get('status') === 'PENDING' ? 'درخواست جدیدی منتظر بررسی نیست.' : 'هنوز کسی در این بخش نیست.', 'users'));
+      body.append(table([
+        { label: 'متقاضی', render: (p) => h('div', null, h('div', { class: 'cell-main', text: p.user.name || (p.user.username ? '@' + p.user.username : '—') }), h('div', { class: 'cell-sub' }, ltr(p.user.telegramId), p.user.username ? ` · @${p.user.username}` : '')) },
+        { label: 'توضیح', cls: 'wrap', render: (p) => h('span', { class: 'muted', text: p.note || p.adminNote || '—' }) },
+        { label: 'وضعیت', render: (p) => h('span', { class: `badge ${PARTNER_ST[p.status][1]}`, text: PARTNER_ST[p.status][0] }) },
+        { label: 'تخفیف', cls: 'num', render: (p) => (p.status === 'APPROVED' || p.status === 'SUSPENDED' ? `${num(p.discountPercent)}٪` : '—') },
+        { label: 'خرید', cls: 'num', render: (p) => h('div', null, h('div', { text: money(p.stats.spent) }), h('div', { class: 'cell-sub', text: `${num(p.stats.orders)} سفارش · صرفه‌جویی ${money(p.stats.saved)}` })) },
+        { label: 'درخواست', render: (p) => datetime(p.requestedAt) },
+        { label: '', render: (p) => h('div', { class: 'actions' }, ...partnerActions(p)) },
+      ], r.items));
+      foot.append(pager({ page: r.page, pageSize: r.pageSize, total: r.total }, (n) => { ctx.setQuery({ page: n === 1 ? '' : String(n) }); loadList(); }));
+    } catch (e) { clear(body); body.append(errorState(errMsg(e), loadList)); }
+  }
+
+  const act = async (fn, okMsg) => { try { await fn(); toast(okMsg); loadList(); } catch (e) { toast(errMsg(e), 'err'); } };
+  function partnerActions(p) {
+    const out = [];
+    const post = (path, b) => api(`/partners/${p.id}/${path}`, { method: 'POST', body: b ?? {} });
+    if (p.status === 'PENDING' || p.status === 'REJECTED') out.push(button('تأیید', { size: 'sm', kind: 'primary', onClick: () => percentDialog(p, (percent) => act(() => post('approve', { percent }), 'همکار تأیید شد')) }));
+    if (p.status === 'PENDING') out.push(button('رد', { size: 'sm', onClick: () => rejectDialog(p, (reason) => act(() => post('reject', { reason }), 'درخواست رد شد')) }));
+    if (p.status === 'APPROVED') out.push(button('تغییر درصد', { size: 'sm', onClick: () => percentDialog(p, (percent) => act(() => post('approve', { percent }), 'درصد تغییر کرد')) }), button('تعلیق', { size: 'sm', onClick: () => act(() => post('suspend', { suspended: true }), 'معلق شد') }));
+    if (p.status === 'SUSPENDED') out.push(button('فعال‌سازی', { size: 'sm', onClick: () => act(() => post('suspend', { suspended: false }), 'فعال شد') }));
+    return out;
+  }
+  loadSettings(); loadList();
+}
+function percentDialog(p, onOk) {
+  const inp = h('input', { class: 'input', type: 'number', inputmode: 'numeric', min: 0, max: 100, 'aria-label': 'درصد تخفیف' });
+  api('/partners/settings').then((S) => { inp.value = p.status === 'APPROVED' ? p.discountPercent : S['partner.defaultDiscount']; }).catch(() => undefined);
+  const err = h('div', { class: 'form-error', hidden: true });
+  const ok = button('ذخیره', { kind: 'primary', onClick: () => { const n = Number(inp.value); if (!Number.isInteger(n) || n < 0 || n > 100) { err.hidden = false; err.textContent = 'عدد صحیح بین ۰ تا ۱۰۰ وارد کنید'; return; } m.close(); onOk(n); } });
+  const m = modal({ title: p.status === 'APPROVED' ? 'تغییر درصد تخفیف' : 'تأیید همکار', small: true, body: h('div', { class: 'stack' }, h('div', { class: 'field' }, h('label', { text: `درصد تخفیف برای ${p.user.name || p.user.telegramId}` }), inp, h('div', { class: 'hint', text: 'روی همه‌ی خریدها و تمدیدهای این کاربر اعمال می‌شود' })), err), footer: [ok, button('انصراف', { onClick: () => m.close() })] });
+}
+function rejectDialog(p, onOk) {
+  const inp = h('textarea', { class: 'textarea', 'aria-label': 'دلیل رد', placeholder: 'دلیل رد (به کاربر نمایش داده می‌شود)' });
+  const err = h('div', { class: 'form-error', hidden: true });
+  const ok = button('رد درخواست', { kind: 'danger', onClick: () => { if (!inp.value.trim()) { err.hidden = false; err.textContent = 'دلیل را بنویسید'; return; } m.close(); onOk(inp.value.trim()); } });
+  const m = modal({ title: 'رد درخواست همکاری', small: true, body: h('div', { class: 'stack' }, h('div', { class: 'field' }, h('label', { text: 'دلیل' }), inp), err), footer: [ok, button('انصراف', { onClick: () => m.close() })] });
+}

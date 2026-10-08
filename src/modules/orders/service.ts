@@ -2,7 +2,8 @@ import { Order, PaymentMethod } from '@prisma/client';
 import { prisma } from '../../db/client';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../utils/errors';
 import { randomId } from '../../utils/misc';
-import { consumeCoupon, releaseCoupon, validateCoupon } from '../coupons/service';
+import { consumeCoupon, releaseCoupon } from '../coupons/service';
+import { quote } from './pricing';
 import { audit } from '../admin/audit';
 import { isPaymentMethodEnabled } from '../payments/service';
 import { validateServiceName } from '../../utils/names';
@@ -44,22 +45,18 @@ export async function createOrder(input: CreateOrderInput): Promise<{ order: Ord
     },
     orderBy: { createdAt: 'desc' },
   });
-  if (existing && !input.couponCode) return { order: existing, reused: true };
+  // Reuse only if the price would still be the same (a user who became a partner meanwhile must get the new price).
+  if (existing && !input.couponCode && existing.partnerDiscountAmount === (await quote(input.userId, product.price, undefined)).partnerDiscount) return { order: existing, reused: true };
 
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const order = await prisma.$transaction(async (tx) => {
-        let discount = 0;
-        let couponId: string | undefined;
-        if (input.couponCode) {
-          const v = await validateCoupon(input.couponCode, input.userId, product.price, tx);
-          discount = v.discount;
-          couponId = v.coupon.id;
-        }
+        const q = await quote(input.userId, product.price, input.couponCode, tx);
+        const couponId = q.couponId;
         const o = await tx.order.create({
           data: {
             orderNumber: newOrderNumber(), userId: input.userId, productId: product.id,
-            amount: product.price, discountAmount: discount, finalAmount: product.price - discount,
+            amount: product.price, discountAmount: q.discount, partnerDiscountAmount: q.partnerDiscount, finalAmount: q.final,
             currency: product.currency, paymentMethod: input.paymentMethod, couponId,
             renewalOfServiceId: input.renewalOfServiceId,
           },

@@ -7,7 +7,7 @@ import { ValidationError } from '../../utils/errors';
 import { audit } from '../admin/audit';
 import { RULE, esc } from '../../bot/format';
 
-export type TextGroup = 'منو و خوش‌آمد' | 'خرید و پرداخت' | 'اعلان‌ها' | 'تحویل سرویس' | 'پشتیبانی و قوانین';
+export type TextGroup = 'منو و خوش‌آمد' | 'خرید و پرداخت' | 'اعلان‌ها' | 'تحویل سرویس' | 'پشتیبانی و قوانین' | 'همکاری';
 export interface VarSpec { label: string; sample: string; code?: boolean }
 export interface TextDef { label: string; group: TextGroup; default: string; vars?: Record<string, VarSpec>; plain?: boolean; max: number; optional?: boolean }
 
@@ -18,6 +18,7 @@ const V = {
   service: { label: 'نام سرویس', sample: 'اقتصادی ۵۰ گیگ' },
   days: { label: 'روز باقی‌مانده', sample: '۳' },
   date: { label: 'تاریخ انقضا', sample: '۹ آبان ۱۴۰۵' },
+  percent: { label: 'درصد تخفیف', sample: '۲۰' },
 } satisfies Record<string, VarSpec>;
 
 export const TEXT_DEFS = {
@@ -61,6 +62,17 @@ export const TEXT_DEFS = {
   'support.intro': { label: 'جمله‌ی بالای پشتیبانی', group: 'پشتیبانی و قوانین', max: 200, default: 'ما کنار شما هستیم' },
   rules: { label: 'متن قوانین', group: 'پشتیبانی و قوانین', max: 1500,
     default: '1️⃣ سرویس‌ها فقط برای استفاده شخصی هستند.\n2️⃣ فروش مجدد یا اشتراک‌گذاری لینک مجاز نیست.\n3️⃣ بازگشت وجه فقط در صورت عدم‌ارائه خدمات امکان‌پذیر است.\n4️⃣ پرداخت را با *مبلغ دقیق* سفارش و به کارت اعلام‌شده انجام دهید.\n5️⃣ ارسال رسید جعلی یا تکراری منجر به مسدود شدن حساب می‌شود.' },
+
+  'btn.partner': { label: 'دکمه‌ی همکاری', group: 'همکاری', max: 30, plain: true, default: '🤝 همکاری' },
+  'partner.intro': { label: 'معرفی برنامه‌ی همکاری', group: 'همکاری', max: 900,
+    default: `🤝 *همکاری در فروش*\n${RULE}\nبا ثبت‌نام به‌عنوان همکار، روی «همه‌ی خریدهایتان» تخفیف اختصاصی می‌گیرید و می‌توانید سرویس را با سود برای مشتریان خودتان بفروشید.\n\n✅ درخواست شما توسط ما بررسی می‌شود\n✅ بعد از تأیید، تخفیف خودکار روی همه‌ی پلن‌ها اعمال می‌شود` },
+  'partner.apply_prompt': { label: 'پیام قبل از ثبت درخواست', group: 'همکاری', max: 400,
+    default: 'برای تسریع بررسی، کوتاه بنویسید چه کاری می‌کنید (مثلاً کانال یا فروشگاه شما و تعداد تقریبی مشتری).\nاگر نمی‌خواهید توضیح دهید، «ندارم» بفرستید.' },
+  'partner.pending': { label: 'پیام درخواست در حال بررسی', group: 'همکاری', max: 400, default: '⏳ *درخواست همکاری شما ثبت شده و در حال بررسی است*\nنتیجه همین‌جا به شما اعلام می‌شود.' },
+  'partner.approved': { label: 'پیام تأیید همکاری', group: 'همکاری', max: 600, vars: { name: V.name, percent: V.percent },
+    default: `🎉 *{name} عزیز، همکاری شما تأیید شد*\n${RULE}\n💸 تخفیف اختصاصی شما: *{percent}٪* روی همه‌ی خریدها\nاز منوی خرید، قیمت‌ها با تخفیف نمایش داده می‌شود.` },
+  'partner.rejected': { label: 'پیام رد درخواست همکاری', group: 'همکاری', max: 600, vars: { reason: V.reason },
+    default: `❌ *درخواست همکاری شما تأیید نشد*\n${RULE}\nدلیل: {reason}\n\nبعد از چند روز می‌توانید دوباره درخواست بدهید.` },
 } satisfies Record<string, TextDef>;
 export type TextKey = keyof typeof TEXT_DEFS;
 export const isTextKey = (k: string): k is TextKey => k in TEXT_DEFS;

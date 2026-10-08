@@ -14,6 +14,7 @@ import { adminRetry } from '../modules/vpn/provisioning';
 import { adminReply, closeTicket } from '../modules/support/service';
 import { SETTING_DEFAULTS, SettingKey, allSettings, setSetting } from '../modules/settings/service';
 import { flushPending } from '../modules/notifications/service';
+import { PartnerFilter, approvePartner, getPartnerById, listPartners, partnerCounts, partnerStats, rejectPartner, setPartnerPercent, setPartnerSuspended } from '../modules/partners/service';
 import { PanelView, createPanel, deletePanel, listPanelInbounds, listPanels, panelHealth, setPanelActive, testPanel, updatePanel } from '../modules/panels/service';
 import { categoryTree, createCategory, deleteCategory, moveCategory, updateCategory } from '../modules/categories/service';
 import { isTextKey, listTexts, previewText, resetText, setText } from '../modules/texts/service';
@@ -88,6 +89,12 @@ const panelBody = z.object({
   username: z.string().max(120).optional(), password: z.string().max(200).optional(), apiToken: z.string().max(400).optional(),
   subBaseUrl: z.string().max(300).optional(), publicHost: z.string().max(200).optional(), tlsInsecure: z.boolean().optional(),
 });
+
+const PARTNER_RULES: Record<string, z.ZodType<string>> = {
+  'partner.enabled': bool, 'partner.autoApprove': bool, 'partner.stackCoupons': bool,
+  'partner.defaultDiscount': int(0, 100), 'partner.maxDiscount': int(0, 100), 'partner.reapplyDays': int(0, 365),
+};
+const PARTNER_KEYS = Object.keys(PARTNER_RULES) as SettingKey[];
 
 const confirmFor = (externalId: string) => `DELETE ${externalId.slice(-6)}`;
 
@@ -207,6 +214,38 @@ export const routes: Route[] = [
     },
   },
   { method: 'PUT', re: /^\/settings$/, perm: 'settings.manage', run: putSetting },
+  // Partner (reseller) programme
+  {
+    method: 'GET', re: /^\/partners$/, perm: 'partners.manage',
+    run: async (c) => {
+      const status = str(c, 'status', 12).toUpperCase() as PartnerFilter;
+      const f: PartnerFilter = ['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED'].includes(status) ? status : 'ALL';
+      const pg = page(c); const size = 25;
+      const rows = await listPartners(f, (pg - 1) * size, size + 1);
+      const items = await Promise.all(rows.slice(0, size).map(async (p) => ({
+        id: p.id, status: p.status, discountPercent: p.discountPercent, note: p.note, adminNote: p.adminNote, requestedAt: p.requestedAt, decidedAt: p.decidedAt, decidedBy: p.decidedBy,
+        user: { id: p.user.id, telegramId: String(p.user.telegramId), username: p.user.username, name: [p.user.firstName, p.user.lastName].filter(Boolean).join(' ') },
+        stats: await partnerStats(p.userId),
+      })));
+      const counts = await partnerCounts();
+      return { items, counts, page: pg, pageSize: size, total: f === 'ALL' ? Object.values(counts).reduce((a, b) => a + b, 0) : counts[f] };
+    },
+  },
+  { method: 'POST', re: /^\/partners\/([\w-]+)\/approve$/, perm: 'partners.manage', run: async (c) => { const b = z.object({ percent: z.number().int().optional().nullable() }).parse(c.body ?? {}); const p = await getPartnerById(c.params[0]); if (p.status === 'APPROVED' && b.percent != null) await setPartnerPercent(actor(c), p.id, b.percent); else await approvePartner(actor(c), p.id, b.percent ?? undefined); return { ok: true }; } },
+  { method: 'POST', re: /^\/partners\/([\w-]+)\/reject$/, perm: 'partners.manage', run: async (c) => { await rejectPartner(actor(c), c.params[0], z.object({ reason: z.string().min(1).max(300) }).parse(c.body).reason); return { ok: true }; } },
+  { method: 'POST', re: /^\/partners\/([\w-]+)\/suspend$/, perm: 'partners.manage', run: async (c) => { await setPartnerSuspended(actor(c), c.params[0], z.object({ suspended: z.boolean() }).parse(c.body).suspended); return { ok: true }; } },
+  { method: 'GET', re: /^\/partners\/settings$/, perm: 'partners.manage', run: async () => { const s = await allSettings(); return Object.fromEntries(PARTNER_KEYS.map((k) => [k, s[k]])); } },
+  {
+    method: 'PUT', re: /^\/partners\/settings$/, perm: 'partners.manage',
+    run: async (c) => {
+      const b = z.object({ key: z.enum(PARTNER_KEYS as [SettingKey, ...SettingKey[]]), value: z.string() }).parse(c.body);
+      const v = PARTNER_RULES[b.key].parse(b.value.trim());
+      await setSetting(b.key, v);
+      await audit({ actor: actor(c), action: 'setting.change', target: 'Setting', targetId: b.key, metadata: { value: v } });
+      return { ok: true };
+    },
+  },
+
   { method: 'GET', re: /^\/xui\/status$/, perm: 'settings.manage', run: async () => ({ panels: await Promise.all((await listPanels()).filter((p) => p.isActive).map(async (p) => ({ code: p.code, name: p.name, ...(await testPanel(p.code)) }))) }) },
 
   // Multi-panel management. Secrets are write-only: they are never returned.

@@ -12,6 +12,7 @@ import { adminRetry } from '../modules/vpn/provisioning';
 import { adminReply, closeTicket, listOpenTickets } from '../modules/support/service';
 import { SETTING_DEFAULTS, SettingKey, allSettings, getSetting, setSetting } from '../modules/settings/service';
 import { audit } from '../modules/admin/audit';
+import { PARTNER_STATUS_FA, PartnerFilter, approvePartner, getPartnerById, listPartners, partnerCounts, partnerLabel, partnerStats, rejectPartner, setPartnerPercent, setPartnerSuspended } from '../modules/partners/service';
 import { addChannel, deleteChannel, listChannels, setChannelActive, testChannel } from '../modules/channels/service';
 import { isTextKey, listTexts, previewText, resetText, setText, textDef } from '../modules/texts/service';
 import { categoryTree, createCategory, deleteCategory, getCategory, moveCategory, setProductCategory, splitIconName, updateCategory } from '../modules/categories/service';
@@ -34,7 +35,7 @@ export function adminHandlers() {
 
   /** The admin menu is grouped: related tools live together; groups/items the admin has no permission for are hidden. */
   const GROUPS: { id: string; title: string; hint: string; items: [Permission, string, string][] }[] = [
-    { id: 'fin', title: '💰 فروش و مالی', hint: 'پرداخت‌ها، سفارش‌ها و کدهای تخفیف', items: [['payments.view', '💳 پرداخت‌ها', 'adm:pays'], ['users.view', '🧾 سفارش‌ها و کاربران', 'adm:orders'], ['coupons.manage', '🎁 کدهای تخفیف', 'adm:coupons']] },
+    { id: 'fin', title: '💰 فروش و مالی', hint: 'پرداخت‌ها، سفارش‌ها، کدهای تخفیف و همکاران', items: [['payments.view', '💳 پرداخت‌ها', 'adm:pays'], ['users.view', '🧾 سفارش‌ها و کاربران', 'adm:orders'], ['coupons.manage', '🎁 کدهای تخفیف', 'adm:coupons'], ['partners.manage', '🤝 همکاری‌ها', 'pa:h']] },
     { id: 'cat', title: '📦 محصولات و منوی خرید', hint: 'پلن‌های قابل فروش و دسته‌بندی منو', items: [['products.manage', '📦 محصولات', 'adm:products'], ['products.manage', '🗂 دسته‌بندی منوی خرید', 'ct:l:root']] },
     { id: 'srv', title: '🛰 سرویس‌ها و سرورها', hint: 'سرویس‌های مشتریان و پنل‌های X-UI', items: [['vpn.view', '🛰 سرویس‌های VPN', 'vl:0'], ['panels.manage', '🖥 پنل‌ها و inboundها', 'pn:l']] },
     { id: 'set', title: '⚙️ تنظیمات و ابزارها', hint: 'متن‌ها، کانال‌های اجباری، تنظیمات و گزارش تغییرات', items: [['texts.manage', '✏️ ویرایش متن‌های ربات', 'tx:l'], ['settings.manage', '📢 کانال‌های اجباری', 'ch:l'], ['settings.manage', '⚙️ تنظیمات', 'adm:settings'], ['audit.view', '🧾 Audit Log', 'adm:audit']] },
@@ -111,6 +112,64 @@ export function adminHandlers() {
     if (p.source === 'db') rows.push([{ text: '✏️ ویرایش', data: `pn:e:${code}` }, { text: p.isActive ? '⏸ غیرفعال' : '▶️ فعال', data: `pn:tg:${code}` }], [{ text: '🗑 حذف', data: `pn:d:${code}` }]);
     rows.push(back('pn:l'));
     await show(ctx, panelText(p), rows);
+  }
+
+  /* ------------------------------ partners ------------------------------ */
+  const PCFG_TOGGLE: Record<string, string> = { 'partner.enabled': 'برنامه‌ی همکاری فعال', 'partner.autoApprove': 'تأیید خودکار درخواست‌ها', 'partner.stackCoupons': 'جمع شدن کد تخفیف با تخفیف همکار' };
+  const PCFG_EDIT: Record<string, string> = { 'partner.defaultDiscount': 'درصد تخفیف پیش‌فرض (هنگام تأیید)', 'partner.maxDiscount': 'سقف تخفیف هر همکار', 'partner.reapplyDays': 'روز انتظار بعد از رد شدن' };
+  const PCFG_KEYS = [...Object.keys(PCFG_TOGGLE), ...Object.keys(PCFG_EDIT)] as SettingKey[];
+
+  async function partnersHome(ctx: Ctx) {
+    ctx.session.step = undefined;
+    const n = await partnerCounts();
+    await show(ctx, `🤝 همکاری‌ها\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\nدرخواست‌ها را تأیید یا رد کنید و درصد تخفیف هر همکار را تعیین کنید.${n.PENDING ? `\n\n⏳ ${n.PENDING} درخواست منتظر بررسی شماست.` : ''}`, [
+      [{ text: `⏳ در انتظار (${n.PENDING})`, data: 'pa:l:PENDING:0' }, { text: `✅ همکاران (${n.APPROVED})`, data: 'pa:l:APPROVED:0' }],
+      [{ text: `⛔ معلق (${n.SUSPENDED})`, data: 'pa:l:SUSPENDED:0' }, { text: `❌ ردشده (${n.REJECTED})`, data: 'pa:l:REJECTED:0' }],
+      [{ text: '⚙️ تنظیمات همکاری', data: 'pa:cfg' }],
+      back('adm:g:fin'),
+    ]);
+  }
+
+  async function partnersList(ctx: Ctx, f: PartnerFilter, page: number) {
+    const list = await listPartners(f, page * PAGE, PAGE + 1);
+    const rows: Button[][] = list.slice(0, PAGE).map((p) => [{ text: `${partnerLabel(p.user)}${p.status === 'APPROVED' ? ` · ${p.discountPercent}٪` : ''}`, data: `pa:v:${p.id}` }]);
+    const nav: Button[] = [];
+    if (page > 0) nav.push({ text: '◀️', data: `pa:l:${f}:${page - 1}` });
+    if (list.length > PAGE) nav.push({ text: '▶️', data: `pa:l:${f}:${page + 1}` });
+    if (nav.length) rows.push(nav);
+    rows.push(back('pa:h'));
+    await show(ctx, `🤝 ${f === 'ALL' ? 'همه' : PARTNER_STATUS_FA[f]}${list.length ? '' : '\n\nموردی نیست.'}`, rows);
+  }
+
+  async function partnerView(ctx: Ctx, id: string) {
+    const p = await getPartnerById(id);
+    const st = await partnerStats(p.userId);
+    const text = [
+      `🤝 ${partnerLabel(p.user)}${p.user.username ? ` (@${p.user.username})` : ''}`, '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈',
+      `🪪 ${p.user.telegramId}`,
+      `وضعیت: ${PARTNER_STATUS_FA[p.status]}`,
+      p.status === 'APPROVED' || p.status === 'SUSPENDED' ? `💸 تخفیف: ${p.discountPercent}٪` : '',
+      p.note ? `📝 توضیح متقاضی: ${p.note}` : '📝 بدون توضیح',
+      p.adminNote ? `📌 دلیل/یادداشت ادمین: ${p.adminNote}` : '',
+      `📅 درخواست: ${fmtDt(p.requestedAt)}${p.decidedAt ? `\n🕒 تصمیم: ${fmtDt(p.decidedAt)} (${p.decidedBy ?? '-'})` : ''}`,
+      `🧾 خرید: ${st.orders} · 💰 ${formatMoney(st.spent)} · 🎉 صرفه‌جویی ${formatMoney(st.saved)}`,
+    ].filter(Boolean).join('\n');
+    const rows: Button[][] = [];
+    if (p.status === 'PENDING' || p.status === 'REJECTED') rows.push([{ text: '✅ تأیید', data: `pa:ok:${id}` }, ...(p.status === 'PENDING' ? [{ text: '❌ رد', data: `pa:no:${id}` }] : [])], [{ text: '✏️ تأیید با درصد دلخواه', data: `pa:pc:${id}` }]);
+    if (p.status === 'APPROVED') rows.push([{ text: '✏️ تغییر درصد', data: `pa:pc:${id}` }, { text: '⛔ تعلیق', data: `pa:su:${id}` }]);
+    if (p.status === 'SUSPENDED') rows.push([{ text: '▶️ فعال‌سازی دوباره', data: `pa:re:${id}` }]);
+    rows.push(back(`pa:l:${p.status}:0`));
+    await show(ctx, text, rows);
+  }
+
+  async function partnerCfg(ctx: Ctx) {
+    ctx.session.step = undefined;
+    const s = await allSettings();
+    await show(ctx, `⚙️ تنظیمات همکاری\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n${Object.entries(PCFG_EDIT).map(([k, l]) => `${l}: ${s[k as SettingKey]}${k === 'partner.reapplyDays' ? ' روز' : '٪'}`).join('\n')}`, [
+      ...Object.entries(PCFG_TOGGLE).map(([k, l]): Button[] => [{ text: `${s[k as SettingKey] === 'true' ? '🟢' : '⚪'} ${l}`, data: `pa:t:${k}` }]),
+      ...Object.entries(PCFG_EDIT).map(([k, l]): Button[] => [{ text: `✏️ ${l}`, data: `pa:e:${k}` }]),
+      back('pa:h'),
+    ]);
   }
 
   const FILTERS: [PaymentFilter, string][] = [['review', '🔎 نیازمند بررسی'], ['submitted', '📤 ارسال‌شده'], ['auto', '🤖 تأیید خودکار'], ['approved', '✅ تأییدشده'], ['rejected', '❌ ردشده'], ['pending', '⏳ در انتظار']];
@@ -218,7 +277,7 @@ export function adminHandlers() {
   c.on('callback_query:data', async (ctx, next) => {
     const d = ctx.callbackQuery.data;
     const [ns, a, b] = d.split(':');
-    const adminNs = ['adm', 'pl', 'ap', 'av', 'vl', 'pr', 'cp', 'st', 'at', 'ao', 'ct', 'tx', 'ch', 'pn'];
+    const adminNs = ['adm', 'pl', 'ap', 'av', 'vl', 'pr', 'cp', 'st', 'at', 'ao', 'ct', 'tx', 'ch', 'pn', 'pa'];
     if (!adminNs.includes(ns)) return next();
     try {
       // every admin callback re-checks authorization server-side (callback data is untrusted)
@@ -468,6 +527,30 @@ export function adminHandlers() {
         if (a === 'd') return show(ctx, `⚠️ حذف پنل «${p.name}»؟\nفقط وقتی هیچ محصول و سرویسی روی آن نباشد حذف می‌شود.`, [[{ text: '🗑 بله، حذف شود', data: `pn:d2:${b}` }, { text: '↩️ انصراف', data: `pn:v:${b}` }]]);
         if (a === 'd2') { await deletePanel(actor(ctx), p.id); return show(ctx, '🗑 پنل حذف شد.', [back('pn:l')]); }
       }
+      if (ns === 'pa') {
+        await need(ctx, 'partners.manage');
+        if (a === 'h') return partnersHome(ctx);
+        if (a === 'cfg') return partnerCfg(ctx);
+        if (a === 'l') return partnersList(ctx, b as PartnerFilter, Number(d.split(':')[3] ?? 0));
+        if (a === 'v') return partnerView(ctx, b);
+        if (a === 'ok') { await approvePartner(actor(ctx), b); return partnerView(ctx, b); }
+        if (a === 'no') { ctx.session.step = 'a_partner_reject'; ctx.session.data = { id: b }; return show(ctx, 'دلیل رد درخواست را بنویسید (به کاربر نمایش داده می‌شود):', [back(`pa:v:${b}`)]); }
+        if (a === 'pc') { ctx.session.step = 'a_partner_pct'; ctx.session.data = { id: b }; return show(ctx, `درصد تخفیف این همکار را بفرستید (عدد ۰ تا ۱۰۰؛ حداکثر مجاز ${await getSetting('partner.maxDiscount')}):`, [back(`pa:v:${b}`)]); }
+        if (a === 'su') { await setPartnerSuspended(actor(ctx), b, true); return partnerView(ctx, b); }
+        if (a === 're') { await setPartnerSuspended(actor(ctx), b, false); return partnerView(ctx, b); }
+        if (a === 't') {
+          if (!(b in PCFG_TOGGLE)) throw new AppError('VALIDATION', 'کلید نامعتبر');
+          const next = String((await getSetting(b as SettingKey)) !== 'true');
+          await setSetting(b as SettingKey, next);
+          await audit({ actor: actor(ctx), action: 'setting.change', target: 'Setting', targetId: b, metadata: { value: next } });
+          return partnerCfg(ctx);
+        }
+        if (a === 'e') {
+          if (!(b in PCFG_EDIT)) throw new AppError('VALIDATION', 'کلید نامعتبر');
+          ctx.session.step = 'a_partner_cfg'; ctx.session.data = { key: b };
+          return show(ctx, `${PCFG_EDIT[b]}\nمقدار فعلی: ${await getSetting(b as SettingKey)}\n\nعدد جدید را بفرستید:`, [back('pa:cfg')]);
+        }
+      }
       if (ns === 'ch') {
         await need(ctx, 'settings.manage');
         if (a === 'l') {
@@ -664,6 +747,34 @@ export function adminHandlers() {
         ctx.session.step = undefined;
         return void (await ctx.reply('✅ ذخیره شد و اتصال با مشخصات جدید تست شد.', { reply_markup: { inline_keyboard: [[{ text: '🖥 مشاهده پنل', callback_data: `pn:v:${data.code}` }]] } }));
       }
+      if (step === 'a_partner_reject') {
+        await need(ctx, 'partners.manage');
+        await rejectPartner(actor(ctx), data.id, text);
+        ctx.session.step = undefined;
+        await ctx.reply('✅ رد شد و به کاربر اطلاع داده شد.');
+        return partnerView(ctx, data.id);
+      }
+      if (step === 'a_partner_pct') {
+        await need(ctx, 'partners.manage');
+        const n = Number(text.replace(/[۰-۹]/g, (c) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c))).replace(/[%٪\s]/g, ''));
+        const p = await getPartnerById(data.id);
+        if (p.status === 'APPROVED') await setPartnerPercent(actor(ctx), data.id, n); else await approvePartner(actor(ctx), data.id, n);
+        ctx.session.step = undefined;
+        await ctx.reply('✅ ذخیره شد.');
+        return partnerView(ctx, data.id);
+      }
+      if (step === 'a_partner_cfg') {
+        await need(ctx, 'partners.manage');
+        if (!PCFG_KEYS.includes(data.key)) throw new AppError('VALIDATION', 'کلید نامعتبر');
+        const n = Number(text.replace(/[۰-۹]/g, (c) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(c))).replace(/[%٪\s]/g, ''));
+        const max = data.key === 'partner.reapplyDays' ? 365 : 100;
+        if (!Number.isInteger(n) || n < (data.key === 'partner.reapplyDays' ? 0 : 0) || n > max) throw new AppError('VALIDATION', `عدد صحیح بین ۰ تا ${max} بفرستید`);
+        await setSetting(data.key, String(n));
+        await audit({ actor: actor(ctx), action: 'setting.change', target: 'Setting', targetId: data.key, metadata: { value: String(n) } });
+        ctx.session.step = undefined;
+        await ctx.reply('✅ ذخیره شد.');
+        return partnerCfg(ctx);
+      }
       if (step === 'a_chan_add') {
         await need(ctx, 'settings.manage');
         const c = await addChannel(actor(ctx), text);
@@ -744,7 +855,7 @@ export function adminHandlers() {
       }
     } catch (e) {
       // validation errors on multi-line / field edits keep the step, so the admin can just resend a corrected text
-      const retry = e instanceof AppError && (e.code === 'VALIDATION' || e.code === 'CONFLICT') && ['a_bulk', 'a_pfield', 'a_cat_new', 'a_cat_rename', 'a_text', 'a_chan_add', 'a_panel_add', 'a_panel_edit'].includes(step ?? '');
+      const retry = e instanceof AppError && (e.code === 'VALIDATION' || e.code === 'CONFLICT') && ['a_bulk', 'a_pfield', 'a_cat_new', 'a_cat_rename', 'a_text', 'a_chan_add', 'a_panel_add', 'a_panel_edit', 'a_partner_reject', 'a_partner_pct', 'a_partner_cfg'].includes(step ?? '');
       if (!retry) ctx.session.step = undefined;
       return handleError(ctx, e, step === 'a_bulk' ? 'adm:products' : 'adm:home');
     }

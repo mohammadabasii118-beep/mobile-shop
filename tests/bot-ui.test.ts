@@ -25,16 +25,16 @@ const cbs = (c = last()) => (c.payload.reply_markup?.inline_keyboard ?? []).flat
 const labels = (c = last()) => (c.payload.reply_markup?.inline_keyboard ?? []).flat().map((b: any) => b.text) as string[];
 
 describe('Telegram UX', () => {
-  it('main menu: personalised, exactly the 7 required entries, mobile-friendly rows (max 2 per row)', async () => {
+  it('main menu: personalised, the 7 required entries + partner, mobile-friendly rows (max 2 per row)', async () => {
     await say('/start');
     expect(text()).toContain('سلام علی');
     expect(last().payload.parse_mode).toBe('HTML');
-    expect(labels()).toEqual(['🛒 خرید VPN', '📦 سرویس‌های من', '💳 سفارش‌های من', '👤 حساب من', '🎁 کد تخفیف', '🎫 پشتیبانی', '📜 قوانین']);
+    expect(labels()).toEqual(['🛒 خرید VPN', '📦 سرویس‌های من', '💳 سفارش‌های من', '👤 حساب من', '🎁 کد تخفیف', '🎫 پشتیبانی', '📜 قوانین', '🤝 همکاری']);
     expect(last().payload.reply_markup.inline_keyboard.every((r: any[]) => r.length <= 2)).toBe(true);
   });
 
   it('no screen is a dead end: every main-menu page offers back/home', async () => {
-    for (const d of ['menu:buy', 'menu:services', 'menu:orders', 'menu:account', 'menu:coupon', 'menu:support', 'menu:rules', 'tk:new']) {
+    for (const d of ['menu:buy', 'menu:services', 'menu:orders', 'menu:account', 'menu:coupon', 'menu:support', 'menu:rules', 'menu:partner', 'tk:new']) {
       await tap(d);
       expect(cbs().some((x) => x === 'menu:main' || x.startsWith('menu:') || x.startsWith('tk:') ), d).toBe(true);
       expect(labels().join(' '), d).toMatch(/بازگشت|منو/);

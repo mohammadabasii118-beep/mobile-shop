@@ -10,7 +10,8 @@ import { deleteServiceByUser, getServiceForUser, listUserServices, renameService
 import { deliveryButtons } from '../modules/vpn/provisioning';
 import { serviceLabel } from '../utils/names';
 import { createTicket, getTicketForUser, listUserTickets, userReply } from '../modules/support/service';
-import { validateCoupon } from '../modules/coupons/service';
+import { quote } from '../modules/orders/pricing';
+import { applyBlockReason, applyForPartner, effectivePercent, getPartner, partnerEnabled, partnerStats } from '../modules/partners/service';
 import { getSetting } from '../modules/settings/service';
 import { serviceCard } from '../modules/notifications/templates';
 import { Button } from '../modules/notifications/service';
@@ -37,7 +38,7 @@ export function userHandlers(fetchFile: FileFetcher) {
   const c = new Composer<Ctx>();
 
   /** Main menu rows; the management button is rendered ONLY for admins (authorisation is re-checked on every admin callback). */
-  const menuRows = async (ctx: Ctx) => mainMenuRows(!!(await getAdmin(BigInt(ctx.from!.id))), await loadTexts());
+  const menuRows = async (ctx: Ctx) => mainMenuRows(!!(await getAdmin(BigInt(ctx.from!.id))), await loadTexts(), await partnerEnabled());
 
   const mainMenu = async (ctx: Ctx) => {
     ctx.session.step = undefined;
@@ -66,6 +67,32 @@ export function userHandlers(fetchFile: FileFetcher) {
     ].filter(Boolean).join('\n'), [[{ text: '📦 سرویس‌های من', data: 'menu:services' }, { text: '💳 سفارش‌ها', data: 'menu:orders' }], nav()], H);
   }
 
+  /* ------------------------------ partners ------------------------------ */
+
+  async function partnerMenu(ctx: Ctx) {
+    ctx.session.step = undefined;
+    const T = await loadTexts();
+    const title = T.plain('btn.partner').replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '') || 'همکاری';
+    if (!(await partnerEnabled())) return show(ctx, `${header('🤝', title)}\n😕 برنامه‌ی همکاری فعلاً فعال نیست.`, [nav()], H);
+    const p = await getPartner(ctx.dbUser.id);
+    if (!p) return show(ctx, `${T.html('partner.intro')}`, [[{ text: '📝 ثبت درخواست همکاری', data: 'pt:req' }], nav()], H);
+    if (p.status === 'PENDING') return show(ctx, `${T.html('partner.pending')}\n\n📅 ثبت: ${jdate(p.requestedAt)}`, [nav()], H);
+    if (p.status === 'APPROVED') {
+      const st = await partnerStats(ctx.dbUser.id);
+      return show(ctx, [
+        header('🤝', title, '✅ همکار تأییدشده'), '',
+        `💸 تخفیف اختصاصی شما: ${b(fa(await effectivePercent(p)) + '٪')}`,
+        i('روی همه‌ی خریدها و تمدیدها خودکار اعمال می‌شود.'), RULE,
+        `🧾 خریدهای انجام‌شده: ${b(fa(st.orders))}`,
+        `💰 مجموع پرداختی: ${b(money(st.spent))}`,
+        `🎉 مجموع صرفه‌جویی: ${b(money(st.saved))}`,
+      ].join('\n'), [[{ text: '🛒 خرید با تخفیف', data: 'menu:buy' }], nav()], H);
+    }
+    if (p.status === 'SUSPENDED') return show(ctx, `${header('🤝', title)}\n⛔ ${b('همکاری شما موقتاً معلق شده است')}\nبرای اطلاع از دلیل با پشتیبانی در ارتباط باشید.`, [[{ text: '🎫 پشتیبانی', data: 'menu:support' }], nav()], H);
+    const block = await applyBlockReason(p);
+    return show(ctx, `${T.html('partner.rejected', { reason: p.adminNote ?? '—' })}${block ? `\n\n⏳ ${esc(block)}` : ''}`, [...(block ? [] : [[{ text: '📝 درخواست دوباره', data: 'pt:req' }]]), nav()], H);
+  }
+
   /* ----------------------------- buy flow ----------------------------- */
 
   /** One level of the buy menu: sub-category buttons first, then this level's plans as cards. */
@@ -92,11 +119,11 @@ export function userHandlers(fetchFile: FileFetcher) {
   async function orderSummary(ctx: Ctx, productId: string) {
     const p = await getProduct(productId);
     if (!p.isActive) return show(ctx, fail('این پلن در دسترس نیست', 'لطفاً پلن دیگری انتخاب کنید.'), [back(p.categoryId ? `bc:${p.categoryId}` : 'menu:buy')], H);
-    let discount = 0;
+    let q = await quote(ctx.dbUser.id, p.price, undefined);
     let couponNote = '';
     if (ctx.session.coupon) {
       try {
-        discount = (await validateCoupon(ctx.session.coupon, ctx.dbUser.id, p.price)).discount;
+        q = await quote(ctx.dbUser.id, p.price, ctx.session.coupon);
         couponNote = `🎁 کد تخفیف ${code(ctx.session.coupon)} اعمال می‌شود`;
       } catch (e) {
         couponNote = `⚠️ ${esc(e instanceof AppError ? e.message : 'کد تخفیف معتبر نیست')} — اعمال نشد`;
@@ -111,8 +138,9 @@ export function userHandlers(fetchFile: FileFetcher) {
       `📊 حجم: ${fa(p.trafficGB)} GB`,
       RULE,
       `💰 قیمت اصلی: ${money(p.price, p.currency)}`,
-      `🎁 تخفیف: ${discount ? money(discount, p.currency) : '—'}`,
-      `✅ مبلغ نهایی: ${b(money(p.price - discount, p.currency))}`,
+      ...(q.partnerDiscount ? [`🤝 تخفیف همکاری (${fa(q.partnerPercent)}٪): ${money(q.partnerDiscount, p.currency)}`] : []),
+      ...(q.couponDiscount || !q.partnerDiscount ? [`🎁 تخفیف: ${q.couponDiscount ? money(q.couponDiscount, p.currency) : '—'}`] : []),
+      `✅ مبلغ نهایی: ${b(money(q.final, p.currency))}`,
       couponNote ? `\n${couponNote}` : '',
       '',
       methods.length ? `${b('روش پرداخت را انتخاب کنید')} 👇` : fail('در حال حاضر روش پرداختی فعال نیست', 'لطفاً بعداً تلاش کنید یا با پشتیبانی در ارتباط باشید.'),
@@ -219,10 +247,20 @@ export function userHandlers(fetchFile: FileFetcher) {
           case 'orders': return await ordersList(ctx);
           case 'account': return await account(ctx);
           case 'support': return await supportMenu(ctx);
+          case 'partner': return await partnerMenu(ctx);
           case 'rules': return await show(ctx, `${header('📜', 'قوانین استفاده')}\n${(await loadTexts()).html('rules')}`, [nav()], H);
           case 'coupon':
             ctx.session.step = 'coupon';
             return await show(ctx, `${header('🎁', 'کد تخفیف')}\n${(await loadTexts()).html('coupon.prompt')}`, [nav()], H);
+        }
+      }
+      if (ns === 'pt') {
+        if (a === 'req') {
+          if (!(await partnerEnabled())) return await partnerMenu(ctx);
+          const block = await applyBlockReason(await getPartner(ctx.dbUser.id));
+          if (block) return await show(ctx, `${fail('در حال حاضر نمی‌توانید درخواست بدهید', block)}`, [nav('menu:partner')], H);
+          ctx.session.step = 'partner_req';
+          return await show(ctx, `${header('📝', 'درخواست همکاری')}\n${(await loadTexts()).html('partner.apply_prompt')}`, [back('menu:partner')], H);
         }
       }
       if (ns === 'bc') return await buyMenu(ctx, a);
@@ -418,11 +456,18 @@ export function userHandlers(fetchFile: FileFetcher) {
         await ctx.reply(`${ok('نام سرویس تغییر کرد')}\n📛 ${b(serviceLabel(svc.displayName, svc.externalId))}`, { parse_mode: 'HTML' });
         return await serviceCallbacks(ctx, 'v', sid);
       }
+      if (step === 'partner_req') {
+        const note = /^(ندارم|-|no)$/i.test(text.trim()) ? undefined : text;
+        ctx.session.step = undefined;
+        const r = await applyForPartner(ctx.dbUser.id, note);
+        if (!r.auto) await ctx.reply(`${ok('درخواست همکاری ثبت شد')}\n${i('بعد از بررسی، نتیجه همین‌جا اعلام می‌شود.')}`, { parse_mode: 'HTML' });
+        return await partnerMenu(ctx);
+      }
       if (step === 'coupon') {
-        const v = await validateCoupon(text, ctx.dbUser.id, 1_000_000);
+        const v = await quote(ctx.dbUser.id, 1_000_000, text); // also rejects coupons that cannot be combined with a partner discount
         const returnTo = ctx.session.data?.returnTo as string | undefined;
-        ctx.session.coupon = v.coupon.code; ctx.session.step = undefined; ctx.session.data = undefined;
-        await ctx.reply(`${ok('کد تخفیف ثبت شد')}\n🎁 ${code(v.coupon.code)} روی سفارش بعدی اعمال می‌شود.`, { parse_mode: 'HTML' });
+        ctx.session.coupon = v.couponCode!; ctx.session.step = undefined; ctx.session.data = undefined;
+        await ctx.reply(`${ok('کد تخفیف ثبت شد')}\n🎁 ${code(v.couponCode!)} روی سفارش بعدی اعمال می‌شود.`, { parse_mode: 'HTML' });
         return returnTo ? orderSummary(ctx, returnTo) : show(ctx, 'ادامه دهید 👇', await menuRows(ctx));
       }
       if (step === 'ticket') {

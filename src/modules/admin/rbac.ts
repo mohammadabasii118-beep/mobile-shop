@@ -8,16 +8,16 @@ export type Permission =
   | 'vpn.view' | 'vpn.manage' | 'vpn.delete'
   | 'products.manage' | 'coupons.manage'
   | 'support.reply' | 'users.view'
-  | 'settings.manage' | 'audit.view' | 'stats.view' | 'admins.manage' | 'texts.manage' | 'panels.manage';
+  | 'settings.manage' | 'audit.view' | 'stats.view' | 'admins.manage' | 'texts.manage' | 'panels.manage' | 'partners.manage';
 
 const ALL: Permission[] = [
   'payments.view', 'payments.review', 'vpn.view', 'vpn.manage', 'vpn.delete', 'products.manage',
-  'coupons.manage', 'support.reply', 'users.view', 'settings.manage', 'audit.view', 'stats.view', 'admins.manage', 'texts.manage', 'panels.manage',
+  'coupons.manage', 'support.reply', 'users.view', 'settings.manage', 'audit.view', 'stats.view', 'admins.manage', 'texts.manage', 'panels.manage', 'partners.manage',
 ];
 
 export const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
   SUPER_ADMIN: ALL,
-  PAYMENT_ADMIN: ['payments.view', 'payments.review', 'stats.view', 'users.view'],
+  PAYMENT_ADMIN: ['payments.view', 'payments.review', 'stats.view', 'users.view', 'partners.manage'],
   VPN_ADMIN: ['vpn.view', 'vpn.manage', 'stats.view', 'users.view'],
   SUPPORT_ADMIN: ['support.reply', 'users.view', 'vpn.view', 'payments.view'],
   PRODUCT_ADMIN: ['products.manage', 'coupons.manage', 'stats.view', 'texts.manage'],

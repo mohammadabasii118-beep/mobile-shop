@@ -25,6 +25,12 @@ export const SETTING_DEFAULTS = {
   'xui.defaultInboundId': () => '',
   'orders.expireMinutes': () => '1440',
   'notify.newUser': () => 'true', // tell admins when someone starts the bot for the first time
+  'partner.enabled': () => 'true', // partner programme: menu button + applications
+  'partner.autoApprove': () => 'false', // approve applications immediately with the default discount
+  'partner.defaultDiscount': () => '20', // % given when an application is approved
+  'partner.maxDiscount': () => '70', // hard cap for any partner's %
+  'partner.stackCoupons': () => 'false', // may partners also use discount coupons?
+  'partner.reapplyDays': () => '3', // wait before re-applying after a rejection
 } as const;
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
 

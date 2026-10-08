@@ -22,13 +22,13 @@ let themeBtn;
 /* ---------- routing: #/route?query ; filters/search/page live in the URL ---------- */
 const NAV = [
   ['dashboard', 'داشبورد', 'dashboard', 'stats.view', ''],
-  ['orders', 'سفارش‌ها', 'receipt', 'users.view', 'فروش و مالی'], ['payments', 'پرداخت‌ها', 'card', 'payments.view', 'فروش و مالی'], ['coupons', 'کدهای تخفیف', 'ticket', 'coupons.manage', 'فروش و مالی'],
+  ['orders', 'سفارش‌ها', 'receipt', 'users.view', 'فروش و مالی'], ['payments', 'پرداخت‌ها', 'card', 'payments.view', 'فروش و مالی'], ['coupons', 'کدهای تخفیف', 'ticket', 'coupons.manage', 'فروش و مالی'], ['partners', 'همکاری‌ها', 'handshake', 'partners.manage', 'فروش و مالی'],
   ['users', 'کاربران', 'users', 'users.view', 'مشتریان'], ['support', 'پشتیبانی', 'headset', 'support.reply', 'مشتریان'], ['notifications', 'اعلان‌ها', 'bell', 'stats.view', 'مشتریان'],
   ['products', 'محصولات', 'box', 'products.manage', 'محصولات و منو'], ['categories', 'دسته‌بندی منو', 'folder', 'products.manage', 'محصولات و منو'],
   ['services', 'سرویس‌های VPN', 'shield', 'vpn.view', 'سرویس‌ها و سرورها'], ['panels', 'پنل‌ها و inbound', 'server', 'panels.manage', 'سرویس‌ها و سرورها'],
   ['texts', 'متن‌های ربات', 'edit', 'texts.manage', 'تنظیمات و ابزارها'], ['channels', 'کانال‌های اجباری', 'bell', 'settings.manage', 'تنظیمات و ابزارها'], ['settings', 'تنظیمات', 'settings', 'settings.manage', 'تنظیمات و ابزارها'], ['audit', 'Audit Logs', 'audit', 'audit.view', 'تنظیمات و ابزارها'],
 ];
-const PAGES = { dashboard: P.dashboard, users: P.users, products: P.products, categories: P.categories, orders: P.orders, payments: P.payments, services: P.services, coupons: P.coupons, support: P.support, notifications: P.notifications, settings: P.settings, panels: P.panels, texts: P.texts, channels: P.channels, audit: P.audit };
+const PAGES = { dashboard: P.dashboard, users: P.users, products: P.products, categories: P.categories, orders: P.orders, payments: P.payments, services: P.services, coupons: P.coupons, support: P.support, notifications: P.notifications, settings: P.settings, panels: P.panels, partners: P.partners, texts: P.texts, channels: P.channels, audit: P.audit };
 const parse = () => { const raw = location.hash.replace(/^#\/?/, ''); const [route, qs = ''] = raw.split('?'); return { route: route || 'dashboard', q: new URLSearchParams(qs) }; };
 const ctx = {
   me: null,
