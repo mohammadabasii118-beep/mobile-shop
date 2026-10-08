@@ -69,6 +69,17 @@ async function main() {
   await createTicket(users[2].id, 'PAYMENT_ISSUE', 'پرداخت من تأیید نشده', 'دو ساعت پیش پرداخت کردم ولی هنوز سرویس نگرفتم.');
   await createTicket(users[1].id, 'RENEWAL', 'تمدید سرویس', 'می‌خواهم سرویسم را تمدید کنم.');
 
+  // partners (همکاری): one pending, two approved (one with purchases), one suspended, one rejected
+  const P = await import('../src/modules/partners/service');
+  const notes = ['فروشگاه موبایل — حدود ۵۰ مشتری', 'کانال تلگرام ۱۲ هزار عضو', 'می‌خواهم برای دوستانم بفروشم', 'ادمین چند گروه فروش', 'درخواست تست'];
+  const pend: string[] = [];
+  for (let k = 3; k < 8; k++) { const r = await P.applyForPartner(users[k].id, notes[k - 3]); pend.push(r.partner.id); }
+  await P.approvePartner('admin:9000', pend[1], 30); await P.approvePartner('admin:9000', pend[3], 25);
+  await P.approvePartner('admin:9000', pend[2], 20); await P.setPartnerSuspended('admin:9000', pend[2], true);
+  await P.rejectPartner('admin:9000', pend[4], 'اطلاعات کافی ارائه نشده است');
+  const { createOrder: mk } = await import('../src/modules/orders/service');
+  await mk({ userId: users[4].id, productId: p2.id, paymentMethod: 'CARD_TO_CARD' });
+
   const server = createServer().listen(Number(process.env.PORT ?? 8110));
   for (let k = 0; k < 6; k++) console.log('LOGIN', loginUrl(createLoginToken(9000n)));
   console.log('READY');
