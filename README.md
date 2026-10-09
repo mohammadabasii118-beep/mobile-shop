@@ -38,3 +38,16 @@ python run.py
 و پیام در پیوی/گروه/سوپرگروه باشد. اگر تلگرام درخواستی را رد کند، همان پیام با ایموجی معمولی ارسال می‌شود.
 
 تست آفلاین: `python -m tests.emoji_test`
+
+## انتقال کامل ربات به سرور دیگر (بکاپ + نصب)
+روی سرور **قدیمی**:
+```
+bash /opt/pcl-transfer/deploy/backup.sh          # → ~/pcl-backup-DATE.tar.gz (کد + .env + دیتابیس + لوگو/پس‌زمینه‌ها)
+scp ~/pcl-backup-*.tar.gz root@IP_SERVER_JADID:/root/
+sudo systemctl stop pclbot                       # توکن را نمی‌شود هم‌زمان از دو سرور پولینگ کرد
+```
+روی سرور **جدید** (Ubuntu/Debian، root):
+```
+tar xzf /root/pcl-backup-*.tar.gz -C /tmp ./deploy/install.sh && bash /tmp/deploy/install.sh /root/pcl-backup-*.tar.gz
+```
+بعد: DNS دامنه‌ی کال‌بک زرین‌پال را روی IP جدید ببر و nginx/certbot را مثل قبل با `deploy/nginx.conf` بساز. فایل بکاپ شامل `.env` است؛ بعد از انتقال حذفش کن.
