@@ -29,17 +29,31 @@ if [ -n "$need_pkgs" ]; then
   else die "نصب $need_pkgs را دستی انجام بده."; fi
 fi
 
+mkdir -p "$DIR"
 # ── Node.js ۲۲ ──
-node_major() { node -v 2>/dev/null | sed 's/^v\([0-9]*\).*/\1/'; }
-if ! command -v node >/dev/null || [ "$(node_major)" -lt 22 ]; then
-  say "نصب Node.js 22"
-  if command -v apt-get >/dev/null; then
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs
-  elif command -v dnf >/dev/null || command -v yum >/dev/null; then
-    curl -fsSL https://rpm.nodesource.com/setup_22.x | bash - && (dnf install -y nodejs || yum install -y nodejs)
-  else die "Node.js 22 را دستی نصب کن (https://nodejs.org)."; fi
+# اگر Node سیستم ۲۲+ باشد همان؛ وگرنه یک نسخه‌ی مستقل داخل پوشه‌ی برنامه نصب می‌شود
+# (به Node سیستم و برنامه‌های دیگر سرور، مثل ربات VPN، دست نمی‌زنیم).
+node_major() { "$1" -v 2>/dev/null | sed 's/^v\([0-9]*\).*/\1/'; }
+NODE_DIR=""
+if command -v node >/dev/null && [ "$(node_major node)" -ge 22 ] 2>/dev/null; then
+  say "Node سیستم مناسب است ($(node -v))"
+else
+  say "نصب Node.js 22 به‌صورت مستقل در $DIR/.node (بدون تغییر Node سیستم)"
+  case "$(uname -m)" in x86_64) ARCH=x64 ;; aarch64|arm64) ARCH=arm64 ;; *) die "معماری $(uname -m) پشتیبانی نمی‌شود." ;; esac
+  mkdir -p "$DIR/.node"
+  for BASE in https://nodejs.org/dist https://registry.npmmirror.com/-/binary/node; do
+    if [ "$BASE" = https://nodejs.org/dist ]; then IDX="$BASE/latest-v22.x/SHASUMS256.txt"; else IDX="$BASE/latest-v22.x/SHASUMS256.txt"; fi
+    FILE="$(curl -fsSL "$IDX" 2>/dev/null | grep -o "node-v22[0-9.]*-linux-$ARCH\.tar\.gz" | head -1 || true)"
+    [ -n "$FILE" ] || continue
+    if curl -fsSL "$BASE/latest-v22.x/$FILE" -o "$DIR/.node/node.tgz"; then
+      tar -xzf "$DIR/.node/node.tgz" -C "$DIR/.node" --strip-components=1 && rm -f "$DIR/.node/node.tgz" && break
+    fi
+  done
+  [ -x "$DIR/.node/bin/node" ] || die "دانلود Node.js ناموفق بود (دسترسی سرور به nodejs.org را چک کن)."
+  NODE_DIR="$DIR/.node/bin"
+  export PATH="$NODE_DIR:$PATH"
 fi
-[ "$(node_major)" -ge 22 ] || die "نسخه‌ی Node باید ۲۲ یا بالاتر باشد (الان: $(node -v))."
+[ "$(node_major node)" -ge 22 ] || die "نسخه‌ی Node باید ۲۲ یا بالاتر باشد (الان: $(node -v))."
 
 # ── دریافت کد ──
 if [ -d "$DIR/.git" ]; then
@@ -49,7 +63,8 @@ if [ -d "$DIR/.git" ]; then
   git -C "$DIR" reset -q --hard FETCH_HEAD
 else
   say "دریافت کد در $DIR"
-  git clone --depth 1 -b "$BRANCH" "$REPO" "$DIR"
+  git clone --depth 1 -b "$BRANCH" "$REPO" "$DIR.src"
+  cp -a "$DIR.src/." "$DIR/" && rm -rf "$DIR.src"
 fi
 cd "$DIR"
 
@@ -80,6 +95,7 @@ After=network.target
 [Service]
 WorkingDirectory=$DIR
 EnvironmentFile=$ENV_FILE
+Environment=PATH=${NODE_DIR:+$NODE_DIR:}/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=$DIR/node_modules/.bin/tsx server/src/index.ts
 Restart=always
 RestartSec=2
@@ -88,11 +104,19 @@ RestartSec=2
 WantedBy=multi-user.target
 UNIT
 
-# سرویس/پروسه‌ی قدیمی که پورت را گرفته آزاد شود
-systemctl disable --now game 2>/dev/null || true
+# سرویس قدیمی همین بازی (اگر ساخته بودی) غیرفعال شود؛ به سرویس‌های دیگر دست نمی‌زنیم
+if [ -f /etc/systemd/system/game.service ] && grep -q mobile-shop /etc/systemd/system/game.service; then systemctl disable --now game 2>/dev/null || true; fi
 systemctl stop miras 2>/dev/null || true
+# پورت باید آزاد باشد. فقط پروسه‌ی قدیمی همین بازی بسته می‌شود؛ هر برنامه‌ی دیگری (مثل ربات VPN) دست‌نخورده می‌ماند.
 OLD_PID="$(ss -ltnpH "sport = :$PORT" 2>/dev/null | grep -o 'pid=[0-9]*' | head -1 | cut -d= -f2 || true)"
-if [ -n "$OLD_PID" ]; then say "بستن پروسه‌ی قدیمی روی پورت $PORT (pid $OLD_PID)"; kill "$OLD_PID" 2>/dev/null || true; sleep 1; fi
+if [ -n "$OLD_PID" ]; then
+  WHO="$(readlink "/proc/$OLD_PID/cwd" 2>/dev/null || true) $(tr '\0' ' ' < "/proc/$OLD_PID/cmdline" 2>/dev/null || true)"
+  if echo "$WHO" | grep -q "mobile-shop"; then
+    say "بستن نسخه‌ی قدیمیِ همین بازی روی پورت $PORT (pid $OLD_PID)"; kill "$OLD_PID" 2>/dev/null || true; sleep 1
+  else
+    die "پورت $PORT را برنامه‌ی دیگری گرفته ($WHO). برای پورت دیگر: PORT=3101 را قبل از bash بگذار."
+  fi
+fi
 
 # فایروال سرور (اگر فعال است)
 if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then ufw allow "$PORT/tcp" >/dev/null; fi
