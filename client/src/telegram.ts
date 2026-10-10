@@ -18,6 +18,16 @@ function devIdentity() {
   return `dev:${id}:${encodeURIComponent(`بازیکن ${id}`)}`;
 }
 
-export const initData = tg?.initData ? tg.initData : devIdentity();
+/** هویت تلگرام: از اسکریپت رسمی؛ اگر لود نشد (مثلاً telegram.org فیلتر بود) مستقیم از هش لینک (#tgWebAppData=…) */
+function telegramInitData(): string {
+  if (tg?.initData) return tg.initData;
+  try {
+    const fromHash = new URLSearchParams(location.hash.slice(1)).get('tgWebAppData');
+    if (fromHash) { sessionStorage.setItem('tgInit', fromHash); return fromHash; }
+    return sessionStorage.getItem('tgInit') ?? '';
+  } catch { return ''; }
+}
+
+export const initData = telegramInitData() || devIdentity();
 export const isDev = initData.startsWith('dev:');
 export const haptic = () => { try { tg?.HapticFeedback?.impactOccurred('light'); } catch { /* ignore */ } };
