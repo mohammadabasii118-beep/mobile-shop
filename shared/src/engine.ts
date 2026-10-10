@@ -16,6 +16,7 @@ export function resolveCard(def: CardDef, level: number, cfg: GameConfig): UnitI
     atk: scale(def.atk, cfg.levelScale.atk),
     shield: scale(def.shield, cfg.levelScale.shield),
     ability: def.ability,
+    level,
   };
 }
 

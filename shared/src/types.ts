@@ -12,6 +12,8 @@ export interface CardDef {
   shield: number;
   ability?: AbilityRef;
   desc?: string;
+  /** آدرس عکس آپلودشده از پنل مدیریت (اختیاری) */
+  image?: string;
 }
 
 export interface SoloStage {
@@ -47,6 +49,7 @@ export interface UnitInit {
   atk: number;
   shield: number;
   ability?: AbilityRef;
+  level?: number;
 }
 
 export interface Unit extends UnitInit {

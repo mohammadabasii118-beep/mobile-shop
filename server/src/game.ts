@@ -4,7 +4,7 @@ import type { TgUser } from './auth';
 
 export class GameError extends Error {}
 
-export interface Deps { db: Db; cfg: GameConfig; now: () => number; rng: () => number }
+export interface Deps { db: Db; cfg: GameConfig; now: () => number; rng: () => number; isAdmin?: (tgId: number) => boolean }
 
 const randInt = (rng: () => number, [a, b]: [number, number]) => a + Math.floor(rng() * (b - a + 1));
 
@@ -15,7 +15,8 @@ export class Game {
   // ---------- کاربر ----------
   upsertUser(u: TgUser): number {
     const { db } = this.d;
-    const row = db.prepare('SELECT id FROM users WHERE tg_id = ?').get(u.tgId) as { id: number } | undefined;
+    const row = db.prepare('SELECT id, banned FROM users WHERE tg_id = ?').get(u.tgId) as { id: number; banned: number } | undefined;
+    if (row?.banned) throw new GameError('حساب شما مسدود شده است');
     if (row) {
       db.prepare('UPDATE users SET name = ?, avatar = ? WHERE id = ?').run(u.name, u.avatar, row.id);
       return row.id;
@@ -48,7 +49,7 @@ export class Game {
     return {
       id: u.id, name: u.name, avatar: u.avatar, level: u.level, xp: u.xp,
       xpNeeded: this.xpNeeded(u.level), coins: u.coins, wins: u.wins, losses: u.losses,
-      soloStage: u.solo_stage, cards, deck, boxes,
+      soloStage: u.solo_stage, cards, deck, boxes, isAdmin: this.d.isAdmin?.(u.tg_id) ?? false,
     };
   }
 
@@ -181,5 +182,46 @@ export class Game {
       db.prepare('UPDATE users SET solo_stage = MAX(solo_stage, ?) WHERE id = ?').run(soloStage + 1, userId);
     }
     return this.grantBox(userId);
+  }
+
+  // ---------- ابزارهای مدیریت ----------
+  adminStats() {
+    const { db } = this.d;
+    const n = (sql: string) => Number((db.prepare(sql).get() as any).n ?? 0);
+    return {
+      users: n('SELECT COUNT(*) n FROM users'),
+      battles: n('SELECT COALESCE(SUM(wins),0) n FROM users'),
+      pendingBoxes: n('SELECT COUNT(*) n FROM boxes'),
+      coins: n('SELECT COALESCE(SUM(coins),0) n FROM users'),
+      banned: n('SELECT COUNT(*) n FROM users WHERE banned = 1'),
+    };
+  }
+
+  adminUsers(q: string) {
+    const like = `%${q.replace(/[%_]/g, '')}%`;
+    return (this.d.db.prepare('SELECT id, tg_id, name, level, xp, coins, wins, losses, banned, created_at FROM users WHERE name LIKE ? OR CAST(tg_id AS TEXT) LIKE ? ORDER BY id DESC LIMIT 100').all(like, like) as any[]);
+  }
+
+  adminGift(userId: number, g: { coins?: number; xp?: number; cardId?: string }) {
+    const { db, cfg } = this.d;
+    if (!db.prepare('SELECT 1 FROM users WHERE id = ?').get(userId)) throw new GameError('بازیکن پیدا نشد');
+    const int = (v: unknown) => (Number.isInteger(v) && Math.abs(v as number) <= 1_000_000 ? (v as number) : 0);
+    if (int(g.coins)) db.prepare('UPDATE users SET coins = MAX(0, coins + ?) WHERE id = ?').run(int(g.coins), userId);
+    if (int(g.xp) > 0) this.addXp(userId, int(g.xp));
+    if (g.cardId) {
+      if (!cfg.cards.some((c) => c.id === g.cardId)) throw new GameError('کارت ناشناخته');
+      const has = db.prepare('SELECT 1 FROM user_cards WHERE user_id = ? AND card_id = ?').get(userId, g.cardId);
+      if (has) db.prepare('UPDATE user_cards SET copies = copies + 1 WHERE user_id = ? AND card_id = ?').run(userId, g.cardId);
+      else db.prepare('INSERT INTO user_cards (user_id, card_id) VALUES (?,?)').run(userId, g.cardId);
+    }
+  }
+
+  adminBan(userId: number, banned: boolean) {
+    this.d.db.prepare('UPDATE users SET banned = ? WHERE id = ?').run(banned ? 1 : 0, userId);
+  }
+
+  /** آیا کسی این کارت را دارد؟ (برای جلوگیری از حذف) */
+  cardOwned(cardId: string): boolean {
+    return !!this.d.db.prepare('SELECT 1 FROM user_cards WHERE card_id = ? LIMIT 1').get(cardId);
   }
 }

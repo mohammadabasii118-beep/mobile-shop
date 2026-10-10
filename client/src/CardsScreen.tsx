@@ -7,13 +7,14 @@ import { Bar, CardTile, Modal, RARITY_FA, fa, sortByPower } from './ui';
 export function CardsScreen({ ctx }: { ctx: Ctx }) {
   const { profile: p, cfg, setProfile, toast } = ctx;
   const [open, setOpen] = useState<string | null>(null);
+  const [flash, setFlash] = useState<string | null>(null);
   const defOf = (id: string) => cfg.cards.find((c) => c.id === id)!;
   const owned = new Map(p.cards.map((c) => [c.id, c]));
 
   const tile = (id: string, onClick: () => void, extra?: { selected?: boolean }) => {
     const c = owned.get(id)!, def = defOf(id), s = resolveCard(def, c.level, cfg);
     const need = cfg.upgrade.levels[c.level - 1];
-    return <CardTile key={id} def={def} level={c.level} hp={s.hp} atk={s.atk} shield={s.shield} onClick={onClick} selected={extra?.selected}
+    return <CardTile key={id} maxLevel={cfg.upgrade.maxLevel} def={def} level={c.level} hp={s.hp} atk={s.atk} shield={s.shield} onClick={onClick} selected={extra?.selected}
       badge={need ? <div className={`dup ${c.copies >= need.copies ? 'ok' : ''}`}>{fa(c.copies)}/{fa(need.copies)}</div> : <div className="dup ok">حداکثر</div>} />;
   };
 
@@ -28,7 +29,7 @@ export function CardsScreen({ ctx }: { ctx: Ctx }) {
     try { setProfile((await call('/api/deck', { cards: next })).profile); setOpen(null); } catch (e) { toast((e as Error).message); }
   };
   const upgrade = async (id: string) => {
-    try { setProfile((await call('/api/upgrade', { cardId: id })).profile); toast('ارتقا انجام شد ✨'); } catch (e) { toast((e as Error).message); }
+    try { setProfile((await call('/api/upgrade', { cardId: id })).profile); toast('ارتقا انجام شد ✨'); setFlash(id); setTimeout(() => setFlash(null), 900); } catch (e) { toast((e as Error).message); }
   };
 
   const sel = open ? { def: defOf(open), c: owned.get(open)! } : null;
@@ -43,14 +44,14 @@ export function CardsScreen({ ctx }: { ctx: Ctx }) {
       </div>
       <p className="hint">کارت‌های ناموجود از جعبه‌ها به‌دست می‌آیند. برای ارتقا کارت تکراری و سکه لازم است.</p>
 
-      {sel && <Detail def={sel.def} level={sel.c.level} copies={sel.c.copies} cfg={ctx.cfg} coins={p.coins} deck={p.deck}
+      {sel && <Detail flash={flash === sel.def.id} def={sel.def} level={sel.c.level} copies={sel.c.copies} cfg={ctx.cfg} coins={p.coins} deck={p.deck}
         onClose={() => setOpen(null)} onUpgrade={() => upgrade(sel.def.id)} onSlot={(s) => setDeckSlot(s, sel.def.id)} />}
     </>
   );
 }
 
-function Detail({ def, level, copies, cfg, coins, deck, onClose, onUpgrade, onSlot }: {
-  def: CardDef; level: number; copies: number; cfg: Ctx['cfg']; coins: number; deck: string[];
+function Detail({ flash, def, level, copies, cfg, coins, deck, onClose, onUpgrade, onSlot }: {
+  flash: boolean; def: CardDef; level: number; copies: number; cfg: Ctx['cfg']; coins: number; deck: string[];
   onClose: () => void; onUpgrade: () => void; onSlot: (s: number) => void;
 }) {
   const s = resolveCard(def, level, cfg);
@@ -61,7 +62,7 @@ function Detail({ def, level, copies, cfg, coins, deck, onClose, onUpgrade, onSl
   return (
     <Modal onClose={onClose}>
       <div className="detail">
-        <CardTile def={def} level={level} hp={s.hp} atk={s.atk} shield={s.shield} />
+        <CardTile def={def} level={level} maxLevel={cfg.upgrade.maxLevel} className={flash ? 'evolve' : ''} hp={s.hp} atk={s.atk} shield={s.shield} />
         <div className="dinfo">
           <h3>{def.name} <small className={`rt r-${def.rarity}`}>{RARITY_FA[def.rarity]}</small></h3>
           <p>❤ جان: {fa(s.hp)}{d(s.hp, next?.hp)}</p>

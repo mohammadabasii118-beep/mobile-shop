@@ -1,4 +1,4 @@
-# نبرد کارت‌ها — Telegram Mini App
+# میراث — Telegram Mini App
 
 بازی کارتی نوبتی ۳ به ۳ (سولو در برابر ربات + مولتی‌پلیر آنلاین)، فارسی و راست‌چین.
 
@@ -18,6 +18,21 @@ npm start                # اجرای سرور روی http://localhost:3000
 (هر دو روی «مولتی‌پلیر» بزنند). در جعبه‌ها دکمه‌ی «⏩ دمو» تایمر را رد می‌کند (فقط در حالت آزمایشی).
 
 حالت توسعه (تغییرات کلاینت زنده): در دو ترمینال جدا `npm run dev:server` و `npm run dev:client` (آدرس: http://localhost:5173).
+
+
+## نصب روی سرور (یک خط، به‌صورت root)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mohammadabasii118-beep/mobile-shop/claude/card-battle-game/install.sh | bash
+```
+نسخه‌ی واقعی با ربات (توکن BotFather و شناسه‌ی عددی تلگرام خودت برای دسترسی به پنل مدیریت؛ شناسه را از @userinfobot بگیر):
+```bash
+curl -fsSL https://raw.githubusercontent.com/mohammadabasii118-beep/mobile-shop/claude/card-battle-game/install.sh | BOT_TOKEN="توکن" ADMIN_IDS="123456789" bash
+```
+اجرای دوباره‌ی همین دستور = به‌روزرسانی؛ داده‌ها حفظ می‌شوند. سرویس: `systemctl status miras`، لاگ: `journalctl -u miras -f`.
+
+## پنل مدیریت
+در بازی: پروفایل ← «پنل مدیریت» (فقط برای ادمین‌ها؛ در نصب تست برای همه). امکانات: ویرایش کارت‌ها، **آپلود/تغییر عکس هر کارت**، کارت جدید/حذف، پیش‌نمایش قدرت‌گیری ۶ لول، تنظیم جعبه/اقتصاد/ارتقا، جستجوی بازیکن، هدیه‌دادن و مسدودکردن، ویرایش کامل JSON. تغییرها بلافاصله و بدون ری‌استارت اعمال و در `shared/config/game.json` ذخیره می‌شوند. عکس‌ها در `data/uploads/cards/` ذخیره می‌شوند.
 
 ## ساخت ربات تلگرام و باز کردن بازی داخل تلگرام
 
@@ -56,7 +71,7 @@ docker run -d -p 3000:3000 -e BOT_TOKEN="توکن" -v cardbattle-data:/data card
 
 ## آرت
 
-فعلاً هر کارت یک placeholder رنگی دارد. آرت را با نام `<id کارت>.png` (مثلاً `phoenix.png`) در `client/public/assets/cards/` بگذار؛ خودکار جایگزین می‌شود (مربعی، ترجیحاً ۵۱۲×۵۱۲).
+فعلاً هر کارت یک placeholder رنگی دارد. ساده‌ترین راه: از پنل مدیریت عکس هر کارت را آپلود کن. راه دیگر: فایل `<id کارت>.png` را در `client/public/assets/cards/` بگذار (عکس آپلودشده اولویت دارد).
 
 ## ساختار پروژه
 

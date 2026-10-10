@@ -4,11 +4,13 @@ import { loadConfig, loadProfile, Socket } from './net';
 import { Home } from './Home';
 import { CardsScreen } from './CardsScreen';
 import { BattleScreen, type BattleInit } from './BattleScreen';
+import { Admin } from './Admin';
 import { Modal, fa } from './ui';
 import type { BattleReward } from '@game/shared';
 
 export interface Ctx {
   cfg: GameConfig;
+  setCfg: (c: GameConfig) => void;
   profile: Profile;
   setProfile: (p: Profile) => void;
   sock: Socket;
@@ -19,7 +21,7 @@ export function App() {
   const [cfg, setCfg] = useState<GameConfig | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [tab, setTab] = useState<'home' | 'cards'>('home');
+  const [tab, setTab] = useState<'home' | 'cards' | 'admin'>('home');
   const [battle, setBattle] = useState<BattleInit | null>(null);
   const [result, setResult] = useState<Extract<ServerMsg, { t: 'battleEnd' }> | null>(null);
   const [queued, setQueued] = useState(false);
@@ -55,7 +57,7 @@ export function App() {
   if (err) return <div className="center"><h2>😕</h2><p>{err}</p><button className="btn" onClick={() => location.reload()}>تلاش دوباره</button></div>;
   if (!cfg || !profile) return <div className="center"><div className="spinner" /><p>در حال بارگذاری…</p></div>;
 
-  const ctx: Ctx = { cfg, profile, setProfile, sock, toast };
+  const ctx: Ctx = { cfg, setCfg, profile, setProfile, sock, toast };
   const onBattleDone = (end: Extract<ServerMsg, { t: 'battleEnd' }>) => { setProfile(end.profile); setResult(end); };
 
   return (
@@ -63,9 +65,9 @@ export function App() {
       {battle ? (
         <BattleScreen ctx={ctx} init={battle} onDone={onBattleDone} onExit={() => { setBattle(null); setResult(null); }} result={result} />
       ) : (
-        <>
+        tab === 'admin' ? <Admin ctx={ctx} onExit={async () => { setTab('home'); try { setCfg(await loadConfig()); } catch { /* ignore */ } }} /> : <>
           <div className="screen">
-            {tab === 'home' ? <Home ctx={ctx} queued={queued} setQueued={setQueued} /> : <CardsScreen ctx={ctx} />}
+            {tab === 'home' ? <Home ctx={ctx} queued={queued} onAdmin={() => setTab('admin')} /> : <CardsScreen ctx={ctx} />}
           </div>
           <nav className="nav">
             <button className={tab === 'home' ? 'on' : ''} onClick={() => setTab('home')}>⚔️<span>بازی</span></button>

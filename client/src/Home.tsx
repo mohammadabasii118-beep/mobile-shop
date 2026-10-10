@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import type { Ctx } from './App';
 import { call } from './net';
 import { isDev } from './telegram';
-import { Bar, Modal, fa, fmtTime, CardTile, RARITY_FA } from './ui';
+import { Bar, Modal, fa, fmtTime, CardTile, RARITY_FA, Icon } from './ui';
 
-export function Home({ ctx, queued, setQueued }: { ctx: Ctx; queued: boolean; setQueued: (b: boolean) => void }) {
+export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAdmin: () => void }) {
   const { profile: p, cfg, sock } = ctx;
   const [view, setView] = useState<'menu' | 'solo'>('menu');
   const [showProfile, setShowProfile] = useState(false);
@@ -20,18 +20,18 @@ export function Home({ ctx, queued, setQueued }: { ctx: Ctx; queued: boolean; se
             <Bar value={p.xp} max={p.xpNeeded} color="var(--xp)" />
           </div>
         </button>
-        <div className="coins">🪙 {fa(p.coins)}</div>
+        <div className="coins"><Icon n="coin" /> {fa(p.coins)}</div>
         <button className="gear" onClick={() => setShowProfile(true)} aria-label="تنظیمات">⚙️</button>
       </header>
 
       {view === 'menu' ? (
         <section className="menu">
-          <h2>منوی بازی</h2>
+          <div className="hero"><div className="brand">میراث</div><p>سه کارت، یک میراث. نبرد نوبتی ۳ به ۳</p></div>
           <button className="mode solo" onClick={() => setView('solo')}>
-            <span className="ico">🤖</span><div><b>سولو</b><small>مرحله‌های متوالی در برابر ربات</small></div>
+            <span className="ico"><svg className="i" viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9 16h6"/></svg></span><div><b>سولو</b><small>مرحله‌های متوالی در برابر ربات</small></div>
           </button>
           <button className="mode multi" disabled={queued} onClick={() => sock.send({ t: 'queue' })}>
-            <span className="ico">🌐</span><div><b>مولتی‌پلیر</b><small>نبرد آنلاین با بازیکن واقعی</small></div>
+            <span className="ico"><svg className="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg></span><div><b>مولتی‌پلیر</b><small>نبرد آنلاین با بازیکن واقعی</small></div>
           </button>
         </section>
       ) : (
@@ -54,8 +54,7 @@ export function Home({ ctx, queued, setQueued }: { ctx: Ctx; queued: boolean; se
 
       <Boxes ctx={ctx} />
 
-      {showProfile && <ProfileModal ctx={ctx} onClose={() => setShowProfile(false)} />}
-      {queued && null}
+      {showProfile && <ProfileModal ctx={ctx} onClose={() => setShowProfile(false)} onAdmin={onAdmin} />}
     </>
   );
 }
@@ -67,7 +66,7 @@ function Avatar({ url, name, big }: { url: string | null; name: string; big?: bo
     : <div className={`avatar ph ${big ? 'big' : ''}`}>{name.slice(0, 1)}</div>;
 }
 
-function ProfileModal({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) {
+function ProfileModal({ ctx, onClose, onAdmin }: { ctx: Ctx; onClose: () => void; onAdmin: () => void }) {
   const p = ctx.profile;
   const total = p.wins + p.losses;
   return (
@@ -82,6 +81,7 @@ function ProfileModal({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) {
           <div><b>{fa(p.losses)}</b><small>باخت</small></div>
           <div><b>{total ? fa(Math.round((p.wins / total) * 100)) + '٪' : '—'}</b><small>درصد برد</small></div>
         </div>
+        {p.isAdmin && <button className="btn ghost" onClick={onAdmin}>پنل مدیریت</button>}
         <button className="btn" onClick={onClose}>بستن</button>
       </div>
     </Modal>

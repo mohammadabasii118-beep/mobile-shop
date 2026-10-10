@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { BattleEvent, ServerMsg, Side, UnitView } from '@game/shared';
 import type { Ctx } from './App';
 import { rewardText } from './App';
-import { CardArt, Modal, fa } from './ui';
+import { CardTile, Modal, fa } from './ui';
 import { haptic } from './telegram';
 
 type Start = Extract<ServerMsg, { t: 'battleStart' }>;
@@ -113,17 +113,12 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
   const tile = (u: UnitView) => {
     const def = cfg.cards.find((c) => c.id === u.cardId)!;
     const targetable = !!prompt?.mine && u.side !== me && u.alive;
+    const cls = `bcard ${active === u.uid ? 'active' : ''} ${attacking === u.uid ? (u.side === me ? 'atk-up' : 'atk-down') : ''} ${hit === u.uid ? 'hit' : ''} ${targetable ? 'targetable' : ''}`;
     return (
-      <div key={u.uid} className={`bcard-wrap`}>
-        <button
-          className={`card bcard r-${def.rarity} ${u.alive ? '' : 'dead'} ${active === u.uid ? 'active' : ''} ${attacking === u.uid ? (u.side === me ? 'atk-up' : 'atk-down') : ''} ${hit === u.uid ? 'hit' : ''} ${targetable ? 'targetable' : ''}`}
-          onClick={() => choose(u.uid)} disabled={!targetable}>
-          <CardArt id={def.id} name={def.name} rarity={def.rarity} />
-          <div className="cname">{u.name}</div>
-          <div className="hpbar"><i style={{ width: `${(Math.max(0, u.hp) / u.maxHp) * 100}%` }} /></div>
-          <div className="stats"><span>❤ {fa(Math.max(0, u.hp))}</span><span>⚔ {fa(u.atk)}</span><span>🛡 {fa(u.shield)}</span></div>
-          {u.ability && <div className="ab">✦</div>}
-        </button>
+      <div key={u.uid} className="bcard-wrap">
+        <CardTile def={def} level={u.level} maxLevel={cfg.upgrade.maxLevel} hp={Math.max(0, u.hp)} atk={u.atk} shield={u.shield}
+          dead={!u.alive} className={cls} onClick={() => choose(u.uid)} disabled={!targetable} />
+        <div className="hpbar"><i style={{ width: `${(Math.max(0, u.hp) / u.maxHp) * 100}%` }} /></div>
         {floaters.filter((f) => f.uid === u.uid).map((f) => <span key={f.id} className={`float ${f.cls}`}>{f.text}</span>)}
       </div>
     );

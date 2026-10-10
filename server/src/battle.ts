@@ -55,7 +55,7 @@ export class Battle {
     return this.state.units.map((u) => ({
       uid: u.uid, side: u.side, slot: u.slot, cardId: u.cardId, name: u.name,
       rarity: this.o.cfg.cards.find((c) => c.id === u.cardId)?.rarity ?? null,
-      hp: u.hp, maxHp: u.maxHp, shield: u.shield, atk: u.atk, alive: u.alive, ability: u.ability?.id ?? null,
+      hp: u.hp, maxHp: u.maxHp, shield: u.shield, atk: u.atk, alive: u.alive, ability: u.ability?.id ?? null, level: u.level ?? 1,
     }));
   }
 

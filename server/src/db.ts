@@ -42,5 +42,6 @@ export function openDb(path = ':memory:'): Db {
       PRIMARY KEY (user_id, slot)
     );
   `);
+  try { db.exec('ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0'); } catch { /* ستون از قبل هست */ }
   return db;
 }

@@ -53,3 +53,11 @@ export const ABILITIES: Record<string, Ability> = {
     },
   },
 };
+
+/** توضیح توانایی‌ها برای پنل مدیریت (برچسب فارسی و پارامترها) */
+export const ABILITY_META: Record<string, { label: string; params: { key: string; label: string; def: number }[] }> = {
+  double_strike: { label: 'حمله‌ی چندگانه', params: [{ key: 'attacks', label: 'تعداد حمله در نوبت', def: 2 }] },
+  lifesteal: { label: 'دزدیدن جان', params: [{ key: 'percent', label: 'درصد آسیب که به جان تبدیل می‌شود', def: 50 }] },
+  armor_up: { label: 'شیلد هر نوبت', params: [{ key: 'amount', label: 'مقدار شیلد', def: 8 }] },
+  revive: { label: 'زنده‌شدن دوباره', params: [{ key: 'hpPercent', label: 'درصد جان بعد از زنده‌شدن', def: 50 }] },
+};

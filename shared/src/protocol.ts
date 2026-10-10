@@ -2,7 +2,7 @@ import type { BattleEvent, Rarity, Side, Unit } from './types';
 
 export interface UnitView {
   uid: string; side: Side; slot: number; cardId: string; name: string; rarity: Rarity | null;
-  hp: number; maxHp: number; shield: number; atk: number; alive: boolean; ability: string | null;
+  hp: number; maxHp: number; shield: number; atk: number; alive: boolean; ability: string | null; level: number;
 }
 export interface Snap { uid: string; hp: number; shield: number; alive: boolean }
 
@@ -11,7 +11,7 @@ export interface CardView { id: string; level: number; copies: number }
 export interface Profile {
   id: number; name: string; avatar: string | null;
   level: number; xp: number; xpNeeded: number; coins: number;
-  wins: number; losses: number; soloStage: number;
+  wins: number; losses: number; soloStage: number; isAdmin: boolean;
   cards: CardView[]; deck: string[]; boxes: BoxView[];
 }
 
