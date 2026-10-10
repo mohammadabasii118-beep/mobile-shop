@@ -74,40 +74,26 @@ const RARITY_TONE: Record<Rarity, string> = { common: 'bronze', rare: 'silver', 
 type Run = <T>(f: () => Promise<T>, okText?: string) => Promise<T | undefined>;
 interface TabProps { cfg: GameConfig; refresh: (c: GameConfig) => void; run: Run }
 
-const emptyCard = (cfg: GameConfig): CardDef => {
-  let n = cfg.cards.length + 1;
-  while (cfg.cards.some((c) => c.id === `card${n}`)) n++;
-  return { id: `card${n}`, name: 'کارت تازه', rarity: 'common', hp: 100, atk: 15, shield: 0 };
-};
-
+/**
+ * کارت‌ها: فقط اسم، نوع و عکس از پنل ویرایش می‌شود.
+ * آمار هر لول و توانایی‌ها بعد از بالانس نهایی توسط توسعه‌دهنده در تنظیمات گذاشته می‌شود (و با «پیشرفته» هم قابل ویرایش است).
+ */
 function CardsTab({ cfg, refresh, run }: TabProps) {
   const [sel, setSel] = useState<string | undefined>(cfg.cards[0]?.id);
   const [draft, setDraft] = useState<CardDef | null>(null);
-  const [isNew, setIsNew] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const saved = cfg.cards.find((c) => c.id === sel);
-  useEffect(() => { if (!isNew) setDraft(saved ? { ...saved, ability: saved.ability ? { ...saved.ability, params: { ...saved.ability.params } } : undefined } : null); }, [sel, cfg, isNew]);
+  useEffect(() => { setDraft(saved ? { ...saved } : null); }, [sel, cfg]);
   if (!draft) return <p className="hint">کارتی نیست.</p>;
   const set = (p: Partial<CardDef>) => setDraft({ ...draft, ...p });
-  const num = (v: string) => (v === '' ? 0 : Number(v));
-  const meta = draft.ability ? ABILITY_META[draft.ability.id] : null;
-  /** ردیف آمار لول (i+2): از جدول؛ اگر نبود از لول قبل (یا پایه) */
-  const lvRow = (i: number): { hp: number; atk: number; shield: number } =>
-    draft.levels?.[i] ?? (i === 0 ? { hp: draft.hp, atk: draft.atk, shield: draft.shield } : lvRow(i - 1));
-  const setLv = (i: number, k: 'hp' | 'atk' | 'shield', v: number) => {
-    const rows = Array.from({ length: cfg.upgrade.maxLevel - 1 }, (_, j) => ({ ...lvRow(j) }));
-    rows[i] = { ...rows[i], [k]: v };
-    set({ levels: rows });
-  };
+  const dirty = !!saved && (saved.name !== draft.name || saved.rarity !== draft.rarity);
 
   const save = () => run(async () => {
-    const next = await call('/api/admin/card', { card: draft }); refresh(next); setIsNew(false); setSel(draft.id);
+    refresh(await call('/api/admin/card', { card: { ...saved!, name: draft.name, rarity: draft.rarity } }));
   }, 'ذخیره شد و همین الان در بازی اعمال شد');
-  const del = () => run(async () => { refresh(await call('/api/admin/card/delete', { id: draft.id })); setIsNew(false); setSel(cfg.cards.find((c) => c.id !== draft.id)?.id); }, 'کارت حذف شد');
   const upload = async (f: File | undefined) => {
     if (!f) return;
     await run(async () => {
-      if (isNew) throw new Error('اول کارت را ذخیره کن، بعد عکس بگذار');
       const blob = await shrink(f);
       const r = await fetch(`/api/admin/card-image?cardId=${encodeURIComponent(draft.id)}`, { method: 'POST', headers: { 'x-init-data': initData, 'content-type': blob.type }, body: blob });
       const j = await r.json(); if (!r.ok) throw new Error(j.error); refresh(j as GameConfig);
@@ -121,16 +107,15 @@ function CardsTab({ cfg, refresh, run }: TabProps) {
         <h3>فهرست کارت‌ها</h3>
         <div className="list">
           {cfg.cards.map((c) => (
-            <button key={c.id} aria-pressed={!isNew && sel === c.id} onClick={() => { setIsNew(false); setSel(c.id); }}>
+            <button key={c.id} aria-pressed={sel === c.id} onClick={() => setSel(c.id)}>
               <span>{c.name}</span><span className={`rar ${c.rarity}`}>{RARITY_FA[c.rarity]}</span>
             </button>
           ))}
         </div>
-        <button className="btn ghost" onClick={() => { setDraft(emptyCard(cfg)); setIsNew(true); }}>+ کارت جدید</button>
       </div>
 
       <div className="box">
-        <h3>{isNew ? 'کارت جدید' : `ویرایش «${saved?.name}»`}</h3>
+        <h3>«{saved?.name}»</h3>
         <div className="picrow">
           <div className="pic-prev"><CardTile def={draft} level={1} hp={draft.hp} atk={draft.atk} shield={draft.shield} /></div>
           <div className="picctl">
@@ -139,62 +124,24 @@ function CardsTab({ cfg, refresh, run }: TabProps) {
             <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => void upload(e.target.files?.[0])} />
             <div className="btns">
               <button className="btn" onClick={() => fileRef.current?.click()}>{draft.image ? 'تغییر عکس' : 'آپلود عکس'}</button>
-              {draft.image && !isNew && <button className="btn ghost" onClick={() => run(async () => refresh(await call('/api/admin/card-image/delete', { cardId: draft.id })), 'عکس حذف شد')}>حذف عکس</button>}
+              {draft.image && <button className="btn ghost" onClick={() => run(async () => refresh(await call('/api/admin/card-image/delete', { cardId: draft.id })), 'عکس حذف شد')}>حذف عکس</button>}
             </div>
           </div>
         </div>
         <div className="fgrid">
-          <label className="field">شناسه (انگلیسی)<input value={draft.id} disabled={!isNew} onChange={(e) => set({ id: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })} /></label>
           <label className="field">نام<input value={draft.name} onChange={(e) => set({ name: e.target.value })} /></label>
           <label className="field">نوع کارت
             <select value={draft.rarity} onChange={(e) => set({ rarity: e.target.value as Rarity })}>
-              {(['common', 'rare', 'epic'] as Rarity[]).map((r) => <option key={r} value={r}>{RARITY_FA[r]}</option>)}
+              {RARITIES.map((r) => <option key={r} value={r}>{RARITY_FA[r]}</option>)}
             </select>
           </label>
         </div>
-        <div className="fgrid">
-          <label className="field">جان<input type="number" min={1} value={draft.hp} onChange={(e) => set({ hp: num(e.target.value) })} /></label>
-          <label className="field">حمله<input type="number" min={0} value={draft.atk} onChange={(e) => set({ atk: num(e.target.value) })} /></label>
-          <label className="field">شیلد<input type="number" min={0} value={draft.shield} onChange={(e) => set({ shield: num(e.target.value) })} /></label>
-        </div>
-        <div className="fgrid">
-          <label className="field">توانایی
-            <select value={draft.ability?.id ?? ''} onChange={(e) => {
-              const id = e.target.value;
-              if (!id) return set({ ability: undefined, desc: undefined });
-              set({ ability: { id, params: Object.fromEntries(ABILITY_META[id].params.map((p) => [p.key, p.def])) } });
-            }}>
-              <option value="">— بدون توانایی —</option>
-              {Object.entries(ABILITY_META).map(([id, m]) => <option key={id} value={id}>{m.label}</option>)}
-            </select>
-          </label>
-          {meta?.params.map((p) => (
-            <label key={p.key} className="field">{p.label}
-              <input type="number" value={draft.ability?.params?.[p.key] ?? p.def} onChange={(e) => set({ ability: { id: draft.ability!.id, params: { ...draft.ability!.params, [p.key]: num(e.target.value) } } })} />
-            </label>
-          ))}
-        </div>
-        {draft.ability && <label className="field">توضیح توانایی (به بازیکن نشان داده می‌شود)<input value={draft.desc ?? ''} onChange={(e) => set({ desc: e.target.value })} /></label>}
-        <h3>آمار هر لول <small>لول ۱ همان جان/حمله/شیلد بالاست. برای لول‌های بالاتر آمار دقیق را خودت بنویس.</small></h3>
-        <div className="tblwrap"><table>
-          <thead><tr><th>لول</th><th>جان</th><th>حمله</th><th>شیلد</th></tr></thead>
-          <tbody>
-            {Array.from({ length: cfg.upgrade.maxLevel - 1 }, (_, i) => {
-              const row = lvRow(i);
-              return (
-                <tr key={i}><td>{fa(i + 2)}</td>
-                  {(['hp', 'atk', 'shield'] as const).map((k) => (
-                    <td key={k}><input className="cell" type="number" min={k === 'hp' ? 1 : 0} value={row[k]} onChange={(e) => setLv(i, k, num(e.target.value))} /></td>
-                  ))}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table></div>
-        <h3>مسیر قدرت‌گیری <small>هر لول طبق جدول ضریب، آمار بیشتر و قاب جدید</small></h3>
+        <div className="btns"><button className="btn" disabled={!dirty} onClick={save}>ذخیره و اعمال</button></div>
+
+        <h3>مسیر قدرت‌گیری <small>فقط نمایش؛ آمار هر لول از تنظیمات بازی خوانده می‌شود</small></h3>
         <div className="evo">
           {Array.from({ length: cfg.upgrade.maxLevel }, (_, i) => {
-            const s = resolveCard(draft, i + 1, cfg);
+            const s = resolveCard(draft, i + 1);
             const need = cfg.upgrade.byRarity[draft.rarity][i - 1];
             return (
               <div key={i}>
@@ -203,10 +150,6 @@ function CardsTab({ cfg, refresh, run }: TabProps) {
               </div>
             );
           })}
-        </div>
-        <div className="btns">
-          <button className="btn" onClick={save}>ذخیره و اعمال</button>
-          {!isNew && <button className="btn ghost danger" onClick={() => { if (window.confirm?.('این کارت حذف شود؟') !== false) void del(); }}>حذف کارت</button>}
         </div>
       </div>
     </div>
