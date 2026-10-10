@@ -87,4 +87,4 @@ export function App() {
 }
 
 export const rewardText = (r: BattleReward | null, boxName?: string) =>
-  !r ? '' : r.box !== null ? `🎁 یک جعبه‌ی ${boxName ?? ''} گرفتی! (اسلات ${fa(r.box + 1)})` : '📦 اسلات‌های جعبه پر است؛ این بار جعبه‌ای نگرفتی.';
+  !r ? '' : r.box === null && !r.noSlot ? 'این بار جعبه‌ای نیامد.' : r.box !== null ? `🎁 یک جعبه‌ی ${boxName ?? ''} گرفتی! (اسلات ${fa(r.box + 1)})` : '📦 اسلات‌های جعبه پر است؛ این بار جعبه‌ای نگرفتی.';

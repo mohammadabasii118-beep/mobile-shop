@@ -75,16 +75,28 @@ describe('game economy', () => {
     expect(r.coins).toBeGreaterThanOrEqual(gold.coins[0]);
     expect(r.coins).toBeLessThanOrEqual(gold.coins[1]);
     expect(r.cards.length).toBeGreaterThanOrEqual(gold.cardCountRange[0]);
-    // جایزه‌ی سولو بر اساس گودال: لول ۱ گودال ۱ برنزی، لول ۱ گودال ۲ نقره‌ای، گودال ۳ طلایی
-    const n1 = cfg.solo.pits[0].stages.length, n2 = cfg.solo.pits[1].stages.length;
-    expect(game.rewardBoxType(0)).toBe('bronze');
-    expect(game.rewardBoxType(n1 - 1)).toBe('bronze');
-    expect(game.rewardBoxType(n1)).toBe('silver');
-    expect(game.rewardBoxType(n1 + n2)).toBe('gold');
-    // مولتی‌پلیر: بر اساس وزن‌ها
-    rngVal = 0.0; expect(game.rewardBoxType()).toBe('bronze');
-    rngVal = 0.999; expect(game.rewardBoxType()).toBe('gold');
-    rngVal = 0.8; expect(game.rewardBoxType()).toBe('silver'); // وزن‌ها ۷۰/۲۵/۵ → ۰٫۸ در بازه‌ی نقره‌ای
+    // شانس جعبه‌ی جایزه با هر برد (سولو/آنلاین جدا): پیش‌فرض ۷۰ برنزی، ۲۵ نقره‌ای، ۵ طلایی
+    rngVal = 0.0; expect(game.rewardBoxType('solo')).toBe('bronze');
+    rngVal = 0.8; expect(game.rewardBoxType('solo')).toBe('silver');
+    rngVal = 0.999; expect(game.rewardBoxType('solo')).toBe('gold');
+    rngVal = 0.8; expect(game.rewardBoxType('multi')).toBe('silver');
+  });
+
+  it('box drop chances are set per mode and may leave room for "no box"', () => {
+    const custom = { ...cfg, box: { ...cfg.box, drops: { solo: { bronze: 10, silver: 0, gold: 0 }, multi: { bronze: 0, silver: 0, gold: 100 } } } };
+    const g2 = new Game({ db: openDb(), cfg: custom, now: () => t, rng: () => rngVal });
+    const id = g2.upsertUser({ tgId: 7, name: 'X', avatar: null });
+    rngVal = 0.05; expect(g2.rewardBoxType('solo')).toBe('bronze');
+    rngVal = 0.5; expect(g2.rewardBoxType('solo')).toBeNull();           // ۹۰٪ بدون جعبه
+    rngVal = 0.0; expect(g2.rewardBoxType('multi')).toBe('gold');
+    rngVal = 0.999; expect(g2.rewardBoxType('multi')).toBe('gold');
+    // برد بدون جعبه: چیزی ساخته نمی‌شود و «اسلات پر» هم نیست
+    rngVal = 0.5;
+    expect(g2.recordResult(id, true, 0)).toEqual({ box: null, type: null, noSlot: false });
+    expect(g2.profile(id).boxes).toHaveLength(0);
+    rngVal = 0.05;
+    expect(g2.recordResult(id, true, 1)).toMatchObject({ box: 0, type: 'bronze' });
+    expect(g2.recordResult(id, true)).toMatchObject({ type: 'gold' });  // مولتی‌پلیر
   });
 
   it('card stats come from the explicit per-level table (no growth formula)', () => {

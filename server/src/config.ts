@@ -48,10 +48,10 @@ export function validateConfig(cfg: GameConfig): GameConfig {
       if (cc[r] > 0 && !cfg.cards.some((c) => c.rarity === r)) bad(`جعبه‌ی ${bt.name}: برای نادری ${r} شانس گذاشته‌ای ولی کارتی از آن نیست`);
     }
   }
-  const d = b.drops;
-  if (!Array.isArray(d.soloByPit) || d.soloByPit.length < 1 || d.soloByPit.some((t) => !['bronze', 'silver', 'gold'].includes(t))) bad('جعبه‌ی جایزه‌ی گودال‌ها نامعتبر است');
-  const mc = d.multiChance;
-  if (!mc || !isNum(mc.bronze) || !isNum(mc.silver) || !isNum(mc.gold) || mc.bronze + mc.silver + mc.gold <= 0) bad('شانس جعبه‌ی مولتی‌پلیر نامعتبر است');
+  for (const mode of ['solo', 'multi'] as const) {
+    const m = b.drops[mode];
+    if (!m || !isNum(m.bronze) || !isNum(m.silver) || !isNum(m.gold) || m.bronze + m.silver + m.gold > 100.0001) bad(`شانس جعبه‌ی ${mode === 'solo' ? 'سولو' : 'آنلاین'}: هر عدد باید ۰ یا بیشتر و مجموعشان حداکثر ۱۰۰ باشد`);
+  }
   if (cfg.ui?.banner !== undefined && !/^\/uploads\/banner\.(png|jpg|webp)(\?v=\d+)?$/.test(cfg.ui.banner)) bad('آدرس بنر نامعتبر است');
   if (!cfg.solo || !Array.isArray(cfg.solo.pits) || cfg.solo.pits.length < 1) bad('حداقل یک گودال سولو لازم است');
   for (const pit of cfg.solo.pits) {
@@ -95,6 +95,15 @@ export function loadConfigWithOverride(overridePath: string, basePath = CONFIG_P
   }
   // ساختار قدیمی جعبه (بدون types) → جعبه‌های جدید از پایه
   if (!merged.box?.types) merged.box = base.box;
+  // شانس جعبه‌ی جایزه: شکل قدیمی (soloByPit/multiChance) → شانس جدید؛ مولتی از وزن‌های قبلی (به ۱۰۰ نرمال)، سولو از پایه
+  if (!merged.box.drops?.solo || !merged.box.drops?.multi) {
+    const mc = merged.box.drops?.multiChance;
+    const sum = mc ? mc.bronze + mc.silver + mc.gold : 0;
+    merged.box = { ...merged.box, drops: {
+      solo: base.box.drops.solo,
+      multi: sum > 0 ? { bronze: Math.round((mc.bronze / sum) * 100), silver: Math.round((mc.silver / sum) * 100), gold: Math.round((mc.gold / sum) * 100) } : base.box.drops.multi,
+    } };
+  }
   // آمار هر لول کارت: اگر ذخیره‌ی قدیمی بود (بدون levels): از رشد درصدی قدیمی بساز یا از کارت هم‌شناسه‌ی پایه بگیر
   const ls = raw.levelScale;
   merged.cards = (merged.cards ?? []).map((c: any) => {

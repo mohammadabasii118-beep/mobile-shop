@@ -58,8 +58,8 @@ export interface GameConfig {
   box: {
     slots: number;
     types: Record<BoxType, BoxTypeCfg>;
-    /** کدام جعبه جایزه‌ی برد است: سولو بر اساس گودال، مولتی‌پلیر با شانس (وزن) */
-    drops: { soloByPit: BoxType[]; multiChance: Record<BoxType, number> };
+    /** شانس (٪) دریافت هر نوع جعبه با هر برد، برای سولو و آنلاین. مجموع حداکثر ۱۰۰؛ باقی‌مانده = این بار جعبه‌ای نمی‌آید. */
+    drops: { solo: Record<BoxType, number>; multi: Record<BoxType, number> };
   };
   solo: { pits: SoloPit[] };
   /** ظاهر: بنر بالای صفحه‌ی اصلی (آدرس عکس آپلودشده از پنل مدیریت) */

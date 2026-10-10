@@ -113,19 +113,12 @@ export class Game {
     return t === 'silver' || t === 'gold' ? t : 'bronze';
   }
 
-  /** جعبه‌ی جایزه‌ی برد: سولو بر اساس گودال، مولتی‌پلیر با شانس */
-  rewardBoxType(soloStage?: number): BoxType {
-    const { cfg, rng } = this.d;
-    const { soloByPit, multiChance } = cfg.box.drops;
-    if (soloStage !== undefined) {
-      let g = soloStage, pit = 0;
-      for (; pit < cfg.solo.pits.length - 1 && g >= cfg.solo.pits[pit].stages.length; pit++) g -= cfg.solo.pits[pit].stages.length;
-      return this.boxType(soloByPit[Math.min(pit, soloByPit.length - 1)]);
-    }
-    const total = multiChance.bronze + multiChance.silver + multiChance.gold;
-    let r = rng() * total;
-    for (const t of ['bronze', 'silver', 'gold'] as BoxType[]) { if (r < multiChance[t]) return t; r -= multiChance[t]; }
-    return 'bronze';
+  /** با هر برد: جعبه‌ی جایزه با شانسِ تنظیم‌شده برای همان حالت (سولو/آنلاین)؛ null = این بار جعبه‌ای نمی‌آید */
+  rewardBoxType(mode: 'solo' | 'multi'): BoxType | null {
+    const chances = this.d.cfg.box.drops[mode];
+    let r = this.d.rng() * 100;
+    for (const t of ['bronze', 'silver', 'gold'] as BoxType[]) { if (r < chances[t]) return t; r -= chances[t]; }
+    return null;
   }
 
   /** بعد از برد: اگه اسلات خالی بود جعبه می‌ده */
@@ -218,7 +211,8 @@ export class Game {
     if (soloStage !== undefined) {
       db.prepare('UPDATE users SET solo_stage = MAX(solo_stage, ?) WHERE id = ?').run(soloStage + 1, userId);
     }
-    return this.grantBox(userId, this.rewardBoxType(soloStage));
+    const type = this.rewardBoxType(soloStage !== undefined ? 'solo' : 'multi');
+    return type ? this.grantBox(userId, type) : { box: null, type: null, noSlot: false };
   }
 
   // ---------- ابزارهای مدیریت ----------

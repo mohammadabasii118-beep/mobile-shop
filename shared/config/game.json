@@ -590,12 +590,12 @@
       }
     },
     "drops": {
-      "soloByPit": [
-        "bronze",
-        "silver",
-        "gold"
-      ],
-      "multiChance": {
+      "solo": {
+        "bronze": 70,
+        "silver": 25,
+        "gold": 5
+      },
+      "multi": {
         "bronze": 70,
         "silver": 25,
         "gold": 5

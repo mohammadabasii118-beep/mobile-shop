@@ -295,3 +295,7 @@ table.clickable tbody tr:hover, table.clickable tbody tr:focus-visible { backgro
 .slot.bx.gold { border-color: var(--gold); background: linear-gradient(180deg, rgba(227,180,72,.2), var(--panel)); }
 .btype { font-size: 11px; font-weight: 800; border-radius: 8px; padding: 0 8px; color: #1b1303; }
 .btype.bronze { background: #c78a50; } .btype.silver { background: #cdd8e6; } .btype.gold { background: var(--gold); }
+
+.dropsum { display: flex; justify-content: space-between; background: var(--panel2); border-radius: 12px; padding: 10px 14px; font-size: 14px; }
+.dropsum b { color: var(--gold); font-family: var(--f-display); font-weight: 400; font-size: 20px; margin-inline-start: 6px; }
+.dropsum.bad b { color: var(--ruby); }

@@ -166,6 +166,8 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
   const urows = d.upgrade.byRarity[ur];
   const total = urows.reduce((s, l) => ({ c: s.c + l.copies, k: s.k + l.coins }), { c: 0, k: 0 });
   const [bt, setBt] = useState<BoxType>('bronze');
+  const [dm, setDm] = useState<'solo' | 'multi'>('solo');
+  const dropSum = BOX_TYPES.reduce((t, k) => t + (Number(d.box.drops[dm][k]) || 0), 0);
   const box = d.box.types[bt];
   const cc = box.cardChance;
   const upd = (fn: (c: GameConfig) => void) => { const c = JSON.parse(JSON.stringify(d)) as GameConfig; fn(c); setD(c); };
@@ -207,20 +209,6 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
         <small className="hint">شانس بدون کارت: {fa(Math.round((1 - cc.epic - cc.rare - cc.common) * 100))}٪ (برای هر کارتِ جعبه جدا انداخته می‌شود)</small>
         <h3>تعداد اسلات جعبه</h3>
         <div className="fgrid">{f('اسلات', d.box.slots, (x) => upd((c) => { c.box.slots = x; }))}</div>
-        <h3>کدام جعبه جایزه‌ی برد است؟</h3>
-        <small className="hint" style={{ textAlign: 'start' }}>سولو: جعبه‌ی جایزه بر اساس گودال. مولتی‌پلیر: با شانس (وزن؛ مجموع لازم نیست ۱۰۰ باشد).</small>
-        <div className="fgrid">
-          {d.solo.pits.map((_, pi) => (
-            <label key={pi} className="field">سولو — گودال {fa(pi + 1)}
-              <select value={d.box.drops.soloByPit[Math.min(pi, d.box.drops.soloByPit.length - 1)]} onChange={(e) => upd((c) => { const arr = d.solo.pits.map((__, i) => c.box.drops.soloByPit[Math.min(i, c.box.drops.soloByPit.length - 1)]); arr[pi] = e.target.value as BoxType; c.box.drops.soloByPit = arr; })}>
-                {BOX_TYPES.map((t) => <option key={t} value={t}>{d.box.types[t].name}</option>)}
-              </select>
-            </label>
-          ))}
-        </div>
-        <div className="fgrid">
-          {BOX_TYPES.map((t) => f(`مولتی‌پلیر — شانس ${d.box.types[t].name}`, d.box.drops.multiChance[t], (x) => upd((c) => { c.box.drops.multiChance[t] = x; })))}
-        </div>
         <h3>هزینه‌ی ورود به نبرد (سکه)</h3>
         <div className="fgrid">
           {f('هر مرحله‌ی سولو', d.fees?.solo ?? 0, (x) => upd((c) => { c.fees = { solo: x, multi: c.fees?.multi ?? 0 }; }))}
@@ -231,6 +219,24 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
           {f('مهلت انتخاب هدف (ثانیه)', d.turnSeconds, (x) => upd((c) => { c.turnSeconds = x; }))}
           {f('سقف دور (مخفی)', d.maxRounds, (x) => upd((c) => { c.maxRounds = x; }))}
         </div>
+      </div>
+      <div className="box">
+        <h3>شانس دریافت جعبه با هر برد</h3>
+        <small className="hint" style={{ textAlign: 'start' }}>برای هر حالت، با هر برد کدام جعبه به بازیکن می‌رسد؟ عددها درصدند و مجموعشان حداکثر ۱۰۰ است؛ باقی‌مانده یعنی «این بار جعبه‌ای نمی‌آید».</small>
+        <div className="pits" role="tablist" aria-label="حالت بازی">
+          {(['solo', 'multi'] as const).map((m) => (
+            <button key={m} role="tab" aria-selected={dm === m} className="pit" onClick={() => setDm(m)}>{m === 'solo' ? 'سولو' : 'آنلاین'}</button>
+          ))}
+        </div>
+        <div className="fgrid">
+          {BOX_TYPES.map((t) => f(`شانس جعبه‌ی ${d.box.types[t].name} (٪)`, d.box.drops[dm][t], (x) => upd((c) => { c.box.drops[dm][t] = x; })))}
+        </div>
+        <div className={`dropsum ${dropSum > 100 ? 'bad' : ''}`}>
+          <span>مجموع: <b className="num">{fa(dropSum)}٪</b></span>
+          <span>بدون جعبه: <b className="num">{fa(Math.max(0, 100 - dropSum))}٪</b></span>
+        </div>
+        {dropSum > 100 && <div className="warn">مجموع بیشتر از ۱۰۰٪ است؛ ذخیره نمی‌شود.</div>}
+        <button className="btn" disabled={dropSum > 100} onClick={() => run(async () => refresh((await call('/api/admin/config', { config: d })) as GameConfig), 'ذخیره شد و اعمال شد')}>ذخیره و اعمال</button>
       </div>
       <div className="box">
         <h3>هزینه‌ی ارتقا</h3>
