@@ -39,6 +39,8 @@ export interface GameConfig {
     cardCountRange: [number, number];
   };
   solo: { stages: SoloStage[] };
+  /** ظاهر: بنر بالای صفحه‌ی اصلی (آدرس عکس آپلودشده از پنل مدیریت) */
+  ui?: { banner?: string };
 }
 
 /** Fully resolved fighter used by the engine (level already applied). */

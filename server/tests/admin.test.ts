@@ -95,3 +95,21 @@ describe('validateConfig', () => {
     expect(() => validateConfig({ ...c, upgrade: { ...c.upgrade, maxLevel: 9 } })).toThrow(/جدول ارتقا/);
   });
 });
+
+describe('banner', () => {
+  it('uploads, serves and deletes the home banner; rejects fake images and non-admins', async () => {
+    expect((await call(42, '/api/admin/banner', Buffer.from('not an image'), 'image/png')).status).toBe(400);
+    expect((await call(43, '/api/admin/banner', PNG, 'image/png')).status).toBe(403);
+    const r = await call(42, '/api/admin/banner', PNG, 'image/png');
+    expect(r.status).toBe(200);
+    const url = ((await r.json()) as any).ui.banner as string;
+    expect(url).toMatch(/^\/uploads\/banner\.png\?v=\d+$/);
+    expect(((await (await fetch(base + '/api/config')).json()) as any).ui.banner).toBe(url);
+    const img = await fetch(base + url.split('?')[0]);
+    expect(img.status).toBe(200);
+    expect(img.headers.get('content-type')).toBe('image/png');
+    await call(42, '/api/admin/banner/delete', {});
+    expect((await fetch(base + url.split('?')[0])).status).toBe(404);
+    expect(((await (await fetch(base + '/api/config')).json()) as any).ui?.banner).toBeUndefined();
+  });
+});

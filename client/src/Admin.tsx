@@ -6,14 +6,14 @@ import { call, loadConfig } from './net';
 import { initData } from './telegram';
 import { CardTile, RARITY_FA, fa } from './ui';
 
-type Tab = 'cards' | 'eco' | 'players' | 'json';
+type Tab = 'cards' | 'eco' | 'look' | 'players' | 'json';
 interface Stats { users: number; battles: number; pendingBoxes: number; coins: number; banned: number }
 interface AdminUser { id: number; tg_id: number; name: string; level: number; coins: number; wins: number; losses: number; banned: number }
 
 /** عکس را قبل از آپلود کوچک می‌کند (حداکثر ۶۴۰ پیکسل، WebP) تا سبک و سریع باشد */
-async function shrink(file: File): Promise<Blob> {
+async function shrink(file: File, max = 640): Promise<Blob> {
   const bmp = await createImageBitmap(file);
-  const k = Math.min(1, 640 / Math.max(bmp.width, bmp.height));
+  const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
   const c = document.createElement('canvas');
   c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
   c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
@@ -53,12 +53,13 @@ export function Admin({ ctx, onExit }: { ctx: Ctx; onExit: () => void }) {
         </div>
       )}
       <div className="tabs" role="tablist">
-        {([['cards', 'کارت‌ها و عکس‌ها'], ['eco', 'جعبه و اقتصاد'], ['players', 'بازیکن‌ها'], ['json', 'پیشرفته']] as [Tab, string][]).map(([k, l]) => (
+        {([['cards', 'کارت‌ها و عکس‌ها'], ['eco', 'جعبه و اقتصاد'], ['look', 'ظاهر و بنر'], ['players', 'بازیکن‌ها'], ['json', 'پیشرفته']] as [Tab, string][]).map(([k, l]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{l}</button>
         ))}
       </div>
       {tab === 'cards' && <CardsTab cfg={cfg} refresh={refresh} run={run} />}
       {tab === 'eco' && <EcoTab cfg={cfg} refresh={refresh} run={run} />}
+      {tab === 'look' && <LookTab cfg={cfg} refresh={refresh} run={run} />}
       {tab === 'players' && <PlayersTab cfg={cfg} run={run} />}
       {tab === 'json' && <JsonTab cfg={cfg} refresh={refresh} run={run} />}
     </div>
@@ -238,6 +239,34 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
         </table></div>
         <small className="hint">رساندن یک کارت تا لول آخر: {fa(total.c)} کارت تکراری و {fa(total.k)} سکه</small>
         <button className="btn" onClick={() => run(async () => refresh((await call('/api/admin/config', { config: d })) as GameConfig), 'ذخیره شد و اعمال شد')}>ذخیره و اعمال</button>
+      </div>
+    </div>
+  );
+}
+
+function LookTab({ cfg, refresh, run }: TabProps) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const banner = cfg.ui?.banner;
+  const upload = async (f: File | undefined) => {
+    if (!f) return;
+    await run(async () => {
+      const blob = await shrink(f, 1400);
+      const r = await fetch('/api/admin/banner', { method: 'POST', headers: { 'x-init-data': initData, 'content-type': blob.type }, body: blob });
+      const j = await r.json(); if (!r.ok) throw new Error(j.error); refresh(j as GameConfig);
+    }, 'بنر عوض شد');
+    if (fileRef.current) fileRef.current.value = '';
+  };
+  return (
+    <div className="box">
+      <h3>بنر صفحه‌ی اصلی</h3>
+      <small className="hint" style={{ textAlign: 'start' }}>این عکس به‌جای نوشته‌ی «میراث» بالای منوی بازی نشان داده می‌شود. اندازه‌ی پیشنهادی: عریض، مثلاً ۱۲۰۰×۴۰۰ (نسبت ۳ به ۱) با پس‌زمینه‌ی تیره یا شفاف (PNG/WebP).</small>
+      <div className="bannerprev">
+        {banner ? <img src={banner} alt="بنر" /> : <div className="brand">میراث</div>}
+      </div>
+      <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => void upload(e.target.files?.[0])} />
+      <div className="btns">
+        <button className="btn" onClick={() => fileRef.current?.click()}>{banner ? 'تغییر بنر' : 'آپلود بنر'}</button>
+        {banner && <button className="btn ghost" onClick={() => run(async () => refresh(await call('/api/admin/banner/delete', {})), 'بنر حذف شد و نوشته‌ی پیش‌فرض برگشت')}>حذف بنر</button>}
       </div>
     </div>
   );

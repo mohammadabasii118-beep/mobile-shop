@@ -58,12 +58,14 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
 
       {view === 'menu' ? (
         <section className="menu">
-          <div className="hero"><div className="brand">میراث</div><p>سه کارت، یک میراث. نبرد نوبتی ۳ به ۳</p></div>
+          <div className="hero">
+            {cfg.ui?.banner ? <img className="bannerimg" src={cfg.ui.banner} alt="میراث" /> : <><div className="brand">میراث</div><p>سه کارت، یک میراث</p></>}
+          </div>
           <button className="mode solo" onClick={() => setView('solo')}>
-            <span className="ico"><svg className="i" viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9 16h6"/></svg></span><div><b>سولو</b><small>مرحله‌های متوالی در برابر ربات</small></div>
+            <span className="ico"><svg className="i" viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9 16h6"/></svg></span><div><b>سولو</b></div>
           </button>
           <button className="mode multi" disabled={queued} onClick={() => sock.send({ t: 'queue' })}>
-            <span className="ico"><svg className="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg></span><div><b>مولتی‌پلیر</b><small>نبرد آنلاین با بازیکن واقعی</small></div>
+            <span className="ico"><svg className="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg></span><div><b>مولتی‌پلیر</b></div>
           </button>
         </section>
       ) : (

@@ -40,6 +40,7 @@ export function validateConfig(cfg: GameConfig): GameConfig {
   for (const r of ['common', 'rare', 'epic'] as const) {
     if (cc[r] > 0 && !cfg.cards.some((c) => c.rarity === r)) bad(`برای نادری ${r} شانس گذاشته‌ای ولی کارتی از آن نیست`);
   }
+  if (cfg.ui?.banner !== undefined && !/^\/uploads\/banner\.(png|jpg|webp)(\?v=\d+)?$/.test(cfg.ui.banner)) bad('آدرس بنر نامعتبر است');
   if (!cfg.solo || !Array.isArray(cfg.solo.stages) || cfg.solo.stages.length < 1) bad('حداقل یک مرحله‌ی سولو لازم است');
   for (const st of cfg.solo.stages) {
     if (typeof st.name !== 'string' || !['random', 'smart'].includes(st.ai) || !Array.isArray(st.deck) || st.deck.length !== 3) bad('مرحله‌ی سولو نامعتبر است');

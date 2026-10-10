@@ -35,7 +35,8 @@ export function createGameServer(opt: ServerOptions) {
   const { cfg } = opt;
   const adminIds = new Set(opt.adminIds ?? []);
   const isAdmin = (tgId: number) => opt.auth.devAuth || adminIds.has(tgId);
-  const uploadsDir = join(opt.dataDir ?? '.', 'uploads', 'cards');
+  const uploadsRoot = join(opt.dataDir ?? '.', 'uploads');
+  const uploadsDir = join(uploadsRoot, 'cards');
   const game = new Game({ db: opt.db, cfg, now, rng, isAdmin });
   const conns = new Map<number, Conn>();
   let queue: Conn[] = [];
@@ -171,6 +172,10 @@ export function createGameServer(opt: ServerOptions) {
     for (const ext of ['png', 'jpg', 'webp']) { try { unlinkSync(join(uploadsDir, `${id}.${ext}`)); } catch { /* نبود */ } }
   };
 
+  const removeBanner = () => {
+    for (const ext of ['png', 'jpg', 'webp']) { try { unlinkSync(join(uploadsRoot, `banner.${ext}`)); } catch { /* نبود */ } }
+  };
+
   async function admin(req: IncomingMessage, res: ServerResponse, path: string, url: URL) {
     switch (path) {
       case '/api/admin/overview':
@@ -221,6 +226,25 @@ export function createGameServer(opt: ServerOptions) {
         const card = next.cards.find((c) => c.id === id);
         if (!card) throw new GameError('کارت پیدا نشد');
         delete card.image; removeImages(id); commitConfig(next);
+        return json(res, 200, cfg);
+      }
+      case '/api/admin/banner': {
+        const next = clone();
+        const buf = await readRaw(req, 3_000_000);
+        if (!buf) throw new GameError('حجم بنر بیشتر از ۳ مگابایت است');
+        const ext = sniffImage(buf);
+        if (!ext) throw new GameError('فقط PNG، JPG یا WebP قبول است');
+        mkdirSync(uploadsRoot, { recursive: true });
+        removeBanner();
+        writeFileSync(join(uploadsRoot, `banner.${ext}`), buf);
+        next.ui = { ...next.ui, banner: `/uploads/banner.${ext}?v=${Date.now()}` };
+        commitConfig(next);
+        return json(res, 200, cfg);
+      }
+      case '/api/admin/banner/delete': {
+        const next = clone();
+        if (next.ui) delete next.ui.banner;
+        removeBanner(); commitConfig(next);
         return json(res, 200, cfg);
       }
       case '/api/admin/users':
@@ -291,6 +315,12 @@ export function createGameServer(opt: ServerOptions) {
     const path = new URL(req.url ?? '/', 'http://x').pathname;
     if (path === '/health') return json(res, 200, { ok: true });
     if (path.startsWith('/api/')) return void api(req, res, path);
+    if (/^\/uploads\/banner\.(png|jpg|webp)$/.test(path)) {
+      const f = join(uploadsRoot, path.slice('/uploads/'.length));
+      if (!existsSync(f)) { res.writeHead(404); return res.end(); }
+      res.writeHead(200, { 'content-type': MIME[extname(f)] ?? 'application/octet-stream', 'cache-control': 'public, max-age=31536000, immutable', 'x-content-type-options': 'nosniff' });
+      return res.end(readFileSync(f));
+    }
     if (path.startsWith('/uploads/cards/')) {
       const name = path.slice('/uploads/cards/'.length);
       const f = join(uploadsDir, name);

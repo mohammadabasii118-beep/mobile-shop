@@ -8,8 +8,10 @@ set -euo pipefail
 REPO="${REPO:-https://github.com/mohammadabasii118-beep/mobile-shop.git}"
 BRANCH="${BRANCH:-claude/card-battle-game}"
 DIR="${DIR:-/opt/miras}"
-PORT="${PORT:-3000}"
 ENV_FILE=/etc/miras.env
+# پورت: اگر ندادی همان که قبلاً نصب شده (در /etc/miras.env) استفاده می‌شود، وگرنه ۳۰۰۰
+PORT="${PORT:-$( [ -f "$ENV_FILE" ] && grep '^PORT=' "$ENV_FILE" | cut -d= -f2 || true )}"
+PORT="${PORT:-3000}"
 
 say() { printf '\n\033[1;33m▶ %s\033[0m\n' "$*"; }
 die() { printf '\n\033[1;31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
