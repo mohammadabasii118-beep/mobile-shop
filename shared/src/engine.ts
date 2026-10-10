@@ -1,9 +1,14 @@
 import { ABILITIES, type AbilityCtx } from './abilities';
-import type { BattleEvent, BattleState, CardDef, CardStats, Side, Unit, UnitInit } from './types';
+import type { BattleEvent, BattleState, CardDef, CardStats, GameConfig, Rarity, Side, Unit, UnitInit } from './types';
 
 export type Rng = () => number;
 
 export const other = (s: Side): Side => (s === 'A' ? 'B' : 'A');
+
+/** هزینه‌ی ارتقای کارتی از این نوع از لول `level` به لول بعد (undefined = حداکثر لول) */
+export function upgradeStep(cfg: GameConfig, rarity: Rarity, level: number) {
+  return cfg.upgrade.byRarity[rarity]?.[level - 1];
+}
 
 /** آمار کارت در یک لول (از جدول آمار خودِ کارت) */
 export function cardStatsAt(def: CardDef, level: number): CardStats {

@@ -13,7 +13,7 @@ export function CardsScreen({ ctx }: { ctx: Ctx }) {
 
   const tile = (id: string, onClick: () => void, extra?: { selected?: boolean }) => {
     const c = owned.get(id)!, def = defOf(id), s = resolveCard(def, c.level, cfg);
-    const need = cfg.upgrade.levels[c.level - 1];
+    const need = cfg.upgrade.byRarity[def.rarity][c.level - 1];
     return <CardTile key={id} maxLevel={cfg.upgrade.maxLevel} def={def} level={c.level} hp={s.hp} atk={s.atk} shield={s.shield} onClick={onClick} selected={extra?.selected}
       badge={need ? <div className={`dup ${c.copies >= need.copies ? 'ok' : ''}`}>{fa(c.copies)}/{fa(need.copies)}</div> : <div className="dup ok">حداکثر</div>} />;
   };
@@ -56,7 +56,7 @@ function Detail({ flash, def, level, copies, cfg, coins, deck, onClose, onUpgrad
 }) {
   const s = resolveCard(def, level, cfg);
   const next = level < cfg.upgrade.maxLevel ? resolveCard(def, level + 1, cfg) : null;
-  const need = cfg.upgrade.levels[level - 1];
+  const need = cfg.upgrade.byRarity[def.rarity][level - 1];
   const can = !!need && copies >= need.copies && coins >= need.coins;
   const d = (a: number, b?: number) => (b !== undefined && b !== a ? <em> ← {fa(b)}</em> : null);
   return (

@@ -3,7 +3,8 @@ import type { CardDef, GameConfig } from '@game/shared';
 import { resolveCard } from '@game/shared';
 
 export const fa = (n: number) => Math.round(n).toLocaleString('fa-IR');
-export const RARITY_FA = { common: 'معمولی', rare: 'نادر', epic: 'حماسی' } as const;
+/** نوع کارت: ساده (برنزی)، معمولی (نقره‌ای)، کمیاب (طلایی) */
+export const RARITY_FA = { common: 'ساده', rare: 'معمولی', epic: 'کمیاب' } as const;
 const RARITY_ORDER = { common: 0, rare: 1, epic: 2 } as const;
 export const cardPower = (c: { hp: number; atk: number; shield: number }) => c.hp + c.shield + c.atk * 3;
 export const sortByPower = <T extends { def: CardDef; level: number }>(a: T[], cfg: GameConfig) =>

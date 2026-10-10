@@ -52,7 +52,8 @@ export interface GameConfig {
   /** هزینه‌ی ورود به نبرد (سکه) */
   fees?: { solo: number; multi: number };
   cards: CardDef[];
-  upgrade: { maxLevel: number; levels: { copies: number; coins: number }[] };
+  /** هزینه‌ی ارتقا برای هر نوع کارت (ساده/معمولی/کمیاب)؛ ردیف i = از لول i+1 به i+2 */
+  upgrade: { maxLevel: number; byRarity: Record<Rarity, { copies: number; coins: number }[]> };
   xpPerLevel: number[];
   box: {
     slots: number;

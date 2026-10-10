@@ -146,11 +146,13 @@ describe('config override (survives code updates)', () => {
     // ساختار قدیمی: بدون pits و بدون fees، با یک کارت ویرایش‌شده
     const old: any = JSON.parse(JSON.stringify(base));
     delete old.fees; old.solo = { stages: [] }; old.cards[0].hp = 321;
+    old.upgrade = { maxLevel: base.upgrade.maxLevel, levels: base.upgrade.byRarity.common }; // جدول ارتقای قدیمی (یکی برای همه)
     writeFileSync(file, JSON.stringify(old));
     const merged = loadConfigWithOverride(file);
     expect(merged.cards[0].hp).toBe(321);       // ویرایش ادمین حفظ شد
     expect(merged.fees).toEqual(base.fees);      // کلید جدید از پایه
     expect(merged.solo.pits).toHaveLength(3);    // گودال‌ها از پایه
+    expect(merged.upgrade.byRarity.epic).toEqual(base.upgrade.byRarity.common); // جدول قدیمی برای هر سه نوع
     writeFileSync(file, '{ not json');
     expect(loadConfigWithOverride(file).cards[0].hp).toBe(base.cards[0].hp); // فایل خراب → پایه
     expect(loadConfigWithOverride(join(dataDir, 'nope.json')).cards[0].hp).toBe(base.cards[0].hp);

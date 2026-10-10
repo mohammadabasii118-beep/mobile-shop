@@ -99,7 +99,7 @@ export class Game {
     const c = db.prepare('SELECT level, copies FROM user_cards WHERE user_id = ? AND card_id = ?').get(userId, cardId) as any;
     if (!c) throw new GameError('این کارت را نداری');
     if (c.level >= cfg.upgrade.maxLevel) throw new GameError('کارت در بالاترین لول است');
-    const need = cfg.upgrade.levels[c.level - 1];
+    const need = cfg.upgrade.byRarity[cfg.cards.find((x) => x.id === cardId)?.rarity ?? 'common'][c.level - 1];
     const coins = (db.prepare('SELECT coins FROM users WHERE id = ?').get(userId) as any).coins as number;
     if (c.copies < need.copies) throw new GameError(`تعداد کارت کافی نیست (${c.copies}/${need.copies})`);
     if (coins < need.coins) throw new GameError(`سکه کافی نیست (${coins}/${need.coins})`);

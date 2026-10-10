@@ -151,6 +151,6 @@ describe('engine', () => {
     c.solo.pits.forEach((pit) => pit.stages.forEach((st) => st.deck.forEach(([id]) => expect(ids.has(id)).toBe(true))));
     expect(c.solo.pits).toHaveLength(3);
     c.solo.pits.forEach((pit) => expect(pit.stages).toHaveLength(20));
-    expect(c.upgrade.levels.length).toBe(c.upgrade.maxLevel - 1);
+    (['common', 'rare', 'epic'] as const).forEach((r) => expect(c.upgrade.byRarity[r].length).toBe(c.upgrade.maxLevel - 1));
   });
 });

@@ -30,8 +30,12 @@ export function validateConfig(cfg: GameConfig): GameConfig {
   for (const id of cfg.startingDeck) if (!ids.has(id)) bad(`ترکیب اولیه: کارت ناشناخته ${id}`);
   if (cfg.fees && (!Number.isInteger(cfg.fees.solo) || !Number.isInteger(cfg.fees.multi) || cfg.fees.solo < 0 || cfg.fees.multi < 0 || cfg.fees.solo > 100000 || cfg.fees.multi > 100000)) bad('هزینه‌ی ورود باید عدد صحیح بین ۰ و ۱۰۰٬۰۰۰ باشد');
   const up = cfg.upgrade;
-  if (!up || !isNum(up.maxLevel, 2) || !Array.isArray(up.levels) || up.levels.length !== up.maxLevel - 1) bad('جدول ارتقا باید دقیقاً (حداکثر لول - ۱) ردیف داشته باشد');
-  for (const l of up.levels) if (!isNum(l.copies, 1) || !isNum(l.coins)) bad('ردیف جدول ارتقا نامعتبر است');
+  if (!up || !isNum(up.maxLevel, 2) || !up.byRarity) bad('جدول ارتقا نامعتبر است');
+  for (const r of ['common', 'rare', 'epic'] as const) {
+    const rows = up.byRarity[r];
+    if (!Array.isArray(rows) || rows.length !== up.maxLevel - 1) bad('جدول ارتقا برای هر نوع کارت باید دقیقاً (حداکثر لول - ۱) ردیف داشته باشد');
+    for (const l of rows) if (!isNum(l.copies, 1) || !isNum(l.coins)) bad('ردیف جدول ارتقا نامعتبر است');
+  }
   if (!Array.isArray(cfg.xpPerLevel) || cfg.xpPerLevel.length < 1 || cfg.xpPerLevel.some((x) => !isNum(x, 1))) bad('جدول XP نامعتبر است');
   const b = cfg.box;
   if (!b || !isNum(b.slots, 1) || !b.types || !b.drops) bad('تنظیمات جعبه نامعتبر است');
@@ -84,6 +88,11 @@ export function loadConfigWithOverride(overridePath: string, basePath = CONFIG_P
   try { raw = JSON.parse(readFileSync(overridePath, 'utf8')); } catch { return base; }
   const merged: any = { ...raw };
   for (const k of Object.keys(base) as (keyof GameConfig)[]) if (merged[k] === undefined) merged[k] = base[k];
+  // جدول ارتقای قدیمی (یک جدول برای همه) → همان برای هر سه نوع کارت
+  if (!merged.upgrade?.byRarity) {
+    const lv = merged.upgrade?.levels;
+    merged.upgrade = Array.isArray(lv) ? { maxLevel: merged.upgrade.maxLevel, byRarity: { common: lv, rare: lv, epic: lv } } : base.upgrade;
+  }
   // ساختار قدیمی جعبه (بدون types) → جعبه‌های جدید از پایه
   if (!merged.box?.types) merged.box = base.box;
   // آمار هر لول کارت: اگر ذخیره‌ی قدیمی بود (بدون levels): از رشد درصدی قدیمی بساز یا از کارت هم‌شناسه‌ی پایه بگیر

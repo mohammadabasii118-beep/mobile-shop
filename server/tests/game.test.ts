@@ -97,6 +97,23 @@ describe('game economy', () => {
     expect(resolveCard({ ...soldier, levels: undefined }, 4).hp).toBe(soldier.hp); // بدون جدول: بدون رشد
   });
 
+  it('upgrade cost depends on the card type (ساده / معمولی / کمیاب)', () => {
+    const db = (game as any).d.db;
+    db.prepare("INSERT INTO user_cards (user_id, card_id, copies) VALUES (?, 'duelist', 1), (?, 'phoenix', 1)").run(uid, uid);
+    db.prepare('UPDATE users SET coins = 150').run();
+    // ساده: ۲ کارت و ۵۰ سکه — معمولی: ۲ کارت و ۱۰۰ — کمیاب: ۱ کارت و ۲۰۰
+    expect(cfg.upgrade.byRarity.common[0]).toEqual({ copies: 2, coins: 50 });
+    expect(cfg.upgrade.byRarity.rare[0]).toEqual({ copies: 2, coins: 100 });
+    expect(cfg.upgrade.byRarity.epic[0]).toEqual({ copies: 1, coins: 200 });
+    expect(() => game.upgradeCard(uid, 'duelist')).toThrow(/تعداد کارت/);   // ۱ از ۲
+    expect(() => game.upgradeCard(uid, 'phoenix')).toThrow(/سکه/);         // ۱۵۰ از ۲۰۰
+    db.prepare("UPDATE user_cards SET copies = 2 WHERE card_id = 'duelist'").run();
+    game.upgradeCard(uid, 'duelist');
+    const p = game.profile(uid);
+    expect(p.cards.find((c) => c.id === 'duelist')).toMatchObject({ level: 2, copies: 0 });
+    expect(p.coins).toBe(50);
+  });
+
   it('upgrade needs duplicates and coins', () => {
     expect(() => game.upgradeCard(uid, 'soldier')).toThrow(/تعداد کارت/);
     const db = (game as any).d.db;

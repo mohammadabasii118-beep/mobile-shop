@@ -67,6 +67,10 @@ export function Admin({ ctx, onExit }: { ctx: Ctx; onExit: () => void }) {
   );
 }
 
+/** ترتیب و رنگ نوع‌ها: ساده=برنزی، معمولی=نقره‌ای، کمیاب=طلایی */
+const RARITIES: Rarity[] = ['common', 'rare', 'epic'];
+const RARITY_TONE: Record<Rarity, string> = { common: 'bronze', rare: 'silver', epic: 'gold' };
+
 type Run = <T>(f: () => Promise<T>, okText?: string) => Promise<T | undefined>;
 interface TabProps { cfg: GameConfig; refresh: (c: GameConfig) => void; run: Run }
 
@@ -142,7 +146,7 @@ function CardsTab({ cfg, refresh, run }: TabProps) {
         <div className="fgrid">
           <label className="field">شناسه (انگلیسی)<input value={draft.id} disabled={!isNew} onChange={(e) => set({ id: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') })} /></label>
           <label className="field">نام<input value={draft.name} onChange={(e) => set({ name: e.target.value })} /></label>
-          <label className="field">نادری
+          <label className="field">نوع کارت
             <select value={draft.rarity} onChange={(e) => set({ rarity: e.target.value as Rarity })}>
               {(['common', 'rare', 'epic'] as Rarity[]).map((r) => <option key={r} value={r}>{RARITY_FA[r]}</option>)}
             </select>
@@ -191,7 +195,7 @@ function CardsTab({ cfg, refresh, run }: TabProps) {
         <div className="evo">
           {Array.from({ length: cfg.upgrade.maxLevel }, (_, i) => {
             const s = resolveCard(draft, i + 1, cfg);
-            const need = cfg.upgrade.levels[i - 1];
+            const need = cfg.upgrade.byRarity[draft.rarity][i - 1];
             return (
               <div key={i}>
                 <CardTile def={draft} level={i + 1} maxLevel={cfg.upgrade.maxLevel} hp={s.hp} atk={s.atk} shield={s.shield} />
@@ -215,15 +219,21 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
   const f = (label: string, v: number, on: (x: number) => void, step = 1) => (
     <label className="field">{label}<input type="number" step={step} value={v} onChange={(e) => on(n(e.target.value))} /></label>
   );
-  const total = d.upgrade.levels.reduce((s, l) => ({ c: s.c + l.copies, k: s.k + l.coins }), { c: 0, k: 0 });
+  const [ur, setUr] = useState<Rarity>('common');
+  const urows = d.upgrade.byRarity[ur];
+  const total = urows.reduce((s, l) => ({ c: s.c + l.copies, k: s.k + l.coins }), { c: 0, k: 0 });
   const [bt, setBt] = useState<BoxType>('bronze');
   const box = d.box.types[bt];
   const cc = box.cardChance;
   const upd = (fn: (c: GameConfig) => void) => { const c = JSON.parse(JSON.stringify(d)) as GameConfig; fn(c); setD(c); };
+  /** حداکثر لول برای هر سه نوع کارت با هم عوض می‌شود؛ ردیف‌های جدید از آخرین ردیف دو برابر می‌شوند */
   const setMax = (m: number) => upd((c) => {
     c.upgrade.maxLevel = m;
-    while (c.upgrade.levels.length < m - 1) { const last = c.upgrade.levels[c.upgrade.levels.length - 1] ?? { copies: 2, coins: 50 }; c.upgrade.levels.push({ copies: last.copies * 2, coins: last.coins * 2 }); }
-    c.upgrade.levels.length = m - 1;
+    for (const r of RARITIES) {
+      const rows = c.upgrade.byRarity[r];
+      while (rows.length < m - 1) { const last = rows[rows.length - 1] ?? { copies: 2, coins: 50 }; rows.push({ copies: last.copies * 2, coins: last.coins * 2 }); }
+      rows.length = Math.max(1, m - 1);
+    }
   });
   return (
     <div className="cols">
@@ -247,9 +257,9 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
         </div>
         <h3>شانس کارت — جعبه‌ی {box.name} (٪)</h3>
         <div className="fgrid">
-          {f('حماسی', Math.round(cc.epic * 100), (x) => upd((c) => { c.box.types[bt].cardChance.epic = x / 100; }))}
-          {f('نادر', Math.round(cc.rare * 100), (x) => upd((c) => { c.box.types[bt].cardChance.rare = x / 100; }))}
-          {f('معمولی', Math.round(cc.common * 100), (x) => upd((c) => { c.box.types[bt].cardChance.common = x / 100; }))}
+          {f('کمیاب (طلایی)', Math.round(cc.epic * 100), (x) => upd((c) => { c.box.types[bt].cardChance.epic = x / 100; }))}
+          {f('معمولی (نقره‌ای)', Math.round(cc.rare * 100), (x) => upd((c) => { c.box.types[bt].cardChance.rare = x / 100; }))}
+          {f('ساده (برنزی)', Math.round(cc.common * 100), (x) => upd((c) => { c.box.types[bt].cardChance.common = x / 100; }))}
         </div>
         <small className="hint">شانس بدون کارت: {fa(Math.round((1 - cc.epic - cc.rare - cc.common) * 100))}٪ (برای هر کارتِ جعبه جدا انداخته می‌شود)</small>
         <h3>تعداد اسلات جعبه</h3>
@@ -281,16 +291,22 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
       </div>
       <div className="box">
         <h3>هزینه‌ی ارتقا</h3>
-        {f('حداکثر لول کارت', d.upgrade.maxLevel, setMax)}
+        <div className="pits" role="tablist" aria-label="نوع کارت">
+          {RARITIES.map((r) => (
+            <button key={r} role="tab" aria-selected={ur === r} className={`pit boxtab ${RARITY_TONE[r]}`} onClick={() => setUr(r)}>{RARITY_FA[r]}</button>
+          ))}
+        </div>
+        <small className="hint" style={{ textAlign: 'start' }}>نوع کارت را انتخاب کن؛ هزینه‌ی ارتقای همین نوع در جدول زیر ویرایش می‌شود.</small>
+        {f('حداکثر لول کارت (برای هر سه نوع)', d.upgrade.maxLevel, setMax)}
         <div className="tblwrap"><table>
           <thead><tr><th>از لول</th><th>تعداد کارت</th><th>سکه</th></tr></thead>
-          <tbody>{d.upgrade.levels.map((l, i) => (
+          <tbody>{urows.map((l, i) => (
             <tr key={i}><td>{fa(i + 1)} ← {fa(i + 2)}</td>
-              <td><input className="cell" type="number" min={1} value={l.copies} onChange={(e) => upd((c) => { c.upgrade.levels[i].copies = n(e.target.value); })} /></td>
-              <td><input className="cell" type="number" min={0} value={l.coins} onChange={(e) => upd((c) => { c.upgrade.levels[i].coins = n(e.target.value); })} /></td></tr>
+              <td><input className="cell" type="number" min={1} value={l.copies} onChange={(e) => upd((c) => { c.upgrade.byRarity[ur][i].copies = n(e.target.value); })} /></td>
+              <td><input className="cell" type="number" min={0} value={l.coins} onChange={(e) => upd((c) => { c.upgrade.byRarity[ur][i].coins = n(e.target.value); })} /></td></tr>
           ))}</tbody>
         </table></div>
-        <small className="hint">رساندن یک کارت تا لول آخر: {fa(total.c)} کارت (تعداد) و {fa(total.k)} سکه</small>
+        <small className="hint">رساندن یک کارت {RARITY_FA[ur]} تا لول آخر: {fa(total.c)} کارت (تعداد) و {fa(total.k)} سکه</small>
         <button className="btn" onClick={() => run(async () => refresh((await call('/api/admin/config', { config: d })) as GameConfig), 'ذخیره شد و اعمال شد')}>ذخیره و اعمال</button>
       </div>
     </div>

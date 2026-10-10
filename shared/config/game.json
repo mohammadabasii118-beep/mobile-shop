@@ -441,28 +441,74 @@
   ],
   "upgrade": {
     "maxLevel": 6,
-    "levels": [
-      {
-        "copies": 2,
-        "coins": 50
-      },
-      {
-        "copies": 4,
-        "coins": 150
-      },
-      {
-        "copies": 8,
-        "coins": 400
-      },
-      {
-        "copies": 16,
-        "coins": 1000
-      },
-      {
-        "copies": 32,
-        "coins": 2500
-      }
-    ]
+    "byRarity": {
+      "common": [
+        {
+          "copies": 2,
+          "coins": 50
+        },
+        {
+          "copies": 4,
+          "coins": 150
+        },
+        {
+          "copies": 8,
+          "coins": 400
+        },
+        {
+          "copies": 16,
+          "coins": 1000
+        },
+        {
+          "copies": 32,
+          "coins": 2500
+        }
+      ],
+      "rare": [
+        {
+          "copies": 2,
+          "coins": 100
+        },
+        {
+          "copies": 3,
+          "coins": 300
+        },
+        {
+          "copies": 6,
+          "coins": 800
+        },
+        {
+          "copies": 12,
+          "coins": 2000
+        },
+        {
+          "copies": 24,
+          "coins": 5000
+        }
+      ],
+      "epic": [
+        {
+          "copies": 1,
+          "coins": 200
+        },
+        {
+          "copies": 2,
+          "coins": 600
+        },
+        {
+          "copies": 4,
+          "coins": 1600
+        },
+        {
+          "copies": 8,
+          "coins": 4000
+        },
+        {
+          "copies": 16,
+          "coins": 10000
+        }
+      ]
+    }
   },
   "xpPerLevel": [
     100,

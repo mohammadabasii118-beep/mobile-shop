@@ -116,9 +116,9 @@ svg.i.f { fill: currentColor; stroke: none; }
 .card { --fr1: #b07a45; --fr2: #6e4521; --glow: transparent; --art1: #54627a; --art2: #263043; position: relative; width: 100%; aspect-ratio: 3 / 4.15; border-radius: 14px; padding: 4px; background: linear-gradient(150deg, var(--fr1), var(--fr2) 55%, var(--fr1)); box-shadow: 0 0 0 1px rgba(0,0,0,.4), 0 6px 14px rgba(0,0,0,.35), 0 0 16px var(--glow); text-align: center; color: #fff; transition: transform .15s, box-shadow .3s; container-type: inline-size; display: block; }
 .card[data-tier="silver"] { --fr1: #dfe7f1; --fr2: #7d8da3; }
 .card[data-tier="gold"] { --fr1: #ffe08a; --fr2: #b27d12; --glow: rgba(255,200,70,.55); }
-.card[data-r="rare"] { --art1: #1e6f8f; --art2: #0c2d4d; }
-.card[data-r="epic"] { --art1: #8a3fe0; --art2: #2a0f55; }
-.card[data-r="epic"][data-tier="bronze"] { --glow: rgba(163,92,240,.35); }
+.card[data-r="common"] { --art1: #8a5a35; --art2: #2d1c10; }
+.card[data-r="rare"] { --art1: #7d8da3; --art2: #1f2a3a; }
+.card[data-r="epic"] { --art1: #c9a02e; --art2: #3d2d06; }
 .card .in { position: relative; height: 100%; border-radius: 10px; overflow: hidden; background: linear-gradient(180deg, var(--art1), var(--art2)); display: flex; flex-direction: column; }
 .card .emb { flex: 1; min-height: 0; display: grid; place-items: center; position: relative; overflow: hidden; }
 .card .emb svg.e { width: 78%; height: auto; max-height: 100%; }
@@ -154,9 +154,9 @@ button.card:not(:disabled):active { transform: scale(.96); }
 .dinfo p { margin: 4px 0; font-size: 14px; } .dinfo em { color: var(--green); font-style: normal; font-weight: 800; }
 .dinfo h3 { font-family: var(--f-display); font-weight: 400; font-size: 20px; }
 .ability { color: var(--gold); font-size: 13px; background: var(--panel2); border-radius: 10px; padding: 8px 10px; }
-.rt { font-size: 11px; margin-inline-start: 6px; } .rt.r-common { color: var(--muted); } .rt.r-rare { color: var(--turq); } .rt.r-epic { color: var(--amethyst); }
+.rt { font-size: 11px; margin-inline-start: 6px; } .rt.r-common { color: #d49a5f; } .rt.r-rare { color: #dfe7f1; } .rt.r-epic { color: var(--gold); }
 .rar { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-weight: 600; }
-.rar.common { background: rgba(108,122,143,.25); color: var(--muted); } .rar.rare { background: rgba(53,199,180,.2); color: var(--turq); } .rar.epic { background: rgba(163,92,240,.2); color: var(--amethyst); }
+.rar.common { background: rgba(199,138,80,.25); color: #e2a86d; } .rar.rare { background: rgba(205,216,230,.2); color: #dfe7f1; } .rar.epic { background: rgba(227,180,72,.22); color: var(--gold); }
 .row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 .slotpick { display: flex; flex-direction: column; gap: 6px; }
 .profile { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
