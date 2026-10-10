@@ -77,8 +77,14 @@ export type BattleEvent =
 
 export interface BattleState {
   units: Unit[];
-  order: string[];
-  cursor: number;
+  /** طرفی که اول شروع کرد */
+  firstSide: Side;
+  /** نوبت بعدی مال کدام طرف است (همیشه یکی‌درمیان) */
+  nextSide: Side;
+  /** آخرین جایگاهِ کارتی که هر طرف بازی کرده (-1 = هنوز هیچ) */
+  lastSlot: Record<Side, number>;
+  /** تعداد نوبت‌های انجام‌شده */
+  turns: number;
   round: number;
   current: { uid: string; attacksLeft: number } | null;
   over: boolean;

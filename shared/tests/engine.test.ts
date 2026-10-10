@@ -7,17 +7,45 @@ const u = (o: Partial<UnitInit> = {}): UnitInit => ({ cardId: 'x', name: 'x', hp
 const deck = (o: Partial<UnitInit> = {}) => [u(o), u(o), u(o)];
 
 describe('engine', () => {
-  it('turn order is A0 B0 A1 B1 A2 B2 and skips dead units', () => {
-    const s = createBattle({ A: deck(), B: deck() }, 'A');
-    expect(s.order).toEqual(['A0', 'B0', 'A1', 'B1', 'A2', 'B2']);
-    getUnit(s, 'B0')!.alive = false;
+  /** n نوبت پشت‌سرهم را بازی می‌کند (بدون حمله) و uid کارت‌ها را برمی‌گرداند */
+  const turnsOf = (s: ReturnType<typeof createBattle>, n: number) => {
     const seen: string[] = [];
-    for (let i = 0; i < 5; i++) {
-      startNextTurn(s);
-      seen.push(s.current!.uid);
-      s.current = null;
+    for (let i = 0; i < n; i++) { startNextTurn(s); seen.push(s.current!.uid); s.current = null; }
+    return seen;
+  };
+  const kill = (s: ReturnType<typeof createBattle>, ...uids: string[]) => uids.forEach((u) => { getUnit(s, u)!.alive = false; });
+
+  it('3v3: order is A0 B0 A1 B1 A2 B2, repeating', () => {
+    const s = createBattle({ A: deck(), B: deck() }, 'A');
+    expect(turnsOf(s, 8)).toEqual(['A0', 'B0', 'A1', 'B1', 'A2', 'B2', 'A0', 'B0']);
+  });
+
+  it('sides always alternate even when card counts differ (2 vs 3)', () => {
+    const s = createBattle({ A: deck(), B: deck() }, 'A');
+    kill(s, 'A2');
+    const seq = turnsOf(s, 10);
+    expect(seq.map((u) => u[0])).toEqual(['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B']);
+    expect(seq).toEqual(['A0', 'B0', 'A1', 'B1', 'A0', 'B2', 'A1', 'B0', 'A0', 'B1']);
+  });
+
+  it('3 cards vs 1 card: strictly one turn each, never the same side twice in a row', () => {
+    const s = createBattle({ A: deck(), B: deck() }, 'A');
+    kill(s, 'B0', 'B1');
+    const seq = turnsOf(s, 12);
+    expect(seq.map((u) => u[0])).toEqual(['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B']);
+    expect(seq.filter((u) => u === 'B2')).toHaveLength(6);
+    expect(seq.filter((u) => u[0] === 'A')).toEqual(['A0', 'A1', 'A2', 'A0', 'A1', 'A2']);
+  });
+
+  it('alternation holds when the second side starts and when cards die mid-battle', () => {
+    const s = createBattle({ A: deck(), B: deck() }, 'B');
+    const seq: string[] = [];
+    for (let i = 0; i < 14; i++) {
+      if (i === 3) kill(s, 'B0');
+      if (i === 6) kill(s, 'B1');
+      startNextTurn(s); seq.push(s.current!.uid); s.current = null;
     }
-    expect(seen).toEqual(['A0', 'A1', 'B1', 'A2', 'B2']);
+    expect(seq.map((u) => u[0])).toEqual(Array.from({ length: 14 }, (_, i) => (i % 2 === 0 ? 'B' : 'A')));
   });
 
   it('second side can start first', () => {

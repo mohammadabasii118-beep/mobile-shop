@@ -239,3 +239,5 @@ textarea.json { min-height: 380px; font-family: ui-monospace, Menlo, monospace; 
 .fee { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 5px; background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.22); border-radius: 12px; padding: 4px 10px; font-weight: 800; font-size: 15px; color: var(--gold); white-space: nowrap; }
 .fee.sm { font-size: 12px; padding: 2px 8px; margin: 0; }
 .stagend { display: inline-flex; align-items: center; gap: 10px; }
+
+.secs { font-family: var(--f-display); font-size: 34px; line-height: 1; color: var(--gold); }

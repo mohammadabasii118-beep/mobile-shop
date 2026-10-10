@@ -40,14 +40,12 @@ export function createBattle(
       }),
     );
   }
-  const second = other(firstSide);
-  const order: string[] = [];
-  const n = Math.max(decks.A.length, decks.B.length);
-  for (let i = 0; i < n; i++) order.push(`${firstSide}${i}`, `${second}${i}`);
   return {
     units,
-    order: order.filter((uid) => units.some((u) => u.uid === uid)),
-    cursor: 0,
+    firstSide,
+    nextSide: firstSide,
+    lastSlot: { A: -1, B: -1 },
+    turns: 0,
     round: 1,
     current: null,
     over: false,
@@ -77,33 +75,37 @@ function finish(s: BattleState, winner: Side, reason: 'kills' | 'round_cap', eve
   events.push({ type: 'end', winner, reason });
 }
 
-/** نوبت بعدی را شروع می‌کند. بعد از صدا زدنش state.current پر می‌شود (یا بازی تمام می‌شود). */
+/**
+ * نوبت بعدی را شروع می‌کند. همیشه یکی‌درمیان: یک نوبت این طرف، یک نوبت طرف مقابل، حتی اگر تعداد کارت‌های زنده‌شان فرق کند.
+ * هر طرف کارت‌های زنده‌اش را به ترتیب جایگاه می‌چرخد. بعد از صدا زدنش state.current پر می‌شود (یا بازی تمام می‌شود).
+ */
 export function startNextTurn(s: BattleState): BattleEvent[] {
   const events: BattleEvent[] = [];
   if (s.over) return events;
-  for (let tries = 0; tries < s.order.length; tries++) {
-    if (s.cursor >= s.order.length) {
-      s.cursor = 0;
-      s.round++;
-      if (s.round > s.maxRounds) {
-        const a = power(s, 'A');
-        const b = power(s, 'B');
-        // تساوی: نفر دوم برنده (جبران مزیت شروع)
-        const first = getUnit(s, s.order[0])!.side;
-        finish(s, a === b ? other(first) : a > b ? 'A' : 'B', 'round_cap', events);
-        return events;
-      }
-    }
-    const unit = getUnit(s, s.order[s.cursor++])!;
-    if (!unit.alive) continue;
-    events.push({ type: 'turn', uid: unit.uid, round: s.round });
-    const ctx = ctxFor(s, unit, events);
-    const ab = unit.ability && ABILITIES[unit.ability.id];
-    if (ctx && ab?.onTurnStart) ab.onTurnStart(ctx);
-    const attacks = ab?.attacksPerTurn?.(unit.ability!.params ?? {}) ?? 1;
-    s.current = { uid: unit.uid, attacksLeft: attacks };
+  // سقف مخفی دور: هر دور = یک نوبت از هر طرف. تساوی: نفر دوم برنده (جبران مزیت شروع)
+  if (s.turns >= s.maxRounds * 2) {
+    const a = power(s, 'A');
+    const b = power(s, 'B');
+    finish(s, a === b ? other(s.firstSide) : a > b ? 'A' : 'B', 'round_cap', events);
     return events;
   }
+  const side = s.nextSide;
+  const alive = aliveUnits(s, side).sort((x, y) => x.slot - y.slot);
+  if (alive.length === 0) {
+    finish(s, other(side), 'kills', events);
+    return events;
+  }
+  const unit = alive.find((u) => u.slot > s.lastSlot[side]) ?? alive[0];
+  s.lastSlot[side] = unit.slot;
+  s.round = Math.floor(s.turns / 2) + 1;
+  s.turns++;
+  s.nextSide = other(side);
+  events.push({ type: 'turn', uid: unit.uid, round: s.round });
+  const ctx = ctxFor(s, unit, events);
+  const ab = unit.ability && ABILITIES[unit.ability.id];
+  if (ctx && ab?.onTurnStart) ab.onTurnStart(ctx);
+  const attacks = ab?.attacksPerTurn?.(unit.ability!.params ?? {}) ?? 1;
+  s.current = { uid: unit.uid, attacksLeft: attacks };
   return events;
 }
 

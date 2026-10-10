@@ -45,7 +45,7 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
   async function play(ev: BattleEvent, list: UnitView[]) {
     switch (ev.type) {
       case 'turn':
-        setActive(ev.uid); setLog(`نوبت ${nameOf(ev.uid, list)}`); await sleep(350); break;
+        setActive(ev.uid); setLog(`نوبت ${list.find((u) => u.uid === ev.uid)?.side === me ? ctx.profile.name : start.opponent}`); await sleep(350); break;
       case 'attack':
         setAttacking(ev.from); await sleep(260); haptic();
         setAttacking(null); setHit(ev.to);
@@ -136,7 +136,7 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
           <div className="turnbox">
             <b>هدف را انتخاب کن{prompt.attacksLeft > 1 ? ` (${fa(prompt.attacksLeft)} حمله)` : ''}</b>
             <div className="timer"><i style={{ width: `${(left / prompt.ms) * 100}%` }} /></div>
-            <small>{fa(Math.ceil(left / 1000))} ثانیه — در غیر این‌صورت هدف رندوم می‌شود</small>
+            <span className="secs num" aria-live="off">{fa(Math.ceil(left / 1000))}</span>
           </div>
         ) : <div className="turnbox idle"><small>{prompt ? 'حریف در حال انتخاب هدف…' : '…'}</small></div>}
       </div>
