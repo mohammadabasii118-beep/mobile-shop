@@ -236,14 +236,14 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
         <h3>هزینه‌ی ارتقا</h3>
         {f('حداکثر لول کارت', d.upgrade.maxLevel, setMax)}
         <div className="tblwrap"><table>
-          <thead><tr><th>از لول</th><th>کارت تکراری</th><th>سکه</th></tr></thead>
+          <thead><tr><th>از لول</th><th>تعداد کارت</th><th>سکه</th></tr></thead>
           <tbody>{d.upgrade.levels.map((l, i) => (
             <tr key={i}><td>{fa(i + 1)} ← {fa(i + 2)}</td>
               <td><input className="cell" type="number" min={1} value={l.copies} onChange={(e) => upd((c) => { c.upgrade.levels[i].copies = n(e.target.value); })} /></td>
               <td><input className="cell" type="number" min={0} value={l.coins} onChange={(e) => upd((c) => { c.upgrade.levels[i].coins = n(e.target.value); })} /></td></tr>
           ))}</tbody>
         </table></div>
-        <small className="hint">رساندن یک کارت تا لول آخر: {fa(total.c)} کارت تکراری و {fa(total.k)} سکه</small>
+        <small className="hint">رساندن یک کارت تا لول آخر: {fa(total.c)} کارت (تعداد) و {fa(total.k)} سکه</small>
         <button className="btn" onClick={() => run(async () => refresh((await call('/api/admin/config', { config: d })) as GameConfig), 'ذخیره شد و اعمال شد')}>ذخیره و اعمال</button>
       </div>
     </div>

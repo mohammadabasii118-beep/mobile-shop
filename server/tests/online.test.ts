@@ -102,7 +102,7 @@ describe('online', () => {
     expect((await api(300, '/api/deck', { cards: ['soldier', 'x', 'guard'] })).error).toBeTruthy();
     expect((await api(300, '/api/box/start', { slot: 0 })).error).toBeTruthy();
     const r = await api(300, '/api/upgrade', { cardId: 'soldier' });
-    expect(r.error).toMatch(/تکراری/);
+    expect(r.error).toMatch(/تعداد کارت/);
   });
 });
 

@@ -213,7 +213,7 @@ function Boxes({ ctx }: { ctx: Ctx }) {
               {reward.cards.map((c: { id: string; isNew: boolean }) => {
                 const def = cfg.cards.find((x) => x.id === c.id)!;
                 return <CardTile key={c.id} small def={def} level={1} hp={def.hp} atk={def.atk} shield={def.shield}
-                  badge={<div className="newb">{c.isNew ? 'جدید!' : `تکراری (${RARITY_FA[def.rarity]})`}</div>} />;
+                  badge={<div className="newb">{c.isNew ? 'جدید!' : `+۱ تعداد کارت`}</div>} />;
               })}
             </div>
             <button className="btn" onClick={() => setReward(null)}>عالی</button>

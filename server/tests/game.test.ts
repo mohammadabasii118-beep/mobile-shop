@@ -60,7 +60,7 @@ describe('game economy', () => {
   });
 
   it('upgrade needs duplicates and coins', () => {
-    expect(() => game.upgradeCard(uid, 'soldier')).toThrow(/تکراری/);
+    expect(() => game.upgradeCard(uid, 'soldier')).toThrow(/تعداد کارت/);
     const db = (game as any).d.db;
     db.prepare('UPDATE user_cards SET copies = 5 WHERE card_id = ?').run('soldier');
     db.prepare('UPDATE users SET coins = 10').run();

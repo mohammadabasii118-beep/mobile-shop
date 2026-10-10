@@ -42,7 +42,7 @@ export function CardsScreen({ ctx }: { ctx: Ctx }) {
       <div className="grid">
         {collection.map(({ def }) => tile(def.id, () => setOpen(def.id), { selected: inDeck.has(def.id) }))}
       </div>
-      <p className="hint">کارت‌های ناموجود از جعبه‌ها به‌دست می‌آیند. برای ارتقا کارت تکراری و سکه لازم است.</p>
+      <p className="hint">کارت‌های ناموجود از جعبه‌ها به‌دست می‌آیند. برای ارتقا تعداد کارت و سکه لازم است.</p>
 
       {sel && <Detail flash={flash === sel.def.id} def={sel.def} level={sel.c.level} copies={sel.c.copies} cfg={ctx.cfg} coins={p.coins} deck={p.deck}
         onClose={() => setOpen(null)} onUpgrade={() => upgrade(sel.def.id)} onSlot={(s) => setDeckSlot(s, sel.def.id)} />}
@@ -74,7 +74,7 @@ function Detail({ flash, def, level, copies, cfg, coins, deck, onClose, onUpgrad
       {need ? (
         <>
           <Bar value={copies} max={need.copies} />
-          <small>کارت تکراری {fa(copies)}/{fa(need.copies)} — هزینه 🪙 {fa(need.coins)}</small>
+          <small>تعداد کارت {fa(copies)}/{fa(need.copies)} — هزینه 🪙 {fa(need.coins)}</small>
           <button className="btn" disabled={!can} onClick={onUpgrade}>ارتقا به لول {fa(level + 1)}</button>
         </>
       ) : <p>این کارت در بالاترین لول است 👑</p>}

@@ -99,7 +99,7 @@ export class Game {
     if (c.level >= cfg.upgrade.maxLevel) throw new GameError('کارت در بالاترین لول است');
     const need = cfg.upgrade.levels[c.level - 1];
     const coins = (db.prepare('SELECT coins FROM users WHERE id = ?').get(userId) as any).coins as number;
-    if (c.copies < need.copies) throw new GameError(`کارت تکراری کافی نیست (${c.copies}/${need.copies})`);
+    if (c.copies < need.copies) throw new GameError(`تعداد کارت کافی نیست (${c.copies}/${need.copies})`);
     if (coins < need.coins) throw new GameError(`سکه کافی نیست (${coins}/${need.coins})`);
     db.prepare('UPDATE user_cards SET level = level + 1, copies = copies - ? WHERE user_id = ? AND card_id = ?').run(need.copies, userId, cardId);
     db.prepare('UPDATE users SET coins = coins - ? WHERE id = ?').run(need.coins, userId);
