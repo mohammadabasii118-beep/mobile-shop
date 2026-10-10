@@ -73,7 +73,7 @@ export function createGameServer(opt: ServerOptions) {
     switch (m.t) {
       case 'queue': {
         if (c.battle || c.queued) return send(c, { t: 'error', message: 'الان درگیر مبارزه یا صف هستی' });
-        game.deckUnits(c.userId); // دک کامل؟
+        game.deckUnits(c.userId); // ترکیب کامل؟
         const fee = cfg.fees?.multi ?? 0;
         if (!game.canAfford(c.userId, fee)) return send(c, { t: 'error', message: `برای ورود به مولتی‌پلیر ${fee} سکه لازم است` });
         const opp = queue.find((q) => q.userId !== c.userId && q.ws.readyState === 1);
@@ -98,12 +98,13 @@ export function createGameServer(opt: ServerOptions) {
         if (c.battle || c.queued) return send(c, { t: 'error', message: 'الان درگیر مبارزه یا صف هستی' });
         const stage = Number(m.stage);
         const profile = game.profile(c.userId);
-        const def = cfg.solo.stages[stage];
-        if (!def || !Number.isInteger(stage) || stage < 0 || stage > profile.soloStage) {
+        const flat = cfg.solo.pits.flatMap((pit, pi) => pit.stages.map((st, li) => ({ st, label: `گودال ${(pi + 1).toLocaleString('fa-IR')} — لول ${(li + 1).toLocaleString('fa-IR')}` })));
+        const def = Number.isInteger(stage) ? flat[stage] : undefined;
+        if (!def || stage < 0 || stage > profile.soloStage) {
           return send(c, { t: 'error', message: 'این مرحله هنوز باز نشده' });
         }
-        const botUnits = def.deck.map(([id, lvl]) => resolveCard(cfg.cards.find((x) => x.id === id)!, lvl, cfg));
-        const bot: Participant = { side: 'B', name: def.name, userId: null, send: null, ai: def.ai, units: botUnits };
+        const botUnits = def.st.deck.map(([id, lvl]) => resolveCard(cfg.cards.find((x) => x.id === id)!, lvl, cfg));
+        const bot: Participant = { side: 'B', name: def.label, userId: null, send: null, ai: def.st.ai, units: botUnits };
         const me = human(c, 'A');
         const fee = cfg.fees?.solo ?? 0;
         if (!game.chargeEntry(c.userId, fee)) return send(c, { t: 'error', message: `برای هر مرحله‌ی سولو ${fee} سکه لازم است` });

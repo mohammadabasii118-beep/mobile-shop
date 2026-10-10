@@ -206,185 +206,1037 @@
     ]
   },
   "solo": {
-    "stages": [
+    "pits": [
       {
-        "name": "مرحله ۱ — تازه‌کار",
-        "ai": "random",
-        "deck": [
-          [
-            "soldier",
-            1
-          ],
-          [
-            "guard",
-            1
-          ],
-          [
-            "archer",
-            1
-          ]
+        "stages": [
+          {
+            "ai": "random",
+            "deck": [
+              [
+                "soldier",
+                1
+              ],
+              [
+                "archer",
+                1
+              ],
+              [
+                "scout",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "random",
+            "deck": [
+              [
+                "guard",
+                1
+              ],
+              [
+                "brute",
+                1
+              ],
+              [
+                "soldier",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "random",
+            "deck": [
+              [
+                "archer",
+                2
+              ],
+              [
+                "scout",
+                1
+              ],
+              [
+                "guard",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "random",
+            "deck": [
+              [
+                "brute",
+                2
+              ],
+              [
+                "soldier",
+                1
+              ],
+              [
+                "archer",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "random",
+            "deck": [
+              [
+                "scout",
+                2
+              ],
+              [
+                "guard",
+                1
+              ],
+              [
+                "brute",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "soldier",
+                2
+              ],
+              [
+                "archer",
+                1
+              ],
+              [
+                "scout",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "guard",
+                2
+              ],
+              [
+                "brute",
+                2
+              ],
+              [
+                "soldier",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "archer",
+                2
+              ],
+              [
+                "scout",
+                2
+              ],
+              [
+                "guard",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "brute",
+                2
+              ],
+              [
+                "soldier",
+                2
+              ],
+              [
+                "archer",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "scout",
+                2
+              ],
+              [
+                "guard",
+                2
+              ],
+              [
+                "brute",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "soldier",
+                2
+              ],
+              [
+                "archer",
+                2
+              ],
+              [
+                "scout",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "guard",
+                2
+              ],
+              [
+                "brute",
+                2
+              ],
+              [
+                "soldier",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "archer",
+                2
+              ],
+              [
+                "scout",
+                2
+              ],
+              [
+                "guard",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "brute",
+                2
+              ],
+              [
+                "soldier",
+                2
+              ],
+              [
+                "archer",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "scout",
+                3
+              ],
+              [
+                "guard",
+                2
+              ],
+              [
+                "paladin",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "soldier",
+                3
+              ],
+              [
+                "archer",
+                2
+              ],
+              [
+                "duelist",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "guard",
+                3
+              ],
+              [
+                "brute",
+                2
+              ],
+              [
+                "vampire",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "archer",
+                3
+              ],
+              [
+                "scout",
+                2
+              ],
+              [
+                "paladin",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "brute",
+                3
+              ],
+              [
+                "soldier",
+                3
+              ],
+              [
+                "duelist",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "scout",
+                3
+              ],
+              [
+                "guard",
+                3
+              ],
+              [
+                "vampire",
+                2
+              ]
+            ]
+          }
         ]
       },
       {
-        "name": "مرحله ۲ — نگهبان دروازه",
-        "ai": "random",
-        "deck": [
-          [
-            "guard",
-            1
-          ],
-          [
-            "brute",
-            1
-          ],
-          [
-            "scout",
-            1
-          ]
+        "stages": [
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "duelist",
+                3
+              ],
+              [
+                "guard",
+                3
+              ],
+              [
+                "brute",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "vampire",
+                3
+              ],
+              [
+                "archer",
+                3
+              ],
+              [
+                "scout",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "paladin",
+                3
+              ],
+              [
+                "brute",
+                3
+              ],
+              [
+                "soldier",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "duelist",
+                3
+              ],
+              [
+                "scout",
+                3
+              ],
+              [
+                "guard",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "vampire",
+                3
+              ],
+              [
+                "soldier",
+                3
+              ],
+              [
+                "archer",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "paladin",
+                3
+              ],
+              [
+                "guard",
+                3
+              ],
+              [
+                "brute",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "duelist",
+                4
+              ],
+              [
+                "archer",
+                3
+              ],
+              [
+                "scout",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "vampire",
+                4
+              ],
+              [
+                "brute",
+                3
+              ],
+              [
+                "soldier",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "paladin",
+                4
+              ],
+              [
+                "scout",
+                3
+              ],
+              [
+                "guard",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "duelist",
+                4
+              ],
+              [
+                "soldier",
+                3
+              ],
+              [
+                "archer",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "vampire",
+                4
+              ],
+              [
+                "paladin",
+                4
+              ],
+              [
+                "archer",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "paladin",
+                4
+              ],
+              [
+                "duelist",
+                4
+              ],
+              [
+                "brute",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "duelist",
+                4
+              ],
+              [
+                "vampire",
+                4
+              ],
+              [
+                "scout",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "vampire",
+                4
+              ],
+              [
+                "paladin",
+                4
+              ],
+              [
+                "soldier",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "paladin",
+                4
+              ],
+              [
+                "duelist",
+                4
+              ],
+              [
+                "guard",
+                4
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "duelist",
+                4
+              ],
+              [
+                "vampire",
+                4
+              ],
+              [
+                "archer",
+                4
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "vampire",
+                4
+              ],
+              [
+                "paladin",
+                4
+              ],
+              [
+                "brute",
+                4
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "paladin",
+                4
+              ],
+              [
+                "duelist",
+                4
+              ],
+              [
+                "scout",
+                4
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "duelist",
+                5
+              ],
+              [
+                "vampire",
+                4
+              ],
+              [
+                "soldier",
+                4
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "vampire",
+                5
+              ],
+              [
+                "paladin",
+                4
+              ],
+              [
+                "guard",
+                4
+              ]
+            ]
+          }
         ]
       },
       {
-        "name": "مرحله ۳ — شکارچی",
-        "ai": "smart",
-        "deck": [
-          [
-            "archer",
-            2
-          ],
-          [
-            "scout",
-            2
-          ],
-          [
-            "soldier",
-            2
-          ]
-        ]
-      },
-      {
-        "name": "مرحله ۴ — دوئل",
-        "ai": "smart",
-        "deck": [
-          [
-            "duelist",
-            1
-          ],
-          [
-            "guard",
-            2
-          ],
-          [
-            "brute",
-            2
-          ]
-        ]
-      },
-      {
-        "name": "مرحله ۵ — خون و شب",
-        "ai": "smart",
-        "deck": [
-          [
-            "vampire",
-            2
-          ],
-          [
-            "paladin",
-            1
-          ],
-          [
-            "archer",
-            3
-          ]
-        ]
-      },
-      {
-        "name": "مرحله ۶ — سنگر آهنین",
-        "ai": "smart",
-        "deck": [
-          [
-            "paladin",
-            3
-          ],
-          [
-            "guard",
-            4
-          ],
-          [
-            "duelist",
-            2
-          ]
-        ]
-      },
-      {
-        "name": "مرحله ۷ — خاکستر",
-        "ai": "smart",
-        "deck": [
-          [
-            "phoenix",
-            1
-          ],
-          [
-            "vampire",
-            3
-          ],
-          [
-            "brute",
-            4
-          ]
-        ]
-      },
-      {
-        "name": "مرحله ۸ — جنگ‌سالار",
-        "ai": "smart",
-        "deck": [
-          [
-            "warlord",
-            2
-          ],
-          [
-            "paladin",
-            4
-          ],
-          [
-            "duelist",
-            3
-          ]
-        ]
-      },
-      {
-        "name": "مرحله ۹ — درو",
-        "ai": "smart",
-        "deck": [
-          [
-            "reaper",
-            3
-          ],
-          [
-            "phoenix",
-            3
-          ],
-          [
-            "warlord",
-            3
-          ]
-        ]
-      },
-      {
-        "name": "مرحله ۱۰ — افسانه",
-        "ai": "smart",
-        "deck": [
-          [
-            "reaper",
-            5
-          ],
-          [
-            "phoenix",
-            5
-          ],
-          [
-            "warlord",
-            5
-          ]
+        "stages": [
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "phoenix",
+                5
+              ],
+              [
+                "duelist",
+                4
+              ],
+              [
+                "soldier",
+                4
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "warlord",
+                5
+              ],
+              [
+                "vampire",
+                4
+              ],
+              [
+                "guard",
+                4
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "reaper",
+                5
+              ],
+              [
+                "paladin",
+                5
+              ],
+              [
+                "archer",
+                4
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "phoenix",
+                5
+              ],
+              [
+                "duelist",
+                5
+              ],
+              [
+                "brute",
+                4
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "warlord",
+                5
+              ],
+              [
+                "vampire",
+                5
+              ],
+              [
+                "scout",
+                4
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "reaper",
+                5
+              ],
+              [
+                "paladin",
+                5
+              ],
+              [
+                "soldier",
+                4
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "phoenix",
+                5
+              ],
+              [
+                "duelist",
+                5
+              ],
+              [
+                "guard",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "warlord",
+                5
+              ],
+              [
+                "vampire",
+                5
+              ],
+              [
+                "archer",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "reaper",
+                5
+              ],
+              [
+                "paladin",
+                5
+              ],
+              [
+                "brute",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "phoenix",
+                5
+              ],
+              [
+                "duelist",
+                5
+              ],
+              [
+                "scout",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "warlord",
+                6
+              ],
+              [
+                "reaper",
+                5
+              ],
+              [
+                "vampire",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "reaper",
+                6
+              ],
+              [
+                "phoenix",
+                5
+              ],
+              [
+                "paladin",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "phoenix",
+                6
+              ],
+              [
+                "warlord",
+                5
+              ],
+              [
+                "duelist",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "warlord",
+                6
+              ],
+              [
+                "reaper",
+                5
+              ],
+              [
+                "vampire",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "reaper",
+                6
+              ],
+              [
+                "phoenix",
+                6
+              ],
+              [
+                "paladin",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "phoenix",
+                6
+              ],
+              [
+                "warlord",
+                6
+              ],
+              [
+                "duelist",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "warlord",
+                6
+              ],
+              [
+                "reaper",
+                6
+              ],
+              [
+                "vampire",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "reaper",
+                6
+              ],
+              [
+                "phoenix",
+                6
+              ],
+              [
+                "warlord",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "phoenix",
+                6
+              ],
+              [
+                "warlord",
+                6
+              ],
+              [
+                "reaper",
+                6
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "warlord",
+                6
+              ],
+              [
+                "reaper",
+                6
+              ],
+              [
+                "phoenix",
+                6
+              ]
+            ]
+          }
         ]
       }
     ]

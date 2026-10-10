@@ -113,3 +113,23 @@ describe('banner', () => {
     expect(((await (await fetch(base + '/api/config')).json()) as any).ui?.banner).toBeUndefined();
   });
 });
+
+describe('config override (survives code updates)', () => {
+  it('uses the saved admin config, fills new keys from the base, and migrates the old solo shape', async () => {
+    const { writeFileSync } = await import('node:fs');
+    const { loadConfigWithOverride } = await import('../src/config');
+    const base = loadConfig();
+    const file = join(dataDir, 'override.json');
+    // ساختار قدیمی: بدون pits و بدون fees، با یک کارت ویرایش‌شده
+    const old: any = JSON.parse(JSON.stringify(base));
+    delete old.fees; old.solo = { stages: [] }; old.cards[0].hp = 321;
+    writeFileSync(file, JSON.stringify(old));
+    const merged = loadConfigWithOverride(file);
+    expect(merged.cards[0].hp).toBe(321);       // ویرایش ادمین حفظ شد
+    expect(merged.fees).toEqual(base.fees);      // کلید جدید از پایه
+    expect(merged.solo.pits).toHaveLength(3);    // گودال‌ها از پایه
+    writeFileSync(file, '{ not json');
+    expect(loadConfigWithOverride(file).cards[0].hp).toBe(base.cards[0].hp); // فایل خراب → پایه
+    expect(loadConfigWithOverride(join(dataDir, 'nope.json')).cards[0].hp).toBe(base.cards[0].hp);
+  });
+});

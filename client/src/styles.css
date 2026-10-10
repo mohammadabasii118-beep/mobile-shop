@@ -241,3 +241,23 @@ textarea.json { min-height: 380px; font-family: ui-monospace, Menlo, monospace; 
 .stagend { display: inline-flex; align-items: center; gap: 10px; }
 
 .secs { font-family: var(--f-display); font-size: 34px; line-height: 1; color: var(--gold); }
+
+/* گودال‌ها و لول‌های سولو */
+.menu h2 .fee { margin-inline-start: auto; }
+.pits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.pit { padding: 12px 6px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); font-family: var(--f-display); font-size: 18px; color: var(--muted); }
+.pit[aria-selected="true"] { background: linear-gradient(var(--gold), var(--gold2)); color: #1b1303; border-color: var(--gold); box-shadow: 0 3px 0 rgba(0,0,0,.35); }
+.pit.locked { opacity: .45; }
+.levels { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.lvl { aspect-ratio: 1; border-radius: 16px; background: var(--panel); border: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
+.lvl small { font-size: 11px; }
+.lvl b { font-family: var(--f-display); font-weight: 400; font-size: 26px; line-height: 1; }
+.lvl span { font-size: 13px; }
+.lvl.done { border-color: rgba(79,214,138,.5); }
+.lvl.cur { border-color: var(--gold); background: linear-gradient(160deg, rgba(227,180,72,.25), var(--panel)); animation: glow 1.4s ease-in-out infinite alternate; }
+.lvl.locked { opacity: .4; }
+.lvl:active:not(:disabled) { transform: scale(.95); }
+
+.levels.adminlv { grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; }
+.levels.adminlv .lvl { aspect-ratio: 1; border-radius: 10px; }
+.levels.adminlv .lvl b { font-size: 18px; }

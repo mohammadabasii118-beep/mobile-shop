@@ -148,7 +148,9 @@ describe('engine', () => {
     expect(resolveCard(soldier, 3, c).hp).toBe(132);
     const ids = new Set(c.cards.map((x) => x.id));
     c.startingDeck.forEach((id) => expect(ids.has(id)).toBe(true));
-    c.solo.stages.forEach((st) => st.deck.forEach(([id]) => expect(ids.has(id)).toBe(true)));
+    c.solo.pits.forEach((pit) => pit.stages.forEach((st) => st.deck.forEach(([id]) => expect(ids.has(id)).toBe(true))));
+    expect(c.solo.pits).toHaveLength(3);
+    c.solo.pits.forEach((pit) => expect(pit.stages).toHaveLength(20));
     expect(c.upgrade.levels.length).toBe(c.upgrade.maxLevel - 1);
   });
 });

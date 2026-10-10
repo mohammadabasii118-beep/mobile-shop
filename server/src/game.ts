@@ -71,9 +71,9 @@ export class Game {
     return fee <= 0 || (this.d.db.prepare('SELECT coins FROM users WHERE id = ?').get(userId) as any).coins >= fee;
   }
 
-  // ---------- دک ----------
+  // ---------- ترکیب (۳ کارت) ----------
   setDeck(userId: number, ids: string[]) {
-    if (!Array.isArray(ids) || ids.length !== 3 || new Set(ids).size !== 3) throw new GameError('دک باید دقیقاً ۳ کارت متفاوت باشد');
+    if (!Array.isArray(ids) || ids.length !== 3 || new Set(ids).size !== 3) throw new GameError('ترکیب باید دقیقاً ۳ کارت متفاوت باشد');
     const { db } = this.d;
     for (const id of ids) {
       if (!db.prepare('SELECT 1 FROM user_cards WHERE user_id = ? AND card_id = ?').get(userId, id)) throw new GameError('این کارت را نداری');
@@ -87,7 +87,7 @@ export class Game {
     const rows = db.prepare(
       'SELECT d.card_id, c.level FROM deck d JOIN user_cards c ON c.user_id = d.user_id AND c.card_id = d.card_id WHERE d.user_id = ? ORDER BY d.slot',
     ).all(userId) as any[];
-    if (rows.length !== 3) throw new GameError('دک کامل نیست');
+    if (rows.length !== 3) throw new GameError('ترکیب کامل نیست');
     return rows.map((r) => resolveCard(cfg.cards.find((c) => c.id === r.card_id)!, r.level, cfg));
   }
 

@@ -6,7 +6,7 @@ import { call, loadConfig } from './net';
 import { initData } from './telegram';
 import { CardTile, RARITY_FA, fa } from './ui';
 
-type Tab = 'cards' | 'eco' | 'look' | 'players' | 'json';
+type Tab = 'cards' | 'eco' | 'solo' | 'look' | 'players' | 'json';
 interface Stats { users: number; battles: number; pendingBoxes: number; coins: number; banned: number }
 interface AdminUser { id: number; tg_id: number; name: string; level: number; coins: number; wins: number; losses: number; banned: number }
 
@@ -53,12 +53,13 @@ export function Admin({ ctx, onExit }: { ctx: Ctx; onExit: () => void }) {
         </div>
       )}
       <div className="tabs" role="tablist">
-        {([['cards', 'کارت‌ها و عکس‌ها'], ['eco', 'جعبه و اقتصاد'], ['look', 'ظاهر و بنر'], ['players', 'بازیکن‌ها'], ['json', 'پیشرفته']] as [Tab, string][]).map(([k, l]) => (
+        {([['cards', 'کارت‌ها و عکس‌ها'], ['eco', 'جعبه و اقتصاد'], ['solo', 'سولو (گودال‌ها)'], ['look', 'ظاهر و بنر'], ['players', 'بازیکن‌ها'], ['json', 'پیشرفته']] as [Tab, string][]).map(([k, l]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{l}</button>
         ))}
       </div>
       {tab === 'cards' && <CardsTab cfg={cfg} refresh={refresh} run={run} />}
       {tab === 'eco' && <EcoTab cfg={cfg} refresh={refresh} run={run} />}
+      {tab === 'solo' && <SoloTab cfg={cfg} refresh={refresh} run={run} />}
       {tab === 'look' && <LookTab cfg={cfg} refresh={refresh} run={run} />}
       {tab === 'players' && <PlayersTab cfg={cfg} run={run} />}
       {tab === 'json' && <JsonTab cfg={cfg} refresh={refresh} run={run} />}
@@ -249,6 +250,51 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
   );
 }
 
+/** ویرایش حریف هر لول سولو: سه کارت (با لول) و هوش ربات */
+function SoloTab({ cfg, refresh, run }: TabProps) {
+  const [d, setD] = useState<GameConfig>(() => JSON.parse(JSON.stringify(cfg)));
+  const [pit, setPit] = useState(0);
+  const [lvl, setLvl] = useState(0);
+  const stage = d.solo.pits[pit].stages[lvl];
+  const edit = (fn: (s: typeof stage) => void) => { const c = JSON.parse(JSON.stringify(d)) as GameConfig; fn(c.solo.pits[pit].stages[lvl]); setD(c); };
+  const copyPrev = () => { if (lvl === 0) return; const c = JSON.parse(JSON.stringify(d)) as GameConfig; c.solo.pits[pit].stages[lvl] = JSON.parse(JSON.stringify(c.solo.pits[pit].stages[lvl - 1])); setD(c); };
+  const power = stage.deck.reduce((t, [id, l]) => { const def = d.cards.find((x) => x.id === id); if (!def) return t; const r = resolveCard(def, l, d); return t + r.hp + r.shield + r.atk * 3; }, 0);
+  return (
+    <div className="box">
+      <div className="pits">
+        {d.solo.pits.map((_, i) => <button key={i} className="pit" aria-selected={pit === i} onClick={() => { setPit(i); setLvl(0); }}>گودال {fa(i + 1)}</button>)}
+      </div>
+      <div className="levels adminlv">
+        {d.solo.pits[pit].stages.map((_, i) => <button key={i} className={`lvl ${lvl === i ? 'cur' : ''}`} onClick={() => setLvl(i)}><b className="num">{fa(i + 1)}</b></button>)}
+      </div>
+      <h3>گودال {fa(pit + 1)} — لول {fa(lvl + 1)} <small>قدرت کل حریف ≈ {fa(power)}</small></h3>
+      <div className="fgrid">
+        {stage.deck.map(([id, l], i) => (
+          <div key={i} className="giftbox">
+            <label className="field">کارت {fa(i + 1)}
+              <select value={id} onChange={(e) => edit((s) => { s.deck[i][0] = e.target.value; })}>
+                {d.cards.map((c) => <option key={c.id} value={c.id}>{c.name} ({RARITY_FA[c.rarity]})</option>)}
+              </select>
+            </label>
+            <label className="field">لول کارت
+              <input type="number" min={1} max={d.upgrade.maxLevel} value={l} onChange={(e) => edit((s) => { s.deck[i][1] = Math.max(1, Math.min(d.upgrade.maxLevel, Number(e.target.value) || 1)); })} />
+            </label>
+          </div>
+        ))}
+      </div>
+      <label className="field" style={{ maxWidth: 260 }}>هوش ربات در انتخاب هدف
+        <select value={stage.ai} onChange={(e) => edit((s) => { s.ai = e.target.value as 'random' | 'smart'; })}>
+          <option value="random">ساده (هدف رندوم)</option><option value="smart">هوشمند (ضعیف‌ترین یا خطرناک‌ترین)</option>
+        </select>
+      </label>
+      <div className="btns">
+        <button className="btn" onClick={() => run(async () => refresh((await call('/api/admin/config', { config: d })) as GameConfig), 'ذخیره شد و همین الان اعمال شد')}>ذخیره و اعمال</button>
+        {lvl > 0 && <button className="btn ghost" onClick={copyPrev}>کپی از لول قبل</button>}
+      </div>
+    </div>
+  );
+}
+
 function LookTab({ cfg, refresh, run }: TabProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const banner = cfg.ui?.banner;
@@ -332,7 +378,7 @@ function JsonTab({ cfg, refresh, run }: TabProps) {
   const [text, setText] = useState(() => JSON.stringify(cfg, null, 2));
   return (
     <div className="box">
-      <div className="warn">ویرایش مستقیم کل تنظیمات بازی (مرحله‌های سولو، دک اولیه، جدول XP و …). قبل از ذخیره، همه‌چیز اعتبارسنجی می‌شود و در صورت خطا چیزی تغییر نمی‌کند.</div>
+      <div className="warn">ویرایش مستقیم کل تنظیمات بازی (مرحله‌های سولو، ترکیب اولیه، جدول XP و …). قبل از ذخیره، همه‌چیز اعتبارسنجی می‌شود و در صورت خطا چیزی تغییر نمی‌کند.</div>
       <textarea className="json" dir="ltr" spellCheck={false} value={text} onChange={(e) => setText(e.target.value)} />
       <div className="btns">
         <button className="btn" onClick={() => run(async () => {

@@ -36,7 +36,7 @@ export function CardsScreen({ ctx }: { ctx: Ctx }) {
 
   return (
     <>
-      <h2 className="title">دک من <small>(۳ کارت)</small></h2>
+      <h2 className="title">ترکیب من <small>(۳ کارت)</small></h2>
       <div className="deck">{p.deck.map((id) => tile(id, () => setOpen(id), { selected: true }))}</div>
       <h2 className="title">کلکسیون <small>({fa(p.cards.length)} کارت)</small></h2>
       <div className="grid">
@@ -79,7 +79,7 @@ function Detail({ flash, def, level, copies, cfg, coins, deck, onClose, onUpgrad
         </>
       ) : <p>این کارت در بالاترین لول است 👑</p>}
       <div className="slotpick">
-        <small>قرار دادن در دک:</small>
+        <small>قرار دادن در ترکیب:</small>
         <div className="row">
           {[0, 1, 2].map((i) => (
             <button key={i} className="btn ghost" disabled={deck[i] === def.id} onClick={() => onSlot(i)}>جایگاه {fa(i + 1)}</button>

@@ -25,8 +25,8 @@ export function validateConfig(cfg: GameConfig): GameConfig {
     if (c.ability && !ABILITIES[c.ability.id]) bad(`توانایی ناشناخته: ${c.ability.id}`);
     if (c.image !== undefined && (typeof c.image !== 'string' || !/^\/uploads\/cards\/[a-z0-9_]+\.(png|jpg|webp)(\?v=\d+)?$/.test(c.image))) bad(`آدرس عکس ${c.id} نامعتبر است`);
   }
-  if (!Array.isArray(cfg.startingDeck) || cfg.startingDeck.length !== 3 || new Set(cfg.startingDeck).size !== 3) bad('دک اولیه باید ۳ کارت متفاوت باشد');
-  for (const id of cfg.startingDeck) if (!ids.has(id)) bad(`دک اولیه: کارت ناشناخته ${id}`);
+  if (!Array.isArray(cfg.startingDeck) || cfg.startingDeck.length !== 3 || new Set(cfg.startingDeck).size !== 3) bad('ترکیب اولیه باید ۳ کارت متفاوت باشد');
+  for (const id of cfg.startingDeck) if (!ids.has(id)) bad(`ترکیب اولیه: کارت ناشناخته ${id}`);
   if (cfg.fees && (!Number.isInteger(cfg.fees.solo) || !Number.isInteger(cfg.fees.multi) || cfg.fees.solo < 0 || cfg.fees.multi < 0 || cfg.fees.solo > 100000 || cfg.fees.multi > 100000)) bad('هزینه‌ی ورود باید عدد صحیح بین ۰ و ۱۰۰٬۰۰۰ باشد');
   const ls = cfg.levelScale;
   if (!ls || !isNum(ls.hp) || !isNum(ls.atk) || !isNum(ls.shield)) bad('levelScale نامعتبر است');
@@ -42,12 +42,15 @@ export function validateConfig(cfg: GameConfig): GameConfig {
     if (cc[r] > 0 && !cfg.cards.some((c) => c.rarity === r)) bad(`برای نادری ${r} شانس گذاشته‌ای ولی کارتی از آن نیست`);
   }
   if (cfg.ui?.banner !== undefined && !/^\/uploads\/banner\.(png|jpg|webp)(\?v=\d+)?$/.test(cfg.ui.banner)) bad('آدرس بنر نامعتبر است');
-  if (!cfg.solo || !Array.isArray(cfg.solo.stages) || cfg.solo.stages.length < 1) bad('حداقل یک مرحله‌ی سولو لازم است');
-  for (const st of cfg.solo.stages) {
-    if (typeof st.name !== 'string' || !['random', 'smart'].includes(st.ai) || !Array.isArray(st.deck) || st.deck.length !== 3) bad('مرحله‌ی سولو نامعتبر است');
-    for (const [id, lvl] of st.deck) {
-      if (!ids.has(id)) bad(`مرحله‌ی سولو: کارت ناشناخته ${id}`);
-      if (!Number.isInteger(lvl) || lvl < 1 || lvl > up.maxLevel) bad(`مرحله‌ی سولو: لول نامعتبر برای ${id}`);
+  if (!cfg.solo || !Array.isArray(cfg.solo.pits) || cfg.solo.pits.length < 1) bad('حداقل یک گودال سولو لازم است');
+  for (const pit of cfg.solo.pits) {
+    if (!pit || !Array.isArray(pit.stages) || pit.stages.length < 1) bad('هر گودال حداقل یک لول لازم دارد');
+    for (const st of pit.stages) {
+      if (!['random', 'smart'].includes(st.ai) || !Array.isArray(st.deck) || st.deck.length !== 3) bad('لول سولو نامعتبر است');
+      for (const [id, lvl] of st.deck) {
+        if (!ids.has(id)) bad(`سولو: کارت ناشناخته ${id}`);
+        if (!Number.isInteger(lvl) || lvl < 1 || lvl > up.maxLevel) bad(`سولو: لول نامعتبر برای ${id}`);
+      }
     }
   }
   return cfg;
@@ -62,4 +65,22 @@ export function saveConfig(cfg: GameConfig, path = CONFIG_PATH) {
   const tmp = `${path}.tmp`;
   writeFileSync(tmp, JSON.stringify(cfg, null, 2) + '\n');
   renameSync(tmp, path);
+}
+
+/**
+ * کانفیگ نهایی = تنظیمات ویرایش‌شده از پنل مدیریت (در پوشه‌ی داده، با آپدیت پاک نمی‌شود) روی پایه‌ی کانفیگ داخل کد.
+ * اگر فایل ویرایش‌شده نبود یا بعد از تغییر ساختار نامعتبر شد، بخش‌های جدید از پایه گرفته می‌شود.
+ */
+export function loadConfigWithOverride(overridePath: string, basePath = CONFIG_PATH): GameConfig {
+  const base = loadConfig(basePath);
+  let raw: any;
+  try { raw = JSON.parse(readFileSync(overridePath, 'utf8')); } catch { return base; }
+  const merged: any = { ...raw };
+  for (const k of Object.keys(base) as (keyof GameConfig)[]) if (merged[k] === undefined) merged[k] = base[k];
+  // ساختار قدیمی سولو (stages) → گودال‌های جدید از پایه
+  if (!merged.solo?.pits) merged.solo = base.solo;
+  try { return validateConfig(merged as GameConfig); } catch (e) {
+    console.warn(`[config] تنظیمات ذخیره‌شده نامعتبر است (${(e as Error).message}) و کانفیگ پیش‌فرض استفاده شد.`);
+    return base;
+  }
 }

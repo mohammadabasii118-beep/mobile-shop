@@ -7,6 +7,12 @@ import { Bar, Modal, fa, fmtTime, CardTile, RARITY_FA, Icon } from './ui';
 export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAdmin: () => void }) {
   const { profile: p, cfg, sock } = ctx;
   const [view, setView] = useState<'menu' | 'solo'>('menu');
+  // گودال‌ها با اندیس اولین لولشان در ترتیب کلی (برای باز و قفل بودن)
+  const pits = cfg.solo.pits.reduce<{ stages: unknown[]; first: number }[]>((acc, pit) => {
+    const first = acc.length ? acc[acc.length - 1].first + acc[acc.length - 1].stages.length : 0;
+    return [...acc, { stages: pit.stages, first }];
+  }, []);
+  const [pitIdx, setPitIdx] = useState(() => Math.max(0, pits.findIndex((q) => q.first + q.stages.length > ctx.profile.soloStage)));
   const [showProfile, setShowProfile] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [page, setPage] = useState<'about' | 'news' | null>(null);
@@ -70,15 +76,25 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
         </section>
       ) : (
         <section className="menu">
-          <h2><button className="back" onClick={() => setView('menu')}>→</button> مرحله‌های سولو</h2>
-          <div className="stages">
-            {cfg.solo.stages.map((st, i) => {
-              const locked = i > p.soloStage, done = i < p.soloStage;
+          <h2><button className="back" onClick={() => setView('menu')}>→</button> سولو <FeePill n={cfg.fees?.solo} small /></h2>
+          <div className="pits" role="tablist" aria-label="گودال‌ها">
+            {pits.map((pit, pi) => (
+              <button key={pi} role="tab" aria-selected={pi === pitIdx} className={`pit ${pits[pi].first > p.soloStage ? 'locked' : ''}`}
+                disabled={pits[pi].first > p.soloStage} onClick={() => setPitIdx(pi)}>
+                {pits[pi].first > p.soloStage ? '🔒 ' : ''}گودال {fa(pi + 1)}
+              </button>
+            ))}
+          </div>
+          <div className="levels">
+            {pits[pitIdx].stages.map((_, li) => {
+              const g = pits[pitIdx].first + li;
+              const locked = g > p.soloStage, done = g < p.soloStage, cur = g === p.soloStage;
               return (
-                <button key={i} className={`stage ${locked ? 'locked' : ''} ${done ? 'done' : ''}`} disabled={locked}
-                  onClick={() => sock.send({ t: 'solo', stage: i })}>
-                  <b>{st.name}</b>
-                  <span className="stagend">{!locked && <FeePill n={cfg.fees?.solo} small />}{locked ? '🔒' : done ? '✅' : '▶'}</span>
+                <button key={li} className={`lvl ${locked ? 'locked' : ''} ${done ? 'done' : ''} ${cur ? 'cur' : ''}`} disabled={locked}
+                  onClick={() => sock.send({ t: 'solo', stage: g })} aria-label={`لول ${li + 1}`}>
+                  <small>لول</small>
+                  <b className="num">{fa(li + 1)}</b>
+                  <span>{locked ? '🔒' : done ? '✅' : '▶'}</span>
                 </button>
               );
             })}

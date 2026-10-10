@@ -53,6 +53,7 @@ describe('online', () => {
     c.send({ t: 'solo', stage: 0 });
     const start = await c.wait('battleStart');
     expect(start.units).toHaveLength(6);
+    expect(start.opponent).toBe('گودال ۱ — لول ۱');
     const end = await c.wait('battleEnd', 30000);
     expect(['A', 'B']).toContain(end.winner);
     expect(end.profile.wins + end.profile.losses).toBe(1);

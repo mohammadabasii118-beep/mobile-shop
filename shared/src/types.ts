@@ -16,10 +16,15 @@ export interface CardDef {
   image?: string;
 }
 
+/** یک لولِ سولو: دک ربات (کارت، لول) و هوش آن */
 export interface SoloStage {
-  name: string;
   ai: 'random' | 'smart';
   deck: [string, number][];
+}
+
+/** یک گودال: چند لول پشت‌سرهم */
+export interface SoloPit {
+  stages: SoloStage[];
 }
 
 export interface GameConfig {
@@ -40,7 +45,7 @@ export interface GameConfig {
     cardChance: Record<Rarity, number>;
     cardCountRange: [number, number];
   };
-  solo: { stages: SoloStage[] };
+  solo: { pits: SoloPit[] };
   /** ظاهر: بنر بالای صفحه‌ی اصلی (آدرس عکس آپلودشده از پنل مدیریت) */
   ui?: { banner?: string };
 }
