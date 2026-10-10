@@ -217,6 +217,11 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
           {f('معمولی', Math.round(cc.common * 100), (x) => upd((c) => { c.box.cardChance.common = x / 100; }))}
         </div>
         <small className="hint">شانس بدون کارت: {fa(Math.round((1 - cc.epic - cc.rare - cc.common) * 100))}٪</small>
+        <h3>هزینه‌ی ورود به نبرد (سکه)</h3>
+        <div className="fgrid">
+          {f('هر مرحله‌ی سولو', d.fees?.solo ?? 0, (x) => upd((c) => { c.fees = { solo: x, multi: c.fees?.multi ?? 0 }; }))}
+          {f('ورود به مولتی‌پلیر', d.fees?.multi ?? 0, (x) => upd((c) => { c.fees = { solo: c.fees?.solo ?? 0, multi: x }; }))}
+        </div>
         <h3>نبرد</h3>
         <div className="fgrid">
           {f('مهلت انتخاب هدف (ثانیه)', d.turnSeconds, (x) => upd((c) => { c.turnSeconds = x; }))}

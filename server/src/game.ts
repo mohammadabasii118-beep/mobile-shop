@@ -58,6 +58,19 @@ export class Game {
     return t[Math.min(level - 1, t.length - 1)];
   }
 
+  // ---------- هزینه‌ی ورود ----------
+  /** سکه را کم می‌کند؛ اگر کافی نبود چیزی کم نمی‌شود و false برمی‌گردد */
+  chargeEntry(userId: number, fee: number): boolean {
+    if (fee <= 0) return true;
+    return Number(this.d.db.prepare('UPDATE users SET coins = coins - ? WHERE id = ? AND coins >= ?').run(fee, userId, fee).changes) === 1;
+  }
+  refund(userId: number, fee: number) {
+    if (fee > 0) this.d.db.prepare('UPDATE users SET coins = coins + ? WHERE id = ?').run(fee, userId);
+  }
+  canAfford(userId: number, fee: number): boolean {
+    return fee <= 0 || (this.d.db.prepare('SELECT coins FROM users WHERE id = ?').get(userId) as any).coins >= fee;
+  }
+
   // ---------- دک ----------
   setDeck(userId: number, ids: string[]) {
     if (!Array.isArray(ids) || ids.length !== 3 || new Set(ids).size !== 3) throw new GameError('دک باید دقیقاً ۳ کارت متفاوت باشد');

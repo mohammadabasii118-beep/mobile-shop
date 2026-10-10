@@ -235,3 +235,7 @@ textarea.json { min-height: 380px; font-family: ui-monospace, Menlo, monospace; 
 .bannerimg { display: block; width: 100%; max-height: 150px; object-fit: contain; margin: 0 auto; }
 .bannerprev { background: var(--panel2); border: 1px dashed var(--line); border-radius: 14px; padding: 12px; display: grid; place-items: center; min-height: 100px; }
 .bannerprev img { max-width: 100%; max-height: 180px; object-fit: contain; }
+
+.fee { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 5px; background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.22); border-radius: 12px; padding: 4px 10px; font-weight: 800; font-size: 15px; color: var(--gold); white-space: nowrap; }
+.fee.sm { font-size: 12px; padding: 2px 8px; margin: 0; }
+.stagend { display: inline-flex; align-items: center; gap: 10px; }

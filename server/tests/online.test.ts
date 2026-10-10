@@ -104,3 +104,36 @@ describe('online', () => {
     expect(r.error).toMatch(/تکراری/);
   });
 });
+
+describe('entry fees', () => {
+  it('solo costs the configured fee per stage and is refused when coins are short; multiplayer charges both players on match', async () => {
+    const cfg = loadConfig();
+    const s2 = createGameServer({ db: openDb(), cfg: { ...cfg, fees: { solo: 150, multi: 60 } }, auth: { devAuth: true }, pauseMs: 5, botDelayMs: 2, turnMs: 400 });
+    await new Promise<void>((r) => s2.http.listen(0, r));
+    const saved = base;
+    base = `127.0.0.1:${(s2.http.address() as AddressInfo).port}`;
+    try {
+      const a = new Client(500);
+      await a.open();
+      a.send({ t: 'solo', stage: 0 });
+      expect((await a.wait('error')).message).toMatch(/150/); // موجودی ۱۰۰ کافی نیست
+      a.send({ t: 'queue' }); await a.wait('queued');
+      const b = new Client(501);
+      await b.open();
+      b.send({ t: 'queue' });
+      expect((await a.wait('profile')).profile.coins).toBe(40);
+      expect((await b.wait('profile')).profile.coins).toBe(40);
+      await a.wait('battleStart'); await b.wait('battleStart');
+      a.ws.close(); b.ws.close();
+    } finally { s2.close(); base = saved; }
+  }, 20000);
+
+  it('default config: solo stage costs 10 coins up front', async () => {
+    const c = new Client(510);
+    await c.open();
+    c.send({ t: 'solo', stage: 0 });
+    expect((await c.wait('profile')).profile.coins).toBe(90);
+    await c.wait('battleStart');
+    c.ws.close();
+  });
+});

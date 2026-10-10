@@ -26,6 +26,8 @@ export interface GameConfig {
   turnSeconds: number;
   maxRounds: number;
   startingDeck: string[];
+  /** هزینه‌ی ورود به نبرد (سکه) */
+  fees?: { solo: number; multi: number };
   levelScale: { hp: number; atk: number; shield: number };
   cards: CardDef[];
   upgrade: { maxLevel: number; levels: { copies: number; coins: number }[] };

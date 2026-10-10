@@ -28,6 +28,7 @@ export type ServerMsg =
   | { t: 'ready'; profile: Profile }
   | { t: 'error'; message: string }
   | { t: 'queued' }
+  | { t: 'profile'; profile: Profile }
   | { t: 'battleStart'; battleId: string; you: Side; units: UnitView[]; mode: 'solo' | 'pvp'; opponent: string; first: Side }
   | { t: 'prompt'; battleId: string; actor: string; attacksLeft: number; remainingMs: number; mine: boolean }
   | { t: 'events'; battleId: string; events: BattleEvent[]; snap: Snap[] }

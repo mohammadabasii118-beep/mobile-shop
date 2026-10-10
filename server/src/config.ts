@@ -27,6 +27,7 @@ export function validateConfig(cfg: GameConfig): GameConfig {
   }
   if (!Array.isArray(cfg.startingDeck) || cfg.startingDeck.length !== 3 || new Set(cfg.startingDeck).size !== 3) bad('دک اولیه باید ۳ کارت متفاوت باشد');
   for (const id of cfg.startingDeck) if (!ids.has(id)) bad(`دک اولیه: کارت ناشناخته ${id}`);
+  if (cfg.fees && (!Number.isInteger(cfg.fees.solo) || !Number.isInteger(cfg.fees.multi) || cfg.fees.solo < 0 || cfg.fees.multi < 0 || cfg.fees.solo > 100000 || cfg.fees.multi > 100000)) bad('هزینه‌ی ورود باید عدد صحیح بین ۰ و ۱۰۰٬۰۰۰ باشد');
   const ls = cfg.levelScale;
   if (!ls || !isNum(ls.hp) || !isNum(ls.atk) || !isNum(ls.shield)) bad('levelScale نامعتبر است');
   const up = cfg.upgrade;

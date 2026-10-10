@@ -62,10 +62,10 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
             {cfg.ui?.banner ? <img className="bannerimg" src={cfg.ui.banner} alt="میراث" /> : <><div className="brand">میراث</div><p>سه کارت، یک میراث</p></>}
           </div>
           <button className="mode solo" onClick={() => setView('solo')}>
-            <span className="ico"><svg className="i" viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9 16h6"/></svg></span><div><b>سولو</b></div>
+            <span className="ico"><svg className="i" viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9 16h6"/></svg></span><div><b>سولو</b></div><FeePill n={cfg.fees?.solo} />
           </button>
           <button className="mode multi" disabled={queued} onClick={() => sock.send({ t: 'queue' })}>
-            <span className="ico"><svg className="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg></span><div><b>مولتی‌پلیر</b></div>
+            <span className="ico"><svg className="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg></span><div><b>مولتی‌پلیر</b></div><FeePill n={cfg.fees?.multi} />
           </button>
         </section>
       ) : (
@@ -78,7 +78,7 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
                 <button key={i} className={`stage ${locked ? 'locked' : ''} ${done ? 'done' : ''}`} disabled={locked}
                   onClick={() => sock.send({ t: 'solo', stage: i })}>
                   <b>{st.name}</b>
-                  <span>{locked ? '🔒' : done ? '✅' : '▶'}</span>
+                  <span className="stagend">{!locked && <FeePill n={cfg.fees?.solo} small />}{locked ? '🔒' : done ? '✅' : '▶'}</span>
                 </button>
               );
             })}
@@ -111,6 +111,12 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
       )}
     </>
   );
+}
+
+/** هزینه‌ی ورود (سکه) */
+function FeePill({ n, small }: { n?: number; small?: boolean }) {
+  if (!n) return null;
+  return <span className={`fee ${small ? 'sm' : ''}`}><Icon n="coin" /> {fa(n)}</span>;
 }
 
 function Avatar({ url, name, big }: { url: string | null; name: string; big?: boolean }) {

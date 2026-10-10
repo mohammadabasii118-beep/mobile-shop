@@ -74,9 +74,21 @@ export function createGameServer(opt: ServerOptions) {
       case 'queue': {
         if (c.battle || c.queued) return send(c, { t: 'error', message: 'الان درگیر مبارزه یا صف هستی' });
         game.deckUnits(c.userId); // دک کامل؟
+        const fee = cfg.fees?.multi ?? 0;
+        if (!game.canAfford(c.userId, fee)) return send(c, { t: 'error', message: `برای ورود به مولتی‌پلیر ${fee} سکه لازم است` });
         const opp = queue.find((q) => q.userId !== c.userId && q.ws.readyState === 1);
         if (!opp) { c.queued = true; queue.push(c); return send(c, { t: 'queued' }); }
         queue = queue.filter((q) => q !== opp);
+        // ورودی از هر دو نفر هنگام شروع نبرد کم می‌شود
+        if (!game.chargeEntry(opp.userId, fee)) {
+          opp.queued = false; send(opp, { t: 'error', message: `برای ورود به مولتی‌پلیر ${fee} سکه لازم است` });
+          c.queued = true; queue.push(c); return send(c, { t: 'queued' });
+        }
+        if (!game.chargeEntry(c.userId, fee)) {
+          game.refund(opp.userId, fee); queue.unshift(opp);
+          return send(c, { t: 'error', message: `برای ورود به مولتی‌پلیر ${fee} سکه لازم است` });
+        }
+        send(opp, { t: 'profile', profile: game.profile(opp.userId) }); send(c, { t: 'profile', profile: game.profile(c.userId) });
         startBattle('pvp', human(opp, 'A'), human(c, 'B'), [opp, c]);
         return;
       }
@@ -92,7 +104,11 @@ export function createGameServer(opt: ServerOptions) {
         }
         const botUnits = def.deck.map(([id, lvl]) => resolveCard(cfg.cards.find((x) => x.id === id)!, lvl, cfg));
         const bot: Participant = { side: 'B', name: def.name, userId: null, send: null, ai: def.ai, units: botUnits };
-        startBattle('solo', human(c, 'A'), bot, [c], stage);
+        const me = human(c, 'A');
+        const fee = cfg.fees?.solo ?? 0;
+        if (!game.chargeEntry(c.userId, fee)) return send(c, { t: 'error', message: `برای هر مرحله‌ی سولو ${fee} سکه لازم است` });
+        send(c, { t: 'profile', profile: game.profile(c.userId) });
+        startBattle('solo', me, bot, [c], stage);
         return;
       }
       case 'target':
