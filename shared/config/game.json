@@ -10,11 +10,6 @@
     "solo": 10,
     "multi": 50
   },
-  "levelScale": {
-    "hp": 0.1,
-    "atk": 0.1,
-    "shield": 0.1
-  },
   "cards": [
     {
       "id": "soldier",
@@ -22,7 +17,34 @@
       "rarity": "common",
       "hp": 110,
       "atk": 18,
-      "shield": 10
+      "shield": 10,
+      "levels": [
+        {
+          "hp": 121,
+          "atk": 20,
+          "shield": 11
+        },
+        {
+          "hp": 132,
+          "atk": 22,
+          "shield": 12
+        },
+        {
+          "hp": 143,
+          "atk": 23,
+          "shield": 13
+        },
+        {
+          "hp": 154,
+          "atk": 25,
+          "shield": 14
+        },
+        {
+          "hp": 165,
+          "atk": 27,
+          "shield": 15
+        }
+      ]
     },
     {
       "id": "guard",
@@ -30,7 +52,34 @@
       "rarity": "common",
       "hp": 130,
       "atk": 14,
-      "shield": 20
+      "shield": 20,
+      "levels": [
+        {
+          "hp": 143,
+          "atk": 15,
+          "shield": 22
+        },
+        {
+          "hp": 156,
+          "atk": 17,
+          "shield": 24
+        },
+        {
+          "hp": 169,
+          "atk": 18,
+          "shield": 26
+        },
+        {
+          "hp": 182,
+          "atk": 20,
+          "shield": 28
+        },
+        {
+          "hp": 195,
+          "atk": 21,
+          "shield": 30
+        }
+      ]
     },
     {
       "id": "archer",
@@ -38,7 +87,34 @@
       "rarity": "common",
       "hp": 90,
       "atk": 24,
-      "shield": 0
+      "shield": 0,
+      "levels": [
+        {
+          "hp": 99,
+          "atk": 26,
+          "shield": 0
+        },
+        {
+          "hp": 108,
+          "atk": 29,
+          "shield": 0
+        },
+        {
+          "hp": 117,
+          "atk": 31,
+          "shield": 0
+        },
+        {
+          "hp": 126,
+          "atk": 34,
+          "shield": 0
+        },
+        {
+          "hp": 135,
+          "atk": 36,
+          "shield": 0
+        }
+      ]
     },
     {
       "id": "brute",
@@ -46,7 +122,34 @@
       "rarity": "common",
       "hp": 140,
       "atk": 20,
-      "shield": 0
+      "shield": 0,
+      "levels": [
+        {
+          "hp": 154,
+          "atk": 22,
+          "shield": 0
+        },
+        {
+          "hp": 168,
+          "atk": 24,
+          "shield": 0
+        },
+        {
+          "hp": 182,
+          "atk": 26,
+          "shield": 0
+        },
+        {
+          "hp": 196,
+          "atk": 28,
+          "shield": 0
+        },
+        {
+          "hp": 210,
+          "atk": 30,
+          "shield": 0
+        }
+      ]
     },
     {
       "id": "scout",
@@ -54,7 +157,34 @@
       "rarity": "common",
       "hp": 100,
       "atk": 16,
-      "shield": 15
+      "shield": 15,
+      "levels": [
+        {
+          "hp": 110,
+          "atk": 18,
+          "shield": 16
+        },
+        {
+          "hp": 120,
+          "atk": 19,
+          "shield": 18
+        },
+        {
+          "hp": 130,
+          "atk": 21,
+          "shield": 20
+        },
+        {
+          "hp": 140,
+          "atk": 22,
+          "shield": 21
+        },
+        {
+          "hp": 150,
+          "atk": 24,
+          "shield": 22
+        }
+      ]
     },
     {
       "id": "duelist",
@@ -63,6 +193,33 @@
       "hp": 100,
       "atk": 16,
       "shield": 10,
+      "levels": [
+        {
+          "hp": 110,
+          "atk": 18,
+          "shield": 11
+        },
+        {
+          "hp": 120,
+          "atk": 19,
+          "shield": 12
+        },
+        {
+          "hp": 130,
+          "atk": 21,
+          "shield": 13
+        },
+        {
+          "hp": 140,
+          "atk": 22,
+          "shield": 14
+        },
+        {
+          "hp": 150,
+          "atk": 24,
+          "shield": 15
+        }
+      ],
       "ability": {
         "id": "double_strike",
         "params": {
@@ -78,6 +235,33 @@
       "hp": 105,
       "atk": 20,
       "shield": 0,
+      "levels": [
+        {
+          "hp": 116,
+          "atk": 22,
+          "shield": 0
+        },
+        {
+          "hp": 126,
+          "atk": 24,
+          "shield": 0
+        },
+        {
+          "hp": 136,
+          "atk": 26,
+          "shield": 0
+        },
+        {
+          "hp": 147,
+          "atk": 28,
+          "shield": 0
+        },
+        {
+          "hp": 158,
+          "atk": 30,
+          "shield": 0
+        }
+      ],
       "ability": {
         "id": "lifesteal",
         "params": {
@@ -93,6 +277,33 @@
       "hp": 120,
       "atk": 17,
       "shield": 15,
+      "levels": [
+        {
+          "hp": 132,
+          "atk": 19,
+          "shield": 16
+        },
+        {
+          "hp": 144,
+          "atk": 20,
+          "shield": 18
+        },
+        {
+          "hp": 156,
+          "atk": 22,
+          "shield": 20
+        },
+        {
+          "hp": 168,
+          "atk": 24,
+          "shield": 21
+        },
+        {
+          "hp": 180,
+          "atk": 26,
+          "shield": 22
+        }
+      ],
       "ability": {
         "id": "armor_up",
         "params": {
@@ -108,6 +319,33 @@
       "hp": 130,
       "atk": 26,
       "shield": 15,
+      "levels": [
+        {
+          "hp": 143,
+          "atk": 29,
+          "shield": 16
+        },
+        {
+          "hp": 156,
+          "atk": 31,
+          "shield": 18
+        },
+        {
+          "hp": 169,
+          "atk": 34,
+          "shield": 20
+        },
+        {
+          "hp": 182,
+          "atk": 36,
+          "shield": 21
+        },
+        {
+          "hp": 195,
+          "atk": 39,
+          "shield": 22
+        }
+      ],
       "ability": {
         "id": "revive",
         "params": {
@@ -123,6 +361,33 @@
       "hp": 140,
       "atk": 22,
       "shield": 20,
+      "levels": [
+        {
+          "hp": 154,
+          "atk": 24,
+          "shield": 22
+        },
+        {
+          "hp": 168,
+          "atk": 26,
+          "shield": 24
+        },
+        {
+          "hp": 182,
+          "atk": 29,
+          "shield": 26
+        },
+        {
+          "hp": 196,
+          "atk": 31,
+          "shield": 28
+        },
+        {
+          "hp": 210,
+          "atk": 33,
+          "shield": 30
+        }
+      ],
       "ability": {
         "id": "double_strike",
         "params": {
@@ -138,6 +403,33 @@
       "hp": 120,
       "atk": 30,
       "shield": 10,
+      "levels": [
+        {
+          "hp": 132,
+          "atk": 33,
+          "shield": 11
+        },
+        {
+          "hp": 144,
+          "atk": 36,
+          "shield": 12
+        },
+        {
+          "hp": 156,
+          "atk": 39,
+          "shield": 13
+        },
+        {
+          "hp": 168,
+          "atk": 42,
+          "shield": 14
+        },
+        {
+          "hp": 180,
+          "atk": 45,
+          "shield": 15
+        }
+      ],
       "ability": {
         "id": "lifesteal",
         "params": {
@@ -186,24 +478,83 @@
   ],
   "box": {
     "slots": 4,
-    "durationSeconds": 10800,
-    "coins": [
-      40,
-      90
-    ],
-    "xp": [
-      30,
-      60
-    ],
-    "cardChance": {
-      "epic": 0.03,
-      "rare": 0.17,
-      "common": 0.5
+    "types": {
+      "bronze": {
+        "name": "برنزی",
+        "durationSeconds": 10800,
+        "coins": [
+          40,
+          90
+        ],
+        "xp": [
+          30,
+          60
+        ],
+        "cardCountRange": [
+          1,
+          1
+        ],
+        "cardChance": {
+          "epic": 0.01,
+          "rare": 0.14,
+          "common": 0.55
+        }
+      },
+      "silver": {
+        "name": "نقره‌ای",
+        "durationSeconds": 28800,
+        "coins": [
+          120,
+          260
+        ],
+        "xp": [
+          80,
+          160
+        ],
+        "cardCountRange": [
+          1,
+          2
+        ],
+        "cardChance": {
+          "epic": 0.05,
+          "rare": 0.3,
+          "common": 0.55
+        }
+      },
+      "gold": {
+        "name": "طلایی",
+        "durationSeconds": 43200,
+        "coins": [
+          400,
+          800
+        ],
+        "xp": [
+          200,
+          400
+        ],
+        "cardCountRange": [
+          2,
+          3
+        ],
+        "cardChance": {
+          "epic": 0.15,
+          "rare": 0.4,
+          "common": 0.45
+        }
+      }
     },
-    "cardCountRange": [
-      1,
-      1
-    ]
+    "drops": {
+      "soloByPit": [
+        "bronze",
+        "silver",
+        "gold"
+      ],
+      "multiChance": {
+        "bronze": 70,
+        "silver": 25,
+        "gold": 5
+      }
+    }
   },
   "solo": {
     "pits": [

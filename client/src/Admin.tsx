@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ABILITY_META, type CardDef, type GameConfig, type Profile, type Rarity } from '@game/shared';
+import { ABILITY_META, BOX_TYPES, type BoxType, type CardDef, type GameConfig, type Profile, type Rarity } from '@game/shared';
 import { resolveCard } from '@game/shared';
 import type { Ctx } from './App';
 import { call, loadConfig } from './net';
@@ -87,6 +87,14 @@ function CardsTab({ cfg, refresh, run }: TabProps) {
   const set = (p: Partial<CardDef>) => setDraft({ ...draft, ...p });
   const num = (v: string) => (v === '' ? 0 : Number(v));
   const meta = draft.ability ? ABILITY_META[draft.ability.id] : null;
+  /** ردیف آمار لول (i+2): از جدول؛ اگر نبود از لول قبل (یا پایه) */
+  const lvRow = (i: number): { hp: number; atk: number; shield: number } =>
+    draft.levels?.[i] ?? (i === 0 ? { hp: draft.hp, atk: draft.atk, shield: draft.shield } : lvRow(i - 1));
+  const setLv = (i: number, k: 'hp' | 'atk' | 'shield', v: number) => {
+    const rows = Array.from({ length: cfg.upgrade.maxLevel - 1 }, (_, j) => ({ ...lvRow(j) }));
+    rows[i] = { ...rows[i], [k]: v };
+    set({ levels: rows });
+  };
 
   const save = () => run(async () => {
     const next = await call('/api/admin/card', { card: draft }); refresh(next); setIsNew(false); setSel(draft.id);
@@ -163,6 +171,22 @@ function CardsTab({ cfg, refresh, run }: TabProps) {
           ))}
         </div>
         {draft.ability && <label className="field">توضیح توانایی (به بازیکن نشان داده می‌شود)<input value={draft.desc ?? ''} onChange={(e) => set({ desc: e.target.value })} /></label>}
+        <h3>آمار هر لول <small>لول ۱ همان جان/حمله/شیلد بالاست. برای لول‌های بالاتر آمار دقیق را خودت بنویس.</small></h3>
+        <div className="tblwrap"><table>
+          <thead><tr><th>لول</th><th>جان</th><th>حمله</th><th>شیلد</th></tr></thead>
+          <tbody>
+            {Array.from({ length: cfg.upgrade.maxLevel - 1 }, (_, i) => {
+              const row = lvRow(i);
+              return (
+                <tr key={i}><td>{fa(i + 2)}</td>
+                  {(['hp', 'atk', 'shield'] as const).map((k) => (
+                    <td key={k}><input className="cell" type="number" min={k === 'hp' ? 1 : 0} value={row[k]} onChange={(e) => setLv(i, k, num(e.target.value))} /></td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table></div>
         <h3>مسیر قدرت‌گیری <small>هر لول طبق جدول ضریب، آمار بیشتر و قاب جدید</small></h3>
         <div className="evo">
           {Array.from({ length: cfg.upgrade.maxLevel }, (_, i) => {
@@ -192,7 +216,9 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
     <label className="field">{label}<input type="number" step={step} value={v} onChange={(e) => on(n(e.target.value))} /></label>
   );
   const total = d.upgrade.levels.reduce((s, l) => ({ c: s.c + l.copies, k: s.k + l.coins }), { c: 0, k: 0 });
-  const cc = d.box.cardChance;
+  const [bt, setBt] = useState<BoxType>('bronze');
+  const box = d.box.types[bt];
+  const cc = box.cardChance;
   const upd = (fn: (c: GameConfig) => void) => { const c = JSON.parse(JSON.stringify(d)) as GameConfig; fn(c); setD(c); };
   const setMax = (m: number) => upd((c) => {
     c.upgrade.maxLevel = m;
@@ -202,22 +228,46 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
   return (
     <div className="cols">
       <div className="box">
-        <h3>جعبه</h3>
-        <div className="fgrid">
-          {f('زمان باز شدن (ساعت)', d.box.durationSeconds / 3600, (x) => upd((c) => { c.box.durationSeconds = Math.round(x * 3600); }), 0.25)}
-          {f('تعداد اسلات', d.box.slots, (x) => upd((c) => { c.box.slots = x; }))}
-          {f('سکه — حداقل', d.box.coins[0], (x) => upd((c) => { c.box.coins[0] = x; }))}
-          {f('سکه — حداکثر', d.box.coins[1], (x) => upd((c) => { c.box.coins[1] = x; }))}
-          {f('XP — حداقل', d.box.xp[0], (x) => upd((c) => { c.box.xp[0] = x; }))}
-          {f('XP — حداکثر', d.box.xp[1], (x) => upd((c) => { c.box.xp[1] = x; }))}
+        <h3>جعبه‌ها</h3>
+        <div className="pits" role="tablist" aria-label="نوع جعبه">
+          {BOX_TYPES.map((t) => (
+            <button key={t} role="tab" aria-selected={bt === t} className={`pit boxtab ${t}`} onClick={() => setBt(t)}>{d.box.types[t].name}</button>
+          ))}
         </div>
-        <h3>شانس کارت (٪)</h3>
+        <small className="hint" style={{ textAlign: 'start' }}>نوع جعبه را انتخاب کن؛ محتوا و شانس کارتِ همین نوع در زیر ویرایش می‌شود.</small>
+        <label className="field">نام نمایشی<input value={box.name} onChange={(e) => upd((c) => { c.box.types[bt].name = e.target.value; })} /></label>
         <div className="fgrid">
-          {f('حماسی', Math.round(cc.epic * 100), (x) => upd((c) => { c.box.cardChance.epic = x / 100; }))}
-          {f('نادر', Math.round(cc.rare * 100), (x) => upd((c) => { c.box.cardChance.rare = x / 100; }))}
-          {f('معمولی', Math.round(cc.common * 100), (x) => upd((c) => { c.box.cardChance.common = x / 100; }))}
+          {f('زمان باز شدن (ساعت)', box.durationSeconds / 3600, (x) => upd((c) => { c.box.types[bt].durationSeconds = Math.round(x * 3600); }), 0.25)}
+          {f('سکه — حداقل', box.coins[0], (x) => upd((c) => { c.box.types[bt].coins[0] = x; }))}
+          {f('سکه — حداکثر', box.coins[1], (x) => upd((c) => { c.box.types[bt].coins[1] = x; }))}
+          {f('XP — حداقل', box.xp[0], (x) => upd((c) => { c.box.types[bt].xp[0] = x; }))}
+          {f('XP — حداکثر', box.xp[1], (x) => upd((c) => { c.box.types[bt].xp[1] = x; }))}
+          {f('تعداد کارت — حداقل', box.cardCountRange[0], (x) => upd((c) => { c.box.types[bt].cardCountRange[0] = x; }))}
+          {f('تعداد کارت — حداکثر', box.cardCountRange[1], (x) => upd((c) => { c.box.types[bt].cardCountRange[1] = x; }))}
         </div>
-        <small className="hint">شانس بدون کارت: {fa(Math.round((1 - cc.epic - cc.rare - cc.common) * 100))}٪</small>
+        <h3>شانس کارت — جعبه‌ی {box.name} (٪)</h3>
+        <div className="fgrid">
+          {f('حماسی', Math.round(cc.epic * 100), (x) => upd((c) => { c.box.types[bt].cardChance.epic = x / 100; }))}
+          {f('نادر', Math.round(cc.rare * 100), (x) => upd((c) => { c.box.types[bt].cardChance.rare = x / 100; }))}
+          {f('معمولی', Math.round(cc.common * 100), (x) => upd((c) => { c.box.types[bt].cardChance.common = x / 100; }))}
+        </div>
+        <small className="hint">شانس بدون کارت: {fa(Math.round((1 - cc.epic - cc.rare - cc.common) * 100))}٪ (برای هر کارتِ جعبه جدا انداخته می‌شود)</small>
+        <h3>تعداد اسلات جعبه</h3>
+        <div className="fgrid">{f('اسلات', d.box.slots, (x) => upd((c) => { c.box.slots = x; }))}</div>
+        <h3>کدام جعبه جایزه‌ی برد است؟</h3>
+        <small className="hint" style={{ textAlign: 'start' }}>سولو: جعبه‌ی جایزه بر اساس گودال. مولتی‌پلیر: با شانس (وزن؛ مجموع لازم نیست ۱۰۰ باشد).</small>
+        <div className="fgrid">
+          {d.solo.pits.map((_, pi) => (
+            <label key={pi} className="field">سولو — گودال {fa(pi + 1)}
+              <select value={d.box.drops.soloByPit[Math.min(pi, d.box.drops.soloByPit.length - 1)]} onChange={(e) => upd((c) => { const arr = d.solo.pits.map((__, i) => c.box.drops.soloByPit[Math.min(i, c.box.drops.soloByPit.length - 1)]); arr[pi] = e.target.value as BoxType; c.box.drops.soloByPit = arr; })}>
+                {BOX_TYPES.map((t) => <option key={t} value={t}>{d.box.types[t].name}</option>)}
+              </select>
+            </label>
+          ))}
+        </div>
+        <div className="fgrid">
+          {BOX_TYPES.map((t) => f(`مولتی‌پلیر — شانس ${d.box.types[t].name}`, d.box.drops.multiChance[t], (x) => upd((c) => { c.box.drops.multiChance[t] = x; })))}
+        </div>
         <h3>هزینه‌ی ورود به نبرد (سکه)</h3>
         <div className="fgrid">
           {f('هر مرحله‌ی سولو', d.fees?.solo ?? 0, (x) => upd((c) => { c.fees = { solo: x, multi: c.fees?.multi ?? 0 }; }))}
@@ -227,9 +277,6 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
         <div className="fgrid">
           {f('مهلت انتخاب هدف (ثانیه)', d.turnSeconds, (x) => upd((c) => { c.turnSeconds = x; }))}
           {f('سقف دور (مخفی)', d.maxRounds, (x) => upd((c) => { c.maxRounds = x; }))}
-          {f('رشد جان هر لول (٪)', Math.round(d.levelScale.hp * 100), (x) => upd((c) => { c.levelScale.hp = x / 100; }))}
-          {f('رشد حمله هر لول (٪)', Math.round(d.levelScale.atk * 100), (x) => upd((c) => { c.levelScale.atk = x / 100; }))}
-          {f('رشد شیلد هر لول (٪)', Math.round(d.levelScale.shield * 100), (x) => upd((c) => { c.levelScale.shield = x / 100; }))}
         </div>
       </div>
       <div className="box">

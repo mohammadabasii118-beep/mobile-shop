@@ -147,7 +147,7 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
           <div className="center-in result">
             <h1>{result.youWon ? '🏆 پیروز شدی!' : '💀 باختی'}</h1>
             {reasonText && <small>{reasonText}</small>}
-            {result.youWon && <p>{rewardText(result.reward)}</p>}
+            {result.youWon && <p>{rewardText(result.reward, result.reward?.type ? cfg.box.types[result.reward.type]?.name : undefined)}</p>}
             <button className="btn" onClick={onExit}>بازگشت به منو</button>
           </div>
         </Modal>

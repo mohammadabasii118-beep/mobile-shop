@@ -207,6 +207,7 @@ export function createGameServer(opt: ServerOptions) {
         const i = next.cards.findIndex((c) => c.id === card?.id);
         const clean: CardDef = {
           id: card.id, name: card.name, rarity: card.rarity, hp: Number(card.hp), atk: Number(card.atk), shield: Number(card.shield),
+          ...(Array.isArray(card.levels) ? { levels: card.levels.map((l) => ({ hp: Number(l.hp), atk: Number(l.atk), shield: Number(l.shield) })) } : {}),
           ...(card.ability ? { ability: card.ability } : {}), ...(card.desc ? { desc: String(card.desc).slice(0, 120) } : {}),
           ...(i >= 0 && next.cards[i].image ? { image: next.cards[i].image } : {}),
         };

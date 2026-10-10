@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { loadConfig } from '../src/config';
 import { openDb } from '../src/db';
+import { resolveCard } from '@game/shared';
 import { Game, GameError } from '../src/game';
 
 const cfg = loadConfig();
@@ -32,15 +33,15 @@ describe('game economy', () => {
 
   it('box: 4 slots, one opening at a time, server timer', () => {
     for (let i = 0; i < 4; i++) expect(game.grantBox(uid).box).toBe(i);
-    expect(game.grantBox(uid)).toEqual({ box: null, noSlot: true });
+    expect(game.grantBox(uid)).toEqual({ box: null, type: null, noSlot: true });
     game.startBox(uid, 0);
     expect(() => game.startBox(uid, 1)).toThrow(GameError);
     expect(() => game.openBox(uid, 0)).toThrow(/زمانش/);
-    t += cfg.box.durationSeconds * 1000 - 1;
+    t += cfg.box.types.bronze.durationSeconds * 1000 - 1;
     expect(() => game.openBox(uid, 0)).toThrow(GameError);
     t += 1;
     const r = game.openBox(uid, 0);
-    expect(r.coins).toBeGreaterThanOrEqual(cfg.box.coins[0]);
+    expect(r.coins).toBeGreaterThanOrEqual(cfg.box.types.bronze.coins[0]);
     expect(game.profile(uid).boxes).toHaveLength(3);
     game.startBox(uid, 1); // حالا می‌شه یکی دیگه شروع کرد
   });
@@ -48,15 +49,52 @@ describe('game economy', () => {
   it('box rewards: coins, xp, level-up, card chance', () => {
     game.grantBox(uid);
     game.startBox(uid, 0);
-    t += cfg.box.durationSeconds * 1000;
+    t += cfg.box.types.bronze.durationSeconds * 1000;
     rngVal = 0.0; // epic roll, max... min coins
     const r = game.openBox(uid, 0);
     expect(r.cards).toHaveLength(1);
     expect(cfg.cards.find((c) => c.id === r.cards[0].id)!.rarity).toBe('epic');
     const p = game.profile(uid);
-    expect(p.coins).toBe(100 + cfg.box.coins[0]);
-    expect(p.xp).toBe(cfg.box.xp[0]);
+    expect(p.coins).toBe(100 + cfg.box.types.bronze.coins[0]);
+    expect(p.xp).toBe(cfg.box.types.bronze.xp[0]);
     expect(game.addXp(uid, 100000)).toBeGreaterThan(1);
+  });
+
+  it('three box types: own timer and own contents; winners get the box type of the pit / by chance', () => {
+    // نوع جعبه، مدت و محتوای خودش را دارد
+    game.grantBox(uid, 'gold');
+    const gold = cfg.box.types.gold;
+    expect(game.profile(uid).boxes[0]).toMatchObject({ type: 'gold', totalMs: gold.durationSeconds * 1000 });
+    game.startBox(uid, 0);
+    t += gold.durationSeconds * 1000 - 1;
+    expect(() => game.openBox(uid, 0)).toThrow(GameError);
+    t += 1;
+    rngVal = 0.5;
+    const r = game.openBox(uid, 0);
+    expect(r.type).toBe('gold');
+    expect(r.coins).toBeGreaterThanOrEqual(gold.coins[0]);
+    expect(r.coins).toBeLessThanOrEqual(gold.coins[1]);
+    expect(r.cards.length).toBeGreaterThanOrEqual(gold.cardCountRange[0]);
+    // جایزه‌ی سولو بر اساس گودال: لول ۱ گودال ۱ برنزی، لول ۱ گودال ۲ نقره‌ای، گودال ۳ طلایی
+    const n1 = cfg.solo.pits[0].stages.length, n2 = cfg.solo.pits[1].stages.length;
+    expect(game.rewardBoxType(0)).toBe('bronze');
+    expect(game.rewardBoxType(n1 - 1)).toBe('bronze');
+    expect(game.rewardBoxType(n1)).toBe('silver');
+    expect(game.rewardBoxType(n1 + n2)).toBe('gold');
+    // مولتی‌پلیر: بر اساس وزن‌ها
+    rngVal = 0.0; expect(game.rewardBoxType()).toBe('bronze');
+    rngVal = 0.999; expect(game.rewardBoxType()).toBe('gold');
+    rngVal = 0.8; expect(game.rewardBoxType()).toBe('silver'); // وزن‌ها ۷۰/۲۵/۵ → ۰٫۸ در بازه‌ی نقره‌ای
+  });
+
+  it('card stats come from the explicit per-level table (no growth formula)', () => {
+    const soldier = cfg.cards.find((c) => c.id === 'soldier')!;
+    const custom = { ...soldier, levels: [{ hp: 500, atk: 50, shield: 5 }, { hp: 600, atk: 60, shield: 6 }] };
+    expect(resolveCard(custom, 1).hp).toBe(soldier.hp);
+    expect(resolveCard(custom, 2)).toMatchObject({ hp: 500, atk: 50, shield: 5, level: 2 });
+    expect(resolveCard(custom, 3).hp).toBe(600);
+    expect(resolveCard(custom, 6).hp).toBe(600);          // بعد از آخرین ردیف: آخرین ردیف
+    expect(resolveCard({ ...soldier, levels: undefined }, 4).hp).toBe(soldier.hp); // بدون جدول: بدون رشد
   });
 
   it('upgrade needs duplicates and coins', () => {
@@ -75,7 +113,7 @@ describe('game economy', () => {
 
   it('only winners get boxes; results are counted', () => {
     expect(game.recordResult(uid, false)).toBeNull();
-    expect(game.recordResult(uid, true, 0)).toEqual({ box: 0, noSlot: false });
+    expect(game.recordResult(uid, true, 0)).toEqual({ box: 0, type: 'bronze', noSlot: false });
     const p = game.profile(uid);
     expect([p.wins, p.losses, p.soloStage]).toEqual([1, 1, 1]);
   });

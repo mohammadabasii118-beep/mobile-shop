@@ -1,23 +1,21 @@
 import { ABILITIES, type AbilityCtx } from './abilities';
-import type { BattleEvent, BattleState, CardDef, GameConfig, Side, Unit, UnitInit } from './types';
+import type { BattleEvent, BattleState, CardDef, CardStats, Side, Unit, UnitInit } from './types';
 
 export type Rng = () => number;
 
 export const other = (s: Side): Side => (s === 'A' ? 'B' : 'A');
 
-/** آمار کارت را با توجه به لول حساب می‌کند. */
-export function resolveCard(def: CardDef, level: number, cfg: GameConfig): UnitInit {
-  const k = level - 1;
-  const scale = (v: number, f: number) => Math.round(v * (1 + f * k));
-  return {
-    cardId: def.id,
-    name: def.name,
-    hp: scale(def.hp, cfg.levelScale.hp),
-    atk: scale(def.atk, cfg.levelScale.atk),
-    shield: scale(def.shield, cfg.levelScale.shield),
-    ability: def.ability,
-    level,
-  };
+/** آمار کارت در یک لول (از جدول آمار خودِ کارت) */
+export function cardStatsAt(def: CardDef, level: number): CardStats {
+  const lv = def.levels ?? [];
+  if (level <= 1 || lv.length === 0) return { hp: def.hp, atk: def.atk, shield: def.shield };
+  return lv[Math.min(level - 2, lv.length - 1)];
+}
+
+/** کارت را با آمارِ لولش برای نبرد آماده می‌کند. (پارامتر سوم برای سازگاری با کدهای قبلی است و استفاده نمی‌شود) */
+export function resolveCard(def: CardDef, level: number, _cfg?: unknown): UnitInit {
+  const s = cardStatsAt(def, level);
+  return { cardId: def.id, name: def.name, hp: s.hp, atk: s.atk, shield: s.shield, ability: def.ability, level };
 }
 
 export function createBattle(

@@ -86,5 +86,5 @@ export function App() {
   );
 }
 
-export const rewardText = (r: BattleReward | null) =>
-  !r ? '' : r.box !== null ? `🎁 یک جعبه گرفتی! (اسلات ${fa(r.box + 1)})` : '📦 اسلات‌های جعبه پر است؛ این بار جعبه‌ای نگرفتی.';
+export const rewardText = (r: BattleReward | null, boxName?: string) =>
+  !r ? '' : r.box !== null ? `🎁 یک جعبه‌ی ${boxName ?? ''} گرفتی! (اسلات ${fa(r.box + 1)})` : '📦 اسلات‌های جعبه پر است؛ این بار جعبه‌ای نگرفتی.';

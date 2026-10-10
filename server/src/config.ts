@@ -23,24 +23,31 @@ export function validateConfig(cfg: GameConfig): GameConfig {
     if (!['common', 'rare', 'epic'].includes(c.rarity)) bad(`نادری ${c.id} نامعتبر است`);
     if (!isNum(c.hp, 1) || !isNum(c.atk, 0) || !isNum(c.shield, 0)) bad(`آمار ${c.id} نامعتبر است`);
     if (c.ability && !ABILITIES[c.ability.id]) bad(`توانایی ناشناخته: ${c.ability.id}`);
+    if (c.levels !== undefined && (!Array.isArray(c.levels) || c.levels.length > 20 || c.levels.some((l) => !l || !isNum(l.hp, 1) || !isNum(l.atk) || !isNum(l.shield)))) bad(`آمار لول‌های ${c.id} نامعتبر است`);
     if (c.image !== undefined && (typeof c.image !== 'string' || !/^\/uploads\/cards\/[a-z0-9_]+\.(png|jpg|webp)(\?v=\d+)?$/.test(c.image))) bad(`آدرس عکس ${c.id} نامعتبر است`);
   }
   if (!Array.isArray(cfg.startingDeck) || cfg.startingDeck.length !== 3 || new Set(cfg.startingDeck).size !== 3) bad('ترکیب اولیه باید ۳ کارت متفاوت باشد');
   for (const id of cfg.startingDeck) if (!ids.has(id)) bad(`ترکیب اولیه: کارت ناشناخته ${id}`);
   if (cfg.fees && (!Number.isInteger(cfg.fees.solo) || !Number.isInteger(cfg.fees.multi) || cfg.fees.solo < 0 || cfg.fees.multi < 0 || cfg.fees.solo > 100000 || cfg.fees.multi > 100000)) bad('هزینه‌ی ورود باید عدد صحیح بین ۰ و ۱۰۰٬۰۰۰ باشد');
-  const ls = cfg.levelScale;
-  if (!ls || !isNum(ls.hp) || !isNum(ls.atk) || !isNum(ls.shield)) bad('levelScale نامعتبر است');
   const up = cfg.upgrade;
   if (!up || !isNum(up.maxLevel, 2) || !Array.isArray(up.levels) || up.levels.length !== up.maxLevel - 1) bad('جدول ارتقا باید دقیقاً (حداکثر لول - ۱) ردیف داشته باشد');
   for (const l of up.levels) if (!isNum(l.copies, 1) || !isNum(l.coins)) bad('ردیف جدول ارتقا نامعتبر است');
   if (!Array.isArray(cfg.xpPerLevel) || cfg.xpPerLevel.length < 1 || cfg.xpPerLevel.some((x) => !isNum(x, 1))) bad('جدول XP نامعتبر است');
   const b = cfg.box;
-  if (!b || !isNum(b.slots, 1) || !isNum(b.durationSeconds, 0) || !isRange(b.coins) || !isRange(b.xp) || !isRange(b.cardCountRange)) bad('تنظیمات جعبه نامعتبر است');
-  const cc = b.cardChance;
-  if (!cc || !isNum(cc.common) || !isNum(cc.rare) || !isNum(cc.epic) || cc.common + cc.rare + cc.epic > 1.0001) bad('مجموع شانس کارت نباید بیشتر از ۱۰۰٪ باشد');
-  for (const r of ['common', 'rare', 'epic'] as const) {
-    if (cc[r] > 0 && !cfg.cards.some((c) => c.rarity === r)) bad(`برای نادری ${r} شانس گذاشته‌ای ولی کارتی از آن نیست`);
+  if (!b || !isNum(b.slots, 1) || !b.types || !b.drops) bad('تنظیمات جعبه نامعتبر است');
+  for (const t of ['bronze', 'silver', 'gold'] as const) {
+    const bt = b.types[t];
+    if (!bt || typeof bt.name !== 'string' || !bt.name.trim() || !isNum(bt.durationSeconds, 0) || !isRange(bt.coins) || !isRange(bt.xp) || !isRange(bt.cardCountRange)) bad(`تنظیمات جعبه‌ی ${t} نامعتبر است`);
+    const cc = bt.cardChance;
+    if (!cc || !isNum(cc.common) || !isNum(cc.rare) || !isNum(cc.epic) || cc.common + cc.rare + cc.epic > 1.0001) bad(`مجموع شانس کارت جعبه‌ی ${bt.name} نباید بیشتر از ۱۰۰٪ باشد`);
+    for (const r of ['common', 'rare', 'epic'] as const) {
+      if (cc[r] > 0 && !cfg.cards.some((c) => c.rarity === r)) bad(`جعبه‌ی ${bt.name}: برای نادری ${r} شانس گذاشته‌ای ولی کارتی از آن نیست`);
+    }
   }
+  const d = b.drops;
+  if (!Array.isArray(d.soloByPit) || d.soloByPit.length < 1 || d.soloByPit.some((t) => !['bronze', 'silver', 'gold'].includes(t))) bad('جعبه‌ی جایزه‌ی گودال‌ها نامعتبر است');
+  const mc = d.multiChance;
+  if (!mc || !isNum(mc.bronze) || !isNum(mc.silver) || !isNum(mc.gold) || mc.bronze + mc.silver + mc.gold <= 0) bad('شانس جعبه‌ی مولتی‌پلیر نامعتبر است');
   if (cfg.ui?.banner !== undefined && !/^\/uploads\/banner\.(png|jpg|webp)(\?v=\d+)?$/.test(cfg.ui.banner)) bad('آدرس بنر نامعتبر است');
   if (!cfg.solo || !Array.isArray(cfg.solo.pits) || cfg.solo.pits.length < 1) bad('حداقل یک گودال سولو لازم است');
   for (const pit of cfg.solo.pits) {
@@ -77,6 +84,21 @@ export function loadConfigWithOverride(overridePath: string, basePath = CONFIG_P
   try { raw = JSON.parse(readFileSync(overridePath, 'utf8')); } catch { return base; }
   const merged: any = { ...raw };
   for (const k of Object.keys(base) as (keyof GameConfig)[]) if (merged[k] === undefined) merged[k] = base[k];
+  // ساختار قدیمی جعبه (بدون types) → جعبه‌های جدید از پایه
+  if (!merged.box?.types) merged.box = base.box;
+  // آمار هر لول کارت: اگر ذخیره‌ی قدیمی بود (بدون levels): از رشد درصدی قدیمی بساز یا از کارت هم‌شناسه‌ی پایه بگیر
+  const ls = raw.levelScale;
+  merged.cards = (merged.cards ?? []).map((c: any) => {
+    if (c.levels) return c;
+    const b = base.cards.find((x) => x.id === c.id);
+    if (ls) {
+      const maxL = merged.upgrade?.maxLevel ?? base.upgrade.maxLevel;
+      const levels = Array.from({ length: maxL - 1 }, (_, i) => { const k = i + 1; return { hp: Math.round(c.hp * (1 + ls.hp * k)), atk: Math.round(c.atk * (1 + ls.atk * k)), shield: Math.round(c.shield * (1 + ls.shield * k)) }; });
+      return { ...c, levels };
+    }
+    return b?.levels ? { ...c, levels: b.levels } : c;
+  });
+  delete merged.levelScale;
   // ساختار قدیمی سولو (stages) → گودال‌های جدید از پایه
   if (!merged.solo?.pits) merged.solo = base.solo;
   try { return validateConfig(merged as GameConfig); } catch (e) {

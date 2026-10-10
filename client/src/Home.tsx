@@ -187,17 +187,18 @@ function Boxes({ ctx }: { ctx: Ctx }) {
           const b = bySlot.get(i);
           if (!b) return <div key={i} className="slot empty">خالی</div>;
           const left = b.state === 'opening' ? Math.max(0, b.remainingMs - (Date.now() - fetchedAt)) : 0;
+          const label = <b className={`btype ${b.type}`}>{cfg.box.types[b.type]?.name ?? b.type}</b>;
           if (b.state === 'locked') return (
-            <button key={i} className="slot" disabled={anyOpening} onClick={() => act('/api/box/start', i)}>
-              <span className="ico">🎁</span><small>{anyOpening ? 'در صف' : 'شروع باز شدن'}</small><small>{fmtTime(b.remainingMs)}</small>
+            <button key={i} className={`slot bx ${b.type}`} disabled={anyOpening} onClick={() => act('/api/box/start', i)}>
+              {label}<span className="ico">🎁</span><small>{anyOpening ? 'در صف' : 'شروع باز شدن'}</small><small>{fmtTime(b.remainingMs)}</small>
             </button>);
           if (b.state === 'ready' || left === 0) return (
-            <button key={i} className="slot ready" onClick={() => act('/api/box/open', i)}>
-              <span className="ico">✨</span><small>باز کن!</small>
+            <button key={i} className={`slot bx ready ${b.type}`} onClick={() => act('/api/box/open', i)}>
+              {label}<span className="ico">✨</span><small>باز کن!</small>
             </button>);
           return (
-            <div key={i} className="slot opening">
-              <span className="ico">⏳</span><small>{fmtTime(left)}</small>
+            <div key={i} className={`slot bx opening ${b.type}`}>
+              {label}<span className="ico">⏳</span><small>{fmtTime(left)}</small>
               {isDev && <button className="mini" onClick={() => act('/api/box/skip', i)}>⏩ دمو</button>}
             </div>);
         })}
@@ -205,7 +206,7 @@ function Boxes({ ctx }: { ctx: Ctx }) {
       {reward && (
         <Modal onClose={() => setReward(null)}>
           <div className="center-in">
-            <h3>🎉 جعبه باز شد</h3>
+            <h3>🎉 جعبه‌ی {cfg.box.types[reward.type as 'bronze']?.name} باز شد</h3>
             <p>🪙 {fa(reward.coins)} سکه</p>
             <p>⭐ {fa(reward.xp)} XP {reward.levelsGained ? `— لول‌آپ! (+${fa(reward.levelsGained)})` : ''}</p>
             {reward.cards.length === 0 && <p>این بار کارتی نیامد</p>}

@@ -1,4 +1,4 @@
-import type { BattleEvent, Rarity, Side, Unit } from './types';
+import type { BattleEvent, BoxType, Rarity, Side, Unit } from './types';
 
 export interface UnitView {
   uid: string; side: Side; slot: number; cardId: string; name: string; rarity: Rarity | null;
@@ -6,7 +6,7 @@ export interface UnitView {
 }
 export interface Snap { uid: string; hp: number; shield: number; alive: boolean }
 
-export interface BoxView { slot: number; state: 'locked' | 'opening' | 'ready'; remainingMs: number }
+export interface BoxView { slot: number; type: BoxType; state: 'locked' | 'opening' | 'ready'; remainingMs: number; totalMs: number }
 export interface CardView { id: string; level: number; copies: number }
 export interface Profile {
   id: number; name: string; avatar: string | null;
@@ -15,7 +15,7 @@ export interface Profile {
   cards: CardView[]; deck: string[]; boxes: BoxView[];
 }
 
-export interface BattleReward { box: number | null; noSlot: boolean }
+export interface BattleReward { box: number | null; type: BoxType | null; noSlot: boolean }
 
 export type ClientMsg =
   | { t: 'hello'; initData: string }

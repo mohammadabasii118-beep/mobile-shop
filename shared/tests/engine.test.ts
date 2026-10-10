@@ -145,7 +145,7 @@ describe('engine', () => {
     const c = cfg as unknown as GameConfig;
     const soldier = c.cards.find((x) => x.id === 'soldier')!;
     expect(resolveCard(soldier, 1, c).hp).toBe(110);
-    expect(resolveCard(soldier, 3, c).hp).toBe(132);
+    expect(resolveCard(soldier, 3, c).hp).toBe(132); // از جدول آمار لول‌ها
     const ids = new Set(c.cards.map((x) => x.id));
     c.startingDeck.forEach((id) => expect(ids.has(id)).toBe(true));
     c.solo.pits.forEach((pit) => pit.stages.forEach((st) => st.deck.forEach(([id]) => expect(ids.has(id)).toBe(true))));

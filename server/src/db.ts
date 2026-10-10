@@ -43,5 +43,6 @@ export function openDb(path = ':memory:'): Db {
     );
   `);
   try { db.exec('ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0'); } catch { /* ستون از قبل هست */ }
+  try { db.exec("ALTER TABLE boxes ADD COLUMN type TEXT NOT NULL DEFAULT 'bronze'"); } catch { /* ستون از قبل هست */ }
   return db;
 }

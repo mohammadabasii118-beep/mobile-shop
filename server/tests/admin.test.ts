@@ -114,7 +114,7 @@ describe('player management', () => {
 describe('validateConfig', () => {
   it('rejects chances above 100% and wrong upgrade table length', () => {
     const c = loadConfig();
-    expect(() => validateConfig({ ...c, box: { ...c.box, cardChance: { common: 0.6, rare: 0.3, epic: 0.2 } } })).toThrow(/۱۰۰/);
+    expect(() => validateConfig({ ...c, box: { ...c.box, types: { ...c.box.types, gold: { ...c.box.types.gold, cardChance: { common: 0.6, rare: 0.3, epic: 0.2 } } } } })).toThrow(/۱۰۰/);
     expect(() => validateConfig({ ...c, upgrade: { ...c.upgrade, maxLevel: 9 } })).toThrow(/جدول ارتقا/);
   });
 });
