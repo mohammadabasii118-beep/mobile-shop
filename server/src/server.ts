@@ -282,7 +282,8 @@ export function createGameServer(opt: ServerOptions) {
     let file = normalize(join(dir, path));
     if (!file.startsWith(dir)) { res.writeHead(403); return res.end(); }
     if (!existsSync(file) || statSync(file).isDirectory()) file = join(dir, 'index.html'); // SPA
-    res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream' });
+    const hashed = file.includes('/assets/');
+    res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream', 'cache-control': hashed ? 'public, max-age=31536000, immutable' : 'no-cache' });
     res.end(readFileSync(file));
   }
 
