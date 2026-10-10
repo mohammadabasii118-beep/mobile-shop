@@ -17,15 +17,21 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
         <button className={`menubtn ${menuOpen ? 'open' : ''}`} onClick={() => setMenuOpen((o) => !o)} aria-label="منو" aria-expanded={menuOpen}>
           <i /><i /><i />
         </button>
-        <button className="me" onClick={() => setShowProfile(true)}>
-          <Avatar url={p.avatar} name={p.name} />
-          <div className="meinfo">
-            <b>{p.name}</b>
-            <div className="lv">لول {fa(p.level)}</div>
-            <Bar value={p.xp} max={p.xpNeeded} color="var(--xp)" />
-          </div>
-        </button>
         <div className="coins"><Icon n="coin" /> {fa(p.coins)}</div>
+        <button className="me" onClick={() => setShowProfile(true)} aria-label="پروفایل">
+          <span className="av">
+            <Avatar url={p.avatar} name={p.name} />
+            <b className="lvbadge">{fa(p.level)}</b>
+          </span>
+          <span className="meinfo">
+            <b className="pname">{p.name}</b>
+            <span className="lvline">لول {fa(p.level)} <small>{fa(Math.max(0, p.xpNeeded - p.xp))} تا لول بعد</small></span>
+            <span className="xpbar" role="progressbar" aria-valuenow={p.xp} aria-valuemax={p.xpNeeded}>
+              <i style={{ width: `${Math.min(100, (p.xp / p.xpNeeded) * 100)}%` }} />
+              <span className="num" dir="ltr">{fa(p.xp)} / {fa(p.xpNeeded)} XP</span>
+            </span>
+          </span>
+        </button>
       </header>
 
       {menuOpen && (
