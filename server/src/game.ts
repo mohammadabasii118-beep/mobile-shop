@@ -212,7 +212,7 @@ export class Game {
 
   adminUsers(q: string) {
     const like = `%${q.replace(/[%_]/g, '')}%`;
-    return (this.d.db.prepare('SELECT id, tg_id, name, level, xp, coins, wins, losses, banned, created_at FROM users WHERE name LIKE ? OR CAST(tg_id AS TEXT) LIKE ? ORDER BY id DESC LIMIT 100').all(like, like) as any[]);
+    return (this.d.db.prepare('SELECT id, tg_id, name, avatar, level, xp, coins, wins, losses, banned, created_at FROM users WHERE name LIKE ? OR CAST(tg_id AS TEXT) LIKE ? ORDER BY id DESC LIMIT 100').all(like, like) as any[]);
   }
 
   adminGift(userId: number, g: { coins?: number; xp?: number; cardId?: string }) {
@@ -226,6 +226,27 @@ export class Game {
       const has = db.prepare('SELECT 1 FROM user_cards WHERE user_id = ? AND card_id = ?').get(userId, g.cardId);
       if (has) db.prepare('UPDATE user_cards SET copies = copies + 1 WHERE user_id = ? AND card_id = ?').run(userId, g.cardId);
       else db.prepare('INSERT INTO user_cards (user_id, card_id) VALUES (?,?)').run(userId, g.cardId);
+    }
+  }
+
+  /** پروفایل کامل یک بازیکن برای پنل مدیریت */
+  adminUser(userId: number) {
+    const u = this.d.db.prepare('SELECT tg_id, banned, created_at FROM users WHERE id = ?').get(userId) as any;
+    if (!u) throw new GameError('بازیکن پیدا نشد');
+    return { ...this.profile(userId), tgId: u.tg_id as number, banned: !!u.banned, createdAt: u.created_at as number };
+  }
+
+  /** سکه را کم/زیاد (delta) یا دقیق تنظیم (set) می‌کند؛ هیچ‌وقت زیر صفر نمی‌رود */
+  adminCoins(userId: number, o: { delta?: unknown; set?: unknown }) {
+    const { db } = this.d;
+    if (!db.prepare('SELECT 1 FROM users WHERE id = ?').get(userId)) throw new GameError('بازیکن پیدا نشد');
+    const LIM = 10_000_000;
+    if (o.set !== undefined) {
+      if (!Number.isInteger(o.set) || (o.set as number) < 0 || (o.set as number) > LIM) throw new GameError('عدد سکه نامعتبر است');
+      db.prepare('UPDATE users SET coins = ? WHERE id = ?').run(o.set as number, userId);
+    } else {
+      if (!Number.isInteger(o.delta) || Math.abs(o.delta as number) > LIM) throw new GameError('عدد سکه نامعتبر است');
+      db.prepare('UPDATE users SET coins = MAX(0, coins + ?) WHERE id = ?').run(o.delta as number, userId);
     }
   }
 

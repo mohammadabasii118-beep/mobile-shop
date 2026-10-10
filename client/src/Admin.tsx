@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { ABILITY_META, type CardDef, type GameConfig, type Rarity } from '@game/shared';
+import { ABILITY_META, type CardDef, type GameConfig, type Profile, type Rarity } from '@game/shared';
 import { resolveCard } from '@game/shared';
 import type { Ctx } from './App';
 import { call, loadConfig } from './net';
 import { initData } from './telegram';
-import { CardTile, RARITY_FA, fa } from './ui';
+import { CardTile, Modal, RARITY_FA, fa } from './ui';
 
 type Tab = 'cards' | 'eco' | 'solo' | 'look' | 'players' | 'json';
 interface Stats { users: number; battles: number; pendingBoxes: number; coins: number; banned: number }
-interface AdminUser { id: number; tg_id: number; name: string; level: number; coins: number; wins: number; losses: number; banned: number }
+interface AdminUser { id: number; tg_id: number; name: string; avatar: string | null; level: number; coins: number; wins: number; losses: number; banned: number }
 
 /** عکس را قبل از آپلود کوچک می‌کند (حداکثر ۶۴۰ پیکسل، WebP) تا سبک و سریع باشد */
 async function shrink(file: File, max = 640): Promise<Blob> {
@@ -323,52 +323,140 @@ function LookTab({ cfg, refresh, run }: TabProps) {
   );
 }
 
+/** عکس پروفایل (از تلگرام) یا حرف اول اسم */
+function Av({ url, name, big }: { url: string | null; name: string; big?: boolean }) {
+  const [bad, setBad] = useState(false);
+  const cls = `avatar ${big ? 'big' : 'small'}`;
+  return url && !bad ? <img className={cls} src={url} alt="" onError={() => setBad(true)} referrerPolicy="no-referrer" /> : <span className={`${cls} ph`}>{[...name][0] ?? '؟'}</span>;
+}
+
+type Detail = Profile & { tgId: number; banned: boolean; createdAt: number };
+
+function soloText(cfg: GameConfig, cleared: number) {
+  const total = cfg.solo.pits.reduce((t, p) => t + p.stages.length, 0);
+  if (cleared >= total) return `همه‌ی ${fa(total)} لول تمام شده`;
+  let g = cleared;
+  for (let pi = 0; pi < cfg.solo.pits.length; pi++) {
+    const n = cfg.solo.pits[pi].stages.length;
+    if (g < n) return `${fa(cleared)} از ${fa(total)} لول — الان در گودال ${fa(pi + 1)}، لول ${fa(g + 1)}`;
+    g -= n;
+  }
+  return `${fa(cleared)} لول`;
+}
+
 function PlayersTab({ cfg, run }: { cfg: GameConfig; run: Run }) {
   const [q, setQ] = useState('');
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [gift, setGift] = useState<AdminUser | null>(null);
-  const [g, setG] = useState({ coins: 0, xp: 0, cardId: '' });
+  const [d, setD] = useState<Detail | null>(null);
+  const [amount, setAmount] = useState('');
+  const [exact, setExact] = useState('');
+  const [g, setG] = useState({ xp: 0, cardId: '' });
   const load = () => run(async () => { setUsers((await call(`/api/admin/users?q=${encodeURIComponent(q)}`)).users); });
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
+  const open = (id: number) => run(async () => { const j = await call(`/api/admin/user?id=${id}`); setD(j.user); setAmount(''); setExact(String(j.user.coins)); setG({ xp: 0, cardId: '' }); });
+  const coins = (body: { delta?: number; set?: number }, ok: string) => d && run(async () => {
+    const j = await call('/api/admin/coins', { userId: d.id, ...body });
+    setD(j.user); setExact(String(j.user.coins)); setAmount(''); await load();
+  }, ok);
+  const amt = Math.floor(Number(amount));
+  const quick = [-500, -100, -50, -10, 10, 50, 100, 500];
+  const cardName = (id: string) => cfg.cards.find((c) => c.id === id)?.name ?? id;
+  const when = (t: number) => new Date(t).toLocaleDateString('fa-IR');
+
   return (
     <div className="box">
       <form className="searchrow" onSubmit={(e) => { e.preventDefault(); void load(); }}>
         <label className="field" style={{ flex: 1 }}>جستجو (نام یا شناسه‌ی تلگرام)<input value={q} onChange={(e) => setQ(e.target.value)} /></label>
         <button className="btn">جستجو</button>
       </form>
-      <div className="tblwrap"><table>
-        <thead><tr><th>نام</th><th>شناسه</th><th>لول</th><th>برد / باخت</th><th>سکه</th><th></th></tr></thead>
+      <small className="hint" style={{ textAlign: 'start' }}>روی هر بازیکن بزن تا اطلاعات کامل و مدیریت سکه‌اش باز شود.</small>
+      <div className="tblwrap"><table className="clickable">
+        <thead><tr><th>بازیکن</th><th>شناسه</th><th>لول</th><th>برد / باخت</th><th>سکه</th></tr></thead>
         <tbody>
           {users.map((u) => (
-            <tr key={u.id}>
-              <td>{u.name} {u.banned ? <span className="tag bad">مسدود</span> : null}</td><td className="num">{u.tg_id}</td><td>{fa(u.level)}</td>
+            <tr key={u.id} tabIndex={0} onClick={() => void open(u.id)} onKeyDown={(e) => { if (e.key === 'Enter') void open(u.id); }}>
+              <td><span className="who"><Av url={u.avatar} name={u.name} /> <span>{u.name}</span>{u.banned ? <span className="tag bad">مسدود</span> : null}</span></td>
+              <td className="num">{u.tg_id}</td><td>{fa(u.level)}</td>
               <td>{fa(u.wins)} / {fa(u.losses)}</td><td>{fa(u.coins)}</td>
-              <td className="acts">
-                <button className="btn ghost" onClick={() => { setGift(u); setG({ coins: 0, xp: 0, cardId: '' }); }}>هدیه</button>
-                <button className="btn ghost" onClick={() => run(async () => { await call('/api/admin/ban', { userId: u.id, banned: !u.banned }); await load(); }, u.banned ? 'رفع مسدودی شد' : 'مسدود شد')}>{u.banned ? 'رفع مسدودی' : 'مسدود'}</button>
-              </td>
             </tr>
           ))}
-          {users.length === 0 && <tr><td colSpan={6}>بازیکنی پیدا نشد</td></tr>}
+          {users.length === 0 && <tr><td colSpan={5}>بازیکنی پیدا نشد</td></tr>}
         </tbody>
       </table></div>
-      {gift && (
-        <div className="giftbox">
-          <b>هدیه برای {gift.name}</b>
-          <div className="fgrid">
-            <label className="field">سکه (می‌تواند منفی باشد)<input type="number" value={g.coins} onChange={(e) => setG({ ...g, coins: Number(e.target.value) })} /></label>
-            <label className="field">XP<input type="number" min={0} value={g.xp} onChange={(e) => setG({ ...g, xp: Number(e.target.value) })} /></label>
-            <label className="field">یک کارت
-              <select value={g.cardId} onChange={(e) => setG({ ...g, cardId: e.target.value })}>
-                <option value="">— هیچ —</option>{cfg.cards.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </label>
+
+      {d && (
+        <Modal onClose={() => setD(null)}>
+          <div className="pdetail">
+            <div className="phead">
+              <Av url={d.avatar} name={d.name} big />
+              <div>
+                <h3>{d.name} {d.banned ? <span className="tag bad">مسدود</span> : null}</h3>
+                <small className="num" dir="ltr">ID: {d.tgId}</small><br />
+                <small>عضویت: {when(d.createdAt)}</small>
+              </div>
+            </div>
+
+            <div className="pstats">
+              <div><small>لول</small><b>{fa(d.level)}</b></div>
+              <div><small>XP</small><b className="num" dir="ltr">{fa(d.xp)} / {fa(d.xpNeeded)}</b></div>
+              <div><small>برد</small><b>{fa(d.wins)}</b></div>
+              <div><small>باخت</small><b>{fa(d.losses)}</b></div>
+              <div><small>درصد برد</small><b>{d.wins + d.losses ? `${fa(Math.round((d.wins / (d.wins + d.losses)) * 100))}٪` : '—'}</b></div>
+              <div><small>کارت‌ها</small><b>{fa(d.cards.length)} از {fa(cfg.cards.length)}</b></div>
+            </div>
+            <small>سولو: {soloText(cfg, d.soloStage)}</small>
+
+            <div className="coinbox">
+              <div className="coinnow">سکه‌ی فعلی <b className="num">{fa(d.coins)}</b></div>
+              <div className="quick">
+                {quick.map((n) => (
+                  <button key={n} dir="ltr" className={`btn ghost ${n < 0 ? 'neg' : 'pos'}`} onClick={() => void coins({ delta: n }, n > 0 ? `${fa(n)} سکه اضافه شد` : `${fa(-n)} سکه کم شد`)}>{n > 0 ? '+' : '−'}{fa(Math.abs(n))}</button>
+                ))}
+              </div>
+              <div className="searchrow">
+                <label className="field" style={{ flex: 1 }}>مقدار دلخواه
+                  <input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="مثلاً ۲۵۰" />
+                </label>
+                <button className="btn ghost pos" disabled={!(amt > 0)} onClick={() => void coins({ delta: amt }, 'سکه اضافه شد')}>+ اضافه</button>
+                <button className="btn ghost neg" disabled={!(amt > 0)} onClick={() => void coins({ delta: -amt }, 'سکه کم شد')}>− کم کن</button>
+              </div>
+              <div className="searchrow">
+                <label className="field" style={{ flex: 1 }}>تنظیم دقیق موجودی
+                  <input type="number" min={0} value={exact} onChange={(e) => setExact(e.target.value)} />
+                </label>
+                <button className="btn ghost" disabled={exact === '' || !(Number(exact) >= 0)} onClick={() => void coins({ set: Math.floor(Number(exact)) }, 'موجودی تنظیم شد')}>تنظیم</button>
+              </div>
+            </div>
+
+            <div>
+              <b>کارت‌ها</b>
+              <div className="chips">
+                {d.cards.map((c) => (
+                  <span key={c.id} className={`chip ${d.deck.includes(c.id) ? 'indeck' : ''}`}>{cardName(c.id)} <em>لول {fa(c.level)}</em> <em>× {fa(c.copies)}</em></span>
+                ))}
+              </div>
+              <small>کارت‌های رنگی داخل ترکیبِ بازیکن‌اند. «×» تعداد کارتِ ذخیره‌شده برای ارتقاست.</small>
+            </div>
+
+            <div className="giftbox">
+              <b>هدیه</b>
+              <div className="fgrid">
+                <label className="field">XP<input type="number" min={0} value={g.xp} onChange={(e) => setG({ ...g, xp: Number(e.target.value) })} /></label>
+                <label className="field">یک کارت
+                  <select value={g.cardId} onChange={(e) => setG({ ...g, cardId: e.target.value })}>
+                    <option value="">— هیچ —</option>{cfg.cards.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </label>
+              </div>
+              <button className="btn ghost" disabled={!(g.xp > 0) && !g.cardId} onClick={() => run(async () => { await call('/api/admin/gift', { userId: d.id, xp: g.xp, cardId: g.cardId }); const j = await call(`/api/admin/user?id=${d.id}`); setD(j.user); setG({ xp: 0, cardId: '' }); await load(); }, 'هدیه داده شد')}>ارسال هدیه</button>
+            </div>
+
+            <div className="btns">
+              <button className="btn ghost danger" onClick={() => run(async () => { await call('/api/admin/ban', { userId: d.id, banned: !d.banned }); setD({ ...d, banned: !d.banned }); await load(); }, d.banned ? 'رفع مسدودی شد' : 'مسدود شد')}>{d.banned ? 'رفع مسدودی' : 'مسدود کردن'}</button>
+              <button className="btn" onClick={() => setD(null)}>بستن</button>
+            </div>
           </div>
-          <div className="btns">
-            <button className="btn" onClick={() => run(async () => { await call('/api/admin/gift', { userId: gift.id, ...g }); setGift(null); await load(); }, 'هدیه داده شد')}>ارسال هدیه</button>
-            <button className="btn ghost" onClick={() => setGift(null)}>انصراف</button>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

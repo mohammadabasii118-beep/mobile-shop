@@ -266,6 +266,13 @@ export function createGameServer(opt: ServerOptions) {
       }
       case '/api/admin/users':
         return json(res, 200, { users: game.adminUsers(url.searchParams.get('q') ?? '') });
+      case '/api/admin/user':
+        return json(res, 200, { user: game.adminUser(Number(url.searchParams.get('id'))) });
+      case '/api/admin/coins': {
+        const b = await readBody(req);
+        game.adminCoins(Number(b.userId), { delta: b.delta, set: b.set });
+        return json(res, 200, { user: game.adminUser(Number(b.userId)) });
+      }
       case '/api/admin/gift': {
         const b = await readBody(req);
         game.adminGift(Number(b.userId), { coins: b.coins, xp: b.xp, cardId: b.cardId || undefined });

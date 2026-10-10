@@ -261,3 +261,25 @@ textarea.json { min-height: 380px; font-family: ui-monospace, Menlo, monospace; 
 .levels.adminlv { grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; }
 .levels.adminlv .lvl { aspect-ratio: 1; border-radius: 10px; }
 .levels.adminlv .lvl b { font-size: 18px; }
+
+/* پنل مدیریت: بازیکن‌ها */
+.avatar.small { width: 30px; height: 30px; font-size: 15px; }
+.who { display: inline-flex; align-items: center; gap: 8px; }
+table.clickable tbody tr { cursor: pointer; }
+table.clickable tbody tr:hover, table.clickable tbody tr:focus-visible { background: rgba(255,255,255,.06); outline: none; }
+.pdetail { display: flex; flex-direction: column; gap: 12px; user-select: text; }
+.phead { display: flex; align-items: center; gap: 14px; }
+.phead h3 { font-family: var(--f-display); font-weight: 400; font-size: 24px; }
+.pstats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.pstats div { background: var(--panel2); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; }
+.pstats small { font-size: 11px; } .pstats b { font-size: 16px; }
+.coinbox { background: var(--panel2); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--gold2); }
+.coinnow { display: flex; justify-content: space-between; align-items: baseline; color: var(--muted); }
+.coinnow b { font-family: var(--f-display); font-weight: 400; font-size: 32px; color: var(--gold); }
+.quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.quick .btn { padding: 9px 0; text-align: center; }
+.btn.pos { color: var(--green); } .btn.neg { color: var(--ruby); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.chip { background: var(--panel2); border-radius: 10px; padding: 3px 10px; font-size: 12px; border: 1px solid transparent; }
+.chip em { font-style: normal; color: var(--muted); }
+.chip.indeck { border-color: var(--turq); }

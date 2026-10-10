@@ -88,6 +88,29 @@ describe('admin', () => {
   });
 });
 
+describe('player management', () => {
+  it('returns full player details and manages coins (add, subtract, set, clamp, validate)', async () => {
+    await call(60, '/api/me');
+    const id = (((await (await call(42, '/api/admin/users?q=U60')).json()) as any).users[0]).id as number;
+    expect((await call(43, `/api/admin/user?id=${id}`)).status).toBe(403);
+    const d = ((await (await call(42, `/api/admin/user?id=${id}`)).json()) as any).user;
+    expect(d).toMatchObject({ tgId: 60, coins: 100, banned: false, level: 1 });
+    expect(d.cards).toHaveLength(3);
+    const coins = async (b: object) => ((await (await call(42, '/api/admin/coins', { userId: id, ...b })).json()) as any);
+    expect((await coins({ delta: 50 })).user.coins).toBe(150);
+    expect((await coins({ delta: -30 })).user.coins).toBe(120);
+    expect((await coins({ delta: -99999 })).user.coins).toBe(0);   // هیچ‌وقت منفی نمی‌شود
+    expect((await coins({ set: 777 })).user.coins).toBe(777);
+    expect((await call(42, '/api/admin/coins', { userId: id, delta: 1.5 })).status).toBe(400);
+    expect((await call(42, '/api/admin/coins', { userId: id, set: -1 })).status).toBe(400);
+    expect((await call(42, '/api/admin/coins', { userId: id, delta: 'abc' })).status).toBe(400);
+    expect((await call(43, '/api/admin/coins', { userId: id, delta: 5 })).status).toBe(403);
+    expect((await call(42, '/api/admin/user?id=99999')).status).toBe(400);
+    const list = ((await (await call(42, '/api/admin/users?q=U60')).json()) as any).users[0];
+    expect(list).toHaveProperty('avatar');
+  });
+});
+
 describe('validateConfig', () => {
   it('rejects chances above 100% and wrong upgrade table length', () => {
     const c = loadConfig();
