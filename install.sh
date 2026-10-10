@@ -80,6 +80,7 @@ setenv PORT "$PORT"
 setenv DATA_DIR "$DIR/data"
 if [ -n "${BOT_TOKEN:-}" ]; then setenv BOT_TOKEN "$BOT_TOKEN"; fi
 if [ -n "${ADMIN_IDS:-}" ]; then setenv ADMIN_IDS "$ADMIN_IDS"; fi
+if [ -n "${WEBAPP_URL:-}" ]; then setenv WEBAPP_URL "$WEBAPP_URL"; fi
 if grep -q '^BOT_TOKEN=' "$ENV_FILE"; then
   setenv NODE_ENV production; MODE="واقعی (فقط ورود با تلگرام)"
 else

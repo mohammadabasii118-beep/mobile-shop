@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig, saveConfig } from './config';
 import { openDb } from './db';
+import { startBot } from './bot';
 import { createGameServer } from './server';
 
 const botToken = process.env.BOT_TOKEN;
@@ -20,6 +21,8 @@ const { http } = createGameServer({
   db, cfg: loadConfig(), auth: { botToken, devAuth }, dataDir, adminIds, saveCfg: (c) => saveConfig(c),
   staticDir: fileURLToPath(new URL('../../client/dist', import.meta.url)),
 });
+if (botToken && process.env.WEBAPP_URL) startBot({ token: botToken, webAppUrl: process.env.WEBAPP_URL });
+else if (botToken) console.log('[bot] WEBAPP_URL تنظیم نشده؛ ربات به /start جواب نمی‌دهد.');
 http.listen(port, () => {
   console.log(`سرور «میراث» روی http://localhost:${port} بالا آمد ${devAuth ? '(حالت توسعه: ورود آزمایشی و پنل مدیریت برای همه باز است)' : `(ادمین‌ها: ${adminIds.join(', ') || 'هیچ‌کس'})`}`);
 });
