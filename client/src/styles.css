@@ -43,7 +43,25 @@ svg.i.f { fill: currentColor; stroke: none; }
 .avatar.ph { display: grid; place-items: center; background: conic-gradient(from 20deg, var(--gold), var(--gold2), var(--gold)); color: #1b1303; font-family: var(--f-display); font-size: 22px; }
 .avatar.big { width: 84px; height: 84px; font-size: 38px; }
 .coins { background: var(--panel); border: 1px solid var(--line); padding: 10px 11px; border-radius: 14px; font-weight: 800; color: var(--gold); white-space: nowrap; }
-.gear { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; width: 42px; height: 42px; font-size: 20px; }
+/* دکمه‌ی منو: سه خط افقی که با باز شدن به ضربدر تبدیل می‌شود */
+.menubtn { flex: none; width: 42px; height: 42px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
+.menubtn i { display: block; width: 20px; height: 2.5px; border-radius: 2px; background: var(--fg); transition: transform .25s, opacity .2s; }
+.menubtn.open { border-color: var(--gold); }
+.menubtn.open i:nth-child(1) { transform: translateY(7.5px) rotate(45deg); }
+.menubtn.open i:nth-child(2) { opacity: 0; }
+.menubtn.open i:nth-child(3) { transform: translateY(-7.5px) rotate(-45deg); }
+/* منوی شیشه‌ای که از بالا پایین می‌آید */
+.gmenu-bg { position: absolute; inset: 0; z-index: 8; background: rgba(4,9,16,.35); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); animation: fade .2s; }
+.gmenu { position: absolute; z-index: 9; top: 66px; inset-inline: 14px; display: flex; flex-direction: column; padding: 8px; border-radius: 20px; background: linear-gradient(160deg, rgba(255,255,255,.16), rgba(255,255,255,.06)); border: 1px solid rgba(255,255,255,.22); backdrop-filter: blur(22px) saturate(1.5); -webkit-backdrop-filter: blur(22px) saturate(1.5); box-shadow: 0 18px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.25); animation: drop .28s cubic-bezier(.2,.9,.3,1.1); transform-origin: top; }
+@keyframes drop { from { transform: translateY(-14px) scaleY(.9); opacity: 0; } }
+.gmenu button { display: flex; align-items: center; gap: 12px; padding: 14px 12px; border-radius: 14px; text-align: start; font-weight: 600; }
+.gmenu button + button { border-top: 1px solid rgba(255,255,255,.1); }
+.gmenu button:active { background: rgba(255,255,255,.12); }
+.gmenu button svg { font-size: 22px; color: var(--gold); }
+.gmenu button span { flex: 1; }
+.gmenu button em { font-style: normal; color: var(--muted); font-size: 22px; }
+.soon { font-size: 11px; font-weight: 800; color: #1b1303; background: var(--gold); border-radius: 8px; padding: 1px 8px; }
+.soonbox { font-family: var(--f-display); font-size: 34px; color: var(--gold); padding: 22px 36px; border: 2px dashed var(--gold2); border-radius: 18px; }
 .bar { height: 7px; background: rgba(0,0,0,.25); border-radius: 6px; overflow: hidden; width: 100%; }
 .bar i { display: block; height: 100%; border-radius: 6px; transition: width .3s; }
 

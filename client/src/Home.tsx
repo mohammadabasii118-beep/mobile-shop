@@ -8,10 +8,15 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
   const { profile: p, cfg, sock } = ctx;
   const [view, setView] = useState<'menu' | 'solo'>('menu');
   const [showProfile, setShowProfile] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [page, setPage] = useState<'about' | 'news' | null>(null);
 
   return (
     <>
       <header className="top">
+        <button className={`menubtn ${menuOpen ? 'open' : ''}`} onClick={() => setMenuOpen((o) => !o)} aria-label="منو" aria-expanded={menuOpen}>
+          <i /><i /><i />
+        </button>
         <button className="me" onClick={() => setShowProfile(true)}>
           <Avatar url={p.avatar} name={p.name} />
           <div className="meinfo">
@@ -21,8 +26,29 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
           </div>
         </button>
         <div className="coins"><Icon n="coin" /> {fa(p.coins)}</div>
-        <button className="gear" onClick={() => setShowProfile(true)} aria-label="تنظیمات">⚙️</button>
       </header>
+
+      {menuOpen && (
+        <>
+          <div className="gmenu-bg" onClick={() => setMenuOpen(false)} />
+          <nav className="gmenu" aria-label="منوی بازی">
+            <button onClick={() => { setMenuOpen(false); setShowProfile(true); }}>
+              <svg className="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4.400 3.600-7 8-7s8 2.600 8 7" /></svg><span>پروفایل</span><em>‹</em>
+            </button>
+            <button onClick={() => { setMenuOpen(false); setPage('about'); }}>
+              <svg className="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.500h.01" /></svg><span>درباره</span><em>‹</em>
+            </button>
+            <button onClick={() => { setMenuOpen(false); setPage('news'); }}>
+              <svg className="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M8 9h8M8 13h8M8 17h4" /></svg><span>خبرگزاری</span><b className="soon">به‌زودی</b><em>‹</em>
+            </button>
+            {p.isAdmin && (
+              <button onClick={() => { setMenuOpen(false); onAdmin(); }}>
+                <svg className="i" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.500-3 8-7 10-4-2-7-5.500-7-10V6z" /><path d="M9 12l2 2 4-4" /></svg><span>پنل مدیریت</span><em>‹</em>
+              </button>
+            )}
+          </nav>
+        </>
+      )}
 
       {view === 'menu' ? (
         <section className="menu">
@@ -54,7 +80,27 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
 
       <Boxes ctx={ctx} />
 
-      {showProfile && <ProfileModal ctx={ctx} onClose={() => setShowProfile(false)} onAdmin={onAdmin} />}
+      {showProfile && <ProfileModal ctx={ctx} onClose={() => setShowProfile(false)} />}
+      {page === 'about' && (
+        <Modal onClose={() => setPage(null)}>
+          <div className="center-in">
+            <div className="brand" style={{ fontSize: 40 }}>میراث</div>
+            <p>بازی کارتی نوبتی ۳ به ۳. سه کارت انتخاب کن، با ربات یا بازیکن‌های دیگر نبرد کن، جعبه بگیر و کارت‌هایت را قوی‌تر کن.</p>
+            <small>نسخه‌ی آزمایشی ۰٫۱</small>
+            <button className="btn" onClick={() => setPage(null)}>بستن</button>
+          </div>
+        </Modal>
+      )}
+      {page === 'news' && (
+        <Modal onClose={() => setPage(null)}>
+          <div className="center-in">
+            <h3 style={{ fontFamily: 'var(--f-display)', fontWeight: 400, fontSize: 24 }}>خبرگزاری</h3>
+            <div className="soonbox">به‌زودی</div>
+            <small>اخبار و رویدادهای بازی اینجا منتشر می‌شود.</small>
+            <button className="btn" onClick={() => setPage(null)}>بستن</button>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }
@@ -66,7 +112,7 @@ function Avatar({ url, name, big }: { url: string | null; name: string; big?: bo
     : <div className={`avatar ph ${big ? 'big' : ''}`}>{name.slice(0, 1)}</div>;
 }
 
-function ProfileModal({ ctx, onClose, onAdmin }: { ctx: Ctx; onClose: () => void; onAdmin: () => void }) {
+function ProfileModal({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) {
   const p = ctx.profile;
   const total = p.wins + p.losses;
   return (
@@ -81,7 +127,6 @@ function ProfileModal({ ctx, onClose, onAdmin }: { ctx: Ctx; onClose: () => void
           <div><b>{fa(p.losses)}</b><small>باخت</small></div>
           <div><b>{total ? fa(Math.round((p.wins / total) * 100)) + '٪' : '—'}</b><small>درصد برد</small></div>
         </div>
-        {p.isAdmin && <button className="btn ghost" onClick={onAdmin}>پنل مدیریت</button>}
         <button className="btn" onClick={onClose}>بستن</button>
       </div>
     </Modal>
