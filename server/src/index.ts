@@ -18,11 +18,12 @@ mkdirSync(dataDir, { recursive: true });
 const adminIds = (process.env.ADMIN_IDS ?? '').split(',').map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0);
 const configPath = join(dataDir, 'game.json'); // تنظیمات ویرایش‌شده از پنل مدیریت؛ با آپدیت کد پاک نمی‌شود
 const db = openDb(process.env.DB_PATH ?? join(dataDir, 'game.db'));
+const cfg = loadConfigWithOverride(configPath);
 const { http } = createGameServer({
-  db, cfg: loadConfigWithOverride(configPath), auth: { botToken, devAuth }, dataDir, adminIds, saveCfg: (c) => saveConfig(c, configPath),
+  db, cfg, auth: { botToken, devAuth }, dataDir, adminIds, telegramApi: process.env.TELEGRAM_API, saveCfg: (c) => saveConfig(c, configPath),
   staticDir: fileURLToPath(new URL('../../client/dist', import.meta.url)),
 });
-if (botToken && process.env.WEBAPP_URL) startBot({ token: botToken, webAppUrl: process.env.WEBAPP_URL });
+if (botToken && process.env.WEBAPP_URL) startBot({ token: botToken, webAppUrl: process.env.WEBAPP_URL, welcomeText: () => cfg.ui?.welcome });
 else if (botToken) console.log('[bot] WEBAPP_URL تنظیم نشده؛ ربات به /start جواب نمی‌دهد.');
 http.listen(port, () => {
   console.log(`سرور «میراث» روی http://localhost:${port} بالا آمد ${devAuth ? '(حالت توسعه: ورود آزمایشی و پنل مدیریت برای همه باز است)' : `(ادمین‌ها: ${adminIds.join(', ') || 'هیچ‌کس'})`}`);

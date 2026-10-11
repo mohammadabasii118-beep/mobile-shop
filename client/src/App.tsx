@@ -5,6 +5,7 @@ import { Home } from './Home';
 import { CardsScreen } from './CardsScreen';
 import { BattleScreen, type BattleInit } from './BattleScreen';
 import { Admin } from './Admin';
+import { Gate } from './Gate';
 import { Modal, fa } from './ui';
 import type { BattleReward } from '@game/shared';
 
@@ -61,7 +62,7 @@ export function App() {
   const onBattleDone = (end: Extract<ServerMsg, { t: 'battleEnd' }>) => { setProfile(end.profile); setResult(end); };
 
   return (
-    <div className="app">
+    <div className="app" style={cfg.ui?.background ? { backgroundImage: `linear-gradient(rgba(8,14,26,.25), rgba(8,14,26,.45)), url(${cfg.ui.background})`, backgroundSize: 'cover', backgroundPosition: 'center bottom', backgroundRepeat: 'no-repeat' } : undefined}>
       {battle ? (
         <BattleScreen ctx={ctx} init={battle} onDone={onBattleDone} onExit={() => { setBattle(null); setResult(null); }} result={result} />
       ) : (
@@ -81,6 +82,7 @@ export function App() {
             <button className="btn ghost" onClick={() => { sock.send({ t: 'leaveQueue' }); setQueued(false); }}>انصراف</button></div>
         </Modal>
       )}
+      {!profile.channelOk && <Gate ctx={ctx} />}
       {toastMsg && <div className="toast">{toastMsg}</div>}
     </div>
   );

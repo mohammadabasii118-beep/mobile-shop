@@ -10,6 +10,10 @@
     "solo": 10,
     "multi": 50
   },
+  "channel": {
+    "username": "MirasGame",
+    "required": true
+  },
   "cards": [
     {
       "id": "soldier",

@@ -12,6 +12,8 @@ export interface Profile {
   id: number; name: string; avatar: string | null;
   level: number; xp: number; xpNeeded: number; coins: number;
   wins: number; losses: number; soloStage: number; isAdmin: boolean;
+  /** آیا شرط عضویت کانال برقرار است (یا لازم نیست)؟ */
+  channelOk: boolean;
   cards: CardView[]; deck: string[]; boxes: BoxView[];
 }
 

@@ -51,6 +51,8 @@ export interface GameConfig {
   startingDeck: string[];
   /** هزینه‌ی ورود به نبرد (سکه) */
   fees?: { solo: number; multi: number };
+  /** عضویت اجباری کانال تلگرام: فقط یک‌بار و با بررسی واقعی (ربات باید ادمین کانال باشد) */
+  channel?: { username: string; required: boolean };
   cards: CardDef[];
   /** هزینه‌ی ارتقا برای هر نوع کارت (ساده/معمولی/کمیاب)؛ ردیف i = از لول i+1 به i+2 */
   upgrade: { maxLevel: number; byRarity: Record<Rarity, { copies: number; coins: number }[]> };
@@ -63,7 +65,7 @@ export interface GameConfig {
   };
   solo: { pits: SoloPit[] };
   /** ظاهر: بنر بالای صفحه‌ی اصلی (آدرس عکس آپلودشده از پنل مدیریت) */
-  ui?: { banner?: string };
+  ui?: { banner?: string; /** پس‌زمینه‌ی بازی (عکس آپلودشده) */ background?: string; /** متن پیام اول /start ربات */ welcome?: string };
 }
 
 /** Fully resolved fighter used by the engine (level already applied). */

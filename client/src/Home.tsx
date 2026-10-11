@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Ctx } from './App';
 import { call } from './net';
-import { isDev } from './telegram';
+import { isDev, openLink } from './telegram';
 import { Bar, Modal, fa, fmtTime, CardTile, RARITY_FA, Icon } from './ui';
 
 export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAdmin: () => void }) {
@@ -107,10 +107,16 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
       {showProfile && <ProfileModal ctx={ctx} onClose={() => setShowProfile(false)} />}
       {page === 'about' && (
         <Modal onClose={() => setPage(null)}>
-          <div className="center-in">
-            <div className="brand" style={{ fontSize: 40 }}>میراث</div>
-            <p>بازی کارتی نوبتی ۳ به ۳. سه کارت انتخاب کن، با ربات یا بازیکن‌های دیگر نبرد کن، جعبه بگیر و کارت‌هایت را قوی‌تر کن.</p>
-            <small>نسخه‌ی آزمایشی ۰٫۱</small>
+          <div className="about">
+            <h3>میراث، نسخه‌ی آزمایشی 0.0.1</h3>
+            <p>بازی کارتی دوئلی با کارت‌های اساطیری. سه کارت می‌چینی، هدف رو خودت انتخاب می‌کنی و حریف رو شکست می‌دی.</p>
+            <div className="links">
+              <span>✅ کانال رسمی:</span>
+              <TgLink id="MirasGame" />
+              <span>✅ پشتیبانی و گزارش باگ:</span>
+              <TgLink id="BHK_Su" />
+              <TgLink id="Mhmdabasiiii" />
+            </div>
             <button className="btn" onClick={() => setPage(null)}>بستن</button>
           </div>
         </Modal>
@@ -127,6 +133,11 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
       )}
     </>
   );
+}
+
+/** لینک آیدی تلگرام (باز شدن داخل تلگرام) */
+function TgLink({ id }: { id: string }) {
+  return <a className="tglink" dir="ltr" href={`https://t.me/${id}`} onClick={(e) => { e.preventDefault(); openLink(`https://t.me/${id}`); }}>@{id}</a>;
 }
 
 /** هزینه‌ی ورود (سکه) */

@@ -309,6 +309,24 @@ function SoloTab({ cfg, refresh, run }: TabProps) {
 
 function LookTab({ cfg, refresh, run }: TabProps) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const bgRef = useRef<HTMLInputElement>(null);
+  const uploadBg = async (f: File | undefined) => {
+    if (!f) return;
+    await run(async () => {
+      const blob = await shrink(f, 1800);
+      const r = await fetch('/api/admin/background', { method: 'POST', headers: { 'x-init-data': initData, 'content-type': blob.type }, body: blob });
+      const j = await r.json(); if (!r.ok) throw new Error(j.error); refresh(j as GameConfig);
+    }, 'پس‌زمینه عوض شد');
+    if (bgRef.current) bgRef.current.value = '';
+  };
+  const [welcome, setWelcome] = useState(cfg.ui?.welcome ?? '');
+  const [chUser, setChUser] = useState(cfg.channel?.username ?? 'MirasGame');
+  const [chReq, setChReq] = useState(cfg.channel?.required ?? true);
+  const saveWelcome = (text: string) => run(async () => {
+    const next = { ...cfg, ui: { ...cfg.ui } };
+    if (text.trim()) next.ui.welcome = text; else delete next.ui.welcome;
+    refresh((await call('/api/admin/config', { config: next })) as GameConfig);
+  }, text.trim() ? 'متن پیام اول ذخیره شد' : 'متن پیش‌فرض برگشت');
   const banner = cfg.ui?.banner;
   const upload = async (f: File | undefined) => {
     if (!f) return;
@@ -330,6 +348,30 @@ function LookTab({ cfg, refresh, run }: TabProps) {
       <div className="btns">
         <button className="btn" onClick={() => fileRef.current?.click()}>{banner ? 'تغییر بنر' : 'آپلود بنر'}</button>
         {banner && <button className="btn ghost" onClick={() => run(async () => refresh(await call('/api/admin/banner/delete', {})), 'بنر حذف شد و نوشته‌ی پیش‌فرض برگشت')}>حذف بنر</button>}
+      </div>
+      <h3>پس‌زمینه‌ی بازی</h3>
+      <small className="hint" style={{ textAlign: 'start' }}>عکس پس‌زمینه‌ی همه‌ی صفحه‌های بازی. عکس عمودی (مثل موبایل)، مثلاً ۱۰۸۰×۱۹۲۰. اگر نگذاری، پس‌زمینه‌ی پیش‌فرض (آسمان شب و گنبدها) استفاده می‌شود.</small>
+      <div className="bgprev" style={cfg.ui?.background ? { backgroundImage: `url(${cfg.ui.background})` } : undefined}>{cfg.ui?.background ? '' : 'پیش‌فرض'}</div>
+      <input ref={bgRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => void uploadBg(e.target.files?.[0])} />
+      <div className="btns">
+        <button className="btn" onClick={() => bgRef.current?.click()}>{cfg.ui?.background ? 'تغییر پس‌زمینه' : 'آپلود پس‌زمینه'}</button>
+        {cfg.ui?.background && <button className="btn ghost" onClick={() => run(async () => refresh(await call('/api/admin/background/delete', {})), 'پس‌زمینه‌ی پیش‌فرض برگشت')}>حذف (برگشت به پیش‌فرض)</button>}
+      </div>
+      <h3>عضویت اجباری کانال</h3>
+      <small className="hint" style={{ textAlign: 'start' }}>بازیکن قبل از بازی باید عضو این کانال باشد (فقط یک‌بار بررسی می‌شود). ربات باید ادمین کانال باشد. ادمین‌های بازی از این شرط معافند.</small>
+      <div className="fgrid">
+        <label className="field">آیدی کانال (بدون @)<input dir="ltr" value={chUser} onChange={(e) => setChUser(e.target.value.replace(/[^A-Za-z0-9_]/g, ''))} /></label>
+        <label className="field">وضعیت
+          <select value={chReq ? 'on' : 'off'} onChange={(e) => setChReq(e.target.value === 'on')}><option value="on">اجباری</option><option value="off">غیرفعال</option></select>
+        </label>
+      </div>
+      <div className="btns"><button className="btn" onClick={() => run(async () => refresh((await call('/api/admin/config', { config: { ...cfg, channel: { username: chUser, required: chReq } } })) as GameConfig), 'تنظیم کانال ذخیره شد')}>ذخیره</button></div>
+      <h3>پیام اول ربات (/start)</h3>
+      <small className="hint" style={{ textAlign: 'start' }}>این متن وقتی کسی به ربات «/start» می‌زند همراه دکمه‌ی «ورود به بازی» فرستاده می‌شود. اگر خالی بگذاری، متن پیش‌فرض استفاده می‌شود. حداکثر ۳۵۰۰ نویسه.</small>
+      <textarea className="json welcome" value={welcome} onChange={(e) => setWelcome(e.target.value)} placeholder="خالی = متن پیش‌فرض" rows={12} />
+      <div className="btns">
+        <button className="btn" onClick={() => void saveWelcome(welcome)}>ذخیره‌ی متن</button>
+        <button className="btn ghost" onClick={() => { setWelcome(''); void saveWelcome(''); }}>بازگشت به متن پیش‌فرض</button>
       </div>
     </div>
   );

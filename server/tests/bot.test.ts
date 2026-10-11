@@ -31,12 +31,27 @@ describe('bot', () => {
   it('answers /start with a web_app button and sets the menu button', async () => {
     const { srv, calls } = fakeTelegram('ok'); const apiBase = await listen(srv);
     const bot = startBot({ token: 'T', webAppUrl: 'https://game.example.com', apiBase, log: () => {} });
+    await until(() => calls.filter((c) => c.method === 'sendMessage').length >= 2);
+    bot.stop(); srv.close();
+    const msgs = calls.filter((c) => c.method === 'sendMessage');
+    expect(msgs).toHaveLength(2);
+    const msg = msgs[0];
+    expect(msg.body.reply_markup).toBeUndefined();            // پیام اول: فقط متن
+    expect(msgs[1].body.text).toBe('هر وقت آماده بودی، بزن بریم👇'); // پیام دوم: متن + دکمه
+    expect(msgs[1].body.reply_markup.inline_keyboard[0][0].web_app.url).toBe('https://game.example.com');
+    expect(msg.body.chat_id).toBe(55);
+    expect(msg.body.text).toContain('به میراث خوش اومدی');
+    expect(msg.body.text).toContain('@MirasGame');
+    expect(msg.body.text).toContain('@BHK_Su');
+    expect(calls.find((c) => c.method === 'setChatMenuButton')!.body.menu_button.web_app.url).toBe('https://game.example.com');
+  });
+
+  it('uses the custom welcome text from the config when set', async () => {
+    const { srv, calls } = fakeTelegram('ok'); const apiBase = await listen(srv);
+    const bot = startBot({ token: 'T', webAppUrl: 'https://game.example.com', apiBase, welcomeText: () => '  سلام سفارشی  ', log: () => {} });
     await until(() => calls.some((c) => c.method === 'sendMessage'));
     bot.stop(); srv.close();
-    const msg = calls.find((c) => c.method === 'sendMessage')!;
-    expect(msg.body.chat_id).toBe(55);
-    expect(msg.body.reply_markup.inline_keyboard[0][0].web_app.url).toBe('https://game.example.com');
-    expect(calls.find((c) => c.method === 'setChatMenuButton')!.body.menu_button.web_app.url).toBe('https://game.example.com');
+    expect(calls.find((c) => c.method === 'sendMessage')!.body.text).toBe('سلام سفارشی');
   });
 
   it('stops polling on 409 so it never fights another bot using the token', async () => {

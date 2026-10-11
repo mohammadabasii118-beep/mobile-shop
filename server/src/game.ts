@@ -4,7 +4,7 @@ import type { TgUser } from './auth';
 
 export class GameError extends Error {}
 
-export interface Deps { db: Db; cfg: GameConfig; now: () => number; rng: () => number; isAdmin?: (tgId: number) => boolean }
+export interface Deps { db: Db; cfg: GameConfig; now: () => number; rng: () => number; isAdmin?: (tgId: number) => boolean; channelRequired?: (tgId: number) => boolean }
 
 const randInt = (rng: () => number, [a, b]: [number, number]) => a + Math.floor(rng() * (b - a + 1));
 
@@ -52,12 +52,18 @@ export class Game {
       id: u.id, name: u.name, avatar: u.avatar, level: u.level, xp: u.xp,
       xpNeeded: this.xpNeeded(u.level), coins: u.coins, wins: u.wins, losses: u.losses,
       soloStage: u.solo_stage, cards, deck, boxes, isAdmin: this.d.isAdmin?.(u.tg_id) ?? false,
+      channelOk: this.d.channelRequired?.(u.tg_id) ? !!u.channel_ok : true,
     };
   }
 
   private xpNeeded(level: number): number {
     const t = this.d.cfg.xpPerLevel;
     return t[Math.min(level - 1, t.length - 1)];
+  }
+
+  /** عضویت کانال تأیید شد؛ دیگر هیچ‌وقت نشان داده نمی‌شود */
+  setChannelOk(userId: number) {
+    this.d.db.prepare('UPDATE users SET channel_ok = 1 WHERE id = ?').run(userId);
   }
 
   // ---------- هزینه‌ی ورود ----------

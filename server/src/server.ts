@@ -14,6 +14,8 @@ export interface ServerOptions {
   db: Db; cfg: GameConfig; auth: AuthOptions; staticDir?: string;
   now?: () => number; rng?: () => number;
   pauseMs?: number; botDelayMs?: number; turnMs?: number; heartbeatMs?: number;
+  /** آدرس API تلگرام (برای تست قابل تغییر) */
+  telegramApi?: string;
   /** پوشه‌ی داده (عکس‌های آپلودشده) */
   dataDir?: string;
   /** شناسه‌ی تلگرام ادمین‌ها */
@@ -37,7 +39,25 @@ export function createGameServer(opt: ServerOptions) {
   const isAdmin = (tgId: number) => opt.auth.devAuth || adminIds.has(tgId);
   const uploadsRoot = join(opt.dataDir ?? '.', 'uploads');
   const uploadsDir = join(uploadsRoot, 'cards');
-  const game = new Game({ db: opt.db, cfg, now, rng, isAdmin });
+  // عضویت اجباری کانال: فقط در حالت واقعی (با توکن) و برای غیرِ ادمین‌ها
+  const needsChannel = (tgId: number) => !!cfg.channel?.required && !!opt.auth.botToken && !opt.auth.devAuth && !isAdmin(tgId);
+  const game = new Game({ db: opt.db, cfg, now, rng, isAdmin, channelRequired: needsChannel });
+  const lastVerify = new Map<number, number>();
+
+  /** از تلگرام می‌پرسد کاربر عضو کانال هست یا نه */
+  async function isChannelMember(tgId: number): Promise<boolean> {
+    const base = opt.telegramApi ?? 'https://api.telegram.org';
+    const url = `${base}/bot${opt.auth.botToken}/getChatMember?chat_id=${encodeURIComponent('@' + cfg.channel!.username)}&user_id=${tgId}`;
+    let j: any;
+    try { j = await (await fetch(url, { signal: AbortSignal.timeout(8000) })).json(); } catch { throw new GameError('ارتباط با تلگرام برقرار نشد؛ چند لحظه‌ی دیگر دوباره امتحان کن'); }
+    if (!j.ok) {
+      if (/user not found|participant_id_invalid/i.test(j.description ?? '')) return false;
+      console.warn(`[channel] بررسی عضویت ناموفق: ${j.description} (ربات باید ادمین کانال @${cfg.channel!.username} باشد)`);
+      throw new GameError('بررسی عضویت ممکن نشد؛ به پشتیبانی بگو');
+    }
+    const st = j.result?.status;
+    return st === 'creator' || st === 'administrator' || st === 'member' || (st === 'restricted' && !!j.result.is_member);
+  }
   const conns = new Map<number, Conn>();
   let queue: Conn[] = [];
   const turnMs = () => opt.turnMs ?? cfg.turnSeconds * 1000;
@@ -73,6 +93,7 @@ export function createGameServer(opt: ServerOptions) {
   function handleMsg(c: Conn, m: ClientMsg) {
     switch (m.t) {
       case 'queue': {
+        if (!game.profile(c.userId).channelOk) return send(c, { t: 'error', message: 'اول باید عضو کانال بشی' });
         if (c.battle || c.queued) return send(c, { t: 'error', message: 'الان درگیر مبارزه یا صف هستی' });
         game.deckUnits(c.userId); // ترکیب کامل؟
         const fee = cfg.fees?.multi ?? 0;
@@ -96,6 +117,7 @@ export function createGameServer(opt: ServerOptions) {
       case 'leaveQueue':
         queue = queue.filter((q) => q !== c); c.queued = false; return;
       case 'solo': {
+        if (!game.profile(c.userId).channelOk) return send(c, { t: 'error', message: 'اول باید عضو کانال بشی' });
         if (c.battle || c.queued) return send(c, { t: 'error', message: 'الان درگیر مبارزه یا صف هستی' });
         const stage = Number(m.stage);
         const profile = game.profile(c.userId);
@@ -205,8 +227,11 @@ export function createGameServer(opt: ServerOptions) {
     for (const ext of ['png', 'jpg', 'webp']) { try { unlinkSync(join(uploadsDir, `${id}.${ext}`)); } catch { /* نبود */ } }
   };
 
-  const removeBanner = () => {
-    for (const ext of ['png', 'jpg', 'webp']) { try { unlinkSync(join(uploadsRoot, `banner.${ext}`)); } catch { /* نبود */ } }
+  /** عکس‌های ظاهر (بنر صفحه‌ی اصلی و پس‌زمینه‌ی بازی) */
+  const SLOTS = { banner: 3_000_000, background: 4_000_000 } as const;
+  type Slot = keyof typeof SLOTS;
+  const removeSlot = (kind: Slot) => {
+    for (const ext of ['png', 'jpg', 'webp']) { try { unlinkSync(join(uploadsRoot, `${kind}.${ext}`)); } catch { /* نبود */ } }
   };
 
   async function admin(req: IncomingMessage, res: ServerResponse, path: string, url: URL) {
@@ -262,23 +287,27 @@ export function createGameServer(opt: ServerOptions) {
         delete card.image; removeImages(id); commitConfig(next);
         return json(res, 200, cfg);
       }
-      case '/api/admin/banner': {
+      case '/api/admin/banner':
+      case '/api/admin/background': {
+        const kind = path.endsWith('background') ? 'background' : 'banner';
         const next = clone();
-        const buf = await readRaw(req, 3_000_000);
-        if (!buf) throw new GameError('حجم بنر بیشتر از ۳ مگابایت است');
+        const buf = await readRaw(req, SLOTS[kind]);
+        if (!buf) throw new GameError(`حجم عکس بیشتر از ${SLOTS[kind] / 1_000_000} مگابایت است`);
         const ext = sniffImage(buf);
         if (!ext) throw new GameError('فقط PNG، JPG یا WebP قبول است');
         mkdirSync(uploadsRoot, { recursive: true });
-        removeBanner();
-        writeFileSync(join(uploadsRoot, `banner.${ext}`), buf);
-        next.ui = { ...next.ui, banner: `/uploads/banner.${ext}?v=${Date.now()}` };
+        removeSlot(kind);
+        writeFileSync(join(uploadsRoot, `${kind}.${ext}`), buf);
+        next.ui = { ...next.ui, [kind]: `/uploads/${kind}.${ext}?v=${Date.now()}` };
         commitConfig(next);
         return json(res, 200, cfg);
       }
-      case '/api/admin/banner/delete': {
+      case '/api/admin/banner/delete':
+      case '/api/admin/background/delete': {
+        const kind = path.includes('background') ? 'background' : 'banner';
         const next = clone();
-        if (next.ui) delete next.ui.banner;
-        removeBanner(); commitConfig(next);
+        if (next.ui) delete next.ui[kind];
+        removeSlot(kind); commitConfig(next);
         return json(res, 200, cfg);
       }
       case '/api/admin/users':
@@ -319,6 +348,20 @@ export function createGameServer(opt: ServerOptions) {
         console.error(e); return json(res, 500, { error: 'خطای سرور' });
       }
     }
+    if (path === '/api/channel/verify') {
+      try {
+        if (!needsChannel(u.tgId) || game.profile(userId).channelOk) return json(res, 200, { ok: true, profile: game.profile(userId) });
+        const now0 = Date.now();
+        if (now0 - (lastVerify.get(userId) ?? 0) < 2000) return json(res, 200, { ok: false, error: 'چند ثانیه صبر کن و دوباره بزن', profile: game.profile(userId) });
+        lastVerify.set(userId, now0);
+        if (await isChannelMember(u.tgId)) { game.setChannelOk(userId); return json(res, 200, { ok: true, profile: game.profile(userId) }); }
+        return json(res, 200, { ok: false, error: 'هنوز عضو کانال نیستی. اول عضو شو و بعد «عضو شدم» رو بزن', profile: game.profile(userId) });
+      } catch (e) {
+        if (e instanceof GameError) return json(res, 502, { error: e.message });
+        console.error(e); return json(res, 500, { error: 'خطای سرور' });
+      }
+    }
+    if (path !== '/api/me' && needsChannel(u.tgId) && !game.profile(userId).channelOk) return json(res, 403, { error: 'اول باید عضو کانال بشی', code: 'channel_required' });
     const body = req.method === 'POST' ? await readBody(req) : {};
     try {
       let extra: object = {};
@@ -356,7 +399,7 @@ export function createGameServer(opt: ServerOptions) {
     const path = new URL(req.url ?? '/', 'http://x').pathname;
     if (path === '/health') return json(res, 200, { ok: true });
     if (path.startsWith('/api/')) return void api(req, res, path);
-    if (/^\/uploads\/banner\.(png|jpg|webp)$/.test(path)) {
+    if (/^\/uploads\/(banner|background)\.(png|jpg|webp)$/.test(path)) {
       const f = join(uploadsRoot, path.slice('/uploads/'.length));
       if (!existsSync(f)) { res.writeHead(404); return res.end(); }
       res.writeHead(200, { 'content-type': MIME[extname(f)] ?? 'application/octet-stream', 'cache-control': 'public, max-age=31536000, immutable', 'x-content-type-options': 'nosniff' });

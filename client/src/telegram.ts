@@ -1,6 +1,6 @@
 declare global {
   interface Window {
-    Telegram?: { WebApp?: { initData: string; ready(): void; expand(): void; setHeaderColor?(c: string): void; setBackgroundColor?(c: string): void; HapticFeedback?: { impactOccurred(s: string): void } } };
+    Telegram?: { WebApp?: { initData: string; ready(): void; expand(): void; setHeaderColor?(c: string): void; setBackgroundColor?(c: string): void; HapticFeedback?: { impactOccurred(s: string): void }; openTelegramLink?(url: string): void; openLink?(url: string): void } };
   }
 }
 
@@ -31,3 +31,12 @@ function telegramInitData(): string {
 export const initData = telegramInitData() || devIdentity();
 export const isDev = initData.startsWith('dev:');
 export const haptic = () => { try { tg?.HapticFeedback?.impactOccurred('light'); } catch { /* ignore */ } };
+
+/** باز کردن لینک: لینک‌های t.me داخل خود تلگرام، بقیه در مرورگر */
+export function openLink(url: string) {
+  try {
+    if (url.startsWith('https://t.me/') && tg?.openTelegramLink) tg.openTelegramLink(url);
+    else if (tg?.openLink) tg.openLink(url);
+    else window.open(url, '_blank', 'noopener');
+  } catch { window.open(url, '_blank', 'noopener'); }
+}

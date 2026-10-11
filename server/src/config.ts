@@ -29,6 +29,7 @@ export function validateConfig(cfg: GameConfig): GameConfig {
   if (!Array.isArray(cfg.startingDeck) || cfg.startingDeck.length !== 3 || new Set(cfg.startingDeck).size !== 3) bad('ترکیب اولیه باید ۳ کارت متفاوت باشد');
   for (const id of cfg.startingDeck) if (!ids.has(id)) bad(`ترکیب اولیه: کارت ناشناخته ${id}`);
   if (cfg.fees && (!Number.isInteger(cfg.fees.solo) || !Number.isInteger(cfg.fees.multi) || cfg.fees.solo < 0 || cfg.fees.multi < 0 || cfg.fees.solo > 100000 || cfg.fees.multi > 100000)) bad('هزینه‌ی ورود باید عدد صحیح بین ۰ و ۱۰۰٬۰۰۰ باشد');
+  if (cfg.channel && (typeof cfg.channel.required !== 'boolean' || !/^[A-Za-z0-9_]{4,32}$/.test(cfg.channel.username ?? ''))) bad('آیدی کانال نامعتبر است (بدون @، فقط حروف انگلیسی، عدد و _)');
   const up = cfg.upgrade;
   if (!up || !isNum(up.maxLevel, 2) || !up.byRarity) bad('جدول ارتقا نامعتبر است');
   for (const r of ['common', 'rare', 'epic'] as const) {
@@ -53,6 +54,8 @@ export function validateConfig(cfg: GameConfig): GameConfig {
     if (!m || !isNum(m.bronze) || !isNum(m.silver) || !isNum(m.gold) || m.bronze + m.silver + m.gold > 100.0001) bad(`شانس جعبه‌ی ${mode === 'solo' ? 'سولو' : 'آنلاین'}: هر عدد باید ۰ یا بیشتر و مجموعشان حداکثر ۱۰۰ باشد`);
   }
   if (cfg.ui?.banner !== undefined && !/^\/uploads\/banner\.(png|jpg|webp)(\?v=\d+)?$/.test(cfg.ui.banner)) bad('آدرس بنر نامعتبر است');
+  if (cfg.ui?.background !== undefined && !/^\/uploads\/background\.(png|jpg|webp)(\?v=\d+)?$/.test(cfg.ui.background)) bad('آدرس پس‌زمینه نامعتبر است');
+  if (cfg.ui?.welcome !== undefined && (typeof cfg.ui.welcome !== 'string' || cfg.ui.welcome.length > 3500)) bad('متن پیام اول باید حداکثر ۳۵۰۰ نویسه باشد');
   if (!cfg.solo || !Array.isArray(cfg.solo.pits) || cfg.solo.pits.length < 1) bad('حداقل یک گودال سولو لازم است');
   for (const pit of cfg.solo.pits) {
     if (!pit || !Array.isArray(pit.stages) || pit.stages.length < 1) bad('هر گودال حداقل یک لول لازم دارد');
