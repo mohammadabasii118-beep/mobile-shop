@@ -1,6 +1,6 @@
 declare global {
   interface Window {
-    Telegram?: { WebApp?: { initData: string; ready(): void; expand(): void; setHeaderColor?(c: string): void; setBackgroundColor?(c: string): void; HapticFeedback?: { impactOccurred(s: string): void }; openTelegramLink?(url: string): void; openLink?(url: string): void } };
+    Telegram?: { WebApp?: { initData: string; ready(): void; expand(): void; setHeaderColor?(c: string): void; setBackgroundColor?(c: string): void; HapticFeedback?: { impactOccurred(s: string): void }; openTelegramLink?(url: string): void; openLink?(url: string): void; disableVerticalSwipes?(): void; enableClosingConfirmation?(): void; disableClosingConfirmation?(): void } };
   }
 }
 
@@ -8,6 +8,8 @@ const tg = window.Telegram?.WebApp;
 tg?.ready();
 tg?.expand();
 try { tg?.setHeaderColor?.('#14121f'); tg?.setBackgroundColor?.('#14121f'); } catch { /* ignore */ }
+// کشیدن انگشت به پایین بازی را نبندد/کوچک نکند (وسط نبرد که با انگشت روی کارت‌ها می‌کشی مهم است)
+try { tg?.disableVerticalSwipes?.(); } catch { /* نسخه‌ی قدیمی تلگرام */ }
 
 /** داخل تلگرام: initData واقعی. بیرون از تلگرام (فقط دمو/توسعه): کاربر آزمایشی. ?u=2 برای کاربر دوم */
 function devIdentity() {
@@ -39,4 +41,9 @@ export function openLink(url: string) {
     else if (tg?.openLink) tg.openLink(url);
     else window.open(url, '_blank', 'noopener');
   } catch { window.open(url, '_blank', 'noopener'); }
+}
+
+/** وسط نبرد: اگر کاربر خواست بازی را ببندد، اول تلگرام تأیید می‌گیرد (جلوی بستن اتفاقی و باخت ناخواسته) */
+export function setClosingConfirm(on: boolean) {
+  try { if (on) tg?.enableClosingConfirmation?.(); else tg?.disableClosingConfirmation?.(); } catch { /* ignore */ }
 }

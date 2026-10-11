@@ -3,7 +3,7 @@ import type { BattleEvent, ServerMsg, Side, UnitView } from '@game/shared';
 import type { Ctx } from './App';
 import { rewardText } from './App';
 import { CardTile, Modal, fa } from './ui';
-import { haptic } from './telegram';
+import { haptic, setClosingConfirm } from './telegram';
 
 type Start = Extract<ServerMsg, { t: 'battleStart' }>;
 type End = Extract<ServerMsg, { t: 'battleEnd' }>;
@@ -78,6 +78,10 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
     }
     busy.current = false;
   }
+
+  // تا وقتی نبرد در جریان است، بستن بازی تأیید می‌خواهد
+  useEffect(() => { setClosingConfirm(true); return () => setClosingConfirm(false); }, []);
+  useEffect(() => { if (result) setClosingConfirm(false); }, [result]);
 
   useEffect(() => {
     alive.current = true;
