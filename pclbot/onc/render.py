@@ -313,7 +313,7 @@ def chrome(cv: Canvas, data: dict, page_i: int, pages_n: int) -> None:
     fy = h - 58
     cv.rect((56, fy - 16, w - 56, fy - 15), fill=(255, 255, 255, 38))
     if "footer" in el:
-        cv.text(el["footer"].get("text"), el["footer"])
+        cv.text(data.get("footer", el["footer"].get("text")), el["footer"])
     if pages_n > 1 and "page" in el:
         cv.text(f"صفحه {page_i} از {pages_n}", el["page"])
 
@@ -333,12 +333,12 @@ def score_pill(cv: Canvas, cx, cy, text, st, w=220, h=66):
     cv.text(text, st, y=cy, max_w=w - 36)
 
 
-def watermark(cv: Canvas) -> None:
+def watermark(cv: Canvas, lines=("ONE NIGHT", "ONE CHAMPION")) -> None:
     """Large faded tagline at the bottom: fills the lower area of short pages with brand texture instead of empty space."""
     f = font_at(templates.O_BOLD, S(104))
     mask = Image.new("L", cv.im.size, 0)
     md = ImageDraw.Draw(mask)
-    for k, txt in enumerate(("ONE NIGHT", "ONE CHAMPION")):
+    for k, txt in enumerate(lines):
         md.text((S(cv.w / 2), S(cv.h - 188 + k * 112)), txt, font=f, fill=255, anchor="ms")
     cv.im.paste((255, 255, 255), (0, 0), mask.point(lambda v: int(v * .055)))
 
@@ -382,7 +382,7 @@ def render_rows(type_: str, cfg: dict, data: dict, bg_path: str | None = None) -
             f = min(1.35, (avail + gap) / (k * (rh + gap)))
             rh, gap = rh * max(f, 1), gap * max(f, 1) * .9
         if y0 + k * (rh + gap) < cfg["h"] - 330:   # only where the lower area would otherwise stay empty
-            watermark(cv)
+            watermark(cv, tuple(data.get("watermark", ("ONE NIGHT", "ONE CHAMPION"))))
         if type_ == "GROUP_TABLE":
             hy = cfg.get("header_y", y0 - 40)
             cv.rect((left, hy - 24, right, hy + 24), fill=(0, 0, 0, 120), r=14)
@@ -582,7 +582,41 @@ def render_champion(cfg: dict, data: dict, bg_path: str | None = None) -> list[b
     return [cv.png()]
 
 
+def render_transfer(cfg: dict, data: dict, bg_path: str | None = None) -> list[bytes]:
+    """HERE WE GO card: player, from → to, type badge, date. (No team logos: they belong to the champion poster only.)"""
+    cv = Canvas(cfg, background(cfg, bg_path))
+    el = cfg["elements"]
+    w = cfg["w"]
+    chrome(cv, {**data, "title": data.get("title") or el["title"].get("text")}, 1, 1)
+    # the title uses the display font + letter spacing; give it a glow
+    pl, tm = el["player"], el["team"]
+    cv.glow(lambda d: d.rounded_rectangle([S(60), S(pl["y"] - 120), S(w - 60), S(pl["y"] + 120)], radius=S(40), fill=cv.accent[:3] + (110,)), 50, .5)
+    panel(cv, (56, pl["y"] - 118, w - 56, pl["y"] + 118), accent=False, strong=True, r=34)
+    cv.rect((56, pl["y"] - 118, 70, pl["y"] + 118), fill=cv.gold, r=7)
+    cv.text("PLAYER", {"x": 540, "size": 24, "min": 14, "color": "#e0bd62", "align": "center", "max_w": 300, "font": templates.O_SEMI}, y=pl["y"] - 78, track=8)
+    cv.text(data["player"], pl, y=pl["y"] + 6, shadow=True)
+    # from → to
+    y0 = 820
+    for k, (lab, name) in enumerate((("FROM", data["from"]), ("TO", data["to"]))):
+        x0, x1 = (56, 500) if k == 0 else (580, w - 56)
+        panel(cv, (x0, y0, x1, y0 + 190), accent=(k == 0), strong=True, r=26)
+        cv.text(lab, {"x": (x0 + x1) / 2, "size": 24, "min": 14, "color": "#e0bd62", "align": "center", "max_w": 200, "font": templates.O_SEMI}, y=y0 + 38, track=8)
+        cv.text(name, tm, y=y0 + 112, x=(x0 + x1) / 2, max_w=(x1 - x0) - 50)
+    # arrow medallion between the two cards
+    cx, cy = w / 2, y0 + 95
+    cv.ellipse((cx - 44, cy - 44, cx + 44, cy + 44), fill=cv.gold)
+    cv.poly([(cx - 20, cy - 8), (cx + 4, cy - 8), (cx + 4, cy - 22), (cx + 28, cy), (cx + 4, cy + 22), (cx + 4, cy + 8), (cx - 20, cy + 8)], (20, 8, 12, 255))
+    # type badge + date
+    b = el["badge"]
+    cv.rect((540 - 240, b["y"] - 46, 540 + 240, b["y"] + 46), fill=cv.gold, r=46)
+    cv.text(data["type_label"], b)
+    cv.text(data["date"], el["date"])
+    return [cv.png()]
+
+
 def render(type_: str, cfg: dict, data: dict, bg_path: str | None = None) -> list[bytes]:
+    if type_ == "TRANSFER":
+        return render_transfer(cfg, data, bg_path)
     if type_ in ("SCHEDULE", "GROUP_TABLE", "ROUND_RESULTS", "QUALIFIED", "KO_MATCHES"):
         return render_rows(type_, cfg, data, bg_path)
     if type_ == "BRACKET":
@@ -621,4 +655,6 @@ def sample(type_: str) -> dict:
             {"name": "فینال", "matches": [{"a": "؟", "b": "؟", "ga": None, "gb": None, "win": None}]}]}
     if type_ == "CHAMPION":
         return {"team": "تاج", "logo": None, "subtitle": sub}
+    if type_ == "TRANSFER":
+        return {"player": "Ali_10", "from": "آریا", "to": "تاج", "type_label": "انتقال", "date": "2026/10/11", "subtitle": "TRANSFER NEWS · PCL"}
     raise ValueError(type_)

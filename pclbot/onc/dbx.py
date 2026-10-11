@@ -15,6 +15,7 @@ from typing import Any
 import aiosqlite
 
 from .. import config
+from ..fx.schema import FX_SCHEMA
 from .schema import SCHEMA
 
 _conn: aiosqlite.Connection | None = None
@@ -50,7 +51,27 @@ async def init(path: str | None = None) -> str | None:
     await _conn.execute("PRAGMA foreign_keys=ON")
     await _conn.execute("PRAGMA busy_timeout=8000")
     await _conn.executescript(SCHEMA)
+    await _conn.executescript(FX_SCHEMA)
+    await _migrate_template_types()
     return backup
+
+
+async def _migrate_template_types() -> None:
+    """Older databases have a CHECK without 'TRANSFER' on onc_templates (SQLite can't alter it) → rebuild the table once."""
+    sql = await (await _conn.execute("SELECT sql FROM sqlite_master WHERE name='onc_templates'")).fetchone()
+    if not sql or "'TRANSFER'" in sql[0]:
+        return
+    new_sql = sql[0].replace("'CHAMPION'))", "'CHAMPION','TRANSFER'))").replace("'CHAMPION')", "'CHAMPION','TRANSFER')", 1) if "'TRANSFER'" not in sql[0] else sql[0]
+    await _conn.execute("BEGIN IMMEDIATE")
+    try:
+        await _conn.execute("ALTER TABLE onc_templates RENAME TO onc_templates_old")
+        await _conn.execute(new_sql)
+        await _conn.execute("INSERT INTO onc_templates SELECT * FROM onc_templates_old")
+        await _conn.execute("DROP TABLE onc_templates_old")
+        await _conn.execute("COMMIT")
+    except BaseException:
+        await _conn.execute("ROLLBACK")
+        raise
 
 
 async def close() -> None:

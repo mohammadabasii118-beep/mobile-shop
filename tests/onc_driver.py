@@ -16,7 +16,7 @@ from aiogram.client.session.base import BaseSession
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.methods import (AnswerCallbackQuery, DeleteMessage, EditMessageMedia, EditMessageText, GetChat, GetChatMember,
-                             GetFile, GetMe, SendMessage, SendPhoto, SetChatMenuButton, SetMyCommands)
+                             GetFile, GetMe, SendDocument, SendMessage, SendPhoto, SetChatMenuButton, SetMyCommands)
 from aiogram.types import (CallbackQuery, Chat, ChatFullInfo, ChatMemberAdministrator, File, InlineKeyboardMarkup, Message,
                            PhotoSize, Update, User)
 
@@ -67,9 +67,14 @@ class FakeSession(BaseSession):
             if str(method.chat_id) == str(CHANNEL) and self.fail_channel:
                 from aiogram.exceptions import TelegramForbiddenError
                 raise TelegramForbiddenError(method, "Forbidden: bot is not a member of the channel chat")
-            data = method.photo.data if hasattr(method.photo, "data") else b""
+            data = method.photo.data if hasattr(method.photo, "data") else self.files.get(method.photo, b"") if isinstance(method.photo, str) else b""
             m = self._msg(method.chat_id, caption=method.caption)
             self._store(method.chat_id, m, method.caption, method.reply_markup, data)
+            return m
+        if isinstance(method, SendDocument):
+            m = self._msg(method.chat_id, caption=method.caption)
+            self._store(method.chat_id, m, method.caption, method.reply_markup)
+            self.files[f"doc{len(self.files)}"] = method.document.data if hasattr(method.document, "data") else b""
             return m
         if isinstance(method, EditMessageText):
             key = (method.chat_id, method.message_id)
@@ -138,7 +143,8 @@ class Driver:
         dp.message.outer_middleware(home.BottomMenuMiddleware())
         dp.callback_query.outer_middleware(home.BottomMenuMiddleware())
         self.home = home
-        dp.include_routers(home.router, user.router, *onc_setup.routers(), admin.router, wallet.router, ads.router, onc_setup.fallback)
+        from pclbot.fx import hub as fx_hub
+        dp.include_routers(home.router, user.router, *onc_setup.routers(), *fx_hub.routers(), admin.router, wallet.router, ads.router, onc_setup.fallback, fx_hub.fallback)
         self.dp = dp
         return self
 
@@ -232,7 +238,7 @@ class Driver:
     def channel(self) -> list[dict]:
         return [self.session.screens[(CHANNEL, i)] for i in self.session.order.get(CHANNEL, []) if (CHANNEL, i) in self.session.screens]
 
-    def snap(self, title: str, uid: int = ADMIN, note: str = "", channel: bool = False, photo_msg: bool = False) -> None:
+    def snap(self, title: str, uid: int = ADMIN, note: str = "", channel: bool = False, photo_msg: bool = False, last: int = 1) -> None:
         """Records what `uid` currently sees (or the channel feed) for the demo / screenshots."""
         def pack(s):
             rows = []
@@ -244,7 +250,7 @@ class Driver:
             self.frames.append({"title": title, "kind": "channel", "messages": msgs, "note": note})
         else:
             ids = self._screens(uid)
-            msgs = [pack(self.session.screens[(uid, i)]) for i in ids[-1:]]
+            msgs = [pack(self.session.screens[(uid, i)]) for i in ids[-last:]]
             self.frames.append({"title": title, "kind": "chat", "messages": msgs, "note": note})
 
     async def state(self, uid: int = ADMIN):
@@ -257,6 +263,8 @@ class Driver:
         meta = []
         for i, f in enumerate(self.frames):
             for j, m in enumerate(f["messages"]):
+                if not m["photo"]:
+                    m["photo"] = None
                 if m["photo"]:
                     name = f"{prefix}f{i:02d}_{j}.png"
                     open(os.path.join(out, name), "wb").write(m["photo"])

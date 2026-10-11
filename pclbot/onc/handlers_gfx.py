@@ -29,7 +29,7 @@ async def gfx_menu(c: CallbackQuery, state: FSMContext):
     s = await templates.active_set()
     miss = await templates.missing_types()
     text = (f"🎨 <b>گرافیک</b>\n\nست تمپلیت فعال: <b>{E(s['name']) if s else '—'}</b>\n"
-            + ("⚠️ تمپلیت فعال ندارد: " + ", ".join(miss) if miss else "✅ هر ۷ نوع گرافیک تمپلیت فعال دارند")
+            + ("⚠️ تمپلیت فعال ندارد: " + ", ".join(miss) if miss else "✅ همه‌ی نوع‌های گرافیک تمپلیت فعال دارند")
             + "\n\n<i>لوگوی تیم‌ها فقط روی پوستر قهرمان نمایش داده می‌شود.</i>")
     rows = [[ob("🗂 ست‌های تمپلیت", "onc:xs")], [ob("🖼 لوگوی PCL (برندینگ)", "onc:pcl")]]
     if s:

@@ -70,7 +70,7 @@ async def run():
 
         # ------------------------------------------------ main menu + two sections + Transfer untouched
         await d.say("/start", VIEWER)
-        assert [t for t, _ in d.buttons(VIEWER)] == ["🔄 ترنسفر", "🏆 وان نایت چمپیون"]
+        assert [t for t, _ in d.buttons(VIEWER)] == ["🔄 ترنسفر", "🏆 وان نایت چمپیون", "⚽ مسابقه فوتبالی", "🌍 اشتراک بین\u200cالمللی", "🚫 بلک\u200cلیست"]
         d.snap("Main menu — two sections", VIEWER)
         # ---- persistent bottom menu: sent once, never needs /start again
         from aiogram.types import ReplyKeyboardMarkup
@@ -85,8 +85,8 @@ async def run():
         await d.say("🏆 وان نایت چمپیون", VIEWER)
         assert [t for t, _ in d.buttons(VIEWER)] == ["🔴 مسابقات زنده", "📁 سایر مسابقات", "🔙 منوی اصلی"]
         await d.say("🏠 منوی اصلی", VIEWER)
-        assert [t for t, _ in d.buttons(VIEWER)] == ["🔄 ترنسفر", "🏆 وان نایت چمپیون"]
-        await d.say("🛠 پنل مدیریت", VIEWER); assert [t for t, _ in d.buttons(VIEWER)] == ["🔄 ترنسفر", "🏆 وان نایت چمپیون"], "normal users can't use the admin key"
+        assert [t for t, _ in d.buttons(VIEWER)] == ["🔄 ترنسفر", "🏆 وان نایت چمپیون", "⚽ مسابقه فوتبالی", "🌍 اشتراک بین\u200cالمللی", "🚫 بلک\u200cلیست"]
+        await d.say("🛠 پنل مدیریت", VIEWER); assert [t for t, _ in d.buttons(VIEWER)] == ["🔄 ترنسفر", "🏆 وان نایت چمپیون", "⚽ مسابقه فوتبالی", "🌍 اشتراک بین\u200cالمللی", "🚫 بلک\u200cلیست"], "normal users can't use the admin key"
         await d.say("/onc", VIEWER); assert any("مسابقات زنده" in t for t, _ in d.buttons(VIEWER))
         await d.say("/start", VIEWER)
         await d.say("/start", ADMIN)
@@ -99,7 +99,7 @@ async def run():
         assert any("admin" in c for _, c in S.commands), "admins get /admin in their menu"
         # the admin-panel button lives in the main menu, for admins only
         await d.say("/start", ADMIN)
-        assert [t for t, _ in d.buttons(ADMIN)] == ["🔄 ترنسفر", "🏆 وان نایت چمپیون", "🛠 پنل مدیریت"], d.buttons(ADMIN)
+        assert [t for t, _ in d.buttons(ADMIN)] == ["🔄 ترنسفر", "🏆 وان نایت چمپیون", "⚽ مسابقه فوتبالی", "🌍 اشتراک بین\u200cالمللی", "🚫 بلک\u200cلیست", "🛠 پنل مدیریت"], d.buttons(ADMIN)
         await d.tap("پنل مدیریت", ADMIN)
         assert [t for t, _ in d.buttons(ADMIN)][:2] == ["🔄 پنل ترنسفر", "🏆 پنل وان نایت چمپیون"]
         await d.tap("منوی اصلی", ADMIN); await d.tap("ترنسفر", ADMIN)

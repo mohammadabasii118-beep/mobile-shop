@@ -25,28 +25,39 @@ HOME_TEXT = "🏠 <b>منوی اصلی</b>\n\nیک بخش را انتخاب کن
 ADMIN_TEXT = "🛠 <b>پنل مدیریت</b>\n\nکدام پنل را می‌خواهی؟"
 
 
-def home_markup(uid: int):
-    rows = [[btn("🔄 ترنسفر", "menu")], [btn("🏆 وان نایت چمپیون", "onc:u")]]
+def home_markup(uid: int, extra: tuple[bool, bool] = (False, False)):
+    rows = [[btn("🔄 ترنسفر", "menu")], [btn("🏆 وان نایت چمپیون", "onc:u")],
+            [btn("⚽ مسابقه فوتبالی", "fx:qz"), btn("🌍 اشتراک بین‌المللی", "fx:sb")], [btn("🚫 بلک‌لیست", "fx:bl")]]
+    draft_on, streamer = extra
+    if draft_on:
+        rows[-1].append(btn("📝 درفت", "fx:dr"))
+    if streamer:
+        rows.append([btn("🎥 پنل استریمر", "fx:st")])
     if is_admin(uid):  # admins only; the panels behind it keep their own admin filters
         rows.append([btn("🛠 پنل مدیریت", "admhome")])
     return kb(rows)
 
 
 def admin_markup():
-    return kb([[btn("🔄 پنل ترنسفر", "adm")], [btn("🏆 پنل وان نایت چمپیون", "onc:a")], [btn("🔙 منوی اصلی", "home")]])
+    return kb([[btn("🔄 پنل ترنسفر", "adm")], [btn("🏆 پنل وان نایت چمپیون", "onc:a")], [btn("⚙️ پنل ویژگی‌های جدید", "fx:a")], [btn("🔙 منوی اصلی", "home")]])
+
+
+async def extras(uid: int) -> tuple[bool, bool]:
+    from ..fx import draft as fx_draft, streamers as fx_streamers
+    return await fx_draft.is_on(), await fx_streamers.is_streamer(uid)
 
 
 @router.message(CommandStart())
 async def start(m: Message, state: FSMContext):
     await state.clear()
     await db.ensure_user(m.from_user.id, m.from_user.full_name, m.from_user.username, parse_ref(m.text))
-    await m.answer(HOME_TEXT, reply_markup=home_markup(m.from_user.id))
+    await m.answer(HOME_TEXT, reply_markup=home_markup(m.from_user.id, await extras(m.from_user.id)))
 
 
 @router.callback_query(F.data == "home")
 async def home(c: CallbackQuery, state: FSMContext):
     await state.clear()
-    await show(c, HOME_TEXT, home_markup(c.from_user.id))
+    await show(c, HOME_TEXT, home_markup(c.from_user.id, await extras(c.from_user.id)))
     await c.answer()
 
 
@@ -103,7 +114,7 @@ async def _clean(m: Message) -> None:
 @router.message(F.text == BTN_HOME)
 async def key_home(m: Message, state: FSMContext):
     await state.clear(); await _clean(m)
-    await m.answer(HOME_TEXT, reply_markup=home_markup(m.from_user.id))
+    await m.answer(HOME_TEXT, reply_markup=home_markup(m.from_user.id, await extras(m.from_user.id)))
 
 
 @router.message(F.text == BTN_TRANSFER)

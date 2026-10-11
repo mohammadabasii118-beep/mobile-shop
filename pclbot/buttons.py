@@ -105,6 +105,12 @@ REGISTRY: list[tuple[str, str]] = [
     ('👁 پیش\u200cنمایش دکمه', 'admin'),
     ('✏️ ویرایش متن', 'admin'),
     ('🎁 تغییر جایزه', 'admin'),
+    ('⚽ مسابقه فوتبالی', 'user'),
+    ('🌍 اشتراک بین\u200cالمللی', 'user'),
+    ('🚫 بلک\u200cلیست', 'user'),
+    ('📝 درفت', 'user'),
+    ('🎥 پنل استریمر', 'user'),
+    ('⚙️ پنل ویژگی\u200cهای جدید', 'admin'),
 ]
 
 _over: dict[str, dict] = {}  # original label -> {"text": str|None, "emoji": str|None, "emoji_id": str|None}

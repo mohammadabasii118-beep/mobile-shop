@@ -8,6 +8,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from . import admins, buttons, config, db, emojis, messages, outgoing, payments, services
 from .handlers import admin, ads, home, user, wallet
+from .fx import hub as fx_hub
 from .onc import dbx as onc_dbx, setup as onc_setup
 from .utils import UserMiddleware
 
@@ -31,15 +32,18 @@ async def main() -> None:
     dp.callback_query.outer_middleware(home.BottomMenuMiddleware())
     # user router first so /start and /admin always win over FSM-state catch-all handlers
     # home first: /start and /admin open the section chooser; ONC routers sit beside Transfer's, in their own `onc:` namespace
-    dp.include_routers(home.router, user.router, *onc_setup.routers(), admin.router, wallet.router, ads.router, onc_setup.fallback)
+    dp.include_routers(home.router, user.router, *onc_setup.routers(), *fx_hub.routers(), admin.router, wallet.router, ads.router, onc_setup.fallback, fx_hub.fallback)
     await services.setup_bot(bot)
     await home.setup_menu(bot)
     runner = await payments.start_web(bot)
     expiry = asyncio.create_task(services.expiry_loop(bot))
+    fx_tasks = fx_hub.start_tasks(bot)
     try:
         await dp.start_polling(bot)
     finally:
         expiry.cancel()
+        for t in fx_tasks:
+            t.cancel()
         await runner.cleanup()
         await db.close()
         await onc_dbx.close()
