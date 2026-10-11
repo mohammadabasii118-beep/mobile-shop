@@ -10,6 +10,7 @@
     "seed": "tsx scripts/seed.ts",
     "seed:reset": "tsx scripts/seed.ts --reset",
     "seed:chargers": "tsx scripts/add-chargers.ts",
+    "seed:hero": "tsx scripts/set-hero-banners.ts",
     "typecheck": "tsc --noEmit",
     "smoke": "node scripts/smoke.mjs"
   },
