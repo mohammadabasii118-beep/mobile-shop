@@ -422,7 +422,7 @@ async def publish(c: CallbackQuery, bot: Bot):
     pv = PREVIEW.get(c.from_user.id)
     if not pv:
         return await c.answer("پیش‌نمایشی نیست؛ دوباره بساز.", show_alert=True)
-    outgoing.EXEMPT_CHATS.add(str(chat))
+    outgoing.EXEMPT_CHATS.discard(str(chat))                      # Premium emoji stay Premium in the channel
     try:
         for i, img in enumerate(pv[0]):
             await bot.send_photo(chat, BufferedInputFile(img, f"app_{i}.png"), caption=pv[1] if i == 0 else None)

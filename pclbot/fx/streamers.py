@@ -139,7 +139,9 @@ async def publish(c: CallbackQuery, state: FSMContext, bot: Bot):
     chat = await core.get("plus_chat")
     if not chat:
         return await c.answer("مقصد انتشار تنظیم نشده.", show_alert=True)
-    try:                                                                   # not exempt: Premium emoji are allowed here (plain fallback is automatic)
+    from .. import outgoing
+    outgoing.EXEMPT_CHATS.discard(str(chat))                               # Premium emoji stay Premium here, even if the same chat was exempt before
+    try:
         msg = await bot.send_photo(chat, d["photo"], caption=caption(d["title"], await streamer_name(c.from_user.id, c.from_user.full_name)),
                                    reply_markup=okb(link_buttons(d["links"])))
     except TelegramAPIError as ex:

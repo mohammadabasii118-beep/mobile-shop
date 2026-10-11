@@ -191,8 +191,14 @@ async def run():
     await d.press("fx:stm:0", STREAMER)
     d.snap("Streamer — preview with link buttons", STREAMER)
     assert "Streamer: KingStream" in d.text(STREAMER)
+    from pclbot import emojis, outgoing
+    await emojis.set_id("🔴", "5368324170671202286")                                                  # a Premium emoji is configured …
+    outgoing.EXEMPT_CHATS.add(str(PLUS))                                                               # … and the chat was exempt earlier in this process
     await d.press("fx:stp", STREAMER)
     assert await dbx.scalar("SELECT COUNT(*) FROM fx_stream_posts") == 1
+    post_ = [s for (ch, _), s in d.session.screens.items() if str(ch) == str(PLUS)][-1]
+    assert "tg-emoji" in post_["text"], post_["text"]                                                  # Premium emoji reach the channel
+    await emojis.reset("🔴")
     sent = [x for x in d.session.log if x[0] == "SendPhoto" and str(x[1]["chat_id"]) == str(PLUS)]
     assert sent, d.session.log[-5:]
     post = [s for (ch, _), s in d.session.screens.items() if str(ch) == str(PLUS)][-1]

@@ -49,7 +49,7 @@ async def card(t: dict) -> bytes:
 
 
 async def post(bot: Bot, t: dict, chat: str) -> None:
-    outgoing.EXEMPT_CHATS.add(str(chat))
+    outgoing.EXEMPT_CHATS.discard(str(chat))                      # Premium emoji stay Premium in the channel
     await bot.send_photo(chat, BufferedInputFile(await card(t), "here_we_go.png"), caption=caption(t))
 
 
