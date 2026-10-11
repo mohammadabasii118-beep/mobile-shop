@@ -321,3 +321,5 @@ textarea.json.welcome { min-height: 220px; font-family: var(--f-body); font-size
 /* جلوگیری از «کشیدن برای رفرش/بستن» و اسکرولِ زنجیره‌ای که تلگرام را به بستن وسوسه می‌کند */
 html, body, #root, .app, .screen, .battle, .admin { overscroll-behavior: none; }
 .battle { touch-action: manipulation; }
+
+.dbg { color: var(--muted); font-size: 11px; opacity: .8; user-select: text; }

@@ -20,17 +20,28 @@ function devIdentity() {
   return `dev:${id}:${encodeURIComponent(`بازیکن ${id}`)}`;
 }
 
+/** منبع هویت (برای عیب‌یابی): اسکریپت تلگرام، هش لینک، حافظه‌ی نشست، یا هویت آزمایشی */
+export let initSource: 'telegram' | 'hash' | 'session' | 'dev' = 'dev';
+
 /** هویت تلگرام: از اسکریپت رسمی؛ اگر لود نشد (مثلاً telegram.org فیلتر بود) مستقیم از هش لینک (#tgWebAppData=…) */
 function telegramInitData(): string {
-  if (tg?.initData) return tg.initData;
+  if (tg?.initData) { initSource = 'telegram'; return tg.initData; }
   try {
     const fromHash = new URLSearchParams(location.hash.slice(1)).get('tgWebAppData');
-    if (fromHash) { sessionStorage.setItem('tgInit', fromHash); return fromHash; }
-    return sessionStorage.getItem('tgInit') ?? '';
+    if (fromHash) { sessionStorage.setItem('tgInit', fromHash); initSource = 'hash'; return fromHash; }
+    const kept = sessionStorage.getItem('tgInit') ?? '';
+    if (kept) initSource = 'session';
+    return kept;
   } catch { return ''; }
 }
 
 export const initData = telegramInitData() || devIdentity();
+/** خلاصه‌ی عیب‌یابی: منبع هویت، طول آن، و سنِ آن (از auth_date) */
+export function initDebug(): string {
+  let age = '';
+  try { const t = Number(new URLSearchParams(initData).get('auth_date')); if (t) age = ` — سن: ${Math.round((Date.now() / 1000 - t) / 60)} دقیقه`; } catch { /* ignore */ }
+  return `هویت: ${initSource}${initData.startsWith('dev:') ? ' (آزمایشی)' : ` (${initData.length} نویسه${age})`}`;
+}
 export const isDev = initData.startsWith('dev:');
 export const haptic = () => { try { tg?.HapticFeedback?.impactOccurred('light'); } catch { /* ignore */ } };
 

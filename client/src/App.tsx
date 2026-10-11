@@ -6,6 +6,7 @@ import { CardsScreen } from './CardsScreen';
 import { BattleScreen, type BattleInit } from './BattleScreen';
 import { Admin } from './Admin';
 import { Gate } from './Gate';
+import { initDebug } from './telegram';
 import { Modal, fa } from './ui';
 import type { BattleReward } from '@game/shared';
 
@@ -55,7 +56,7 @@ export function App() {
     });
   }, [sock, toast]);
 
-  if (err) return <div className="center"><h2>😕</h2><p>{err}</p><button className="btn" onClick={() => location.reload()}>تلاش دوباره</button></div>;
+  if (err) return <div className="center"><h2>😕</h2><p>{err}</p><small className="dbg" dir="rtl">{initDebug()}</small><button className="btn" onClick={() => location.reload()}>تلاش دوباره</button></div>;
   if (!cfg || !profile) return <div className="center"><div className="spinner" /><p>در حال بارگذاری…</p></div>;
 
   const ctx: Ctx = { cfg, setCfg, profile, setProfile, sock, toast };
