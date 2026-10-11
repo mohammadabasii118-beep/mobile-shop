@@ -15,7 +15,7 @@ export async function call(path: string, body?: object): Promise<any> {
 export const loadConfig = (): Promise<GameConfig> => fetch('/api/config').then((r) => r.json());
 export const loadProfile = (): Promise<Profile> => call('/api/me').then((j) => j.profile);
 
-type Listener = (m: ServerMsg | { t: 'closed' }) => void;
+type Listener = (m: ServerMsg | { t: 'closed'; code: number }) => void;
 
 export class Socket {
   private ws!: WebSocket;
@@ -31,7 +31,7 @@ export class Socket {
         if (m.t === 'error') reject(new Error(m.message));
         this.listeners.forEach((l) => l(m));
       };
-      this.ws.onclose = () => { this.listeners.forEach((l) => l({ t: 'closed' })); reject(new Error('closed')); };
+      this.ws.onclose = (e) => { this.listeners.forEach((l) => l({ t: 'closed', code: e.code })); reject(new Error('closed')); };
     });
   }
   send(m: ClientMsg) { if (this.ws.readyState === 1) this.ws.send(JSON.stringify(m)); }

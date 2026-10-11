@@ -13,7 +13,7 @@ import { Game, GameError } from './game';
 export interface ServerOptions {
   db: Db; cfg: GameConfig; auth: AuthOptions; staticDir?: string;
   now?: () => number; rng?: () => number;
-  pauseMs?: number; botDelayMs?: number; turnMs?: number;
+  pauseMs?: number; botDelayMs?: number; turnMs?: number; heartbeatMs?: number;
   /** پوشه‌ی داده (عکس‌های آپلودشده) */
   dataDir?: string;
   /** شناسه‌ی تلگرام ادمین‌ها */
@@ -50,6 +50,7 @@ export function createGameServer(opt: ServerOptions) {
     const battle = new Battle({
       id, mode, cfg, rng, turnMs: turnMs(), pauseMs: opt.pauseMs ?? 900, botDelayMs: opt.botDelayMs ?? 700,
       onEnd: ({ winner, reason }) => {
+        if (reason === 'disconnect') console.log(`[battle] ${id.slice(0, 8)} با قطع اتصال تمام شد؛ برنده: ${winner}`);
         for (const c of humans) {
           c.battle = null;
           const side = battle.sideOf(c.userId)!;
@@ -120,7 +121,21 @@ export function createGameServer(opt: ServerOptions) {
 
   // ---------- WebSocket ----------
   const wss = new WebSocketServer({ noServer: true, maxPayload: 4096 });
+  // ضربان: هر ۲۰ ثانیه ping می‌فرستیم تا تونل/پروکسی/شبکه‌ی موبایل اتصالِ ساکت را قطع نکنند؛
+  // اتصالی که ۳ بار پشت‌سرهم جواب نداد (مرده) بسته می‌شود تا حریفش منتظر یک روحِ بی‌جواب نماند.
+  const missed = new WeakMap<WebSocket, number>();
+  const heartbeat = setInterval(() => {
+    for (const w of wss.clients) {
+      const n = (missed.get(w) ?? 0) + 1;
+      if (n > 3) { w.terminate(); continue; }
+      missed.set(w, n);
+      try { w.ping(); } catch { /* بسته شده */ }
+    }
+  }, opt.heartbeatMs ?? 20_000);
+  heartbeat.unref();
   wss.on('connection', (ws) => {
+    missed.set(ws, 0);
+    ws.on('pong', () => missed.set(ws, 0));
     let conn: Conn | null = null;
     ws.on('message', (raw) => {
       let m: ClientMsg;
@@ -132,7 +147,7 @@ export function createGameServer(opt: ServerOptions) {
           let userId: number;
           try { userId = game.upsertUser(u); } catch (e) { ws.send(JSON.stringify({ t: 'error', message: (e as Error).message })); return ws.close(); }
           const old = conns.get(userId);
-          if (old && old.ws !== ws) old.ws.close(); // اتصال قبلی → اگه وسط مبارزه بود می‌بازه
+          if (old && old.ws !== ws) { console.log(`[ws] ${u.name} (${userId}): اتصال قبلی بسته شد چون همین حساب جای دیگری باز شد`); old.ws.close(4001, 'replaced'); } // اتصال قبلی → اگه وسط مبارزه بود می‌بازه
           conn = { ws, userId, name: u.name, battle: null, queued: false };
           conns.set(userId, conn);
           return send(conn, { t: 'ready', profile: game.profile(userId) });
@@ -144,8 +159,9 @@ export function createGameServer(opt: ServerOptions) {
         if (!(e instanceof GameError)) console.error(e);
       }
     });
-    ws.on('close', () => {
+    ws.on('close', (code, reason) => {
       if (!conn) return;
+      console.log(`[ws] ${conn.name} (${conn.userId}) قطع شد؛ کد=${code}${reason?.length ? ` دلیل=${reason.toString()}` : ''}${conn.battle ? ' — وسط مبارزه بود (می‌بازد)' : ''}`);
       queue = queue.filter((q) => q !== conn);
       if (conns.get(conn.userId) === conn) conns.delete(conn.userId);
       const b = conn.battle;
@@ -360,5 +376,5 @@ export function createGameServer(opt: ServerOptions) {
     wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
   });
 
-  return { http, game, close: () => { wss.clients.forEach((c) => c.close()); http.close(); } };
+  return { http, game, close: () => { clearInterval(heartbeat); wss.clients.forEach((c) => c.close()); http.close(); } };
 }

@@ -138,3 +138,28 @@ describe('entry fees', () => {
     c.ws.close();
   });
 });
+
+describe('connection safety', () => {
+  it('a second login of the same account closes the first with code 4001 (so the client can explain why)', async () => {
+    const a1 = new Client(600);
+    await a1.open();
+    const closed = new Promise<number>((r) => a1.ws.once('close', (code) => r(code)));
+    const a2 = new Client(600);
+    await a2.open();
+    expect(await closed).toBe(4001);
+    a2.ws.close();
+  });
+
+  it('heartbeat pings keep idle connections alive', async () => {
+    const s3 = createGameServer({ db: openDb(), cfg: loadConfig(), auth: { devAuth: true }, heartbeatMs: 30 });
+    await new Promise<void>((r) => s3.http.listen(0, r));
+    const ws = new WebSocket(`ws://127.0.0.1:${(s3.http.address() as AddressInfo).port}/ws`);
+    let pings = 0;
+    ws.on('ping', () => pings++);
+    await new Promise((r) => ws.once('open', r));
+    await new Promise((r) => setTimeout(r, 300));
+    expect(pings).toBeGreaterThanOrEqual(3);
+    expect(ws.readyState).toBe(WebSocket.OPEN);
+    ws.close(); s3.close();
+  });
+});

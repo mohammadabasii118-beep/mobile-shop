@@ -46,7 +46,7 @@ export function App() {
       }
     })();
     return sock.on((m) => {
-      if (m.t === 'closed') return setErr('ارتباط با سرور قطع شد. صفحه را دوباره باز کن.');
+      if (m.t === 'closed') return setErr(m.code === 4001 ? 'این حساب هم‌زمان جای دیگری (پنجره یا دستگاه دیگر) باز شد و این نشست بسته شد.' : 'ارتباط با سرور قطع شد. صفحه را دوباره باز کن.');
       if (m.t === 'ready' || m.t === 'profile') setProfile(m.profile);
       if (m.t === 'queued') setQueued(true);
       if (m.t === 'error') { setQueued(false); toast(m.message); }
