@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Heart, Menu, Moon, Phone, Store, Tag, User, X } from 'lucide-react';
@@ -33,7 +34,7 @@ export default function MobileMenu({ categories, storeName, phone }: { categorie
       <button ref={btn} className="icon-btn menu-btn" onClick={() => setOpen(true)} aria-label="باز کردن منو" aria-expanded={open}>
         <Menu className="i" />
       </button>
-      {open && (
+      {open && createPortal(
         <>
           <div className="drawer-bg" onClick={() => setOpen(false)} />
           <div className="drawer" role="dialog" aria-modal="true" aria-label="منوی سایت">
@@ -61,7 +62,8 @@ export default function MobileMenu({ categories, storeName, phone }: { categorie
               <span style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, color: 'var(--mute)' }}><Phone className="i" /> <span className="num">{phone}</span></span>
             </nav>
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </>
   );
