@@ -614,7 +614,80 @@ def render_transfer(cfg: dict, data: dict, bg_path: str | None = None) -> list[b
     return [cv.png()]
 
 
+def render_stats(cfg: dict, data: dict, bg_path: str | None = None) -> list[bytes]:
+    """PLAYER STATS: one glass card per category (top scorer / assists / goalkeeper / rating) with the leader and the runners-up."""
+    cv = Canvas(cfg, background(cfg, bg_path))
+    el = cfg["elements"]
+    chrome(cv, data, 1, 1)
+    cards = data["cards"][:4]
+    top, ch, gap = 410, 196, 14
+    for i, c in enumerate(cards):
+        y0 = top + i * (ch + gap)
+        panel(cv, (56, y0, cfg["w"] - 56, y0 + ch), accent=True, strong=(i % 2 == 0))
+        ct, pl, tm, ot, vl = el["card_title"], el["player"], el["team"], el["others"], el["value"]
+        cv.text(c["label"], ct, y=y0 + 34)
+        cv.text(c["name"], pl, y=y0 + 90, shadow=True)
+        cv.text(c.get("team"), tm, y=y0 + 138)
+        cv.text(c.get("others"), ot, y=y0 + 172)
+        cv.glow(lambda d, y0=y0: d.rounded_rectangle([S(vl["x"] - 92), S(y0 + 46), S(vl["x"] + 92), S(y0 + 146)], radius=S(30), fill=cv.gold[:3] + (110,)), 12, .5)
+        cv.rect((vl["x"] - 90, y0 + 48, vl["x"] + 90, y0 + 144), fill=cv.gold, r=30)
+        cv.text(c["value"], vl, y=y0 + 96)
+    return [cv.png()]
+
+
+def _line_of(pos: str) -> int:
+    p = (pos or "").upper().replace(" ", "")
+    if p in ("GK", "GOALKEEPER", "GKP") or p.startswith("GK"):
+        return 0
+    if any(k in p for k in ("CB", "LB", "RB", "WB", "DEF", "DF")) and "CDM" not in p:
+        return 1
+    if any(k in p for k in ("CDM", "CM", "CAM", "LM", "RM", "MID", "MF", "DM", "AM")):
+        return 2
+    return 3
+
+
+def _side(pos: str) -> int:
+    p = (pos or "").upper()
+    return 0 if p.startswith("L") else 2 if p.startswith("R") else 1
+
+
+def render_best_xi(cfg: dict, data: dict, bg_path: str | None = None) -> list[bytes]:
+    """BEST XI: the selected players placed on a pitch by line (GK / DEF / MID / ATT) and left-to-right hint of their position."""
+    cv = Canvas(cfg, background(cfg, bg_path))
+    el = cfg["elements"]
+    chrome(cv, data, 1, 1)
+    x0, y0, x1, y1 = 56, 400, cfg["w"] - 56, 1250
+    cv.rect((x0, y0, x1, y1), fill=(20, 110, 60, 70), outline=(255, 255, 255, 70), width=2, r=26)
+    line = (255, 255, 255, 60)
+    cv.line([(x0, (y0 + y1) / 2), (x1, (y0 + y1) / 2)], line, 2)
+    cv.ellipse((cfg["w"] / 2 - 90, (y0 + y1) / 2 - 90, cfg["w"] / 2 + 90, (y0 + y1) / 2 + 90), outline=line, width=2)
+    for yy, d in ((y0, 1), (y1, -1)):
+        cv.rect((cfg["w"] / 2 - 230, min(yy, yy + d * 150), cfg["w"] / 2 + 230, max(yy, yy + d * 150)), outline=line, width=2)
+    groups: dict[int, list[dict]] = {}
+    for p in data["players"][:11]:
+        groups.setdefault(_line_of(p.get("position", "")), []).append(p)
+    present = sorted(groups, reverse=True)                      # attackers at the top … goalkeeper at the bottom
+    ys = [y1 - 120] if len(present) == 1 else [y0 + 90 + k * ((y1 - y0 - 230) / (len(present) - 1)) for k in range(len(present))]
+    pl, rt = el["player"], el["rating"]
+    for ln, yy in zip(present, ys):
+        row = sorted(groups[ln], key=lambda p: _side(p.get("position", "")))
+        n = len(row)
+        for k, p in enumerate(row):
+            cx = x0 + (x1 - x0) * (k + 1) / (n + 1)
+            cv.glow(lambda d, cx=cx, yy=yy: d.ellipse([S(cx - 42), S(yy - 42), S(cx + 42), S(yy + 42)], fill=cv.gold[:3] + (120,)), 10, .55)
+            cv.ellipse((cx - 38, yy - 38, cx + 38, yy + 38), fill=cv.gold, outline=(20, 8, 12, 255), width=3)
+            cv.text((p.get("position") or "")[:3].upper(), {"x": cx, "size": 26, "min": 14, "color": "#14080c", "align": "center", "max_w": 64, "font": templates.O_BOLD}, y=yy)
+            cv.text(p["name"], pl, y=yy + 62, x=cx, shadow=True)
+            if p.get("rating") not in (None, ""):
+                cv.text(p["rating"], rt, y=yy + 92, x=cx)
+    return [cv.png()]
+
+
 def render(type_: str, cfg: dict, data: dict, bg_path: str | None = None) -> list[bytes]:
+    if type_ == "PLAYER_STATS":
+        return render_stats(cfg, data, bg_path)
+    if type_ == "BEST_XI":
+        return render_best_xi(cfg, data, bg_path)
     if type_ == "TRANSFER":
         return render_transfer(cfg, data, bg_path)
     if type_ in ("SCHEDULE", "GROUP_TABLE", "ROUND_RESULTS", "QUALIFIED", "KO_MATCHES"):
@@ -655,6 +728,15 @@ def sample(type_: str) -> dict:
             {"name": "فینال", "matches": [{"a": "؟", "b": "؟", "ga": None, "gb": None, "win": None}]}]}
     if type_ == "CHAMPION":
         return {"team": "تاج", "logo": None, "subtitle": sub}
+    if type_ == "PLAYER_STATS":
+        return {"subtitle": "لیگ برتر پرو · تا راند 5", "cards": [
+            {"label": "TOP SCORER", "name": "Ali_10", "team": "تاج", "value": "12", "others": "2. Reza_7 — 9   ·   3. Sina_9 — 8"},
+            {"label": "MOST ASSISTS", "name": "Mehdi_8", "team": "آزادی", "value": "9", "others": "2. Ali_10 — 7   ·   3. Arash_6 — 6"},
+            {"label": "BEST GOALKEEPER", "name": "Keeper_1", "team": "لگسی", "value": "5 CS", "others": "2. GK_Pro — 4   ·   3. Wall_99 — 3"},
+            {"label": "BEST AVG RATING", "name": "Star_11", "team": "آریا", "value": "8.42", "others": "2. Ali_10 — 8.30   ·   3. Mehdi_8 — 8.11"}]}
+    if type_ == "BEST_XI":
+        pos = ["GK", "LB", "CB", "CB", "RB", "CM", "CAM", "CM", "LW", "ST", "RW"]
+        return {"title": "BEST XI · 4-3-3", "subtitle": "لیگ برتر پرو · تا راند 5", "players": [{"name": f"Player_{i + 1}", "position": p, "rating": f"{8.9 - i * .1:.1f}"} for i, p in enumerate(pos)]}
     if type_ == "TRANSFER":
         return {"player": "Ali_10", "from": "آریا", "to": "تاج", "type_label": "انتقال", "date": "2026/10/11", "subtitle": "TRANSFER NEWS · PCL"}
     raise ValueError(type_)

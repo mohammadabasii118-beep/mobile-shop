@@ -60,11 +60,13 @@ async def init(path: str | None = None) -> str | None:
 
 
 async def _migrate_template_types() -> None:
-    """Older databases have a CHECK without 'TRANSFER' on onc_templates (SQLite can't alter it) → rebuild the table once."""
+    """Older databases have a CHECK without the app-graphic types on onc_templates (SQLite can't alter it) → rebuild the table once."""
     sql = await (await _conn.execute("SELECT sql FROM sqlite_master WHERE name='onc_templates'")).fetchone()
-    if not sql or "'TRANSFER'" in sql[0]:
+    if not sql or "'BEST_XI'" in sql[0]:
         return
-    new_sql = sql[0].replace("'CHAMPION'))", "'CHAMPION','TRANSFER'))").replace("'CHAMPION')", "'CHAMPION','TRANSFER')", 1) if "'TRANSFER'" not in sql[0] else sql[0]
+    import re
+    new_sql = re.sub(r"CHECK\s*\(\s*type\s+IN\s*\([^)]*\)\s*\)",
+                     "CHECK(type IN ('SCHEDULE','GROUP_TABLE','ROUND_RESULTS','QUALIFIED','KO_MATCHES','BRACKET','CHAMPION','TRANSFER','PLAYER_STATS','BEST_XI'))", sql[0], count=1)
     await _conn.execute("BEGIN IMMEDIATE")
     try:
         await _conn.execute("ALTER TABLE onc_templates RENAME TO onc_templates_old")

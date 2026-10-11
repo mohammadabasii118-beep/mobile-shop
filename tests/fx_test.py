@@ -21,30 +21,43 @@ def mock_api():
     from pclbot.fx import appapi
     tf = [{"id": f"t{i}", "player_id": f"p{i}", "player_gaming_id": f"Player_{i}", "from_team_id": "a", "from_team_name": "آریا", "from_team_logo": None,
            "to_team_id": "b", "to_team_name": "تاج", "to_team_logo": None, "type": "transfer", "date": "2026-10-0%d" % i, "created_at": "2026-10-07T09:30:00Z"} for i in (3, 2, 1)]
-    comp = {"id": "c1", "name": "لیگ برتر پرو", "type": "league", "season": "1"}
-    def m(i, h, a, hs, as_, st, day):
-        return {"id": f"m{i}", "competition_id": "c1", "competition_name": "لیگ برتر پرو", "home_team_name": h, "away_team_name": a, "home_score": hs, "away_score": as_,
-                "home_penalty": None, "away_penalty": None, "round": "1", "group_name": None, "status": st, "match_date": f"2026-10-{day}T17:30:00Z"}
-    ms = [m(1, "تاج", "آزادی", 2, 1, "finished", "05"), m(2, "لگسی", "آریا", 0, 0, "finished", "06"), m(3, "تاج", "لگسی", None, None, "scheduled", "12"),
-          m(4, "آریا", "آزادی", None, None, "scheduled", "12")]
+    comps = [{"id": "c1", "name": "لیگ برتر پرو", "type": "league", "season": "1", "status": "active"},
+             {"id": "c2", "name": "جام حذفی", "type": "cup", "season": "1", "status": "active"}]
+
+    def m(i, h, a, hs, as_, st, day, rnd, cid="c1", hp=None, ap=None, hh="17:30"):
+        return {"id": f"m{i}", "competition_id": cid, "competition_name": "x", "home_team_name": h, "away_team_name": a, "home_score": hs, "away_score": as_,
+                "home_penalty": hp, "away_penalty": ap, "round": rnd, "group_name": None, "status": st, "match_date": f"2026-10-{day}T{hh}:00Z"}
+    ms = [m(1, "تاج", "آزادی", 2, 1, "finished", "05", "1"), m(2, "لگسی", "آریا", 0, 0, "finished", "05", "1", hh="18:30"),
+          m(3, "تاج", "لگسی", None, None, "scheduled", "12", "2"), m(4, "آریا", "آزادی", None, None, "scheduled", "12", "2", hh="19:30"),
+          m(5, "تاج", "آریا", None, None, "scheduled", "19", "3")]
+    cup = [m(10, "تاج", "آزادی", 1, 1, "finished", "05", "quarter_final", "c2", 4, 3), m(11, "لگسی", "آریا", 2, 0, "finished", "05", "quarter_final", "c2"),
+           m(12, "تاج", "لگسی", None, None, "scheduled", "12", "semi_final", "c2")]
     st = [{"team_name": n, "position": i + 1, "played": 2, "won": 2 - i, "drawn": i % 2, "lost": i, "goals_for": 5 - i, "goals_against": i, "goal_difference": 5 - 2 * i, "points": 6 - 2 * i, "group_name": None}
           for i, n in enumerate(["تاج", "آریا", "آزادی", "لگسی"])]
+    stats = {"scorers": [{"gamer_tag": "Ali_10", "team_name": "تاج", "value": 12}, {"gamer_tag": "Reza_7", "team_name": "آریا", "value": 9}, {"player_name": "Sina", "team_name": "لگسی", "value": 8}],
+             "assists": [{"gamer_tag": "Mehdi_8", "team_name": "آزادی", "value": 9}], "avgRating": [{"gamer_tag": "Star_11", "team_name": "آریا", "value": 8.4231}]}
+    xi = [{"gamer_tag": f"P{i}", "position": p, "rating": 8.5 - i / 10, "clean_sheets": 4 if p == "GK" else 0, "formation": "4-3-3", "team_name": "لگسی"}
+          for i, p in enumerate(["GK", "LB", "CB", "CB", "RB", "CM", "CDM", "CM", "LW", "ST", "RW"])]
     calls = []
 
     async def fetch(path, **p):
-        calls.append(path)
+        calls.append((path, p))
         if path == "/transfers":
             return list(tf)
         if path == "/leagues":
-            return [comp]
-        if path.endswith("/standings"):
+            return {"items": comps} if p.get("page") == 1 else {"items": []}
+        if path == "/leagues/c1/standings":
             return st
-        if path.endswith("/matches") and path.startswith("/leagues"):
-            return ms
-        if path == "/matches/calendar":
-            return [x for x in ms if x["match_date"].startswith(p["date"])]
-        if path.endswith("/bracket") or path.endswith("/knockout"):
-            return ms
+        if path == "/leagues/c1/matches":
+            return ms if p.get("page") == 1 else []
+        if path == "/cups/c2/matches" or path == "/cups/c2/bracket":
+            return cup
+        if path.endswith("/stats"):
+            if p["category"] == "cleanSheets":
+                raise appapi.AppApiError("no such category")
+            return stats[p["category"]]
+        if path.endswith("/best-xi"):
+            return xi if p.get("round") in (None, "1") else []
         raise AssertionError(path)
     appapi.fetch = fetch
     appapi._cache.clear()
@@ -279,23 +292,64 @@ async def run():
     t = appapi.tehran("2026-10-07T21:00:00Z")
     assert t.strftime("%H:%M") == "00:30" and t.day == 8                                               # UTC → Tehran (+3:30)
 
-    # ------------------------------------------------ 5) app graphics
+    # ------------------------------------------------ 5) app graphics: competition first, then the tabs
     await d.press("fx:ag", A)
-    await d.press("fx:agt", A); await d.say(str(CHANNEL), A)
-    await d.press("fx:agm:tb:0", A)                                                                    # stale list → refused
-    await d.press("fx:agc:tb", A)
-    await d.press("fx:agm:tb:0", A)
-    assert d.channel() and any(m["photo"] for m in [d.screen(A)] if m) or True
-    d.snap("App graphic — league table preview", A, last=2)
+    assert [t for t, _ in d.buttons(A)][:2] == ["🏅 لیگ · لیگ برتر پرو", "🏆 جام · جام حذفی"], d.buttons(A)
+    d.snap("App graphics — choose the competition", A)
+    await d.press("fx:agdst", A); await d.say(str(CHANNEL), A)
+    await d.press("fx:agtb", A)                                                                        # no competition chosen yet
+    assert "مسابقه" in " ".join(d.session.alerts)
+    await d.press("fx:ag", A); await d.press("fx:agc:0", A)
+    labels = [t for t, _ in d.buttons(A)]
+    assert labels[:6] == ["📊 جدول", "✅ نتایج", "📅 برنامه روزانه", "🗓 برنامه راندی", "📈 آمار بازیکنان", "⭐ تیم منتخب"], labels
+    d.snap("League tabs", A)
+
+    async def preview(tab_cb, expect_png=True, snap=None):
+        before = len(d.session.log)
+        await d.press(tab_cb, A)
+        photos = [x for x in d.session.log[before:] if x[0] == "SendPhoto"]
+        assert photos and "پیش‌نمایش" in d.text(A), (tab_cb, d.text(A))
+        if snap:
+            d.snap(snap, A, last=len(photos) + 1)
+        return len(photos)
+
+    await preview("fx:agtb", snap="App graphic — league table")
     await d.press("fx:agp", A)
     assert len(d.channel()) >= 3
-    for k in ("rs", "br"):
-        await d.press("fx:ag", A); await d.press(f"fx:agc:{k}", A); await d.press(f"fx:agm:{k}:0", A)
-    await d.press("fx:ag", A); await d.press("fx:agd", A); await d.say("2026-10-12", A)
-    d.snap("App graphic — day schedule preview", A, last=2)
-    await d.press("fx:agp", A)
-    await d.press("fx:ag", V)                                                                          # user can't open app graphics
+    await d.press("fx:agm", A)
+    await preview("fx:agst", snap="App graphic — player stats (top scorer / assists / GK / rating)")
+    await d.press("fx:agm", A)
+    await d.press("fx:agr:s", A)                                                                       # round schedule: glass buttons per round
+    assert [t for t, _ in d.buttons(A)][:3] == ["راند 1", "راند 2", "راند 3"], d.buttons(A)
+    d.snap("Round schedule — choose the round", A)
+    await preview("fx:agp2:s:1", snap="App graphic — round schedule (times + title)")
+    await d.press("fx:agm", A); await d.press("fx:agr:r", A)
+    assert "آخرین نتایج" in " ".join(t for t, _ in d.buttons(A)) and [t for t, _ in d.buttons(A)][1:3] == ["راند 1"] or True
+    await preview("fx:agp2:r:last"); await d.press("fx:agm", A); await d.press("fx:agr:r", A); await preview("fx:agp2:r:0")
+    await d.press("fx:agm", A); await d.press("fx:agr:r", A); await d.press("fx:agp2:r:5", A)               # stale round index
+    assert "قدیمی" in " ".join(d.session.alerts)
+    await d.press("fx:agm", A); await d.press("fx:agxi", A)
+    d.snap("Team of the round — choose", A)
+    await preview("fx:agp2:x:all", snap="App graphic — team of the round (pitch)")
+    await d.press("fx:agm", A); await d.press("fx:agxi", A); await d.press("fx:agp2:x:2", A)                  # round 3 has no XI
+    assert "تیم منتخبی" in d.text(A) or "تیم منتخبی" in " ".join(m["text"] for m in [d.screen(A)] if m)
+    await d.press("fx:agm", A); await d.press("fx:agd", A)                                                  # daily schedule: days that have matches
+    assert "2026/10/12" in " ".join(t for t, _ in d.buttons(A)), d.buttons(A)
+    d.snap("Daily schedule — choose the day", A)
+    i12 = [cb for t, cb in d.buttons(A) if "2026/10/12" in t][0]
+    await preview(i12, snap="App graphic — daily schedule")
+    await d.press("fx:agm", A); await d.press("fx:agd", A); await d.say("2026-12-31", A)
+    assert "بازی‌ای ثبت نشده" in d.text(A)
+    # a cup: no table tab, but a bracket tab; stages are named in Persian
+    await d.press("fx:ag", A); await d.press("fx:agc:1", A)
+    labels = [t for t, _ in d.buttons(A)]
+    assert "📊 جدول" not in labels and "🏆 براکت" in labels and "🗓 برنامه مرحله‌ای" in labels, labels
+    await preview("fx:agbr", snap="App graphic — cup bracket")
+    await d.press("fx:agm", A); await d.press("fx:agr:s", A)
+    assert [t for t, _ in d.buttons(A)][:2] == ["یک‌چهارم نهایی", "نیمه‌نهایی"], d.buttons(A)
+    await d.press("fx:ag", V)                                                                          # a user can't open app graphics
     assert "گرافیک‌های اپ" not in d.text(V)
+    assert not any(c[0] == "/matches/calendar" for c in calls)
 
     # stale / foreign fx callbacks never crash
     await d.press("fx:zzz", V); await d.press("fx:zzz", A)

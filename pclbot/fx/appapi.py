@@ -66,35 +66,81 @@ def tehran(iso: str) -> datetime:
 
 
 # ------------------------------------------------------------------ typed helpers
+def rows(data) -> list[dict]:
+    """The API returns a plain list, but a paged object ({items|data|results: [...]}) is accepted too."""
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict):
+        for k in ("items", "data", "results", "matches", "players", "standings"):
+            if isinstance(data.get(k), list):
+                return data[k]
+    return []
+
+
+PREFIX = {"league": "leagues", "cup": "cups", "champions": "champions"}
+
+
+def base(comp: dict) -> str:
+    return f"/{PREFIX.get(comp.get('type'), 'leagues')}/{comp['id']}"
+
+
 async def transfers(limit: int = 20) -> list[dict]:
-    return await get("/transfers", ttl=0, page=1, limit=limit)
+    return rows(await get("/transfers", ttl=0, page=1, limit=limit))
 
 
-async def competitions(kind: str | None = None) -> list[dict]:
-    out = await get("/leagues", type=kind, page=1, per_page=50)
-    return out["items"] if isinstance(out, dict) and "items" in out else out
+async def competitions() -> list[dict]:
+    out: list[dict] = []
+    for page in (1, 2, 3):
+        got = rows(await get("/leagues", page=page, per_page=20))
+        out += [x for x in got if x["id"] not in {y["id"] for y in out}]
+        if len(got) < 20:
+            break
+    order = {"active": 0, "open": 1, "full": 1, "closed": 2, "finished": 3, "suspended": 3}
+    return sorted(out, key=lambda x: order.get(x.get("status"), 2))
 
 
 async def standings(comp: dict, group: str | None = None) -> list[dict]:
-    t = comp.get("type")
-    if t == "champions":
-        return await get(f"/champions/{comp['id']}/groups", group=group)
-    return await get(f"/leagues/{comp['id']}/standings", group=group)
+    path = f"/champions/{comp['id']}/groups" if comp.get("type") == "champions" else f"/leagues/{comp['id']}/standings"
+    return rows(await get(path, group=group))
 
 
-async def comp_matches(comp: dict, status: str | None = None) -> list[dict]:
+async def all_matches(comp: dict) -> list[dict]:
+    """Every match of the competition (league pages are walked until they stop returning new matches)."""
     t = comp.get("type")
+    seen: dict[str, dict] = {}
     if t == "cup":
-        return await get(f"/cups/{comp['id']}/matches")
-    if t == "champions":
-        return await get(f"/champions/{comp['id']}/group-matches")
-    return await get(f"/leagues/{comp['id']}/matches", status=status)
+        sources = [(f"/cups/{comp['id']}/matches", False)]
+    elif t == "champions":
+        sources = [(f"/champions/{comp['id']}/group-matches", False), (f"/champions/{comp['id']}/knockout", False)]
+    else:
+        sources = [(f"/leagues/{comp['id']}/matches", True)]
+    for path, paged in sources:
+        for page in range(1, 9 if paged else 2):
+            try:
+                got = rows(await get(path, page=page if paged else None, limit=100 if paged else None))
+            except AppApiError:
+                if page == 1 and not seen:
+                    raise
+                break
+            new = [m for m in got if m["id"] not in seen]
+            for m in new:
+                seen[m["id"]] = m
+            if not paged or not new:
+                break
+    return list(seen.values())
 
 
 async def bracket(comp: dict) -> list[dict]:
-    if comp.get("type") == "champions":
-        return await get(f"/champions/{comp['id']}/knockout")
-    return await get(f"/cups/{comp['id']}/bracket")
+    path = f"/champions/{comp['id']}/knockout" if comp.get("type") == "champions" else f"/cups/{comp['id']}/bracket"
+    return rows(await get(path))
+
+
+async def stats(comp: dict, category: str, limit: int = 3) -> list[dict]:
+    return rows(await get(base(comp) + "/stats", category=category, page=1, limit=limit))
+
+
+async def best_xi(comp: dict, round_: str | None = None) -> list[dict]:
+    return rows(await get(base(comp) + "/best-xi", round=round_))
 
 
 async def day_matches(day) -> list[dict]:
@@ -102,7 +148,7 @@ async def day_matches(day) -> list[dict]:
     from datetime import timedelta
     seen: dict[str, dict] = {}
     for d in (day - timedelta(days=1), day):
-        for m in await get("/matches/calendar", date=d.isoformat()):
+        for m in rows(await get("/matches/calendar", date=d.isoformat())):
             t = tehran(m["match_date"])
             if t.date() == day:
                 m["tehran_time"] = t

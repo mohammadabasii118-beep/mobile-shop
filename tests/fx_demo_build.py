@@ -25,8 +25,17 @@ FA = {
     "Hall of champions": "تالار قهرمانان (۱ تا ۳ هر دوره)",
     "Here We Go — admin": "ترنسفر نیوز (Here We Go) — پنل ادمین",
     "Here We Go — channel post": "پست Here We Go در کانال (گرافیک + متن)",
-    "App graphic — league table preview": "گرافیک از داده اپ — پیش‌نمایش جدول",
-    "App graphic — day schedule preview": "گرافیک از داده اپ — برنامه بازی‌های یک روز",
+    "App graphics — choose the competition": "گرافیک اپ — اول مسابقه را انتخاب می‌کنی (لیگ / جام / تورنمنت)",
+    "League tabs": "تب‌های مسابقه (لیگ)",
+    "App graphic — league table": "جدول لیگ",
+    "App graphic — player stats (top scorer / assists / GK / rating)": "آمار بازیکنان: بهترین گلزن، پاس گل، دروازه‌بان، میانگین امتیاز",
+    "Round schedule — choose the round": "برنامه راندی — انتخاب راند (دکمه شیشه‌ای)",
+    "App graphic — round schedule (times + title)": "برنامه راندی با ساعت و تایتل",
+    "Team of the round — choose": "تیم منتخب — انتخاب راند",
+    "App graphic — team of the round (pitch)": "تیم منتخب روی زمین",
+    "Daily schedule — choose the day": "برنامه روزانه — انتخاب روز (روزهای دارای بازی)",
+    "App graphic — daily schedule": "برنامه روزانه",
+    "App graphic — cup bracket": "براکت جام",
 }
 
 

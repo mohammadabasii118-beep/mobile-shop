@@ -7,12 +7,15 @@ from .. import config
 from . import dbx
 
 ONC_TYPES = ["SCHEDULE", "GROUP_TABLE", "ROUND_RESULTS", "QUALIFIED", "KO_MATCHES", "BRACKET", "CHAMPION"]   # needed to start a tournament
-TYPES = ONC_TYPES + ["TRANSFER"]                                                                              # TRANSFER: Here-We-Go graphic (app data)
+EXTRA_TYPES = ["TRANSFER", "PLAYER_STATS", "BEST_XI"]                                                          # graphics made from the PCL app data
+TYPES = ONC_TYPES + EXTRA_TYPES
 TYPE_LABEL = {"SCHEDULE": "برنامه بازی‌ها", "GROUP_TABLE": "جدول گروه", "ROUND_RESULTS": "نتایج راند",
-              "QUALIFIED": "تیم‌های صعودکننده", "KO_MATCHES": "بازی‌های حذفی", "BRACKET": "جدول مرحله حذفی", "CHAMPION": "پوستر قهرمان", "TRANSFER": "ترنسفر نیوز (Here We Go)"}
+              "QUALIFIED": "تیم‌های صعودکننده", "KO_MATCHES": "بازی‌های حذفی", "BRACKET": "جدول مرحله حذفی", "CHAMPION": "پوستر قهرمان", "TRANSFER": "ترنسفر نیوز (Here We Go)",
+              "PLAYER_STATS": "آمار بازیکنان (اپ)", "BEST_XI": "تیم منتخب (اپ)"}
 THEME_FA = {"RED": "قرمز", "BLUE": "آبی", "GOLD": "طلایی"}
 ELEMENT_FA = {"pcl_logo": "لوگوی PCL", "eyebrow": "برچسب انگلیسی", "footer": "فوتر", "brand": "نام رویداد", "title": "عنوان", "subtitle": "زیرعنوان", "page": "شماره صفحه", "logo": "لوگو", "team": "نام تیم",
               "stage": "نام مرحله", "rows": "ردیف‌ها", "col:slot": "ساعت و راند", "col:match": "ردیف بازی", "col:a": "تیم اول", "col:b": "تیم دوم",
+              "player": "نام بازیکن", "badge": "نشان نوع", "date": "تاریخ", "card_title": "عنوان کارت", "value": "عدد", "others": "نفرات بعدی", "rating": "نمره",
               "col:score": "نتیجه", "col:group": "گروه", "col:pos": "رتبه", "col:team": "نام تیم", "col:P": "بازی", "col:W": "برد", "col:D": "مساوی",
               "col:L": "باخت", "col:GF": "گل زده", "col:GA": "گل خورده", "col:GD": "تفاضل", "col:PTS": "امتیاز"}
 
@@ -56,9 +59,9 @@ def _el(x, y, size, color="#ffffff", align="center", max_w=900, min_=24, font=F_
 
 
 EYEBROW = {"SCHEDULE": "MATCH SCHEDULE", "GROUP_TABLE": "GROUP STAGE", "ROUND_RESULTS": "ROUND RESULTS", "QUALIFIED": "QUALIFIED TEAMS",
-           "KO_MATCHES": "KNOCKOUT", "BRACKET": "KNOCKOUT BRACKET", "CHAMPION": "CHAMPION", "TRANSFER": "TRANSFER NEWS"}
+           "KO_MATCHES": "KNOCKOUT", "BRACKET": "KNOCKOUT BRACKET", "CHAMPION": "CHAMPION", "TRANSFER": "TRANSFER NEWS", "PLAYER_STATS": "PLAYER STATS", "BEST_XI": "TEAM OF THE ROUND"}
 TITLE_FA = {"SCHEDULE": "برنامه بازی‌ها", "GROUP_TABLE": "GROUP STANDINGS", "ROUND_RESULTS": "نتایج", "QUALIFIED": "تیم‌های صعودکننده",
-            "KO_MATCHES": "مرحله حذفی", "BRACKET": "جدول مرحله حذفی", "CHAMPION": "قهرمان", "TRANSFER": "HERE WE GO"}
+            "KO_MATCHES": "مرحله حذفی", "BRACKET": "جدول مرحله حذفی", "CHAMPION": "قهرمان", "TRANSFER": "HERE WE GO", "PLAYER_STATS": "آمار بازیکنان", "BEST_XI": "BEST XI"}
 
 
 def default_config(type_: str, theme: str = "RED") -> dict:
@@ -119,6 +122,15 @@ def default_config(type_: str, theme: str = "RED") -> dict:
         el["team"] = _el(540, 0, 54, "#ffffff", "center", 400, 24, F_XBOLD)
         el["badge"] = _el(540, 1100, 40, "#14080c", "center", 520, 22, F_XBOLD)
         el["date"] = _el(540, 1190, 36, grey, "center", 700, 20, O_MED)
+    elif type_ == "PLAYER_STATS":
+        el["card_title"] = _el(120, 0, 26, gold, "left", 520, 16, O_SEMI, track=6)
+        el["player"] = _el(120, 0, 54, "#ffffff", "left", 640, 24, F_BLACK)
+        el["team"] = _el(120, 0, 30, grey, "left", 640, 18, F_MED)
+        el["others"] = _el(120, 0, 26, grey, "left", 760, 16, F_MED)
+        el["value"] = _el(896, 0, 64, "#14080c", "center", 150, 28, O_BOLD)
+    elif type_ == "BEST_XI":
+        el["player"] = _el(0, 0, 27, "#ffffff", "center", 196, 14, F_XBOLD)
+        el["rating"] = _el(0, 0, 25, gold, "center", 90, 14, O_BOLD)
     elif type_ == "CHAMPION":
         el["subtitle"]["y"] = 1176
         el["title"] = _el(540, 330, 110, gold, "center", 940, 50, F_BLACK, "قهرمان")
@@ -199,11 +211,12 @@ async def active_template(type_: str) -> dict | None:
 
 
 async def ensure_transfer_templates() -> None:
-    """Sets created before the Here-We-Go graphic existed get a TRANSFER template too (inactive sets as well)."""
+    """Sets created before the app graphics existed get TRANSFER / PLAYER_STATS / BEST_XI templates too (inactive sets as well)."""
     for s in await sets():
-        if not await dbx.scalar("SELECT 1 FROM onc_templates WHERE set_id=? AND type='TRANSFER'", s["id"]):
-            await dbx.execute("INSERT INTO onc_templates(set_id,type,name,config,active) VALUES(?,?,?,?,1)",
-                              s["id"], "TRANSFER", TYPE_LABEL["TRANSFER"], json.dumps(default_config("TRANSFER", "RED")))
+        for t in EXTRA_TYPES:
+            if not await dbx.scalar("SELECT 1 FROM onc_templates WHERE set_id=? AND type=?", s["id"], t):
+                await dbx.execute("INSERT INTO onc_templates(set_id,type,name,config,active) VALUES(?,?,?,?,1)",
+                                  s["id"], t, TYPE_LABEL[t], json.dumps(default_config(t, "RED")))
 
 
 async def missing_types() -> list[str]:
