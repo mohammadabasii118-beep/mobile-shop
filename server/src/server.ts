@@ -5,6 +5,7 @@ import { extname, join, normalize } from 'node:path';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { ABILITY_META, resolveCard, type CardDef, type ClientMsg, type GameConfig, type ServerMsg, type Side } from '@game/shared';
 import { validateConfig } from './config';
+import { currentBundle } from './version';
 import { authenticate, type AuthOptions } from './auth';
 import { Battle, type Participant } from './battle';
 import type { Db } from './db';
@@ -336,6 +337,7 @@ export function createGameServer(opt: ServerOptions) {
 
   async function api(req: IncomingMessage, res: ServerResponse, path: string) {
     if (path === '/api/config') return json(res, 200, cfg);
+    if (path === '/api/version') { res.setHeader('cache-control', 'no-store'); return json(res, 200, { bundle: currentBundle(opt.staticDir) }); }
     const hdr = req.headers['x-init-data'];
     const u = authenticate(Array.isArray(hdr) ? hdr[0] : hdr, opt.auth);
     if (!u) return json(res, 401, { error: 'احراز هویت ناموفق' });

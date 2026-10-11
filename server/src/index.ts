@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { loadConfigWithOverride, saveConfig } from './config';
 import { openDb } from './db';
 import { startBot } from './bot';
+import { versionTag } from './version';
 import { createGameServer } from './server';
 
 const botToken = process.env.BOT_TOKEN;
@@ -18,12 +19,13 @@ mkdirSync(dataDir, { recursive: true });
 const adminIds = (process.env.ADMIN_IDS ?? '').split(',').map((s) => Number(s.trim())).filter((n) => Number.isInteger(n) && n > 0);
 const configPath = join(dataDir, 'game.json'); // تنظیمات ویرایش‌شده از پنل مدیریت؛ با آپدیت کد پاک نمی‌شود
 const db = openDb(process.env.DB_PATH ?? join(dataDir, 'game.db'));
+const staticDir = fileURLToPath(new URL('../../client/dist', import.meta.url));
 const cfg = loadConfigWithOverride(configPath);
 const { http } = createGameServer({
   db, cfg, auth: { botToken, devAuth }, dataDir, adminIds, telegramApi: process.env.TELEGRAM_API, saveCfg: (c) => saveConfig(c, configPath),
-  staticDir: fileURLToPath(new URL('../../client/dist', import.meta.url)),
+  staticDir,
 });
-if (botToken && process.env.WEBAPP_URL) startBot({ token: botToken, webAppUrl: process.env.WEBAPP_URL, welcomeText: () => cfg.ui?.welcome });
+if (botToken && process.env.WEBAPP_URL) startBot({ token: botToken, webAppUrl: `${process.env.WEBAPP_URL}${process.env.WEBAPP_URL.includes('?') ? '&' : '?'}v=${versionTag(staticDir)}`, welcomeText: () => cfg.ui?.welcome });
 else if (botToken) console.log('[bot] WEBAPP_URL تنظیم نشده؛ ربات به /start جواب نمی‌دهد.');
 http.listen(port, () => {
   console.log(`سرور «میراث» روی http://localhost:${port} بالا آمد ${devAuth ? '(حالت توسعه: ورود آزمایشی و پنل مدیریت برای همه باز است)' : `(ادمین‌ها: ${adminIds.join(', ') || 'هیچ‌کس'})`}`);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GameConfig, Profile, ServerMsg } from '@game/shared';
-import { loadConfig, loadProfile, Socket } from './net';
+import { loadConfig, loadProfile, reloadIfOutdated, Socket } from './net';
 import { Home } from './Home';
 import { CardsScreen } from './CardsScreen';
 import { BattleScreen, type BattleInit } from './BattleScreen';
@@ -35,6 +35,14 @@ export function App() {
     setToastMsg(s);
     clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setToastMsg(null), 2800);
+  }, []);
+
+  // نسخه‌ی جدید؟ هنگام باز شدن و هر بار که بازی از پس‌زمینه برمی‌گردد چک می‌شود
+  useEffect(() => {
+    void reloadIfOutdated();
+    const onVis = () => { if (document.visibilityState === 'visible') void reloadIfOutdated(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
 
   useEffect(() => {

@@ -37,3 +37,20 @@ export class Socket {
   send(m: ClientMsg) { if (this.ws.readyState === 1) this.ws.send(JSON.stringify(m)); }
   on(l: Listener) { this.listeners.add(l); return () => { this.listeners.delete(l); }; }
 }
+
+/**
+ * اگر نسخه‌ی جدیدی روی سرور هست (و تلگرام صفحه‌ی قدیمی را از کش نشان داده)، یک‌بار صفحه را دوباره بارگذاری می‌کند.
+ * هر بیلد، فایل جاوااسکریپت با اسم تازه می‌سازد؛ اسم فایلِ در حال اجرا را با اسم فایلِ فعلی سرور مقایسه می‌کنیم.
+ */
+export async function reloadIfOutdated(): Promise<void> {
+  try {
+    const running = [...document.scripts].map((s) => s.src.split('/').pop() ?? '').find((n) => /^index-.*\.js$/.test(n));
+    if (!running) return; // حالت توسعه
+    const { bundle } = await (await fetch('/api/version', { cache: 'no-store' })).json() as { bundle: string };
+    if (!bundle || bundle === running) return;
+    const last = Number(sessionStorage.getItem('reloadedAt') ?? 0);
+    if (Date.now() - last < 30_000) return; // جلوگیری از حلقه
+    sessionStorage.setItem('reloadedAt', String(Date.now()));
+    location.reload();
+  } catch { /* بدون نت یا سرور قدیمی: بی‌خیال */ }
+}

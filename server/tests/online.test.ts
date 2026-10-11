@@ -163,3 +163,20 @@ describe('connection safety', () => {
     ws.close(); s3.close();
   });
 });
+
+describe('version', () => {
+  it('/api/version reports the current client bundle and never caches', async () => {
+    const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = mkdtempSync(join(tmpdir(), 'dist-'));
+    mkdirSync(join(dir, 'assets'));
+    writeFileSync(join(dir, 'assets', 'index-AbCd1234.js'), '//');
+    const s4 = createGameServer({ db: openDb(), cfg: loadConfig(), auth: { devAuth: true }, staticDir: dir });
+    await new Promise<void>((r) => s4.http.listen(0, r));
+    const r = await fetch(`http://127.0.0.1:${(s4.http.address() as AddressInfo).port}/api/version`);
+    expect(await r.json()).toEqual({ bundle: 'index-AbCd1234.js' });
+    expect(r.headers.get('cache-control')).toBe('no-store');
+    s4.close();
+  });
+});
