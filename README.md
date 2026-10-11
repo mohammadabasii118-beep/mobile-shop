@@ -109,3 +109,10 @@ docker run -d -p 3000:3000 -e BOT_TOKEN="توکن" -v cardbattle-data:/data card
 ## پس‌زمینه‌ی بازی و پیام‌های ربات
 - پس‌زمینه: پنل مدیریت ← «ظاهر و بنر» ← «پس‌زمینه‌ی بازی» (آپلود عکس عمودی).
 - پیام اول `/start` (متن معرفی) از همان تب قابل تغییر است؛ پیام دوم «هر وقت آماده بودی، بزن بریم👇» با دکمه‌ی ورود به بازی.
+
+## آدرس HTTPS ثابت (به‌جای تونل رایگان)
+تونل رایگان cloudflared روی بعضی اینترنت‌ها بسته یا ناپایدار است (خطای `ERR_CONNECTION_REFUSED` در تلگرام) و با ری‌استارت آدرسش عوض می‌شود. برای آدرس ثابت و مستقیم روی همین سرور (پورت ۸۰ و ۴۴۳ باید آزاد باشند):
+```bash
+curl -fsSL https://raw.githubusercontent.com/mohammadabasii118-beep/mobile-shop/claude/card-battle-game/scripts/https.sh | bash
+```
+بدون دامنه از آدرس رایگان `miras.<IP>.sslip.io` استفاده می‌کند. با دامنه‌ی خودت: `DOMAIN=miras.example.com` (قبلش A رکورد را به IP سرور بزن).
