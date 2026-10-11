@@ -66,7 +66,7 @@ async def run():
 
     # ------------------------------------------------ main menu entries
     labels = [t for t, _ in d.buttons(V)]
-    assert "🌍 اشتراک بین‌المللی" in labels and "⚽ مسابقه فوتبالی" in labels and "🚫 بلک‌لیست" in labels and "📝 درفت" not in labels and "🎥 پنل استریمر" not in labels, labels
+    assert "🌍 اشتراک بین‌المللی" in labels and "⚽ مسابقه فوتبالی" in labels and "🚫 بلک‌لیست" in labels and "📝 درفت" not in labels and "🎥 پنل Streamer" not in labels, labels
     await d.say("/start", A)
     d.snap("Main menu (user)", V)
     await d.press("fx:a", V)
@@ -151,25 +151,43 @@ async def run():
 
     # ------------------------------------------------ 7) streamers
     await d.press("fx:st", STREAMER)
-    assert "استریمر نیستی" in " ".join(d.session.alerts)
+    assert "Streamer نیستی" in " ".join(d.session.alerts)
     await d.press("fx:at", A); await d.press("fx:ata", A)
     await d.say(str(STREAMER), A)
-    assert await dbx.scalar("SELECT COUNT(*) FROM fx_streamers") == 1
+    assert "Streamer Username" in d.text(A) and await dbx.scalar("SELECT COUNT(*) FROM fx_streamers") == 0   # asks the username first
+    await d.say("x", A)
+    assert await dbx.scalar("SELECT COUNT(*) FROM fx_streamers") == 0
+    await d.say("@KingStream", A)
+    assert await dbx.scalar("SELECT username FROM fx_streamers") == "KingStream"
     await d.say("/start", STREAMER)
-    assert "🎥 پنل استریمر" in [t for t, _ in d.buttons(STREAMER)]
+    assert "🎥 پنل Streamer" in [t for t, _ in d.buttons(STREAMER)]
     await d.press("fx:st", STREAMER); await d.press("fx:sts", STREAMER)
     assert "تنظیم نشده" in " ".join(d.session.alerts)                                                  # no destination yet
     await d.press("fx:ap", A)
     await d.say(str(PLUS), A)
     assert await core.get("plus_chat") == str(PLUS)
     await d.press("fx:sts", STREAMER); await d.photo(png(), STREAMER); await d.say("استریم فینال لیگ", STREAMER)
-    d.snap("Streamer — preview", STREAMER)
+    assert "لینک" in d.text(STREAMER)
+    await d.say("not a link", STREAMER)
+    assert "معتبر نیست" in d.text(STREAMER)
+    await d.say("https://twitch.tv/kingstream", STREAMER)
+    assert "لینک استریم دیگری" in d.text(STREAMER)
+    d.snap("Streamer — asks for another link", STREAMER)
+    await d.press("fx:stm:1", STREAMER)
+    await d.say("youtube.com/@kingstream/live", STREAMER)
+    await d.press("fx:stm:0", STREAMER)
+    d.snap("Streamer — preview with link buttons", STREAMER)
+    assert "Streamer: KingStream" in d.text(STREAMER)
     await d.press("fx:stp", STREAMER)
     assert await dbx.scalar("SELECT COUNT(*) FROM fx_stream_posts") == 1
     sent = [x for x in d.session.log if x[0] == "SendPhoto" and str(x[1]["chat_id"]) == str(PLUS)]
     assert sent, d.session.log[-5:]
+    post = [s for (ch, _), s in d.session.screens.items() if str(ch) == str(PLUS)][-1]
+    urls = [(b.text, b.url) for row in post["markup"].inline_keyboard for b in row]
+    assert urls == [("🔗 Twitch", "https://twitch.tv/kingstream"), ("🔗 YouTube", "https://youtube.com/@kingstream/live")], urls
+    assert "🎥 Streamer: KingStream" in post["text"] and "https://" not in post["text"]
     await d.press("fx:sts", V)                                                                         # a non-streamer can't publish
-    assert "استریمر نیستی" in " ".join(d.session.alerts)
+    assert "Streamer نیستی" in " ".join(d.session.alerts)
     await d.press("fx:atd:%d" % STREAMER, A)
     await d.press("fx:stp", STREAMER)
     assert await dbx.scalar("SELECT COUNT(*) FROM fx_stream_posts") == 1

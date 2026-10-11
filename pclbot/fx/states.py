@@ -21,8 +21,11 @@ class DraftSt(StatesGroup):
 
 class StreamSt(StatesGroup):
     add = State()
+    uname = State()
     photo = State()
     title = State()
+    link = State()
+    more = State()
     preview = State()
 
 

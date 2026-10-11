@@ -52,6 +52,9 @@ async def init(path: str | None = None) -> str | None:
     await _conn.execute("PRAGMA busy_timeout=8000")
     await _conn.executescript(SCHEMA)
     await _conn.executescript(FX_SCHEMA)
+    cols = {r[1] for r in await (await _conn.execute("PRAGMA table_info(fx_streamers)")).fetchall()}
+    if "username" not in cols:                                       # database created by the first fx release
+        await _conn.execute("ALTER TABLE fx_streamers ADD COLUMN username TEXT NOT NULL DEFAULT ''")
     await _migrate_template_types()
     return backup
 

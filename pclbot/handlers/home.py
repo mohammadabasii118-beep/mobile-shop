@@ -32,7 +32,7 @@ def home_markup(uid: int, extra: tuple[bool, bool] = (False, False)):
     if draft_on:
         rows[-1].append(btn("📝 درفت", "fx:dr"))
     if streamer:
-        rows.append([btn("🎥 پنل استریمر", "fx:st")])
+        rows.append([btn("🎥 پنل Streamer", "fx:st")])
     if is_admin(uid):  # admins only; the panels behind it keep their own admin filters
         rows.append([btn("🛠 پنل مدیریت", "admhome")])
     return kb(rows)

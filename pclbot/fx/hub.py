@@ -22,7 +22,7 @@ async def panel(c: CallbackQuery, state: FSMContext):
     await show(c, "⚙️ <b>پنل ویژگی‌های جدید</b>\n\nکدام بخش را مدیریت می‌کنی؟",
                okb([[ob("🌍 اشتراک بین‌المللی", "fx:as"), ob("🚫 بلک‌لیست", "fx:ab")],
                     [ob("⚽ مسابقات فوتبالی", "fx:aq"), ob("📝 درفت", "fx:ad")],
-                    [ob("🎥 استریمرها", "fx:at"), ob("⚡ ترنسفر نیوز (HWG)", "fx:hw")],
+                    [ob("🎥 Streamers", "fx:at"), ob("⚡ ترنسفر نیوز (HWG)", "fx:hw")],
                     [ob("🎨 گرافیک‌های اپ", "fx:ag"), ob("📍 کانال «پلاس»", "fx:ap")],
                     [ob("🔙 بازگشت", "admhome")]]))
     await c.answer()
@@ -32,7 +32,7 @@ async def panel(c: CallbackQuery, state: FSMContext):
 async def plus_dest(c: CallbackQuery, state: FSMContext, bot: Bot):
     await state.set_state(DestSt.pick)
     await state.update_data(key="plus_chat", back=PANEL)
-    await show(c, f"📍 <b>مقصد انتشار پست استریمرها («پلاس»)</b>\n\nفعلی: {await core.dest_status(bot, 'plus_chat')}\n\n"
+    await show(c, f"📍 <b>مقصد انتشار پست Streamerها («پلاس»)</b>\n\nفعلی: {await core.dest_status(bot, 'plus_chat')}\n\n"
                   "یک پست از آن کانال/گروه فوروارد کن یا @username / آیدی عددی بفرست.", okb([[ob("❌ لغو", PANEL)]]))
     await c.answer()
 

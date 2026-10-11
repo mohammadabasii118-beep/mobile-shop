@@ -1,10 +1,11 @@
 """🎥 Streamers: admins appoint streamers; a streamer sends a photo + title and it is published to the configured «Plus» chat."""
 import re
+from urllib.parse import urlparse
 
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton as URLButton, Message
 
 from .. import db as main_db
 from ..onc import dbx, ui
@@ -24,8 +25,34 @@ async def is_streamer(uid: int) -> bool:
     return bool(await dbx.scalar("SELECT 1 FROM fx_streamers WHERE user_id=?", uid))
 
 
+MAX_LINKS = 4
+PLATFORMS = (("twitch.tv", "Twitch"), ("youtube.com", "YouTube"), ("youtu.be", "YouTube"), ("kick.com", "Kick"), ("aparat.com", "Aparat"),
+             ("instagram.com", "Instagram"), ("tiktok.com", "TikTok"), ("facebook.com", "Facebook"), ("t.me", "Telegram"))
+
+
 def caption(title: str, streamer: str) -> str:
-    return f"🔴 <b>{E(title)}</b>\n\n🎥 استریمر: {E(streamer)}"
+    return f"🔴 <b>{E(title)}</b>\n\n🎥 Streamer: {E(streamer)}"
+
+
+def clean_url(raw: str) -> str | None:
+    raw = core.norm(raw or "").strip()
+    if re.fullmatch(r"[\w.-]+\.[a-z]{2,}(/\S*)?", raw, re.I):
+        raw = "https://" + raw
+    u = urlparse(raw)
+    return raw if u.scheme in ("http", "https") and "." in (u.hostname or "") and len(raw) <= 300 and " " not in raw else None
+
+
+def link_buttons(links: list[str]) -> list[list]:
+    """One glass button per link, named after the platform (Twitch, YouTube, …; numbered when repeated)."""
+    names = []
+    for url in links:
+        host = (urlparse(url).hostname or "").lower().removeprefix("www.")
+        names.append(next((n for h, n in PLATFORMS if host == h or host.endswith("." + h)), host))
+    return [[URLButton(text=f"🔗 {n}" + (f" {names[:i + 1].count(n)}" if names.count(n) > 1 else ""), url=u)] for i, (n, u) in enumerate(zip(names, links))]
+
+
+async def streamer_name(uid: int, fallback: str) -> str:
+    return (await dbx.scalar("SELECT username FROM fx_streamers WHERE user_id=?", uid)) or fallback
 
 
 # ================================================================= streamer side (re-checked on every step)
@@ -33,8 +60,8 @@ def caption(title: str, streamer: str) -> str:
 async def panel(c: CallbackQuery, state: FSMContext):
     await state.clear()
     if not await is_streamer(c.from_user.id):
-        return await c.answer("⛔ تو استریمر نیستی.", show_alert=True)
-    await show(c, "🎥 <b>پنل استریمر</b>\n\nوقتی می‌خواهی استریم کنی، عکس و تایتل را بفرست تا منتشر شود.",
+        return await c.answer("⛔ تو Streamer نیستی.", show_alert=True)
+    await show(c, "🎥 <b>پنل Streamer</b>\n\nوقتی می‌خواهی استریم کنی، عکس، تایتل و لینک(های) پخش را بفرست تا منتشر شود.",
                okb([[ob("▶️ ارسال پست استریم", "fx:sts")], [ob("🔙 منوی اصلی", "home")]]))
     await c.answer()
 
@@ -42,9 +69,10 @@ async def panel(c: CallbackQuery, state: FSMContext):
 @router.callback_query(F.data == "fx:sts")
 async def start(c: CallbackQuery, state: FSMContext):
     if not await is_streamer(c.from_user.id):
-        return await c.answer("⛔ تو استریمر نیستی.", show_alert=True)
+        return await c.answer("⛔ تو Streamer نیستی.", show_alert=True)
     if not await core.get("plus_chat"):
         return await c.answer("مقصد انتشار هنوز توسط ادمین تنظیم نشده.", show_alert=True)
+    await state.clear()
     await state.set_state(StreamSt.photo)
     await show(c, "🖼 <b>عکس استریم</b> را بفرست:", okb([[ob("❌ لغو", "fx:st")]]))
     await c.answer()
@@ -64,27 +92,56 @@ async def got_title(m: Message, state: FSMContext):
     title = m.text.strip()
     if not title or len(title) > 150:
         return await m.answer("⚠️ تایتل باید بین ۱ تا ۱۵۰ کاراکتر باشد.")
+    await state.update_data(title=title, links=[])
+    await state.set_state(StreamSt.link)
+    await m.answer("🔗 <b>لینک استریم</b> را بفرست (مثلاً لینک Twitch / YouTube / Kick / آپارات):", reply_markup=okb([[ob("❌ لغو", "fx:st")]]))
+
+
+@router.message(StreamSt.link, F.text)
+async def got_link(m: Message, state: FSMContext):
+    url = clean_url(m.text)
+    if not url:
+        return await m.answer("⚠️ لینک معتبر نیست؛ آدرس کامل را بفرست (مثلاً <code>https://twitch.tv/name</code>).")
     d = await state.get_data()
-    await state.update_data(title=title)
+    links = [*d.get("links", []), url]
+    await state.update_data(links=links)
+    if len(links) >= MAX_LINKS:
+        return await _preview(m, state)
+    await state.set_state(StreamSt.more)
+    await m.answer(f"✅ لینک {len(links)} ثبت شد.\n\n<b>لینک استریم دیگری هم داری؟</b>",
+                   reply_markup=okb([[ob("➕ بله، لینک دیگر", "fx:stm:1"), ob("✅ نه، ادامه", "fx:stm:0")], [ob("❌ لغو", "fx:st")]]))
+
+
+@router.callback_query(F.data.regexp(r"^fx:stm:[01]$"), StreamSt.more)
+async def more_links(c: CallbackQuery, state: FSMContext):
+    await c.answer()
+    if c.data.endswith("1"):
+        await state.set_state(StreamSt.link)
+        return await c.message.answer("🔗 لینک بعدی را بفرست:", reply_markup=okb([[ob("❌ لغو", "fx:st")]]))
+    await _preview(c.message, state, c.from_user)
+
+
+async def _preview(m: Message, state: FSMContext, user=None):
+    user = user or m.from_user
+    d = await state.get_data()
     await state.set_state(StreamSt.preview)
-    name = m.from_user.full_name
-    await m.answer_photo(d["photo"], caption=caption(title, name) + "\n\n<i>پیش‌نمایش — منتشر شود؟</i>",
-                         reply_markup=okb([[ob("✅ انتشار", "fx:stp")], [ob("❌ لغو", "fx:st")]]))
+    name = await streamer_name(user.id, user.full_name)
+    await m.answer_photo(d["photo"], caption=caption(d["title"], name) + "\n\n<i>پیش‌نمایش — منتشر شود؟</i>",
+                         reply_markup=okb(link_buttons(d["links"]) + [[ob("✅ انتشار", "fx:stp")], [ob("❌ لغو", "fx:st")]]))
 
 
 @router.callback_query(F.data == "fx:stp", StreamSt.preview)
 async def publish(c: CallbackQuery, state: FSMContext, bot: Bot):
     if not await is_streamer(c.from_user.id):                              # backend check: role may have been removed meanwhile
         await state.clear()
-        return await c.answer("⛔ تو استریمر نیستی.", show_alert=True)
+        return await c.answer("⛔ تو Streamer نیستی.", show_alert=True)
     d = await state.get_data()
     chat = await core.get("plus_chat")
     if not chat:
         return await c.answer("مقصد انتشار تنظیم نشده.", show_alert=True)
-    from .. import outgoing
-    outgoing.EXEMPT_CHATS.add(str(chat))
-    try:
-        msg = await bot.send_photo(chat, d["photo"], caption=caption(d["title"], c.from_user.full_name))
+    try:                                                                   # not exempt: Premium emoji are allowed here (plain fallback is automatic)
+        msg = await bot.send_photo(chat, d["photo"], caption=caption(d["title"], await streamer_name(c.from_user.id, c.from_user.full_name)),
+                                   reply_markup=okb(link_buttons(d["links"])))
     except TelegramAPIError as ex:
         return await c.answer(f"انتشار ناموفق بود: {str(ex)[:120]}", show_alert=True)
     await dbx.execute("INSERT INTO fx_stream_posts(user_id,title,chat_id,message_id,created_at) VALUES(?,?,?,?,?)",
@@ -98,17 +155,17 @@ async def publish(c: CallbackQuery, state: FSMContext, bot: Bot):
 @admin_router.callback_query(F.data == "fx:at")
 async def admin_home(c: CallbackQuery, state: FSMContext):
     await state.clear()
-    rows = await dbx.fetchall("SELECT user_id FROM fx_streamers ORDER BY added_at")
-    btns = [[ob(f"➖ {await core.user_label(r['user_id'])}", f"fx:atd:{r['user_id']}")] for r in rows]
-    await show(c, f"🎥 <b>استریمرها ({len(rows)})</b>\n\nمقصد انتشار (پلاس): {await core.dest_status(c.bot, 'plus_chat')}\n\nروی اسم هر استریمر بزن تا حذف شود.",
-               okb(btns + [[ob("➕ افزودن استریمر", "fx:ata")], [ob("🔙 بازگشت", "fx:a")]]))
+    rows = await dbx.fetchall("SELECT user_id, username FROM fx_streamers ORDER BY added_at")
+    btns = [[ob(f"➖ {r['username'] or ''} · {await core.user_label(r['user_id'])}", f"fx:atd:{r['user_id']}")] for r in rows]
+    await show(c, f"🎥 <b>Streamers ({len(rows)})</b>\n\nمقصد انتشار (پلاس): {await core.dest_status(c.bot, 'plus_chat')}\n\nروی اسم هر Streamer بزن تا حذف شود.",
+               okb(btns + [[ob("➕ افزودن Streamer", "fx:ata")], [ob("🔙 بازگشت", "fx:a")]]))
     await c.answer()
 
 
 @admin_router.callback_query(F.data == "fx:ata")
 async def add_ask(c: CallbackQuery, state: FSMContext):
     await state.set_state(StreamSt.add)
-    await show(c, "➕ <b>آیدی عددی تلگرام</b> استریمر را بفرست، یا یک پیام از او فوروارد کن، یا @username (اگر قبلاً ربات را استارت کرده).",
+    await show(c, "➕ <b>آیدی عددی تلگرام</b> Streamer را بفرست، یا یک پیام از او فوروارد کن، یا @username (اگر قبلاً ربات را استارت کرده).",
                okb([[ob("❌ لغو", "fx:at")]]))
     await c.answer()
 
@@ -128,10 +185,22 @@ async def add_do(m: Message, state: FSMContext, bot: Bot):
             return await m.answer("⚠️ این یوزرنیم در ربات پیدا نشد. آیدی عددی را بفرست.")
     if uid is None:
         return await m.answer("⚠️ آیدی عددی، پیام فورواردشده یا @username بفرست.")
-    await dbx.execute("INSERT OR IGNORE INTO fx_streamers(user_id,added_by,added_at) VALUES(?,?,?)", uid, m.from_user.id, core.now())
+    await state.update_data(uid=uid)
+    await state.set_state(StreamSt.uname)
+    await m.answer(f"👤 {E(await core.user_label(uid))}\n\n<b>Streamer Username</b>:", reply_markup=okb([[ob("❌ لغو", "fx:at")]]))
+
+
+@admin_router.message(StreamSt.uname, F.text)
+async def add_username(m: Message, state: FSMContext, bot: Bot):
+    name = m.text.strip().lstrip("@")
+    if not 2 <= len(name) <= 40:
+        return await m.answer("⚠️ Streamer Username باید بین ۲ تا ۴۰ کاراکتر باشد.")
+    uid = (await state.get_data())["uid"]
+    await dbx.execute("INSERT INTO fx_streamers(user_id,added_by,added_at,username) VALUES(?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET username=excluded.username",
+                      uid, m.from_user.id, core.now(), name)
     await state.clear()
-    await core.tell(bot, uid, "🎥 تو استریمر شدی! از منوی اصلی ← «🎥 پنل استریمر» می‌توانی پست استریم بفرستی.")
-    await m.answer(f"✅ {E(await core.user_label(uid))} استریمر شد.", reply_markup=okb([[ob("🔙 بازگشت", "fx:at")]]))
+    await core.tell(bot, uid, "🎥 تو Streamer شدی! از منوی اصلی ← «🎥 پنل Streamer» می‌توانی پست استریم بفرستی.")
+    await m.answer(f"✅ {E(await core.user_label(uid))} Streamer شد — Username: <b>{E(name)}</b>", reply_markup=okb([[ob("🔙 بازگشت", "fx:at")]]))
 
 
 @admin_router.callback_query(F.data.regexp(r"^fx:atd:(\d+)$"))

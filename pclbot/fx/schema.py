@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS fx_draft_regs(
     user_id INTEGER PRIMARY KEY, gaming_id TEXT NOT NULL, pos1 TEXT NOT NULL, pos2 TEXT, created_at INTEGER NOT NULL);
 
 -- ---- streamers -----------------------------------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS fx_streamers(user_id INTEGER PRIMARY KEY, added_by INTEGER, added_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS fx_streamers(user_id INTEGER PRIMARY KEY, added_by INTEGER, added_at INTEGER NOT NULL, username TEXT NOT NULL DEFAULT '');
 CREATE TABLE IF NOT EXISTS fx_stream_posts(
     id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, title TEXT NOT NULL, chat_id TEXT, message_id INTEGER, created_at INTEGER NOT NULL);
 
