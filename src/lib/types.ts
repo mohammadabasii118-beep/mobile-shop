@@ -63,6 +63,9 @@ export type ProductFull = {
   name: string;
   brand: { id: number; name: string; slug: string } | null;
   category: { id: number; name: string; slug: string } | null;
+  /** همه‌ی برندها/دسته‌ها؛ اولین مورد همان brand/category اصلی است */
+  brands: { id: number; name: string; slug: string }[];
+  categories: { id: number; name: string; slug: string }[];
   short_desc: string;
   description: string;
   type: 'simple' | 'variable';

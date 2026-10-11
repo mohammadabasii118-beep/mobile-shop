@@ -13,7 +13,7 @@ import Pic from '@/components/shop/Pic';
 export const metadata: Metadata = { title: 'محصولات' };
 const PER = 20;
 
-type Row = { id: number; name: string; slug: string; sku: string | null; type: string; status: string; featured: number; images: string; cat: string | null; brand: string | null; pmin: number; pmax: number; stock: number; vcount: number; sale: number };
+type Row = { id: number; name: string; slug: string; sku: string | null; type: string; status: string; featured: number; images: string; cat: string | null; brand: string | null; cats_n: number; brands_n: number; pmin: number; pmax: number; stock: number; vcount: number; sale: number };
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
@@ -25,12 +25,13 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   const where: string[] = []; const args: unknown[] = [];
   if (q) { where.push('(name LIKE ? OR sku LIKE ? OR brand LIKE ?)'); const l = `%${q}%`; args.push(l, l, l); }
   if (status === 'published' || status === 'draft') { where.push('status = ?'); args.push(status); }
-  if (cat) { where.push('category_id = ?'); args.push(cat); }
+  if (cat) { where.push('id IN (SELECT product_id FROM product_categories WHERE category_id = ?)'); args.push(cat); }
   if (type === 'simple' || type === 'variable') { where.push('type = ?'); args.push(type); }
   if (stock === 'out') where.push('stock <= 0'); else if (stock === 'low') where.push('stock > 0 AND stock <= ?'), args.push(low);
   const W = where.length ? 'WHERE ' + where.join(' AND ') : '';
   const BASE = `WITH b AS (
     SELECT p.id, p.name, p.slug, p.sku, p.type, p.status, p.featured, p.images, p.category_id, c.name cat, br.name brand,
+      (SELECT COUNT(*) FROM product_categories x WHERE x.product_id = p.id) cats_n, (SELECT COUNT(*) FROM product_brands x WHERE x.product_id = p.id) brands_n,
       CASE WHEN p.type='variable' THEN COALESCE((SELECT MIN(COALESCE(CASE WHEN v.sale_price>0 AND v.sale_price<v.price THEN v.sale_price END, v.price)) FROM variations v WHERE v.product_id=p.id AND v.status='active'),0) ELSE COALESCE(CASE WHEN p.sale_price>0 AND p.sale_price<p.price THEN p.sale_price END, p.price) END pmin,
       CASE WHEN p.type='variable' THEN COALESCE((SELECT MAX(COALESCE(CASE WHEN v.sale_price>0 AND v.sale_price<v.price THEN v.sale_price END, v.price)) FROM variations v WHERE v.product_id=p.id AND v.status='active'),0) ELSE COALESCE(CASE WHEN p.sale_price>0 AND p.sale_price<p.price THEN p.sale_price END, p.price) END pmax,
       CASE WHEN p.type='variable' THEN COALESCE((SELECT SUM(v.stock) FROM variations v WHERE v.product_id=p.id AND v.status='active'),0) ELSE p.stock END stock,
@@ -84,9 +85,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                     return (
                       <tr key={r.id}>
                         <td className="full"><input type="checkbox" name="ids" value={r.id} aria-label={`انتخاب ${r.name}`} style={{ width: 16, height: 16, accentColor: 'var(--ink)' }} /></td>
-                        <td className="full"><Link className="pn" href={`/admin/products/${r.id}`}><span className="thumb"><Pic src={img} /></span><span><b>{r.name}</b><small>{r.brand ?? 'بدون برند'}{r.sku ? ` · ${r.sku}` : ''}{r.featured ? ' · ویژه' : ''}</small></span></Link></td>
+                        <td className="full"><Link className="pn" href={`/admin/products/${r.id}`}><span className="thumb"><Pic src={img} /></span><span><b>{r.name}</b><small>{r.brand ?? 'بدون برند'}{r.brands_n > 1 ? ` (+${fa(r.brands_n - 1)})` : ''}{r.sku ? ` · ${r.sku}` : ''}{r.featured ? ' · ویژه' : ''}</small></span></Link></td>
                         <td data-label="نوع">{r.type === 'variable' ? <Pill tone="action">متغیر · {fa(r.vcount)}</Pill> : <Pill tone="muted">ساده</Pill>}</td>
-                        <td data-label="دسته" className="mute">{r.cat ?? '—'}</td>
+                        <td data-label="دسته" className="mute">{r.cat ?? '—'}{r.cats_n > 1 ? ` (+${fa(r.cats_n - 1)})` : ''}</td>
                         <td data-label="قیمت" className="num-col">{r.pmax === 0 ? '—' : r.pmin === r.pmax ? toman(r.pmin) : `${toman(r.pmin)} – ${toman(r.pmax)}`}{r.sale ? <span className="pill danger" style={{ marginInlineStart: 6 }}>تخفیف</span> : null}</td>
                         <td data-label="موجودی" className="num-col"><Pill tone={stockTone}>{r.stock <= 0 ? 'ناموجود' : fa(r.stock)}</Pill></td>
                         <td data-label="وضعیت"><QuickAction action={toggleProductStatus.bind(null, r.id)} className="btn btn-sm btn-secondary" title="تغییر وضعیت">{r.status === 'published' ? 'منتشر شده' : 'پیش‌نویس'}</QuickAction></td>

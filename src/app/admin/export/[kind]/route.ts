@@ -26,7 +26,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ kind: string }>
       rows.map((o) => [o.number, parseDbDate(o.created_at).toLocaleString('fa-IR-u-ca-persian', { timeZone: 'Asia/Tehran' }), o.customer_name, o.phone, o.province, o.city, o.address, ORDER_STATUS[o.status].label, labels[orderPayCode(o)] ?? orderPayCode(o), PAY_STATUS[o.payment_status].label, o.subtotal, o.discount, o.shipping, o.total, o.coupon_code ?? '', o.tracking_code]));
   } else if (kind === 'products') {
     const rows = all<{ name: string; sku: string | null; type: string; status: string; price: number; sale_price: number | null; stock: number; brand: string | null; cat: string | null }>(
-      'SELECT p.name, p.sku, p.type, p.status, p.price, p.sale_price, p.stock, b.name brand, c.name cat FROM products p LEFT JOIN brands b ON b.id=p.brand_id LEFT JOIN categories c ON c.id=p.category_id ORDER BY p.id');
+      `SELECT p.name, p.sku, p.type, p.status, p.price, p.sale_price, p.stock,
+        (SELECT GROUP_CONCAT(x.name, '، ') FROM (SELECT b.name FROM product_brands pb JOIN brands b ON b.id = pb.brand_id WHERE pb.product_id = p.id ORDER BY b.id = p.brand_id DESC, b.name) x) brand,
+        (SELECT GROUP_CONCAT(x.name, '، ') FROM (SELECT c.name FROM product_categories pc JOIN categories c ON c.id = pc.category_id WHERE pc.product_id = p.id ORDER BY c.id = p.category_id DESC, c.name) x) cat
+       FROM products p ORDER BY p.id`);
     body = csv(['نام', 'کد', 'نوع', 'وضعیت', 'قیمت', 'قیمت تخفیفی', 'موجودی', 'برند', 'دسته'], rows.map((r) => [r.name, r.sku ?? '', r.type === 'variable' ? 'متغیر' : 'ساده', r.status === 'published' ? 'منتشرشده' : 'پیش‌نویس', r.price, r.sale_price ?? '', r.stock, r.brand ?? '', r.cat ?? '']));
   } else if (kind === 'customers') {
     const rows = all<{ name: string; login: string; created_at: string; orders: number; spent: number }>(

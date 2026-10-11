@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: 'برندها' };
 
 export default async function BrandsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
-  const brands = all<{ id: number; slug: string; name: string; logo: string | null; sort: number; active: number; n: number }>('SELECT b.*, (SELECT COUNT(*) FROM products p WHERE p.brand_id = b.id) n FROM brands b ORDER BY sort, name');
+  const brands = all<{ id: number; slug: string; name: string; logo: string | null; sort: number; active: number; n: number }>('SELECT b.*, (SELECT COUNT(*) FROM product_brands x WHERE x.brand_id = b.id) n FROM brands b ORDER BY sort, name');
   const cur = brands.find((b) => b.id === Number(one(sp.edit)));
   return (
     <>

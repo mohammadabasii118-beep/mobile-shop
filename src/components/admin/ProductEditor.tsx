@@ -8,6 +8,7 @@ import { saveProduct, type ProductPayload } from '@/lib/actions/admin-catalog';
 import { attrsKey, generateCombos, type GenAttr } from '@/lib/variations';
 import { fa, slugify, toman } from '@/lib/format';
 import { adminToast } from './client';
+import MultiPick from './MultiPick';
 import Pic, { parseArt } from '../shop/Pic';
 import { ART_KEYS, ART_LABELS } from '../shop/Sprite';
 
@@ -455,20 +456,8 @@ export default function ProductEditor({ initial, categories, brands, attributes,
           <section className="ad-card">
             <div className="hd"><h2>دسته‌بندی و برند</h2></div>
             <div className="bd">
-              <div className="fld">
-                <label htmlFor="pcat">دسته‌بندی</label>
-                <select id="pcat" className="sel" value={p.category_id ?? ''} onChange={(e) => upd({ category_id: e.target.value ? Number(e.target.value) : null })}>
-                  <option value="">بدون دسته</option>
-                  {categories.map((c) => <option key={c.id} value={c.id}>{'— '.repeat(c.depth)}{c.name}</option>)}
-                </select>
-              </div>
-              <div className="fld">
-                <label htmlFor="pbrand">برند</label>
-                <select id="pbrand" className="sel" value={p.brand_id ?? ''} onChange={(e) => upd({ brand_id: e.target.value ? Number(e.target.value) : null })}>
-                  <option value="">بدون برند</option>
-                  {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-              </div>
+              <MultiPick label="دسته‌بندی‌ها" options={categories} value={p.category_ids} onChange={(ids) => upd({ category_ids: ids })} none="بدون دسته" />
+              <MultiPick label="برندها" options={brands} value={p.brand_ids} onChange={(ids) => upd({ brand_ids: ids })} none="بدون برند" />
               {p.type === 'variable' && <div className="fld"><label htmlFor="psku2">کد پایه (SKU)</label><input id="psku2" className="input" dir="ltr" value={p.sku} onChange={(e) => upd({ sku: e.target.value })} /></div>}
             </div>
           </section>

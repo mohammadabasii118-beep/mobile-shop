@@ -27,8 +27,9 @@ export type ProductPayload = {
   short_desc: string;
   description: string;
   type: 'simple' | 'variable';
-  brand_id: number | null;
-  category_id: number | null;
+  /** اولین مورد = انتخاب اصلی */
+  brand_ids: number[];
+  category_ids: number[];
   status: 'published' | 'draft';
   featured: boolean;
   badge: 'new' | 'best' | 'promo' | null;
@@ -41,6 +42,16 @@ export type ProductPayload = {
   attributes: { attribute_id: number; term_ids: number[]; for_variations: boolean }[];
   variations: { id: number | null; attrs: Record<string, string>; sku: string; price: number | null; sale_price: number | null; stock: number | null; image: string | null; status: 'active' | 'disabled' }[];
 };
+
+/** شناسه‌های یکتا و موجود، با حفظ ترتیب (اولی = اصلی) */
+function validIds(table: 'brands' | 'categories', ids: unknown): number[] {
+  const out: number[] = [];
+  for (const raw of Array.isArray(ids) ? ids : []) {
+    const id = Number(raw);
+    if (Number.isInteger(id) && !out.includes(id) && get(`SELECT 1 FROM ${table} WHERE id = ?`, id)) out.push(id);
+  }
+  return out.slice(0, 30);
+}
 
 export async function saveProduct(p: ProductPayload): Promise<{ ok?: string; error?: string; id?: number }> {
   await assertAdmin();
@@ -62,9 +73,10 @@ export async function saveProduct(p: ProductPayload): Promise<{ ok?: string; err
       const sale = toIntOrNull(p.sale_price);
       const base = {
         short: normText(p.short_desc).slice(0, 300), desc: p.description.replace(/\r/g, '').trim().slice(0, 8000),
-        brand: p.brand_id && get('SELECT 1 FROM brands WHERE id = ?', p.brand_id) ? p.brand_id : null,
-        cat: p.category_id && get('SELECT 1 FROM categories WHERE id = ?', p.category_id) ? p.category_id : null,
+        brands: validIds('brands', p.brand_ids),
+        cats: validIds('categories', p.category_ids),
       };
+      const brand0 = base.brands[0] ?? null, cat0 = base.cats[0] ?? null;
       let pid = p.id;
       const slug = uniqueSlug('products', p.slug || name, pid ?? undefined);
       const varPrices = p.variations.filter((v) => v.status === 'active').map((v) => toInt(v.price));
@@ -73,7 +85,7 @@ export async function saveProduct(p: ProductPayload): Promise<{ ok?: string; err
         if (!get('SELECT 1 FROM products WHERE id = ?', pid)) throw new Error('محصول پیدا نشد (ممکن است حذف شده باشد)');
         const old = get<{ stock: number; type: string }>('SELECT stock, type FROM products WHERE id = ?', pid)!;
         run(`UPDATE products SET name=?, slug=?, brand_id=?, category_id=?, short_desc=?, description=?, type=?, sku=?, price=?, sale_price=?, stock=?, images=?, specs=?, badge=?, status=?, featured=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,
-          name, slug, base.brand, base.cat, base.short, base.desc, p.type, normText(p.sku) || null, p.type === 'variable' ? (Number.isFinite(topPrice) ? topPrice : 0) : price,
+          name, slug, brand0, cat0, base.short, base.desc, p.type, normText(p.sku) || null, p.type === 'variable' ? (Number.isFinite(topPrice) ? topPrice : 0) : price,
           p.type === 'simple' && sale && sale > 0 && sale < price ? sale : null, p.type === 'simple' ? Math.max(0, toInt(p.stock)) : 0,
           JSON.stringify(images), JSON.stringify(specs), badge, p.status === 'draft' ? 'draft' : 'published', p.featured ? 1 : 0, pid);
         if (p.type === 'simple' && old.type === 'simple' && old.stock !== Math.max(0, toInt(p.stock))) {
@@ -82,12 +94,19 @@ export async function saveProduct(p: ProductPayload): Promise<{ ok?: string; err
       } else {
         const info = run(`INSERT INTO products (name, slug, brand_id, category_id, short_desc, description, type, sku, price, sale_price, stock, images, specs, badge, status, featured)
           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-          name, slug, base.brand, base.cat, base.short, base.desc, p.type, normText(p.sku) || null, p.type === 'variable' ? (Number.isFinite(topPrice) ? topPrice : 0) : price,
+          name, slug, brand0, cat0, base.short, base.desc, p.type, normText(p.sku) || null, p.type === 'variable' ? (Number.isFinite(topPrice) ? topPrice : 0) : price,
           p.type === 'simple' && sale && sale > 0 && sale < price ? sale : null, p.type === 'simple' ? Math.max(0, toInt(p.stock)) : 0,
           JSON.stringify(images), JSON.stringify(specs), badge, p.status === 'draft' ? 'draft' : 'published', p.featured ? 1 : 0);
         pid = Number(info.lastInsertRowid);
         if (p.type === 'simple' && toInt(p.stock) > 0) run('INSERT INTO inventory_log (product_id, variation_id, delta, stock_after, reason) VALUES (?,?,?,?,?)', pid, null, toInt(p.stock), toInt(p.stock), 'ثبت محصول');
       }
+
+      // دسته‌ها و برندها (اولین مورد اصلی است؛ تریگرها اصلیِ حذف‌شده را اصلاح می‌کنند، پس بعد از درج دوباره تثبیت می‌شود)
+      run('DELETE FROM product_categories WHERE product_id = ?', pid);
+      run('DELETE FROM product_brands WHERE product_id = ?', pid);
+      base.cats.forEach((c) => run('INSERT INTO product_categories (product_id, category_id) VALUES (?,?)', pid, c));
+      base.brands.forEach((b) => run('INSERT INTO product_brands (product_id, brand_id) VALUES (?,?)', pid, b));
+      run('UPDATE products SET category_id = ?, brand_id = ? WHERE id = ?', cat0, brand0, pid);
 
       // ویژگی‌های محصول
       run('DELETE FROM product_attributes WHERE product_id = ?', pid);
@@ -146,6 +165,8 @@ export async function duplicateProduct(id: number): Promise<AState> {
     const info = run(`INSERT INTO products (slug, name, brand_id, category_id, short_desc, description, type, sku, price, sale_price, stock, images, specs, badge, status, featured)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'draft', 0)`, slug, `${p.name} (کپی)`, p.brand_id, p.category_id, p.short_desc, p.description, p.type, null, p.price, p.sale_price, p.stock, p.images, p.specs, p.badge);
     const nid = Number(info.lastInsertRowid);
+    run('INSERT OR IGNORE INTO product_categories (product_id, category_id) SELECT ?, category_id FROM product_categories WHERE product_id = ?', nid, id);
+    run('INSERT OR IGNORE INTO product_brands (product_id, brand_id) SELECT ?, brand_id FROM product_brands WHERE product_id = ?', nid, id);
     run('INSERT INTO product_attributes (product_id, attribute_id, term_ids, for_variations, sort) SELECT ?, attribute_id, term_ids, for_variations, sort FROM product_attributes WHERE product_id = ?', nid, id);
     run('INSERT INTO variations (product_id, sku, price, sale_price, stock, image, attrs, status) SELECT ?, NULL, price, sale_price, stock, image, attrs, status FROM variations WHERE product_id = ?', nid, id);
     return nid;
@@ -337,8 +358,8 @@ export async function bulkDiscount(_p: AState, fd: FormData): Promise<AState> {
   if (scope === 'category' && scopeId) {
     const ids = [scopeId]; const rows = all<{ id: number; parent_id: number | null }>('SELECT id, parent_id FROM categories');
     for (let i = 0; i < ids.length; i++) for (const r of rows) if (r.parent_id === ids[i] && !ids.includes(r.id)) ids.push(r.id);
-    where = `category_id IN (${qs(ids.length)})`; args.push(...ids);
-  } else if (scope === 'brand' && scopeId) { where = 'brand_id = ?'; args.push(scopeId); }
+    where = `id IN (SELECT product_id FROM product_categories WHERE category_id IN (${qs(ids.length)}))`; args.push(...ids);
+  } else if (scope === 'brand' && scopeId) { where = 'id IN (SELECT product_id FROM product_brands WHERE brand_id = ?)'; args.push(scopeId); }
   else if (scope !== 'all') return { error: 'محدوده را انتخاب کنید' };
   const prods = all<{ id: number }>(`SELECT id FROM products WHERE ${where}`, ...args);
   if (!prods.length) return { error: 'محصولی در این محدوده نیست' };

@@ -72,7 +72,7 @@ export default async function ProductPage({ params }: Params) {
 
   const infoAttrs = p.attributes.filter((a) => !(a.for_variations && p.type === 'variable'));
   const specRows = [
-    ...(p.brand ? [{ k: 'برند', v: p.brand.name }] : []),
+    ...(p.brands.length ? [{ k: 'برند', v: p.brands.map((b) => b.name).join('، ') }] : []),
     ...p.specs.map((s) => ({ k: s.k, v: s.v })),
     ...infoAttrs.map((a) => ({ k: a.attribute.name, v: a.terms.map((t) => t.name).join('، ') })),
     ...(p.sku ? [{ k: 'کد محصول', v: p.sku }] : []),
@@ -80,7 +80,7 @@ export default async function ProductPage({ params }: Params) {
 
   const header = (
     <>
-      {p.brand && <Link className="p-brand" href={`/shop?brand=${p.brand.slug}`}>{p.brand.name}</Link>}
+      {p.brands.length > 0 && <div className="p-brands">{p.brands.map((b) => <Link key={b.id} className="p-brand" href={`/shop?brand=${b.slug}`}>{b.name}</Link>)}</div>}
       <h1>{p.name}</h1>
       {p.ratingCount > 0 && (
         <a href="#reviews" className="rate" style={{ fontSize: 13 }}>

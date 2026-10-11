@@ -29,6 +29,7 @@ Next.js 16 (App Router، Server Components + Server Actions) · React 19 · Type
 - قیمت سفارش **هرگز** از کلاینت نیامده؛ `priceCart`/`placeOrder` در `src/lib/orders.ts` از DB محاسبه می‌کند.
 - محصول متغیر: `variations.attrs` JSON با کلید slug ویژگی (`phone-brand`, `phone-model`, `color`). ویژگی فرزند (مدل) با `attributes.parent_attribute_id` و `attribute_terms.parent_term_id` به والد (برند) وصل است؛ ترکیب‌ها فقط با `generateCombos` (`src/lib/variations.ts`) ساخته شود. slugهای پایه در `ATTR` ثابت‌اند و حذف نمی‌شوند.
 - تصویر محصول: مسیر `/uploads/...webp` (آپلود مدیر؛ `src/lib/images.ts` خودکار AVIF+WebP در ۳ عرض می‌سازد، DESIGN.md §۱۸.۷؛ ذخیره در `data/uploads`) یا `art:p-xxx[@#hex]` (SVG نمونه، `Pic` نمایش می‌دهد).
+- هر محصول چند دسته و چند برند دارد: جدول‌های `product_categories`/`product_brands`؛ `products.category_id/brand_id` فقط انتخاب «اصلی» (اولی) است و تریگرها آن را عضو جدول نگه می‌دارند (DESIGN.md §۱۸.۱۰). فیلتر/شمارش با جدول چندتایی، کارت/breadcrumb/گزارش فروش با اصلی.
 - روش‌های پرداخت داده‌اند (جدول `payment_methods`، درایور در `src/lib/payment-drivers.ts`، DESIGN.md §۱۸.۸). `orders.payment_method` فقط `cod|online`؛ کد دقیق در `orders.pay_code`. درایور با `implemented: false` هرگز در تسویه نمی‌آید. درگاه واقعی را بدون مستندات رسمی حدسی ننویس.
 - فقط logical properties (`inline-start/end`، `padding-inline`)؛ `left/right/ml/mr` ممنوع. متن لاتین داخل جمله‌ی فارسی: `<bdi>`.
 - هر لیست: حالت loading/empty/error. دسترسی‌پذیری (DESIGN.md §۱۳) جزو «تمام‌شده» است.

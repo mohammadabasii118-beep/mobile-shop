@@ -121,15 +121,20 @@ export function listProducts(o: ListOpts = {}): { items: CardData[]; total: numb
   const args: unknown[] = [];
   if (o.q) {
     const like = `%${o.q.replace(/[%_]/g, ' ')}%`;
-    where.push(`(name LIKE ? OR brand_name LIKE ? OR cat_name LIKE ? OR sku LIKE ? OR short_desc LIKE ?)`);
-    args.push(like, like, like, like, like);
+    where.push(`(name LIKE ? OR brand_name LIKE ? OR cat_name LIKE ? OR sku LIKE ? OR short_desc LIKE ?
+      OR EXISTS (SELECT 1 FROM product_brands pb JOIN brands bb ON bb.id = pb.brand_id WHERE pb.product_id = base.id AND bb.name LIKE ?)
+      OR EXISTS (SELECT 1 FROM product_categories pc JOIN categories cc ON cc.id = pc.category_id WHERE pc.product_id = base.id AND cc.name LIKE ?))`);
+    args.push(like, like, like, like, like, like, like);
   }
   if (o.categoryId) {
     const ids = descendantIds(o.categoryId);
-    where.push(`category_id IN (${qs(ids.length)})`);
+    where.push(`EXISTS (SELECT 1 FROM product_categories pc WHERE pc.product_id = base.id AND pc.category_id IN (${qs(ids.length)}))`);
     args.push(...ids);
   }
-  if (o.brandSlug) { where.push('brand_slug = ?'); args.push(o.brandSlug); }
+  if (o.brandSlug) {
+    where.push('EXISTS (SELECT 1 FROM product_brands pb JOIN brands bb ON bb.id = pb.brand_id WHERE pb.product_id = base.id AND bb.slug = ?)');
+    args.push(o.brandSlug);
+  }
   if (o.minPrice) { where.push('eff_price >= ?'); args.push(o.minPrice); }
   if (o.maxPrice) { where.push('eff_price <= ?'); args.push(o.maxPrice); }
   if (o.inStock) where.push('eff_stock > 0');
@@ -239,6 +244,8 @@ export function getProductFull(by: { slug: string } | { id: number }, opts: { in
   if (!r || (r.status !== 'published' && !opts.includeDraft)) return null;
   const brand = r.brand_id ? get<{ id: number; name: string; slug: string }>('SELECT id, name, slug FROM brands WHERE id = ?', r.brand_id) ?? null : null;
   const category = r.category_id ? get<{ id: number; name: string; slug: string }>('SELECT id, name, slug FROM categories WHERE id = ?', r.category_id) ?? null : null;
+  const brands = all<{ id: number; name: string; slug: string }>('SELECT b.id, b.name, b.slug FROM product_brands pb JOIN brands b ON b.id = pb.brand_id WHERE pb.product_id = ? ORDER BY b.id = ? DESC, b.sort, b.name', r.id, r.brand_id ?? 0);
+  const categories = all<{ id: number; name: string; slug: string }>('SELECT c.id, c.name, c.slug FROM product_categories pc JOIN categories c ON c.id = pc.category_id WHERE pc.product_id = ? ORDER BY c.id = ? DESC, c.sort, c.id', r.id, r.category_id ?? 0);
 
   const pas = all<{ attribute_id: number; term_ids: string; for_variations: number }>(
     'SELECT attribute_id, term_ids, for_variations FROM product_attributes WHERE product_id = ? ORDER BY sort, attribute_id', r.id);
@@ -255,7 +262,7 @@ export function getProductFull(by: { slug: string } | { id: number }, opts: { in
   let specs: Spec[] = [];
   try { specs = JSON.parse(r.specs); } catch { /* noop */ }
   return {
-    id: r.id, slug: r.slug, name: r.name, brand, category, short_desc: r.short_desc, description: r.description,
+    id: r.id, slug: r.slug, name: r.name, brand, category, brands, categories, short_desc: r.short_desc, description: r.description,
     type: r.type, sku: r.sku, price: r.price, sale_price: r.sale_price, stock: r.stock,
     images: parseImages(r.images), specs, badge: r.badge, status: r.status, featured: !!r.featured,
     attributes, variations, rating: rv?.a ?? 0, ratingCount: rv?.n ?? 0,

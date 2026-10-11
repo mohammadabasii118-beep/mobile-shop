@@ -193,6 +193,36 @@ CREATE TABLE IF NOT EXISTS payments (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS product_categories (
+  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  category_id INTEGER NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+  PRIMARY KEY (product_id, category_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pcat_category ON product_categories(category_id);
+CREATE TABLE IF NOT EXISTS product_brands (
+  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  PRIMARY KEY (product_id, brand_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pbrand_brand ON product_brands(brand_id);
+
+-- products.category_id/brand_id = انتخاب «اصلی» و همیشه عضو جدول چندتایی
+CREATE TRIGGER IF NOT EXISTS trg_products_ins_cat AFTER INSERT ON products WHEN NEW.category_id IS NOT NULL
+  BEGIN INSERT OR IGNORE INTO product_categories (product_id, category_id) VALUES (NEW.id, NEW.category_id); END;
+CREATE TRIGGER IF NOT EXISTS trg_products_ins_brand AFTER INSERT ON products WHEN NEW.brand_id IS NOT NULL
+  BEGIN INSERT OR IGNORE INTO product_brands (product_id, brand_id) VALUES (NEW.id, NEW.brand_id); END;
+CREATE TRIGGER IF NOT EXISTS trg_products_upd_cat AFTER UPDATE OF category_id ON products WHEN NEW.category_id IS NOT NULL
+  BEGIN INSERT OR IGNORE INTO product_categories (product_id, category_id) VALUES (NEW.id, NEW.category_id); END;
+CREATE TRIGGER IF NOT EXISTS trg_products_upd_brand AFTER UPDATE OF brand_id ON products WHEN NEW.brand_id IS NOT NULL
+  BEGIN INSERT OR IGNORE INTO product_brands (product_id, brand_id) VALUES (NEW.id, NEW.brand_id); END;
+-- حذف دسته/برند اصلی (cascade): اصلیِ جدید از بین بقیه‌ی عضویت‌ها انتخاب می‌شود
+CREATE TRIGGER IF NOT EXISTS trg_pcat_del AFTER DELETE ON product_categories
+  BEGIN UPDATE products SET category_id = (SELECT category_id FROM product_categories WHERE product_id = OLD.product_id ORDER BY rowid LIMIT 1)
+    WHERE id = OLD.product_id AND (category_id IS NULL OR category_id = OLD.category_id); END;
+CREATE TRIGGER IF NOT EXISTS trg_pbrand_del AFTER DELETE ON product_brands
+  BEGIN UPDATE products SET brand_id = (SELECT brand_id FROM product_brands WHERE product_id = OLD.product_id ORDER BY rowid LIMIT 1)
+    WHERE id = OLD.product_id AND (brand_id IS NULL OR brand_id = OLD.brand_id); END;
+
 CREATE TABLE IF NOT EXISTS payment_methods (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   code TEXT NOT NULL UNIQUE,
@@ -233,6 +263,8 @@ CREATE TABLE IF NOT EXISTS reviews (
 function migrate(d: Database.Database) {
   const cols = (t: string) => (d.pragma(`table_info(${t})`) as { name: string }[]).map((c) => c.name);
   if (!cols('orders').includes('pay_code')) d.exec('ALTER TABLE orders ADD COLUMN pay_code TEXT');
+  d.exec(`INSERT OR IGNORE INTO product_categories (product_id, category_id) SELECT id, category_id FROM products WHERE category_id IS NOT NULL;
+          INSERT OR IGNORE INTO product_brands (product_id, brand_id) SELECT id, brand_id FROM products WHERE brand_id IS NOT NULL;`);
   if (!cols('payments').includes('meta')) d.exec('ALTER TABLE payments ADD COLUMN meta TEXT');
   const flag = (k: string, def: number) => {
     const r = d.prepare('SELECT value FROM settings WHERE key = ?').get(k) as { value: string } | undefined;

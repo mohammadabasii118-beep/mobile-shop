@@ -16,7 +16,7 @@ type C = { id: number; slug: string; name: string; parent_id: number | null; art
 
 export default async function CategoriesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
-  const cats = all<C>('SELECT c.*, (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id) n FROM categories c ORDER BY sort, id');
+  const cats = all<C>('SELECT c.*, (SELECT COUNT(*) FROM product_categories x WHERE x.category_id = c.id) n FROM categories c ORDER BY sort, id');
   const flat: (C & { depth: number })[] = [];
   const walk = (parent: number | null, d: number) => { for (const c of cats.filter((x) => x.parent_id === parent)) { flat.push({ ...c, depth: d }); walk(c.id, d + 1); } };
   walk(null, 0);
