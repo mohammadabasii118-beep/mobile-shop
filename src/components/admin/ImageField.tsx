@@ -6,7 +6,7 @@ import { adminToast } from './client';
 import Pic from '../shop/Pic';
 
 /** آپلود یک تصویر؛ مقدار در input مخفی با نام `name` ثبت می‌شود */
-export default function ImageField({ name, defaultValue, label, hint, onChange, aspect = '16 / 9' }: { name: string; defaultValue?: string | null; label: string; hint?: string; onChange?: (v: string) => void; aspect?: string }) {
+export default function ImageField({ name, defaultValue, label, hint, onChange, aspect = '16 / 9', kind }: { kind?: 'banner'; name: string; defaultValue?: string | null; label: string; hint?: string; onChange?: (v: string) => void; aspect?: string }) {
   const [v, setV] = useState(defaultValue ?? '');
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
@@ -14,7 +14,7 @@ export default function ImageField({ name, defaultValue, label, hint, onChange, 
   const upload = async (f: File) => {
     setBusy(true);
     try {
-      const fd = new FormData(); fd.append('file', f);
+      const fd = new FormData(); fd.append('file', f); if (kind) fd.append('kind', kind);
       const r = await fetch('/api/upload', { method: 'POST', body: fd });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || 'آپلود انجام نشد');

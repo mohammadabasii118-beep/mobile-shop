@@ -26,6 +26,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'دسترسی غیرمجاز' }, { status: 401 });
   }
   const form = await req.formData().catch(() => null);
+  const kind = form?.get('kind') === 'banner' ? 'banner' : 'product';
   const files = form?.getAll('file').filter((f): f is File => f instanceof File) ?? [];
   if (!files.length) return NextResponse.json({ error: 'فایلی ارسال نشد' }, { status: 400 });
   const urls: string[] = [];
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
       fs.writeFileSync(path.join(dir, name), buf);
     } else {
       try {
-        name = await optimizeImage(buf, dir, id);
+        name = await optimizeImage(buf, dir, id, kind);
       } catch {
         return NextResponse.json({ error: `«${f.name}» قابل پردازش نیست` }, { status: 415 });
       }

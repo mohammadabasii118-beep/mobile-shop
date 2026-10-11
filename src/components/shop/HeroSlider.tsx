@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
 import type { Banner } from '@/lib/types';
 import Pic from './Pic';
+import CoverPic from './CoverPic';
 import { BadgeChip, Title } from './BannerParts';
 
 const INTERVAL = 6500;
@@ -104,11 +105,7 @@ export default function HeroSlider({ slides }: { slides: Banner[] }) {
               >
                 {cover && (
                   <div className="bg" aria-hidden>
-                    <picture>
-                      {s.image_mobile && <source media="(max-width: 767px)" srcSet={s.image_mobile} />}
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={s.image!} alt="" loading={k === 0 ? 'eager' : 'lazy'} draggable={false} />
-                    </picture>
+                    <CoverPic src={s.image!} mobile={s.image_mobile} eager={k === 0} />
                   </div>
                 )}
                 {cover && s.link && <Link className="slide-link" href={s.link} tabIndex={-1} aria-hidden draggable={false} />}

@@ -92,8 +92,8 @@ export default function BannerEditor({ banner, categories, brands }: { banner: P
         <section className="ad-card">
           <div className="hd"><h2>تصویر</h2></div>
           <div className="bd">
-            <ImageField name="image" defaultValue={banner.image} label={b.layout === 'cover' && b.position === 'hero' ? 'تصویر دسکتاپ (الزامی)' : 'تصویر محصول (اختیاری)'} hint={b.layout === 'cover' && b.position === 'hero' ? 'پیشنهاد: ۲۴۰۰×۹۶۰ پیکسل (WebP یا JPG)' : 'PNG/WebP با زمینه‌ی شفاف؛ اگر خالی باشد از تصویر نمونه‌ی زیر استفاده می‌شود.'} onChange={(v) => set({ image: v })} aspect={b.layout === 'cover' ? '5 / 2' : '4 / 3'} />
-            {b.layout === 'cover' && b.position === 'hero' && <ImageField name="image_mobile" defaultValue={banner.image_mobile} label="تصویر موبایل (اختیاری)" hint="پیشنهاد: ۱۰۸۰×۱۲۰۰ پیکسل" onChange={(v) => set({ imageM: v })} aspect="9 / 10" />}
+            <ImageField name="image" kind={b.layout === 'cover' && b.position === 'hero' ? 'banner' : undefined} defaultValue={banner.image} label={b.layout === 'cover' && b.position === 'hero' ? 'تصویر دسکتاپ (الزامی)' : 'تصویر محصول (اختیاری)'} hint={b.layout === 'cover' && b.position === 'hero' ? 'پیشنهاد: ۲۴۰۰×۹۶۰ پیکسل (JPG یا WebP). متن روی نیمه‌ی راست تصویر می‌نشیند؛ سوژه را سمت چپ بگذارید.' : 'PNG/WebP با زمینه‌ی شفاف؛ اگر خالی باشد از تصویر نمونه‌ی زیر استفاده می‌شود.'} onChange={(v) => set({ image: v })} aspect={b.layout === 'cover' ? '5 / 2' : '4 / 3'} />
+            {b.layout === 'cover' && b.position === 'hero' && <ImageField name="image_mobile" kind="banner" defaultValue={banner.image_mobile} label="تصویر موبایل (اختیاری)" hint="پیشنهاد: ۱۰۸۰×۱۲۰۰ پیکسل. در موبایل متن پایین تصویر است؛ سوژه را بالا بگذارید." onChange={(v) => set({ imageM: v })} aspect="9 / 10" />}
             {!(b.layout === 'cover') && (
               <div className="fld"><label htmlFor="bar">تصویر نمونه (وقتی عکسی آپلود نشده)</label>
                 <select id="bar" className="sel" name="art" value={b.art} onChange={(e) => set({ art: e.target.value })}>{ART_KEYS.map((k) => <option key={k} value={k}>{ART_LABELS[k]}</option>)}</select></div>
