@@ -390,8 +390,8 @@ export function createGameServer(opt: ServerOptions) {
     let file = normalize(join(dir, path));
     if (!file.startsWith(dir)) { res.writeHead(403); return res.end(); }
     if (!existsSync(file) || statSync(file).isDirectory()) file = join(dir, 'index.html'); // SPA
-    const hashed = file.includes('/assets/');
-    res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream', 'cache-control': hashed ? 'public, max-age=31536000, immutable' : 'no-cache' });
+    const hashed = /\/assets\/[^/]+-[A-Za-z0-9_-]{8}\.(js|css)$/.test(file); // فقط فایل‌های ساخته‌شده با هش؛ عکس‌های ثابت (پس‌زمینه و آرت کارت) یک ساعت کش می‌شوند تا جایگزینی‌شان دیده شود
+    res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream', 'cache-control': hashed ? 'public, max-age=31536000, immutable' : /\.(jpg|png|webp)$/.test(file) ? 'public, max-age=3600' : 'no-cache' });
     res.end(readFileSync(file));
   }
 

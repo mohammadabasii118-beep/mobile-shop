@@ -7,7 +7,7 @@ declare global {
 const tg = window.Telegram?.WebApp;
 tg?.ready();
 tg?.expand();
-try { tg?.setHeaderColor?.('#14121f'); tg?.setBackgroundColor?.('#14121f'); } catch { /* ignore */ }
+try { tg?.setHeaderColor?.('#0a1124'); tg?.setBackgroundColor?.('#0a1124'); } catch { /* ignore */ }
 // کشیدن انگشت به پایین بازی را نبندد/کوچک نکند (وسط نبرد که با انگشت روی کارت‌ها می‌کشی مهم است)
 try { tg?.disableVerticalSwipes?.(); } catch { /* نسخه‌ی قدیمی تلگرام */ }
 
