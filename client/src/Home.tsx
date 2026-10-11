@@ -68,10 +68,12 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
             {cfg.ui?.banner ? <img className="bannerimg" src={cfg.ui.banner} alt="میراث" /> : <><div className="brand">میراث</div><p>سه کارت، یک میراث</p></>}
           </div>
           <button className="mode solo" onClick={() => setView('solo')}>
-            <span className="ico"><svg className="i" viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9 16h6"/></svg></span><div><b>سولو</b></div><FeePill n={cfg.fees?.solo} />
+            <span className="medal8"><svg className="i" viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9 16h6"/></svg></span>
+            <span className="mtitle">سولو</span><FeePill n={cfg.fees?.solo} />
           </button>
           <button className="mode multi" disabled={queued} onClick={() => sock.send({ t: 'queue' })}>
-            <span className="ico"><svg className="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg></span><div><b>مولتی‌پلیر</b></div><FeePill n={cfg.fees?.multi} />
+            <span className="medal8"><svg className="i" viewBox="0 0 24 24"><path d="M4 4l9 9M9 4H4v5M20 4l-9 9M15 4h5v5M7 17l-3 3M17 17l3 3"/></svg></span>
+            <span className="mtitle">مولتی‌پلیر</span><FeePill n={cfg.fees?.multi} />
           </button>
         </section>
       ) : (
@@ -132,6 +134,22 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
         </Modal>
       )}
     </>
+  );
+}
+
+/** جعبه‌ی گنج؛ رنگش از متغیرهای CSS نوع جعبه (برنزی/نقره‌ای/طلایی) می‌آید */
+function Chest() {
+  return (
+    <svg className="chest" viewBox="0 0 48 42" aria-hidden="true">
+      <ellipse cx="24" cy="39" rx="19" ry="2.6" fill="rgba(0,0,0,.45)" />
+      <rect x="4" y="19" width="40" height="19" rx="3" style={{ fill: 'var(--ch2)' }} />
+      <path d="M4 21C4 9 12 4 24 4s20 5 20 17z" style={{ fill: 'var(--ch1)' }} />
+      <rect x="4" y="18" width="40" height="5" style={{ fill: 'var(--ch3)' }} />
+      <path d="M9 21C9 12 15 8 24 8" fill="none" stroke="#fff" strokeOpacity=".45" strokeWidth="2" strokeLinecap="round" />
+      <rect x="19.500" y="17" width="9" height="12" rx="2" style={{ fill: 'var(--lk)' }} stroke="rgba(0,0,0,.45)" />
+      <circle cx="24" cy="22.500" r="2" fill="#3a2406" />
+      <rect x="23.200" y="23" width="1.600" height="3.600" fill="#3a2406" />
+    </svg>
   );
 }
 
@@ -196,20 +214,20 @@ function Boxes({ ctx }: { ctx: Ctx }) {
       <div className="slots">
         {Array.from({ length: cfg.box.slots }, (_, i) => {
           const b = bySlot.get(i);
-          if (!b) return <div key={i} className="slot empty">خالی</div>;
+          if (!b) return <div key={i} className="slot empty"><span>خالی</span></div>;
           const left = b.state === 'opening' ? Math.max(0, b.remainingMs - (Date.now() - fetchedAt)) : 0;
           const label = <b className={`btype ${b.type}`}>{cfg.box.types[b.type]?.name ?? b.type}</b>;
           if (b.state === 'locked') return (
             <button key={i} className={`slot bx ${b.type}`} disabled={anyOpening} onClick={() => act('/api/box/start', i)}>
-              {label}<span className="ico">🎁</span><small>{anyOpening ? 'در صف' : 'شروع باز شدن'}</small><small>{fmtTime(b.remainingMs)}</small>
+              {label}<Chest /><small>{anyOpening ? 'در صف' : 'شروع باز شدن'}</small><small>{fmtTime(b.remainingMs)}</small>
             </button>);
           if (b.state === 'ready' || left === 0) return (
             <button key={i} className={`slot bx ready ${b.type}`} onClick={() => act('/api/box/open', i)}>
-              {label}<span className="ico">✨</span><small>باز کن!</small>
+              {label}<Chest /><small>باز کن!</small>
             </button>);
           return (
             <div key={i} className={`slot bx opening ${b.type}`}>
-              {label}<span className="ico">⏳</span><small>{fmtTime(left)}</small>
+              {label}<Chest /><small>{fmtTime(left)}</small>
               {isDev && <button className="mini" onClick={() => act('/api/box/skip', i)}>⏩ دمو</button>}
             </div>);
         })}
