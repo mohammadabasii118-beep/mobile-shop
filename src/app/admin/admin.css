@@ -192,7 +192,7 @@
 .tchip.on { background: var(--ink); color: var(--on-ink); box-shadow: none; }
 .tchip i { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(128, 128, 128, .45); }
 .tgroup { display: grid; gap: 6px; } .tgroup > small { color: var(--mute); font-weight: 600; font-size: 12px; }
-.vars { border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden; }
+.vars { border: 1px solid var(--hairline); border-radius: 12px; overflow: hidden; overflow: clip; }
 .vrow { display: grid; grid-template-columns: minmax(200px, 2.2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, .7fr) auto; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--hairline); }
 .vrow:last-child { border-bottom: 0; }
 .vrow.head { background: var(--parchment); font-size: 12px; font-weight: 600; color: var(--mute); position: sticky; top: 60px; z-index: 5; }
@@ -270,3 +270,19 @@
 .mp-opt { display: flex; align-items: center; gap: 10px; min-height: 36px; padding-inline-end: 10px; border-radius: var(--r-sm); cursor: pointer; font-size: 14px; }
 .mp-opt:hover { background: var(--parchment); }
 .mp-opt input { accent-color: var(--ink); width: 16px; height: 16px; }
+
+/* قیمت‌گذاری گروهی (DESIGN.md §18.11) */
+.gp { display: grid; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--hairline); background: var(--parchment); }
+.gp-head { display: grid; gap: 2px; font-size: 13px; } .gp-head b { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); font-size: 14px; }
+.gp-rows { display: grid; gap: 8px; }
+.gp-row { display: grid; grid-template-columns: minmax(140px, 1.4fr) repeat(3, minmax(0, 1fr)) auto; gap: 10px; align-items: center; }
+.gp-h { font-size: 12px; font-weight: 600; color: var(--mute); }
+.gp-name { display: flex; flex-direction: column; font-weight: 600; color: var(--ink); min-width: 0; } .gp-name small { font-weight: 400; font-size: 12px; }
+.gp-name .sw { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-inline-end: 6px; box-shadow: inset 0 0 0 1px rgba(128, 128, 128, .45); }
+@media (max-width: 640px) {
+  .gp-h { display: none; }
+  .gp-row { grid-template-columns: 1fr 1fr; padding: 10px; border-radius: var(--r-md); background: var(--canvas); box-shadow: inset 0 0 0 1px var(--hairline); }
+  .gp-row .gp-name { grid-column: 1 / -1; }
+  .gp-row > div[data-l]::before { content: attr(data-l); display: block; font-size: 11.5px; color: var(--mute); margin-bottom: 2px; }
+  .gp-row > button { grid-column: 1 / -1; }
+}

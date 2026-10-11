@@ -9,6 +9,8 @@ import { attrsKey, generateCombos, type GenAttr } from '@/lib/variations';
 import { fa, slugify, toman } from '@/lib/format';
 import { adminToast } from './client';
 import MultiPick from './MultiPick';
+import Money from './Money';
+import GroupPricing, { type PriceGroup, type GroupRow } from './GroupPricing';
 import Pic, { parseArt } from '../shop/Pic';
 import { ART_KEYS, ART_LABELS } from '../shop/Sprite';
 
@@ -20,19 +22,6 @@ type Props = {
   attributes: EdAttribute[];
   isNew: boolean;
 };
-
-/* ورودی پول با نمایش فارسی */
-function Money({ value, onChange, id, placeholder }: { value: number | null; onChange: (v: number | null) => void; id?: string; placeholder?: string }) {
-  return (
-    <input
-      id={id} className="input num" inputMode="numeric" placeholder={placeholder} value={value ? value.toLocaleString('fa-IR') : ''}
-      onChange={(e) => {
-        const raw = e.target.value.replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/\D/g, '');
-        onChange(raw ? Number(raw) : null);
-      }}
-    />
-  );
-}
 
 export default function ProductEditor({ initial, categories, brands, attributes, isNew }: Props) {
   const router = useRouter();
@@ -146,6 +135,33 @@ export default function ProductEditor({ initial, categories, brands, attributes,
     const keys = new Set(shown.map((v) => attrsKey(v.attrs)));
     upd({ variations: p.variations.map((v) => (keys.has(attrsKey(v.attrs)) ? { ...v, ...fn(v) } : v)) });
     adminToast(`روی ${fa(keys.size)} متغیر اعمال شد`);
+  };
+
+  /* ───── قیمت‌گذاری گروهی بر اساس ویژگی ───── */
+  const priceGroups = useMemo<PriceGroup[]>(() => p.attributes.flatMap((pa) => {
+    const a = attrById.get(pa.attribute_id);
+    if (!a || !pa.for_variations) return [];
+    const terms = a.terms.filter((t) => pa.term_ids.includes(t.id))
+      .map((t) => ({ slug: t.slug, name: t.name, color: a.type === 'color' ? t.value ?? undefined : undefined, count: p.variations.filter((v) => v.attrs[a.slug] === t.slug).length }))
+      .filter((t) => t.count > 0);
+    return terms.length >= 2 ? [{ slug: a.slug, name: a.name, terms }] : [];
+  }), [p.attributes, p.variations, attrById]);
+  const applyGroup = (rows: GroupRow[]) => {
+    for (const r of rows) if (r.price && r.sale && r.sale >= r.price) { adminToast('قیمت تخفیفی باید کمتر از قیمت باشد', 'err'); return; }
+    let n = 0, skipped = 0;
+    const variations = p.variations.map((v) => {
+      let nv = v;
+      for (const r of rows) {
+        if (v.attrs[r.slug] !== r.term) continue;
+        const next = { ...nv, ...(r.price ? { price: r.price } : {}), ...(r.sale ? { sale_price: r.sale } : {}), ...(r.stock !== null ? { stock: r.stock } : {}) };
+        if (next.sale_price && next.price && next.sale_price >= next.price) { skipped++; continue; }
+        nv = next; n++;
+      }
+      return nv;
+    });
+    upd({ variations });
+    if (skipped) adminToast(`روی ${fa(n)} متغیر اعمال شد؛ ${fa(skipped)} متغیر چون قیمت تخفیفی از قیمت‌شان کمتر نبود رد شد`, 'err');
+    else adminToast(`روی ${fa(n)} متغیر اعمال شد. فراموش نکنید ذخیره بزنید.`);
   };
 
   /* ───── ذخیره ───── */
@@ -357,6 +373,7 @@ export default function ProductEditor({ initial, categories, brands, attributes,
                   <div className="ad-empty"><Layers /><h3>هنوز متغیری ساخته نشده</h3><p>ویژگی‌ها را انتخاب کنید و دکمه‌ی «ساخت متغیرها» را بزنید.</p></div>
                 ) : (
                   <>
+                    {priceGroups.length > 0 && <GroupPricing key={priceGroups.map((g) => g.slug).join(',')} groups={priceGroups} onApply={applyGroup} />}
                     <div className="bulkbar" aria-label="عملیات گروهی">
                       <input className="input" placeholder="فیلتر متغیرها…" value={vFilter} onChange={(e) => setVFilter(e.target.value)} aria-label="فیلتر متغیرها" style={{ width: 160 }} />
                       <span style={{ display: 'inline-flex', gap: 4 }}><span style={{ width: 120 }}><Money value={bulk.price} onChange={(v) => setBulk((b) => ({ ...b, price: v }))} placeholder="قیمت" /></span><button type="button" className="btn btn-secondary btn-sm" disabled={!bulk.price} onClick={() => applyBulk(() => ({ price: bulk.price }))}>ثبت قیمت</button></span>
