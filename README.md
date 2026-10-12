@@ -119,4 +119,4 @@ curl -fsSL https://raw.githubusercontent.com/mohammadabasii118-beep/mobile-shop/
 بدون دامنه از آدرس رایگان `miras.<IP>.sslip.io` استفاده می‌کند. با دامنه‌ی خودت: `DOMAIN=miras.example.com` (قبلش A رکورد را به IP سرور بزن).
 
 ## بکاپ روزانه در ربات
-در حالت واقعی (BOT_TOKEN و ADMIN_IDS تنظیم شده) هر روز بعد از ساعت ۳ بامداد UTC (حدود ۶:۳۰ ایران) یک فایل `miras-backup-تاریخ.tar.gz` فقط برای ادمین‌ها در پیام خصوصی ربات فرستاده می‌شود: کد + دیتابیس (کاربرها) + عکس‌ها + تنظیمات پنل (بدون node_modules). هر ادمین باید یک‌بار به ربات /start بزند. بکاپ فوری: ارسال `/backup` به ربات. ساعت: `BACKUP_HOUR_UTC` در /etc/miras.env؛ خاموش: `BACKUP=off`.
+در حالت واقعی (BOT_TOKEN و ADMIN_IDS تنظیم شده) هر روز بعد از ساعت ۳ بامداد UTC (حدود ۶:۳۰ ایران) یک فایل `miras-backup-تاریخ.tar.gz` فقط برای ادمین‌ها در پیام خصوصی ربات فرستاده می‌شود: همه‌ی کد (با node_modules و build) + دیتابیس (کاربرها) + عکس‌ها + تنظیمات پنل (بدون فایل توکن `/etc/miras.env`؛ اگر از ۵۰ مگابایت بیشتر شود اول بدون node_modules، بعد فقط داده‌ها). هر ادمین باید یک‌بار به ربات /start بزند. بکاپ فوری: ارسال `/backup` به ربات. ساعت: `BACKUP_HOUR_UTC` در /etc/miras.env؛ خاموش: `BACKUP=off`.

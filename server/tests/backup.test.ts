@@ -7,7 +7,7 @@ import { makeBackup } from '../src/backup';
 import { openDb } from '../src/db';
 
 describe('backup', () => {
-  it('contains code, a consistent db snapshot and uploads, but not node_modules', async () => {
+  it('contains everything: code, node_modules, db snapshot, uploads and settings', async () => {
     const root = mkdtempSync(join(tmpdir(), 'bk-'));
     const code = join(root, 'app'), data = join(code, 'data');
     mkdirSync(join(code, 'node_modules'), { recursive: true });
@@ -23,7 +23,7 @@ describe('backup', () => {
     expect(list).toContain('data-backup/game.db');
     expect(list).toContain('data-backup/uploads/a.png');
     expect(list).toContain('data-backup/game.json');
-    expect(list).not.toContain('node_modules');
+    expect(list).toContain('./node_modules/big.js');
     expect(list).not.toContain('./data/');
   });
 });

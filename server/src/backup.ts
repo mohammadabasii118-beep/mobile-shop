@@ -12,10 +12,11 @@ export const TG_MAX_BYTES = 49 * 1024 * 1024;
 export interface BackupOpts { db: Db; dataDir: string; codeDir: string; /** پوشه‌ی موقت (پیش‌فرض: tmp سیستم) */ tmp?: string }
 
 /**
- * یک بکاپ کامل tar.gz می‌سازد: کد (بدون node_modules و فایل‌های قابل بازسازی) + دیتابیس (نسخه‌ی سازگار) + عکس‌ها و تنظیمات پنل.
- * اگر حجمش از سقف تلگرام بیشتر شود فقط «داده‌ها» (کاربرها/عکس‌ها/تنظیمات) را می‌فرستد.
+ * یک بکاپ کامل tar.gz می‌سازد: همه‌ی کد (با node_modules و build) + دیتابیس (نسخه‌ی سازگار) + عکس‌ها و تنظیمات پنل.
+ * فایل env سرور (توکن ربات) عمداً داخلش نیست.
+ * اگر حجمش از سقف تلگرام بیشتر شود، اول بدون node_modules/build و اگر باز هم بزرگ بود فقط «داده‌ها» را می‌فرستد.
  */
-export async function makeBackup(o: BackupOpts): Promise<{ file: string; name: string; dataOnly: boolean; cleanup: () => void }> {
+export async function makeBackup(o: BackupOpts): Promise<{ file: string; name: string; dataOnly: boolean; slim: boolean; cleanup: () => void }> {
   const work = mkdtempSync(join(o.tmp ?? tmpdir(), 'miras-backup-'));
   const cleanup = () => rmSync(work, { recursive: true, force: true });
   try {
@@ -29,12 +30,16 @@ export async function makeBackup(o: BackupOpts): Promise<{ file: string; name: s
     }
     const stamp = new Date().toISOString().slice(0, 10);
     const full = join(work, `miras-backup-${stamp}.tar.gz`);
-    const ex = ['--exclude=./node_modules', '--exclude=./client/dist', '--exclude=./data', '--exclude=./.node', '--exclude=./.tmp'];
-    await run('tar', ['-czf', full, ...ex, '-C', o.codeDir, '.', '-C', work, 'data-backup']);
-    if (statSync(full).size <= TG_MAX_BYTES) return { file: full, name: `miras-backup-${stamp}.tar.gz`, dataOnly: false, cleanup };
+    const base = ['--exclude=./data', '--exclude=./.node', '--exclude=./.tmp'];
+    const code = ['-C', o.codeDir, '.', '-C', work, 'data-backup'];
+    await run('tar', ['-czf', full, ...base, ...code]);
+    if (statSync(full).size <= TG_MAX_BYTES) return { file: full, name: `miras-backup-${stamp}.tar.gz`, dataOnly: false, slim: false, cleanup };
+    const slim = join(work, `miras-backup-slim-${stamp}.tar.gz`);
+    await run('tar', ['-czf', slim, ...base, '--exclude=./node_modules', '--exclude=./client/dist', ...code]);
+    if (statSync(slim).size <= TG_MAX_BYTES) return { file: slim, name: `miras-backup-slim-${stamp}.tar.gz`, dataOnly: false, slim: true, cleanup };
     const dataOnly = join(work, `miras-data-${stamp}.tar.gz`);
     await run('tar', ['-czf', dataOnly, '-C', work, 'data-backup']);
-    return { file: dataOnly, name: `miras-data-${stamp}.tar.gz`, dataOnly: true, cleanup };
+    return { file: dataOnly, name: `miras-data-${stamp}.tar.gz`, dataOnly: true, slim: false, cleanup };
   } catch (e) { cleanup(); throw e; }
 }
 
@@ -56,7 +61,7 @@ export async function backupToAdmins(o: BackupOpts & { token: string; adminIds: 
   let ok = 0;
   try {
     const kb = Math.round(statSync(b.file).size / 1024);
-    const cap = `💾 بکاپ «میراث» — ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC (${kb} KB)${b.dataOnly ? '\n⚠️ حجم کامل از سقف تلگرام بیشتر بود؛ فقط داده‌ها (کاربرها، عکس‌ها، تنظیمات) فرستاده شد. کد روی گیت‌هاب هست.' : ''}`;
+    const cap = `💾 بکاپ «میراث» — ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC (${kb} KB)${b.dataOnly ? '\n⚠️ حجم از سقف تلگرام (۵۰ مگابایت) بیشتر بود؛ فقط داده‌ها (کاربرها، عکس‌ها، تنظیمات) فرستاده شد. کد روی گیت‌هاب هست.' : b.slim ? '\n⚠️ حجم کامل از سقف تلگرام بیشتر بود؛ بدون node_modules و build فرستاده شد.' : ''}`;
     for (const id of o.chatIds ?? o.adminIds) {
       try { await sendDocument(o.apiBase ?? 'https://api.telegram.org', o.token, id, b.file, b.name, cap); ok++; }
       catch (e) { log(`ارسال برای ${id} نشد: ${(e as Error).message} (ادمین باید یک‌بار به ربات /start بزند)`); }
