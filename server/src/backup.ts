@@ -14,6 +14,19 @@ export interface BackupOpts { db: Db; dataDir: string; codeDir: string; /** پو
 /** اگر بکاپ از این بزرگ‌تر شود، به چند تکه‌ی کوچک‌تر تقسیم می‌شود (هیچ چیزی کم نمی‌شود) */
 export const PART_BYTES = 45 * 1024 * 1024;
 
+const RESTORE_GUIDE = `بکاپ «میراث»
+==============
+code/   ← کد برنامه (با node_modules و build)
+data/   ← game.db (کاربرها)، game.json (تنظیمات پنل)، uploads/ (عکس‌ها)
+
+برگرداندن روی سرور:
+ 1) سرویس را خاموش کن:        systemctl stop miras
+ 2) محتوای code/ را در /opt/miras بریز (یا فقط install.sh را دوباره اجرا کن؛ کد از گیت‌هاب می‌آید)
+ 3) محتوای data/ را در /opt/miras/data بریز (جایگزین فایل‌های قبلی)
+ 4) روشن کن:                  systemctl start miras
+فایل /etc/miras.env (توکن ربات) داخل بکاپ نیست؛ توکن را از BotFather بگیر.
+`;
+
 export interface BackupFile { file: string; name: string }
 
 /**
@@ -35,7 +48,10 @@ export async function makeBackup(o: BackupOpts & { partBytes?: number }): Promis
     }
     const name = `miras-backup-${new Date().toISOString().slice(0, 10)}.tar.gz`;
     const full = join(work, name);
-    await run('tar', ['-czf', full, '--exclude=./data', '--exclude=./.node', '--exclude=./.tmp', '-C', o.codeDir, '.', '-C', work, 'data-backup']);
+    writeFileSync(join(work, 'README-RESTORE.txt'), RESTORE_GUIDE);
+    // ساختار مرتب: code/ = کد برنامه، data/ = دیتابیس و عکس‌ها و تنظیمات پنل، README-RESTORE.txt = راهنمای برگرداندن
+    await run('tar', ['-czf', full, '--exclude=./data', '--exclude=./.node', '--exclude=./.tmp', '--transform', 's,^\\./,code/,', '-C', o.codeDir, '.',
+      '--transform', 's,^data-backup,data,', '-C', work, 'data-backup', 'README-RESTORE.txt']);
     const totalBytes = statSync(full).size;
     const limit = o.partBytes ?? PART_BYTES;
     if (totalBytes <= limit) return { files: [{ file: full, name }], totalBytes, cleanup };

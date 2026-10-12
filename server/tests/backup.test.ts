@@ -21,12 +21,13 @@ describe('backup', () => {
     expect(b.files).toHaveLength(1);
     const list = execFileSync('tar', ['-tzf', b.files[0].file]).toString();
     b.cleanup();
-    expect(list).toContain('./hello.ts');
-    expect(list).toContain('data-backup/game.db');
-    expect(list).toContain('data-backup/uploads/a.png');
-    expect(list).toContain('data-backup/game.json');
-    expect(list).toContain('./node_modules/big.js');
-    expect(list).not.toContain('./data/');
+    expect(list).toContain('code/hello.ts');
+    expect(list).toContain('data/game.db');
+    expect(list).toContain('data/uploads/a.png');
+    expect(list).toContain('data/game.json');
+    expect(list).toContain('code/node_modules/big.js');
+    expect(list).toContain('README-RESTORE.txt');
+    expect(list).not.toContain('code/data/');
   });
 
   it('splits an oversized backup into parts that join back into one valid archive (nothing dropped)', async () => {
@@ -42,7 +43,7 @@ describe('backup', () => {
     writeFileSync(joined, Buffer.concat(b.files.map((f) => readFileSync(f.file))));
     const list = execFileSync('tar', ['-tzf', joined]).toString();
     b.cleanup();
-    expect(list).toContain('./noise.bin');
-    expect(list).toContain('data-backup/game.db');
+    expect(list).toContain('code/noise.bin');
+    expect(list).toContain('data/game.db');
   });
 });
