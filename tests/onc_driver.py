@@ -16,7 +16,7 @@ from aiogram.client.session.base import BaseSession
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.methods import (AnswerCallbackQuery, DeleteMessage, EditMessageMedia, EditMessageText, GetChat, GetChatMember,
-                             GetFile, GetMe, SendDocument, SendMessage, SendPhoto, SetChatMenuButton, SetMyCommands)
+                             CopyMessage, ForwardMessage, GetFile, GetMe, SendDocument, SendMessage, SendPhoto, SetChatMenuButton, SetMyCommands)
 from aiogram.types import (CallbackQuery, Chat, ChatFullInfo, ChatMemberAdministrator, File, InlineKeyboardMarkup, Message,
                            PhotoSize, Update, User)
 
@@ -34,6 +34,8 @@ class FakeSession(BaseSession):
         self.files: dict[str, bytes] = {}
         self.channel_perms = {"can_post_messages": True, "can_edit_messages": True}
         self.fail_channel = False
+        self.strip_emoji_chats: set[int] = set()              # chats where Telegram silently drops custom emoji from bot posts
+        self.ents: dict[tuple[int, int], list] = {}
         self.alerts: list[str] = []
         self.commands: list = []
 
@@ -42,10 +44,10 @@ class FakeSession(BaseSession):
     async def stream_content(self, url, headers=None, timeout=30, chunk_size=65536, raise_for_status=True):
         yield self.files.get(url.rsplit("/", 1)[-1], b"")
 
-    def _msg(self, chat_id, text=None, caption=None, photo=None):
+    def _msg(self, chat_id, text=None, caption=None, photo=None, entities=None):
         self.mid += 1
         m = Message.model_construct(message_id=self.mid, date=dt.datetime.now(), chat=Chat(id=chat_id, type="channel" if chat_id < 0 else "private"),
-                                    text=text, caption=caption)
+                                    text=text, caption=caption, entities=entities or None)
         return m
 
     def _store(self, chat_id, m, text, markup, photo=None):
@@ -60,8 +62,28 @@ class FakeSession(BaseSession):
             method = method.model_copy(update={"chat_id": int(cid)})
         self.log.append((name, method.model_dump(exclude={"reply_markup"}) if not isinstance(method, (SendPhoto, EditMessageMedia)) else {"chat_id": getattr(method, "chat_id", None)}))
         if isinstance(method, SendMessage):
-            m = self._msg(method.chat_id, method.text)
+            from aiogram.types import MessageEntity
+            import re as _re
+            ids = [] if method.chat_id in self.strip_emoji_chats else _re.findall(r'emoji-id="(\d+)"', method.text or "")
+            ents = [MessageEntity(type="custom_emoji", offset=0, length=2, custom_emoji_id=i) for i in ids]
+            m = self._msg(method.chat_id, method.text, entities=ents)
             self._store(method.chat_id, m, method.text, method.reply_markup)
+            self.ents[(method.chat_id, m.message_id)] = ents
+            return m
+        if isinstance(method, CopyMessage):
+            from aiogram.types import MessageId
+            src = self.screens[(int(method.from_chat_id), method.message_id)]
+            ents = list(self.ents.get((int(method.from_chat_id), method.message_id), []))                 # copy keeps the entities
+            m = self._msg(int(method.chat_id), src["text"], entities=ents)
+            self._store(int(method.chat_id), m, src["text"], method.reply_markup)
+            self.ents[(int(method.chat_id), m.message_id)] = ents
+            return MessageId(message_id=m.message_id)
+        if isinstance(method, ForwardMessage):
+            src = self.screens[(int(method.from_chat_id), method.message_id)]
+            ents = list(self.ents.get((int(method.from_chat_id), method.message_id), []))
+            m = self._msg(int(method.chat_id), src["text"], entities=ents)
+            self._store(int(method.chat_id), m, src["text"], None)
+            self.ents[(int(method.chat_id), m.message_id)] = ents
             return m
         if isinstance(method, SendPhoto):
             if str(method.chat_id) == str(CHANNEL) and self.fail_channel:

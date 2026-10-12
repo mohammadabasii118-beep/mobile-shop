@@ -46,4 +46,38 @@ async def run():
     print("RELAY OK")
 
 
+async def hub_test():
+    """The in-bot test (⚙️ → ✨ گروه واسط → 🧪): group ✅, direct channel ❌ (stripped), copyMessage ✅."""
+    import os as _os
+    import tempfile
+    tmp = tempfile.mkdtemp()
+    _os.environ["DB_PATH"] = _os.path.join(tmp, "t.db")
+    _os.environ["ONC_ASSETS_DIR"] = _os.path.join(tmp, "assets")
+    from tests.onc_driver import ADMIN, CHANNEL, Driver
+    from pclbot import emojis
+    from pclbot.fx import core
+    d = await Driver.create()
+    A = ADMIN
+    await d.say("/start", A)
+    await d.press("fx:a", A); await d.press("fx:ar", A)
+    await d.say("-1008888", A)                                                  # the relay group
+    assert outgoing.RELAY_CHAT == "-1008888"
+    await d.press("fx:aet", A)
+    assert "ست" in " ".join(d.session.alerts)                                 # no premium emoji configured yet
+    await emojis.set_id("🔴", "5368324170671202286")
+    await d.press("fx:ap", A); await d.say(str(CHANNEL), A)                    # a channel destination to test against
+    d.session.strip_emoji_chats.add(CHANNEL)
+    await d.press("fx:ar", A); await d.press("fx:aet", A)
+    d.snap("In-bot test: choose the channel", A)
+    await d.press("fx:aet:0", A)
+    t = d.text(A)
+    assert "ارسال به گروه واسط: ایموجی پریمیوم ماند" in t and "ارسال مستقیم به کانال: ایموجی معمولی شد" in t and "copyMessage): ایموجی پریمیوم ماند" in t, t
+    assert "گروه واسط کار می‌کند" in t
+    d.snap("In-bot test result", A)
+    assert outgoing.RELAY_CHAT == "-1008888"                                    # the automatic relay is switched back on
+    await d.close()
+    print("HUB TEST OK")
+
+
 asyncio.run(run())
+asyncio.run(hub_test())
