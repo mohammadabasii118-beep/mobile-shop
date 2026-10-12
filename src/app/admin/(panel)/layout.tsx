@@ -36,7 +36,8 @@ export default async function PanelLayout({ children }: { children: React.ReactN
       ],
     },
     { title: 'مشتریان', items: [{ href: '/admin/users', label: 'کاربران', icon: 'users', keywords: 'مشتری مدیر' }] },
-    { title: 'محتوا', items: [{ href: '/admin/banners', label: 'بنرها و اسلایدر', icon: 'banners', keywords: 'هیرو اسلایدر تبلیغ' }] },
+    { title: 'محتوا', items: [{ href: '/admin/banners', label: 'بنرها و اسلایدر', icon: 'banners', keywords: 'هیرو اسلایدر تبلیغ' },
+        { href: '/admin/channel', label: 'کانال تلگرام', icon: 'reviews', keywords: 'ربات تلگرام پست کانال خودکار' }] },
     {
       title: 'سیستم', items: [
         { href: '/admin/reports', label: 'گزارش‌ها', icon: 'reports', keywords: 'فروش آمار' },

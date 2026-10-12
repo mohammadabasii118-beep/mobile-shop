@@ -247,6 +247,21 @@ CREATE TABLE IF NOT EXISTS inventory_log (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- پست‌های کانال تلگرام (ربات): هر پست یک ردیف؛ اگر قیمت داشته باشد محصول هم ساخته می‌شود
+CREATE TABLE IF NOT EXISTS channel_posts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source_key TEXT NOT NULL UNIQUE,
+  group_id TEXT,
+  text TEXT NOT NULL DEFAULT '',
+  image TEXT,
+  product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+  note TEXT NOT NULL DEFAULT '',
+  visible INTEGER NOT NULL DEFAULT 1,
+  posted_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_channel_posts_vis ON channel_posts(visible, posted_at);
+
 CREATE TABLE IF NOT EXISTS reviews (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,

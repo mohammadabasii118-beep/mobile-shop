@@ -29,6 +29,7 @@ export default function Footer({ settings, categories }: { settings: Settings; c
                 <li><Link href="/wishlist">علاقه‌مندی‌ها</Link></li>
                 <li><Link href="/cart">سبد خرید</Link></li>
                 <li><Link href="/shop?sale=1">تخفیف‌ها</Link></li>
+                <li><Link href="/channel">تازه‌های کانال</Link></li>
               </ul>
             </div>
             <div>

@@ -9,6 +9,8 @@ import RailSection from '@/components/shop/RailSection';
 import BrandMarquee from '@/components/shop/BrandMarquee';
 import Countdown from '@/components/shop/Countdown';
 import Pic from '@/components/shop/Pic';
+import ChannelCard from '@/components/shop/ChannelCard';
+import { getChannelPosts } from '@/lib/channel/feed';
 import { fa } from '@/lib/format';
 
 const FALLBACK: Banner = {
@@ -29,6 +31,7 @@ export default function HomePage() {
   const brands = getBrands();
   const reviews = getHomeReviews();
   const rating = getStoreRating();
+  const channel = getChannelPosts(8);
 
   return (
     <>
@@ -77,6 +80,12 @@ export default function HomePage() {
       {fresh.length > 0 && (
         <RailSection title="جدیدترین محصولات" sub="تازه رسیده‌ها به انبار" href="/shop?sort=new" className="tight-top">
           {fresh.map((p) => <ProductCard key={p.id} p={p} low={low} />)}
+        </RailSection>
+      )}
+
+      {channel.length > 0 && (
+        <RailSection title="تازه‌های کانال" sub="آخرین پست‌های کانال تلگرام ما" href="/channel" className="tight-top">
+          {channel.map((p) => <ChannelCard key={p.id} p={p} channelUrl={s.telegram || undefined} />)}
         </RailSection>
       )}
 
