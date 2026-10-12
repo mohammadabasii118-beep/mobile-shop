@@ -36,8 +36,8 @@ async def relay_dest(c: CallbackQuery, state: FSMContext, bot: Bot):
     await state.update_data(key="emoji_relay", back=PANEL)
     await show(c, f"✨ <b>گروه واسط ایموجی پریمیوم</b>\n\nفعلی: {await core.dest_status(bot, 'emoji_relay')}\n\n"
                   "گروهی که ایموجی پریمیوم در آن درست نمایش داده می‌شود (ربات ادمین با اجازه‌ی ارسال و حذف پیام). اگر تلگرام ایموجی پریمیوم را از پست کانال حذف کند، "
-                  "ربات پست را اول در این گروه می‌سازد (جایی که ایموجی پریمیوم درست است) و بعد به کانال می‌رساند. حالت «فوروارد»: پست در گروه می‌ماند و به کانال فوروارد می‌شود (بالای پست کانال «Forwarded from» می‌آید). حالت «بدون برچسب» (همان Hide sender name تلگرام): بدون «Forwarded from» و پست موقت گروه پاک می‌شود.\n\n"
-                  "یک پست از گروه فوروارد کن یا آیدی عددی (مثل -100…) بفرست:", okb([[ob("🔀 حالت: فوروارد با برچسب (پست در گروه می‌ماند)" if outgoing_mode() == "forward" else "📋 حالت: بدون برچسب فوروارد (Hide sender)", "fx:arm")], [ob("🗑 غیرفعال کردن", "fx:ar0")], [ob("❌ لغو", PANEL)]]))
+                  "ربات پست را اول در این گروه می‌سازد (جایی که ایموجی پریمیوم درست است) و بعد به کانال می‌رساند. حالت «فوروارد»: پست در گروه می‌ماند و به کانال فوروارد می‌شود (بالای پست کانال «Forwarded from» می‌آید). حالت «کپی تمیز»: بدون برچسب، و پست گروه پاک می‌شود.\n\n"
+                  "یک پست از گروه فوروارد کن یا آیدی عددی (مثل -100…) بفرست:", okb([[ob("🔀 حالت: فوروارد (پست در گروه می‌ماند)" if outgoing_mode() == "forward" else "📋 حالت: کپی تمیز (بدون برچسب فوروارد)", "fx:arm")], [ob("🗑 غیرفعال کردن", "fx:ar0")], [ob("❌ لغو", PANEL)]]))
     await c.answer()
 
 
@@ -67,7 +67,7 @@ async def relay_off(c: CallbackQuery, state: FSMContext):
 async def load() -> None:
     from .. import outgoing
     outgoing.RELAY_CHAT = (await core.get("emoji_relay")) or None
-    outgoing.RELAY_MODE = (await core.get("emoji_relay_mode")) or "copy"
+    outgoing.RELAY_MODE = (await core.get("emoji_relay_mode")) or "forward"
 
 
 @router.callback_query(F.data == "fx:ap")
