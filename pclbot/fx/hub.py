@@ -25,8 +25,34 @@ async def panel(c: CallbackQuery, state: FSMContext):
                     [ob("🎥 Streamers", "fx:at"), ob("⚡ ترنسفر نیوز (HWG)", "fx:hw")],
                     [ob("🎨 گرافیک‌های اپ", "fx:ag"), ob("🎭 تم‌های گرافیکی", "fx:th")],
                     [ob("⭐ تیم منتخب تورنمنت", "fx:xi"), ob("📍 کانال «پلاس»", "fx:ap")],
+                    [ob("✨ گروه واسط ایموجی پریمیوم", "fx:ar")],
                     [ob("🔙 بازگشت", "admhome")]]))
     await c.answer()
+
+
+@router.callback_query(F.data == "fx:ar")
+async def relay_dest(c: CallbackQuery, state: FSMContext, bot: Bot):
+    await state.set_state(DestSt.pick)
+    await state.update_data(key="emoji_relay", back=PANEL)
+    await show(c, f"✨ <b>گروه واسط ایموجی پریمیوم</b>\n\nفعلی: {await core.dest_status(bot, 'emoji_relay')}\n\n"
+                  "گروهی که ایموجی پریمیوم در آن درست نمایش داده می‌شود (ربات ادمین با اجازه‌ی ارسال و حذف پیام). اگر تلگرام ایموجی پریمیوم را از پست کانال حذف کند، "
+                  "ربات همان پست را در این گروه می‌سازد، با copyMessage به کانال می‌برد و پیام‌های موقت را پاک می‌کند.\n\n"
+                  "یک پست از گروه فوروارد کن یا آیدی عددی (مثل -100…) بفرست:", okb([[ob("🗑 غیرفعال کردن", "fx:ar0")], [ob("❌ لغو", PANEL)]]))
+    await c.answer()
+
+
+@router.callback_query(F.data == "fx:ar0")
+async def relay_off(c: CallbackQuery, state: FSMContext):
+    from .. import outgoing
+    await core.put("emoji_relay", "")
+    outgoing.RELAY_CHAT = None
+    await c.answer("غیرفعال شد")
+    await panel(c, state)
+
+
+async def load() -> None:
+    from .. import outgoing
+    outgoing.RELAY_CHAT = (await core.get("emoji_relay")) or None
 
 
 @router.callback_query(F.data == "fx:ap")

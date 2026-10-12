@@ -73,7 +73,7 @@ async def publish(bot: Bot, tid: int, stage: str, kind: str, ref_id: int, images
     prior = {r["page"]: r for r in await dbx.fetchall(
         "SELECT * FROM onc_publications WHERE tournament_id=? AND kind=? AND ref_id=? AND channel_id=?", tid, kind, ref_id, cid)}
     sent = edited = 0
-    outgoing.EXEMPT_CHATS.add(str(cid))
+    outgoing.EXEMPT_CHATS.discard(str(cid))                         # Premium emoji are allowed in the channel
     try:
         for i, img in enumerate(images, 1):
             cap = _caption(caption, i, len(images))
@@ -197,7 +197,7 @@ async def publish_text(bot: Bot, tid: int, stage: str, kind: str, ref_id: int, t
     cid = await channel_id()
     if not cid:
         raise PublishError("کانال وان نایت چمپیون تنظیم نشده (پنل → کانال).")
-    outgoing.EXEMPT_CHATS.add(str(cid))
+    outgoing.EXEMPT_CHATS.discard(str(cid))                         # Premium emoji are allowed in the channel
     old = await dbx.fetchone("SELECT * FROM onc_publications WHERE tournament_id=? AND kind=? AND ref_id=? AND page=1 AND channel_id=?",
                              tid, kind, ref_id, cid)
     try:

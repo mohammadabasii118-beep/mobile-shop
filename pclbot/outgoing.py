@@ -8,7 +8,8 @@ import logging
 from aiogram.client.default import Default
 from aiogram.client.session.middlewares.base import BaseRequestMiddleware
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.types import InlineKeyboardMarkup
+from aiogram.methods import CopyMessage, DeleteMessage
+from aiogram.types import InlineKeyboardMarkup, Message
 
 from . import buttons, emojis
 
@@ -16,6 +17,37 @@ log = logging.getLogger("pclbot")
 
 # chats that can't render custom (Premium) emoji — e.g. the ONC news channel; requests to them are never converted
 EXEMPT_CHATS: set[str] = set()
+# A group where Premium emoji work. When Telegram silently strips them from a channel post, the same post is made in this group
+# and copied (copyMessage keeps the custom_emoji entities) into the channel, then both temporary messages are removed.
+RELAY_CHAT: str | None = None
+
+
+def _lost_premium(sent, res) -> bool:
+    text = getattr(sent, "text", None) or getattr(sent, "caption", None) or ""
+    chat = str(getattr(sent, "chat_id", ""))
+    if not (isinstance(res, Message) and "<tg-emoji" in text and chat.startswith("-100") and chat != RELAY_CHAT):
+        return False
+    return not any(e.type == "custom_emoji" for e in (res.entities or []) + (res.caption_entities or []))
+
+
+async def _relay(make_request, bot, sent, res):
+    """Returns the Message of the copy in the channel, or None (then the plain post simply stays)."""
+    staged = None
+    try:
+        staged = await make_request(bot, sent.model_copy(update={"chat_id": RELAY_CHAT}))
+        copied = await make_request(bot, CopyMessage(chat_id=sent.chat_id, from_chat_id=RELAY_CHAT, message_id=staged.message_id,
+                                                     reply_markup=getattr(sent, "reply_markup", None)))
+        await make_request(bot, DeleteMessage(chat_id=sent.chat_id, message_id=res.message_id))        # the plain original
+        return res.model_copy(update={"message_id": copied.message_id})
+    except Exception as ex:
+        log.warning("Premium emoji relay failed (%s) — the plain post stays", ex)
+        return None
+    finally:
+        if staged is not None:
+            try:
+                await make_request(bot, DeleteMessage(chat_id=RELAY_CHAT, message_id=staged.message_id))
+            except Exception:
+                pass
 
 
 def convert_markup(markup: InlineKeyboardMarkup, premium: bool) -> InlineKeyboardMarkup:
@@ -65,7 +97,10 @@ class OutgoingMiddleware(BaseRequestMiddleware):
         if first is None:
             return await make_request(bot, method)
         try:
-            return await make_request(bot, first)
+            res = await make_request(bot, first)
+            if RELAY_CHAT and first is full and _lost_premium(first, res):
+                res = await _relay(make_request, bot, first, res) or res
+            return res
         except TelegramBadRequest as ex:
             if full is None:
                 raise

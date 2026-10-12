@@ -35,6 +35,7 @@ async def main() -> None:
     dp.include_routers(home.router, user.router, *onc_setup.routers(), *fx_hub.routers(), admin.router, wallet.router, ads.router, onc_setup.fallback, fx_hub.fallback)
     await services.setup_bot(bot)
     await home.setup_menu(bot)
+    await fx_hub.load()                                             # premium-emoji relay group (if configured)
     runner = await payments.start_web(bot)
     expiry = asyncio.create_task(services.expiry_loop(bot))
     fx_tasks = fx_hub.start_tasks(bot)

@@ -149,5 +149,8 @@ async def dest_got(m: Message, state: FSMContext, bot: Bot):
     except ValueError as ex:
         return await m.answer(f"⚠️ {ex}")
     await core.put(d["key"], cid)
+    if d["key"] == "emoji_relay":
+        from .. import outgoing
+        outgoing.RELAY_CHAT = cid
     await state.clear()
     await m.answer(f"✅ مقصد تنظیم شد: <b>{E(title)}</b>", reply_markup=okb([[ob("🔙 بازگشت", d.get("back", "fx:a"))]]))
