@@ -1,5 +1,6 @@
 import type { BattleEvent, BattleState, Unit } from './types';
 
+/** هر توانایی عددهایش را از params همان کارت (در همان لول) می‌خواند؛ اسم پارامتر هر توانایی یکتاست. */
 export interface AbilityCtx {
   state: BattleState;
   unit: Unit;
@@ -9,33 +10,56 @@ export interface AbilityCtx {
 
 /**
  * یک توانایی = یک آبجکت با هوک‌های اختیاری.
- * برای اضافه‌کردن توانایی جدید، فقط یک ورودی به ABILITIES اضافه کن
- * و بعد id‌اش را در game.json روی کارت بنویس.
+ * برای اضافه‌کردن توانایی جدید: یک ورودی به ABILITIES و یک جمله به ABILITY_META اضافه کن،
+ * بعد id‌اش را در `abilities` کارت در game.json بنویس و عددهایش را در `params` / آمار هر لول بگذار.
  */
 export interface Ability {
-  /** تعداد حمله در هر نوبت (پیش‌فرض ۱) */
-  attacksPerTurn?(params: Record<string, number>): number;
+  /** تعداد حمله در هر نوبت (پیش‌فرض ۱؛ بیشینه‌ی همه‌ی توانایی‌های کارت) */
+  attacksPerTurn?(p: Record<string, number>): number;
+  /** یک‌بار، اول مبارزه (قبل از نوبت اول) */
+  onBattleStart?(ctx: AbilityCtx): void;
   /** موقع شروع نوبت کارت */
   onTurnStart?(ctx: AbilityCtx): void;
-  /** بعد از اینکه این کارت آسیب زد (dmg = آسیب واقعی وارد شده) */
+  /** تغییر عدد حمله (مثلاً خشم) */
+  modifyAttack?(ctx: AbilityCtx, atk: number): number;
+  /** درصدی از ضربه که شیلد را رد می‌کند و مستقیم از جان کم می‌شود (۰ تا ۱۰۰) */
+  pierce?(p: Record<string, number>): number;
+  /** بعد از اینکه این کارت ضربه زد (dealt = آسیب واقعی وارد شده) */
   onAttack?(ctx: AbilityCtx, target: Unit, dealt: number): void;
-  /** موقع مرگ؛ اگر true برگردونه مرگ لغو می‌شه */
+  /** موقع مرگ؛ اگر true برگردد مرگ لغو می‌شود */
   onDeath?(ctx: AbilityCtx): boolean;
 }
 
 export const ABILITIES: Record<string, Ability> = {
-  double_strike: {
-    attacksPerTurn: (p) => p.attacks ?? 2,
+  /** خشم: وقتی جان کارت زیر ۵۰٪ جان کامل برسد، حمله‌اش به اندازه‌ی درصدِ rage بیشتر می‌شود */
+  rage: {
+    modifyAttack({ unit, params }, atk) {
+      return unit.hp * 2 < unit.maxHp ? Math.round(atk * (1 + (params.rage ?? 0) / 100)) : atk;
+    },
   },
+  /** سپر هم‌تیمی: اول مبارزه، یک‌بار، به هر کارتِ زنده‌ی ترکیب (از جمله خودش) teamShield شیلد اضافه می‌شود */
+  team_shield: {
+    onBattleStart({ state, unit, params }) {
+      const amount = params.teamShield ?? 0;
+      for (const u of state.units) if (u.side === unit.side && u.alive) u.shield += amount;
+    },
+  },
+  /** نفوذ: درصدِ pierce از هر ضربه شیلد را رد می‌کند و مستقیم از جان هدف کم می‌شود */
+  pierce: {
+    pierce: (p) => p.pierce ?? 0,
+  },
+  /** جان‌ربایی: بعد از هر ضربه، درصدِ lifesteal از «عدد حمله» به جان خودش اضافه می‌شود (بیشتر از جان کامل نمی‌شود) */
   lifesteal: {
-    onAttack({ unit, params, emit }, _target, dealt) {
-      const heal = Math.min(unit.maxHp - unit.hp, Math.floor((dealt * (params.percent ?? 50)) / 100));
+    onAttack({ unit, params, emit }) {
+      const heal = Math.min(unit.maxHp - unit.hp, Math.round((unit.atk * (params.lifesteal ?? 0)) / 100));
       if (heal > 0) {
         unit.hp += heal;
         emit({ type: 'heal', uid: unit.uid, amount: heal });
       }
     },
   },
+  // ── توانایی‌های آماده برای کارت‌های بعدی ──
+  double_strike: { attacksPerTurn: (p) => p.attacks ?? 2 },
   armor_up: {
     onTurnStart({ unit, params, emit }) {
       const amount = params.amount ?? 5;
@@ -54,10 +78,18 @@ export const ABILITIES: Record<string, Ability> = {
   },
 };
 
-/** توضیح توانایی‌ها برای پنل مدیریت (برچسب فارسی و پارامترها) */
-export const ABILITY_META: Record<string, { label: string; params: { key: string; label: string; def: number }[] }> = {
-  double_strike: { label: 'حمله‌ی چندگانه', params: [{ key: 'attacks', label: 'تعداد حمله در نوبت', def: 2 }] },
-  lifesteal: { label: 'دزدیدن جان', params: [{ key: 'percent', label: 'درصد آسیب که به جان تبدیل می‌شود', def: 50 }] },
-  armor_up: { label: 'شیلد هر نوبت', params: [{ key: 'amount', label: 'مقدار شیلد', def: 8 }] },
-  revive: { label: 'زنده‌شدن دوباره', params: [{ key: 'hpPercent', label: 'درصد جان بعد از زنده‌شدن', def: 50 }] },
+/** برچسب فارسی توانایی‌ها و متن توضیحشان (با عددهای همان لول) */
+export const ABILITY_META: Record<string, { label: string; text: (p: Record<string, number>, f: (n: number) => string) => string }> = {
+  rage: { label: 'خشم', text: (p, f) => `وقتی جانش زیر ۵۰٪ جان کامل برسد، حمله‌اش ${f(p.rage ?? 0)}٪ بیشتر می‌شود.` },
+  team_shield: { label: 'سپر هم‌تیمی', text: (p, f) => `اول مبارزه، یک‌بار، به هر ۳ کارت ترکیب (از جمله خودش) ${f(p.teamShield ?? 0)} شیلد اضافه می‌کند.` },
+  pierce: { label: 'نفوذ', text: (p, f) => `${f(p.pierce ?? 0)}٪ از هر ضربه‌اش شیلد را رد می‌کند و مستقیم از جان هدف کم می‌شود.` },
+  lifesteal: { label: 'جان‌ربایی', text: (p, f) => `بعد از هر ضربه، ${f(p.lifesteal ?? 0)}٪ از عدد حمله‌اش به جان خودش اضافه می‌شود.` },
+  double_strike: { label: 'حمله‌ی چندگانه', text: (p, f) => `هر نوبت ${f(p.attacks ?? 2)} بار حمله می‌کند.` },
+  armor_up: { label: 'شیلد هر نوبت', text: (p, f) => `هر نوبت ${f(p.amount ?? 5)} شیلد می‌گیرد.` },
+  revive: { label: 'زنده‌شدن دوباره', text: (p, f) => `اگر بمیرد، یک‌بار با ${f(p.hpPercent ?? 50)}٪ جان زنده می‌شود.` },
 };
+
+/** متن توانایی‌های یک کارت در یک لول (برای نمایش به بازیکن) */
+export function abilityLines(ids: { id: string }[] | undefined, params: Record<string, number> | undefined, f: (n: number) => string = String): { label: string; text: string }[] {
+  return (ids ?? []).filter((a) => ABILITY_META[a.id]).map((a) => ({ label: ABILITY_META[a.id].label, text: ABILITY_META[a.id].text(params ?? {}, f) }));
+}

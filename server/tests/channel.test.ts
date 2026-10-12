@@ -47,7 +47,7 @@ const json = async (r: Response) => (await r.json()) as any;
 describe('forced channel membership', () => {
   it('non-members are gated: profile says channelOk=false and game actions are refused', async () => {
     expect((await json(await call(10, '/api/me'))).profile.channelOk).toBe(false);
-    const r = await call(10, '/api/deck', { cards: ['soldier', 'guard', 'archer'] });
+    const r = await call(10, '/api/deck', { cards: ['giv', 'bijan', 'arash'] });
     expect(r.status).toBe(403);
     expect((await json(r)).code).toBe('channel_required');
   });
@@ -65,7 +65,7 @@ describe('forced channel membership', () => {
     status[11] = 'left';
     const before = tgCalls;
     expect((await json(await call(11, '/api/me'))).profile.channelOk).toBe(true);
-    expect((await call(11, '/api/deck', { cards: ['soldier', 'guard', 'archer'] })).status).toBe(200);
+    expect((await call(11, '/api/deck', { cards: ['giv', 'bijan', 'arash'] })).status).toBe(200);
     await call(11, '/api/channel/verify', {});
     expect(tgCalls).toBe(before);
   });

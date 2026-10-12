@@ -1,10 +1,10 @@
 export type Rarity = 'common' | 'rare' | 'epic';
 export type Side = 'A' | 'B';
 
-export interface AbilityRef { id: string; params?: Record<string, number> }
+export interface AbilityRef { id: string }
 
 /** آمار یک کارت در یک لول */
-export interface CardStats { hp: number; atk: number; shield: number }
+export interface CardStats { hp: number; atk: number; shield: number; /** عددهای توانایی در این لول (مثلاً { rage: 32 }) */ params?: Record<string, number> }
 
 export type BoxType = 'bronze' | 'silver' | 'gold';
 export const BOX_TYPES: BoxType[] = ['bronze', 'silver', 'gold'];
@@ -28,7 +28,10 @@ export interface CardDef {
   shield: number;
   /** آمار لول ۲ به بعد (اندیس ۰ = لول ۲). اگر کم باشد، آخرین ردیف برای لول‌های بالاتر هم استفاده می‌شود. */
   levels?: CardStats[];
-  ability?: AbilityRef;
+  /** عددهای توانایی‌ها در لول ۱؛ برای لول‌های بعد در levels[i].params می‌آید */
+  params?: Record<string, number>;
+  /** توانایی‌ها (هر کارت می‌تواند چند توانایی داشته باشد) */
+  abilities?: AbilityRef[];
   desc?: string;
   /** آدرس عکس آپلودشده از پنل مدیریت (اختیاری) */
   image?: string;
@@ -46,6 +49,8 @@ export interface SoloPit {
 }
 
 export interface GameConfig {
+  /** نسخه‌ی محتوای کارت‌ها/ترکیب اولیه/سولو: اگر عوض شود، تنظیمات ذخیره‌شده‌ی قدیمی این بخش‌ها با نسخه‌ی جدید جایگزین می‌شود */
+  contentVersion?: number;
   turnSeconds: number;
   maxRounds: number;
   startingDeck: string[];
@@ -75,7 +80,9 @@ export interface UnitInit {
   hp: number;
   atk: number;
   shield: number;
-  ability?: AbilityRef;
+  abilities?: AbilityRef[];
+  /** عددهای توانایی‌ها در همین لول */
+  params?: Record<string, number>;
   level?: number;
 }
 

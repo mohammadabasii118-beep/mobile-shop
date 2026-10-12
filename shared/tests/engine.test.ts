@@ -84,7 +84,7 @@ describe('engine', () => {
   });
 
   it('double_strike gives two attacks per turn', () => {
-    const d = [u({ ability: { id: 'double_strike', params: { attacks: 2 } } }), u(), u()];
+    const d = [u({ abilities: [{ id: 'double_strike' }], params: { attacks: 2 } }), u(), u()];
     const s = createBattle({ A: d, B: deck() }, 'A');
     startNextTurn(s);
     expect(s.current!.attacksLeft).toBe(2);
@@ -95,7 +95,7 @@ describe('engine', () => {
   });
 
   it('revive brings the unit back once', () => {
-    const d = [u({ hp: 10, ability: { id: 'revive', params: { hpPercent: 50 } } }), u(), u()];
+    const d = [u({ hp: 10, abilities: [{ id: 'revive' }], params: { hpPercent: 50 } }), u(), u()];
     const s = createBattle({ A: deck({ atk: 50 }), B: d }, 'A');
     startNextTurn(s);
     const ev = attack(s, 'B0');
@@ -111,7 +111,7 @@ describe('engine', () => {
   });
 
   it('lifesteal heals attacker, capped by max hp', () => {
-    const d = [u({ hp: 100, atk: 40, ability: { id: 'lifesteal', params: { percent: 50 } } }), u(), u()];
+    const d = [u({ hp: 100, atk: 40, abilities: [{ id: 'lifesteal' }], params: { lifesteal: 50 } }), u(), u()];
     const s = createBattle({ A: d, B: deck() }, 'A');
     const a = getUnit(s, 'A0')!;
     a.hp = 50;
@@ -121,10 +121,35 @@ describe('engine', () => {
   });
 
   it('armor_up adds shield at turn start', () => {
-    const d = [u({ shield: 5, ability: { id: 'armor_up', params: { amount: 8 } } }), u(), u()];
+    const d = [u({ shield: 5, abilities: [{ id: 'armor_up' }], params: { amount: 8 } }), u(), u()];
     const s = createBattle({ A: d, B: deck() }, 'A');
     startNextTurn(s);
     expect(getUnit(s, 'A0')!.shield).toBe(13);
+  });
+
+  it('rage raises attack below half hp', () => {
+    const d = [u({ hp: 100, atk: 20, abilities: [{ id: 'rage' }], params: { rage: 30 } }), u(), u()];
+    const s = createBattle({ A: d, B: deck({ hp: 500, shield: 0 }) }, 'A');
+    startNextTurn(s);
+    expect(attack(s, 'B0').find((e) => e.type === 'attack')).toMatchObject({ dmg: 20 });
+    getUnit(s, 'A0')!.hp = 49;
+    s.current = { uid: 'A0', attacksLeft: 1 };
+    expect(attack(s, 'B0').find((e) => e.type === 'attack')).toMatchObject({ dmg: 26 });
+  });
+
+  it('team_shield gives every ally shield once at battle start', () => {
+    const d = [u({ shield: 0, abilities: [{ id: 'team_shield' }], params: { teamShield: 8 } }), u({ shield: 0 }), u({ shield: 0 })];
+    const s = createBattle({ A: d, B: deck() }, 'A');
+    expect([0, 1, 2].map((i) => getUnit(s, `A${i}`)!.shield)).toEqual([8, 8, 8]);
+    expect(getUnit(s, 'B0')!.shield).toBe(deck()[0].shield);
+  });
+
+  it('pierce sends part of the hit straight to hp', () => {
+    const d = [u({ atk: 50, abilities: [{ id: 'pierce' }], params: { pierce: 20 } }), u(), u()];
+    const s = createBattle({ A: d, B: deck({ hp: 100, shield: 30 }) }, 'A');
+    startNextTurn(s);
+    const e = attack(s, 'B0').find((x) => x.type === 'attack');
+    expect(e).toMatchObject({ shieldLost: 30, hpLost: 20 });
   });
 
   it('round cap decides winner by hp+shield', () => {
@@ -143,9 +168,9 @@ describe('engine', () => {
 
   it('config levels scale stats and every config card/stage is valid', () => {
     const c = cfg as unknown as GameConfig;
-    const soldier = c.cards.find((x) => x.id === 'soldier')!;
-    expect(resolveCard(soldier, 1, c).hp).toBe(110);
-    expect(resolveCard(soldier, 3, c).hp).toBe(132); // از جدول آمار لول‌ها
+    const giv = c.cards.find((x) => x.id === 'giv')!;
+    expect(resolveCard(giv, 1, c).hp).toBe(135);
+    expect(resolveCard(giv, 3, c).hp).toBe(243); // از جدول آمار لول‌ها
     const ids = new Set(c.cards.map((x) => x.id));
     c.startingDeck.forEach((id) => expect(ids.has(id)).toBe(true));
     c.solo.pits.forEach((pit) => pit.stages.forEach((st) => st.deck.forEach(([id]) => expect(ids.has(id)).toBe(true))));

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { resolveCard, type CardDef } from '@game/shared';
+import { abilityLines, resolveCard, type CardDef } from '@game/shared';
 import type { Ctx } from './App';
 import { call } from './net';
 import { Bar, CardTile, Modal, RARITY_FA, fa, sortByPower } from './ui';
@@ -18,8 +18,15 @@ export function CardsScreen({ ctx }: { ctx: Ctx }) {
       badge={need ? <div className={`dup ${c.copies >= need.copies ? 'ok' : ''}`}>{fa(c.copies)}/{fa(need.copies)}</div> : <div className="dup ok">حداکثر</div>} />;
   };
 
-  const collection = sortByPower(p.cards.map((c) => ({ def: defOf(c.id), level: c.level })), cfg);
   const inDeck = new Set(p.deck);
+  // کارت‌های دارم ولی در ترکیب نیستند / کارت‌هایی که هنوز ندارم (قفل، فقط برای دیدن)
+  const spare = sortByPower(p.cards.filter((c) => !inDeck.has(c.id)).map((c) => ({ def: defOf(c.id), level: c.level })), cfg);
+  const rank = { common: 0, rare: 1, epic: 2 } as const;
+  const missing = cfg.cards.filter((c) => !owned.has(c.id)).sort((a, b) => rank[a.rarity] - rank[b.rarity]);
+  const lockedTile = (def: CardDef) => {
+    const s = resolveCard(def, 1, cfg);
+    return <div key={def.id} className="lockedcard"><CardTile def={def} level={1} maxLevel={cfg.upgrade.maxLevel} hp={s.hp} atk={s.atk} shield={s.shield} onClick={() => setOpen(def.id)} badge={<div className="dup">🔒 {RARITY_FA[def.rarity]}</div>} /></div>;
+  };
 
   const setDeckSlot = async (slot: number, cardId: string) => {
     const next = [...p.deck];
@@ -32,26 +39,34 @@ export function CardsScreen({ ctx }: { ctx: Ctx }) {
     try { setProfile((await call('/api/upgrade', { cardId: id })).profile); toast('ارتقا انجام شد ✨'); setFlash(id); setTimeout(() => setFlash(null), 900); } catch (e) { toast((e as Error).message); }
   };
 
-  const sel = open ? { def: defOf(open), c: owned.get(open)! } : null;
+  const sel = open ? { def: defOf(open), c: owned.get(open) ?? null } : null;
 
   return (
     <>
       <h2 className="title">ترکیب من <small>(۳ کارت)</small></h2>
       <div className="deck">{p.deck.map((id) => tile(id, () => setOpen(id), { selected: true }))}</div>
-      <h2 className="title">کلکسیون <small>({fa(p.cards.length)} کارت)</small></h2>
-      <div className="grid">
-        {collection.map(({ def }) => tile(def.id, () => setOpen(def.id), { selected: inDeck.has(def.id) }))}
-      </div>
-      <p className="hint">کارت‌های ناموجود از جعبه‌ها به‌دست می‌آیند. برای ارتقا تعداد کارت و سکه لازم است.</p>
+      {spare.length > 0 && (
+        <>
+          <h2 className="title">کارت‌های من <small>({fa(spare.length)} کارت)</small></h2>
+          <div className="grid">{spare.map(({ def }) => tile(def.id, () => setOpen(def.id)))}</div>
+        </>
+      )}
+      {missing.length > 0 && (
+        <>
+          <h2 className="title">هنوز نداری <small>({fa(missing.length)} کارت)</small></h2>
+          <div className="grid">{missing.map(lockedTile)}</div>
+        </>
+      )}
+      <p className="hint">کارت‌های قفل را از جعبه‌ها به‌دست می‌آوری. برای ارتقا تعداد کارت و سکه لازم است.</p>
 
-      {sel && <Detail flash={flash === sel.def.id} def={sel.def} level={sel.c.level} copies={sel.c.copies} cfg={ctx.cfg} coins={p.coins} deck={p.deck}
+      {sel && <Detail flash={flash === sel.def.id} def={sel.def} level={sel.c?.level ?? 1} copies={sel.c?.copies ?? 0} locked={!sel.c} cfg={ctx.cfg} coins={p.coins} deck={p.deck}
         onClose={() => setOpen(null)} onUpgrade={() => upgrade(sel.def.id)} onSlot={(s) => setDeckSlot(s, sel.def.id)} />}
     </>
   );
 }
 
-function Detail({ flash, def, level, copies, cfg, coins, deck, onClose, onUpgrade, onSlot }: {
-  flash: boolean; def: CardDef; level: number; copies: number; cfg: Ctx['cfg']; coins: number; deck: string[];
+function Detail({ flash, locked, def, level, copies, cfg, coins, deck, onClose, onUpgrade, onSlot }: {
+  flash: boolean; locked: boolean; def: CardDef; level: number; copies: number; cfg: Ctx['cfg']; coins: number; deck: string[];
   onClose: () => void; onUpgrade: () => void; onSlot: (s: number) => void;
 }) {
   const s = resolveCard(def, level, cfg);
@@ -68,24 +83,25 @@ function Detail({ flash, def, level, copies, cfg, coins, deck, onClose, onUpgrad
           <p>❤ جان: {fa(s.hp)}{d(s.hp, next?.hp)}</p>
           <p>⚔ حمله: {fa(s.atk)}{d(s.atk, next?.atk)}</p>
           <p>🛡 شیلد: {fa(s.shield)}{d(s.shield, next?.shield)}</p>
+          {abilityLines(def.abilities, s.params, fa).map((a) => <p key={a.label} className="ability">✦ <b>{a.label}:</b> {a.text}</p>)}
           {def.desc && <p className="ability">✦ {def.desc}</p>}
         </div>
       </div>
-      {need ? (
+      {locked ? <p className="hint">🔒 این کارت را هنوز نداری؛ از جعبه‌ها به‌دست می‌آید.</p> : need ? (
         <>
           <Bar value={copies} max={need.copies} />
           <small>تعداد کارت {fa(copies)}/{fa(need.copies)} — هزینه 🪙 {fa(need.coins)}</small>
           <button className="btn" disabled={!can} onClick={onUpgrade}>ارتقا به لول {fa(level + 1)}</button>
         </>
       ) : <p>این کارت در بالاترین لول است 👑</p>}
-      <div className="slotpick">
+      {!locked && <div className="slotpick">
         <small>قرار دادن در ترکیب:</small>
         <div className="row">
           {[0, 1, 2].map((i) => (
             <button key={i} className="btn ghost" disabled={deck[i] === def.id} onClick={() => onSlot(i)}>جایگاه {fa(i + 1)}</button>
           ))}
         </div>
-      </div>
+      </div>}
     </Modal>
   );
 }

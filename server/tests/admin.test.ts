@@ -48,7 +48,7 @@ describe('admin', () => {
     expect((await (await fetch(base + '/api/config')).json() as any).cards[0].hp).toBe(777);
     expect((await call(42, '/api/admin/card', { card: { ...card, hp: -5 } })).status).toBe(400);
     expect((await call(42, '/api/admin/card', { card: { ...card, id: 'Bad Id' } })).status).toBe(400);
-    expect((await call(42, '/api/admin/card', { card: { ...card, ability: { id: 'nope' } } })).status).toBe(400);
+    expect((await call(42, '/api/admin/card', { card: { ...card, abilities: [{ id: 'nope' }] } })).status).toBe(400);
   });
 
   it('adds a card, uploads an image, rejects fake images, removes the image', async () => {
@@ -70,7 +70,7 @@ describe('admin', () => {
 
   it('cannot delete a card players own; can delete an unowned one', async () => {
     await call(42, '/api/me'); // کاربر ۴۲ دک اولیه را دارد
-    expect((await call(42, '/api/admin/card/delete', { id: 'soldier' })).status).toBe(400);
+    expect((await call(42, '/api/admin/card/delete', { id: 'giv' })).status).toBe(400);
     expect((await call(42, '/api/admin/card/delete', { id: 'ninja' })).status).toBe(200);
   });
 
@@ -79,10 +79,10 @@ describe('admin', () => {
     const users = ((await (await call(42, '/api/admin/users?q=U44')).json()) as any).users;
     expect(users).toHaveLength(1);
     const id = users[0].id;
-    expect((await call(42, '/api/admin/gift', { userId: id, coins: 500, cardId: 'phoenix' })).status).toBe(200);
+    expect((await call(42, '/api/admin/gift', { userId: id, coins: 500, cardId: 'sohrab' })).status).toBe(200);
     const prof = (await (await call(44, '/api/me')).json() as any).profile;
     expect(prof.coins).toBe(600);
-    expect(prof.cards.find((c: any) => c.id === 'phoenix')).toBeTruthy();
+    expect(prof.cards.find((c: any) => c.id === 'sohrab')).toBeTruthy();
     await call(42, '/api/admin/ban', { userId: id, banned: true });
     expect((await call(44, '/api/me')).status).toBe(403);
   });
@@ -139,6 +139,24 @@ describe('banner', () => {
 });
 
 describe('config override (survives code updates)', () => {
+  it('replaces cards, starting deck and solo when the saved content is from an older contentVersion', async () => {
+    const { writeFileSync } = await import('node:fs');
+    const { loadConfigWithOverride } = await import('../src/config');
+    const base = loadConfig();
+    const file = join(dataDir, 'override-old.json');
+    const old: any = JSON.parse(JSON.stringify(base));
+    delete old.contentVersion;
+    old.cards = [{ id: 'soldier', name: 'سرباز', rarity: 'common', hp: 110, atk: 18, shield: 10 }, ...base.cards.slice(1).map((c) => ({ ...c, id: 'old_' + c.id }))];
+    old.cards.push({ ...base.cards[0], image: '/uploads/cards/giv.png' });
+    old.startingDeck = ['soldier', 'old_bijan', 'old_arash'];
+    writeFileSync(file, JSON.stringify(old));
+    const merged = loadConfigWithOverride(file);
+    expect(merged.cards.map((c) => c.id)).toEqual(base.cards.map((c) => c.id));
+    expect(merged.startingDeck).toEqual(['giv', 'bijan', 'arash']);
+    expect(merged.cards[0].image).toBe('/uploads/cards/giv.png'); // عکس کارت هم‌شناسه حفظ می‌شود
+    expect(merged.contentVersion).toBe(base.contentVersion);
+  });
+
   it('uses the saved admin config, fills new keys from the base, and migrates the old solo shape', async () => {
     const { writeFileSync } = await import('node:fs');
     const { loadConfigWithOverride } = await import('../src/config');

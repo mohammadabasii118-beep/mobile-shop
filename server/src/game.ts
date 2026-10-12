@@ -12,6 +12,31 @@ export class Game {
   constructor(private d: Deps) {}
   get cfg() { return this.d.cfg; }
 
+  /**
+   * هم‌خوان‌کردن کارت‌های همه‌ی بازیکن‌ها با لیست کارت‌های فعلی (موقع بالا آمدن سرور):
+   * کارت‌هایی که دیگر وجود ندارند پاک می‌شوند؛ اگر ترکیب کسی ناقص شد، با کارت‌های ترکیب اولیه کامل می‌شود.
+   */
+  migrateCards() {
+    const { db, cfg } = this.d;
+    const known = new Set(cfg.cards.map((c) => c.id));
+    const users = db.prepare('SELECT id FROM users').all() as { id: number }[];
+    for (const { id } of users) {
+      const owned = (db.prepare('SELECT card_id FROM user_cards WHERE user_id = ?').all(id) as any[]).map((r) => r.card_id as string);
+      const deck = (db.prepare('SELECT card_id FROM deck WHERE user_id = ? ORDER BY slot').all(id) as any[]).map((r) => r.card_id as string);
+      const stale = owned.some((c) => !known.has(c));
+      if (!stale && deck.length === 3 && deck.every((c) => known.has(c))) continue;
+      for (const c of owned) if (!known.has(c)) db.prepare('DELETE FROM user_cards WHERE user_id = ? AND card_id = ?').run(id, c);
+      const have = new Set(owned.filter((c) => known.has(c)));
+      let ids = deck.filter((c) => have.has(c));
+      if (ids.length < 3) {
+        for (const c of cfg.startingDeck) if (!have.has(c)) { db.prepare('INSERT INTO user_cards (user_id, card_id) VALUES (?,?)').run(id, c); have.add(c); }
+        ids = [...ids, ...[...have].filter((c) => !ids.includes(c))].slice(0, 3);
+      }
+      db.prepare('DELETE FROM deck WHERE user_id = ?').run(id);
+      ids.forEach((c, slot) => db.prepare('INSERT INTO deck (user_id, slot, card_id) VALUES (?,?,?)').run(id, slot, c));
+    }
+  }
+
   // ---------- کاربر ----------
   upsertUser(u: TgUser): number {
     const { db } = this.d;

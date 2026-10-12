@@ -60,7 +60,7 @@ export function CardTile(p: TileProps) {
       <div className="emb">
         <CardArt key={p.def.image ?? p.def.id} card={p.def} />
         <span className="lvb">لول {fa(p.level)}</span>
-        {p.def.ability && <span className="abl"><Icon n="spark" /></span>}
+        {(p.def.abilities?.length ?? 0) > 0 && <span className="abl"><Icon n="spark" /></span>}
       </div>
       <div className="nm">{p.def.name}</div>
       <div className="st">

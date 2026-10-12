@@ -2,7 +2,7 @@ import type { BattleEvent, BoxType, Rarity, Side, Unit } from './types';
 
 export interface UnitView {
   uid: string; side: Side; slot: number; cardId: string; name: string; rarity: Rarity | null;
-  hp: number; maxHp: number; shield: number; atk: number; alive: boolean; ability: string | null; level: number;
+  hp: number; maxHp: number; shield: number; atk: number; alive: boolean; abilities: string[]; level: number;
 }
 export interface Snap { uid: string; hp: number; shield: number; alive: boolean }
 

@@ -1,10 +1,11 @@
 {
+  "contentVersion": 2,
   "turnSeconds": 10,
   "maxRounds": 100,
   "startingDeck": [
-    "soldier",
-    "guard",
-    "archer"
+    "giv",
+    "bijan",
+    "arash"
   ],
   "fees": {
     "solo": 10,
@@ -16,431 +17,292 @@
   },
   "cards": [
     {
-      "id": "soldier",
-      "name": "سرباز",
+      "id": "giv",
+      "name": "گیو",
+      "rarity": "common",
+      "hp": 135,
+      "atk": 15,
+      "shield": 18,
+      "levels": [
+        {
+          "hp": 189,
+          "atk": 21,
+          "shield": 25
+        },
+        {
+          "hp": 243,
+          "atk": 27,
+          "shield": 32
+        },
+        {
+          "hp": 297,
+          "atk": 33,
+          "shield": 40
+        },
+        {
+          "hp": 351,
+          "atk": 39,
+          "shield": 47
+        },
+        {
+          "hp": 405,
+          "atk": 45,
+          "shield": 54
+        }
+      ]
+    },
+    {
+      "id": "bijan",
+      "name": "بیژن",
       "rarity": "common",
       "hp": 110,
       "atk": 18,
       "shield": 10,
       "levels": [
         {
-          "hp": 121,
-          "atk": 20,
-          "shield": 11
-        },
-        {
-          "hp": 132,
-          "atk": 22,
-          "shield": 12
-        },
-        {
-          "hp": 143,
-          "atk": 23,
-          "shield": 13
-        },
-        {
           "hp": 154,
           "atk": 25,
           "shield": 14
         },
         {
-          "hp": 165,
-          "atk": 27,
-          "shield": 15
-        }
-      ]
-    },
-    {
-      "id": "guard",
-      "name": "نگهبان",
-      "rarity": "common",
-      "hp": 130,
-      "atk": 14,
-      "shield": 20,
-      "levels": [
+          "hp": 198,
+          "atk": 32,
+          "shield": 18
+        },
         {
-          "hp": 143,
-          "atk": 15,
+          "hp": 242,
+          "atk": 40,
           "shield": 22
         },
         {
-          "hp": 156,
-          "atk": 17,
-          "shield": 24
-        },
-        {
-          "hp": 169,
-          "atk": 18,
+          "hp": 286,
+          "atk": 47,
           "shield": 26
         },
         {
-          "hp": 182,
-          "atk": 20,
-          "shield": 28
-        },
-        {
-          "hp": 195,
-          "atk": 21,
+          "hp": 330,
+          "atk": 54,
           "shield": 30
         }
       ]
     },
     {
-      "id": "archer",
-      "name": "کماندار",
+      "id": "arash",
+      "name": "آرش کمانگیر",
       "rarity": "common",
       "hp": 90,
       "atk": 24,
       "shield": 0,
       "levels": [
         {
-          "hp": 99,
-          "atk": 26,
-          "shield": 0
-        },
-        {
-          "hp": 108,
-          "atk": 29,
-          "shield": 0
-        },
-        {
-          "hp": 117,
-          "atk": 31,
-          "shield": 0
-        },
-        {
           "hp": 126,
           "atk": 34,
           "shield": 0
         },
         {
-          "hp": 135,
-          "atk": 36,
+          "hp": 162,
+          "atk": 43,
+          "shield": 0
+        },
+        {
+          "hp": 198,
+          "atk": 53,
+          "shield": 0
+        },
+        {
+          "hp": 234,
+          "atk": 62,
+          "shield": 0
+        },
+        {
+          "hp": 270,
+          "atk": 72,
           "shield": 0
         }
       ]
     },
     {
-      "id": "brute",
-      "name": "گرزدار",
-      "rarity": "common",
-      "hp": 140,
-      "atk": 20,
+      "id": "gordafarid",
+      "name": "گردآفرید",
+      "rarity": "rare",
+      "hp": 98,
+      "atk": 23,
       "shield": 0,
+      "abilities": [
+        {
+          "id": "rage"
+        }
+      ],
+      "params": {
+        "rage": 30
+      },
       "levels": [
         {
-          "hp": 154,
-          "atk": 22,
-          "shield": 0
+          "hp": 141,
+          "atk": 33,
+          "shield": 0,
+          "params": {
+            "rage": 32
+          }
         },
         {
-          "hp": 168,
-          "atk": 24,
-          "shield": 0
+          "hp": 184,
+          "atk": 43,
+          "shield": 0,
+          "params": {
+            "rage": 34
+          }
         },
         {
-          "hp": 182,
-          "atk": 26,
-          "shield": 0
+          "hp": 227,
+          "atk": 53,
+          "shield": 0,
+          "params": {
+            "rage": 36
+          }
         },
         {
-          "hp": 196,
-          "atk": 28,
-          "shield": 0
+          "hp": 270,
+          "atk": 63,
+          "shield": 0,
+          "params": {
+            "rage": 38
+          }
         },
         {
-          "hp": 210,
-          "atk": 30,
-          "shield": 0
+          "hp": 314,
+          "atk": 74,
+          "shield": 0,
+          "params": {
+            "rage": 40
+          }
         }
       ]
     },
     {
-      "id": "scout",
-      "name": "دیده‌بان",
-      "rarity": "common",
-      "hp": 100,
-      "atk": 16,
-      "shield": 15,
+      "id": "kaveh",
+      "name": "کاوه آهنگر",
+      "rarity": "rare",
+      "hp": 128,
+      "atk": 15,
+      "shield": 18,
+      "abilities": [
+        {
+          "id": "team_shield"
+        }
+      ],
+      "params": {
+        "teamShield": 8
+      },
       "levels": [
         {
-          "hp": 110,
-          "atk": 18,
-          "shield": 16
-        },
-        {
-          "hp": 120,
-          "atk": 19,
-          "shield": 18
-        },
-        {
-          "hp": 130,
-          "atk": 21,
-          "shield": 20
-        },
-        {
-          "hp": 140,
+          "hp": 184,
           "atk": 22,
-          "shield": 21
+          "shield": 26,
+          "params": {
+            "teamShield": 12
+          }
         },
         {
-          "hp": 150,
-          "atk": 24,
-          "shield": 22
+          "hp": 241,
+          "atk": 28,
+          "shield": 34,
+          "params": {
+            "teamShield": 15
+          }
+        },
+        {
+          "hp": 297,
+          "atk": 35,
+          "shield": 42,
+          "params": {
+            "teamShield": 19
+          }
+        },
+        {
+          "hp": 353,
+          "atk": 41,
+          "shield": 50,
+          "params": {
+            "teamShield": 22
+          }
+        },
+        {
+          "hp": 410,
+          "atk": 48,
+          "shield": 58,
+          "params": {
+            "teamShield": 26
+          }
         }
       ]
     },
     {
-      "id": "duelist",
-      "name": "شمشیرزن دوگانه",
-      "rarity": "rare",
-      "hp": 100,
-      "atk": 16,
-      "shield": 10,
-      "levels": [
-        {
-          "hp": 110,
-          "atk": 18,
-          "shield": 11
-        },
-        {
-          "hp": 120,
-          "atk": 19,
-          "shield": 12
-        },
-        {
-          "hp": 130,
-          "atk": 21,
-          "shield": 13
-        },
-        {
-          "hp": 140,
-          "atk": 22,
-          "shield": 14
-        },
-        {
-          "hp": 150,
-          "atk": 24,
-          "shield": 15
-        }
-      ],
-      "ability": {
-        "id": "double_strike",
-        "params": {
-          "attacks": 2
-        }
-      },
-      "desc": "هر نوبت ۲ بار حمله می‌کند"
-    },
-    {
-      "id": "vampire",
-      "name": "خون‌آشام",
-      "rarity": "rare",
-      "hp": 105,
-      "atk": 20,
-      "shield": 0,
-      "levels": [
-        {
-          "hp": 116,
-          "atk": 22,
-          "shield": 0
-        },
-        {
-          "hp": 126,
-          "atk": 24,
-          "shield": 0
-        },
-        {
-          "hp": 136,
-          "atk": 26,
-          "shield": 0
-        },
-        {
-          "hp": 147,
-          "atk": 28,
-          "shield": 0
-        },
-        {
-          "hp": 158,
-          "atk": 30,
-          "shield": 0
-        }
-      ],
-      "ability": {
-        "id": "lifesteal",
-        "params": {
-          "percent": 50
-        }
-      },
-      "desc": "نیمی از آسیبش را به‌عنوان جان پس می‌گیرد"
-    },
-    {
-      "id": "paladin",
-      "name": "پالادین",
-      "rarity": "rare",
-      "hp": 120,
-      "atk": 17,
-      "shield": 15,
-      "levels": [
-        {
-          "hp": 132,
-          "atk": 19,
-          "shield": 16
-        },
-        {
-          "hp": 144,
-          "atk": 20,
-          "shield": 18
-        },
-        {
-          "hp": 156,
-          "atk": 22,
-          "shield": 20
-        },
-        {
-          "hp": 168,
-          "atk": 24,
-          "shield": 21
-        },
-        {
-          "hp": 180,
-          "atk": 26,
-          "shield": 22
-        }
-      ],
-      "ability": {
-        "id": "armor_up",
-        "params": {
-          "amount": 8
-        }
-      },
-      "desc": "هر نوبت ۸ شیلد می‌گیرد"
-    },
-    {
-      "id": "phoenix",
-      "name": "ققنوس",
+      "id": "sohrab",
+      "name": "سهراب",
       "rarity": "epic",
-      "hp": 130,
-      "atk": 26,
-      "shield": 15,
-      "levels": [
+      "hp": 110,
+      "atk": 21,
+      "shield": 7,
+      "abilities": [
         {
-          "hp": 143,
-          "atk": 29,
-          "shield": 16
+          "id": "pierce"
         },
         {
-          "hp": 156,
+          "id": "lifesteal"
+        }
+      ],
+      "params": {
+        "pierce": 20,
+        "lifesteal": 15
+      },
+      "levels": [
+        {
+          "hp": 163,
           "atk": 31,
-          "shield": 18
+          "shield": 10,
+          "params": {
+            "pierce": 22,
+            "lifesteal": 16
+          }
         },
         {
-          "hp": 169,
-          "atk": 34,
-          "shield": 20
+          "hp": 216,
+          "atk": 41,
+          "shield": 14,
+          "params": {
+            "pierce": 24,
+            "lifesteal": 17
+          }
         },
         {
-          "hp": 182,
-          "atk": 36,
-          "shield": 21
+          "hp": 268,
+          "atk": 51,
+          "shield": 17,
+          "params": {
+            "pierce": 26,
+            "lifesteal": 18
+          }
         },
         {
-          "hp": 195,
-          "atk": 39,
-          "shield": 22
+          "hp": 321,
+          "atk": 61,
+          "shield": 20,
+          "params": {
+            "pierce": 28,
+            "lifesteal": 19
+          }
+        },
+        {
+          "hp": 374,
+          "atk": 71,
+          "shield": 24,
+          "params": {
+            "pierce": 30,
+            "lifesteal": 20
+          }
         }
-      ],
-      "ability": {
-        "id": "revive",
-        "params": {
-          "hpPercent": 50
-        }
-      },
-      "desc": "اگر بمیرد، یک بار با نصف جان زنده می‌شود"
-    },
-    {
-      "id": "warlord",
-      "name": "سردار",
-      "rarity": "epic",
-      "hp": 140,
-      "atk": 22,
-      "shield": 20,
-      "levels": [
-        {
-          "hp": 154,
-          "atk": 24,
-          "shield": 22
-        },
-        {
-          "hp": 168,
-          "atk": 26,
-          "shield": 24
-        },
-        {
-          "hp": 182,
-          "atk": 29,
-          "shield": 26
-        },
-        {
-          "hp": 196,
-          "atk": 31,
-          "shield": 28
-        },
-        {
-          "hp": 210,
-          "atk": 33,
-          "shield": 30
-        }
-      ],
-      "ability": {
-        "id": "double_strike",
-        "params": {
-          "attacks": 2
-        }
-      },
-      "desc": "هر نوبت ۲ بار حمله می‌کند"
-    },
-    {
-      "id": "reaper",
-      "name": "شبح مرگ",
-      "rarity": "epic",
-      "hp": 120,
-      "atk": 30,
-      "shield": 10,
-      "levels": [
-        {
-          "hp": 132,
-          "atk": 33,
-          "shield": 11
-        },
-        {
-          "hp": 144,
-          "atk": 36,
-          "shield": 12
-        },
-        {
-          "hp": 156,
-          "atk": 39,
-          "shield": 13
-        },
-        {
-          "hp": 168,
-          "atk": 42,
-          "shield": 14
-        },
-        {
-          "hp": 180,
-          "atk": 45,
-          "shield": 15
-        }
-      ],
-      "ability": {
-        "id": "lifesteal",
-        "params": {
-          "percent": 80
-        }
-      },
-      "desc": "۸۰٪ آسیبش را به‌عنوان جان پس می‌گیرد"
+      ]
     }
   ],
   "upgrade": {
@@ -614,32 +476,15 @@
             "ai": "random",
             "deck": [
               [
-                "soldier",
+                "giv",
                 1
               ],
               [
-                "archer",
+                "arash",
                 1
               ],
               [
-                "scout",
-                1
-              ]
-            ]
-          },
-          {
-            "ai": "random",
-            "deck": [
-              [
-                "guard",
-                1
-              ],
-              [
-                "brute",
-                1
-              ],
-              [
-                "soldier",
+                "bijan",
                 1
               ]
             ]
@@ -648,32 +493,15 @@
             "ai": "random",
             "deck": [
               [
-                "archer",
-                2
-              ],
-              [
-                "scout",
+                "bijan",
                 1
               ],
               [
-                "guard",
-                1
-              ]
-            ]
-          },
-          {
-            "ai": "random",
-            "deck": [
-              [
-                "brute",
-                2
-              ],
-              [
-                "soldier",
+                "giv",
                 1
               ],
               [
-                "archer",
+                "arash",
                 1
               ]
             ]
@@ -682,49 +510,253 @@
             "ai": "random",
             "deck": [
               [
-                "scout",
-                2
-              ],
-              [
-                "guard",
+                "arash",
                 1
               ],
               [
-                "brute",
-                1
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "soldier",
-                2
-              ],
-              [
-                "archer",
+                "bijan",
                 1
               ],
               [
-                "scout",
+                "giv",
                 1
               ]
             ]
           },
           {
+            "ai": "random",
+            "deck": [
+              [
+                "giv",
+                1
+              ],
+              [
+                "arash",
+                1
+              ],
+              [
+                "bijan",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "random",
+            "deck": [
+              [
+                "bijan",
+                1
+              ],
+              [
+                "giv",
+                1
+              ],
+              [
+                "arash",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "random",
+            "deck": [
+              [
+                "arash",
+                1
+              ],
+              [
+                "bijan",
+                1
+              ],
+              [
+                "giv",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "random",
+            "deck": [
+              [
+                "bijan",
+                1
+              ],
+              [
+                "kaveh",
+                1
+              ],
+              [
+                "arash",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "random",
+            "deck": [
+              [
+                "arash",
+                1
+              ],
+              [
+                "giv",
+                1
+              ],
+              [
+                "gordafarid",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "random",
+            "deck": [
+              [
+                "gordafarid",
+                1
+              ],
+              [
+                "bijan",
+                1
+              ],
+              [
+                "kaveh",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "random",
+            "deck": [
+              [
+                "kaveh",
+                1
+              ],
+              [
+                "arash",
+                1
+              ],
+              [
+                "giv",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "random",
+            "deck": [
+              [
+                "giv",
+                1
+              ],
+              [
+                "gordafarid",
+                1
+              ],
+              [
+                "bijan",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "random",
+            "deck": [
+              [
+                "bijan",
+                2
+              ],
+              [
+                "kaveh",
+                1
+              ],
+              [
+                "arash",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "random",
+            "deck": [
+              [
+                "arash",
+                1
+              ],
+              [
+                "giv",
+                2
+              ],
+              [
+                "gordafarid",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "random",
+            "deck": [
+              [
+                "gordafarid",
+                2
+              ],
+              [
+                "bijan",
+                2
+              ],
+              [
+                "kaveh",
+                1
+              ]
+            ]
+          },
+          {
+            "ai": "random",
+            "deck": [
+              [
+                "kaveh",
+                2
+              ],
+              [
+                "arash",
+                1
+              ],
+              [
+                "giv",
+                2
+              ]
+            ]
+          },
+          {
             "ai": "smart",
             "deck": [
               [
-                "guard",
+                "giv",
+                1
+              ],
+              [
+                "gordafarid",
                 2
               ],
               [
-                "brute",
+                "bijan",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "bijan",
                 2
               ],
               [
-                "soldier",
+                "kaveh",
+                2
+              ],
+              [
+                "arash",
                 1
               ]
             ]
@@ -733,16 +765,16 @@
             "ai": "smart",
             "deck": [
               [
-                "archer",
+                "arash",
                 2
               ],
               [
-                "scout",
-                2
-              ],
-              [
-                "guard",
+                "giv",
                 1
+              ],
+              [
+                "gordafarid",
+                2
               ]
             ]
           },
@@ -750,16 +782,16 @@
             "ai": "smart",
             "deck": [
               [
-                "brute",
-                2
-              ],
-              [
-                "soldier",
-                2
-              ],
-              [
-                "archer",
+                "gordafarid",
                 1
+              ],
+              [
+                "bijan",
+                2
+              ],
+              [
+                "kaveh",
+                2
               ]
             ]
           },
@@ -767,186 +799,16 @@
             "ai": "smart",
             "deck": [
               [
-                "scout",
+                "kaveh",
                 2
               ],
               [
-                "guard",
+                "arash",
                 2
               ],
               [
-                "brute",
+                "giv",
                 1
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "soldier",
-                2
-              ],
-              [
-                "archer",
-                2
-              ],
-              [
-                "scout",
-                2
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "guard",
-                2
-              ],
-              [
-                "brute",
-                2
-              ],
-              [
-                "soldier",
-                2
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "archer",
-                2
-              ],
-              [
-                "scout",
-                2
-              ],
-              [
-                "guard",
-                2
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "brute",
-                2
-              ],
-              [
-                "soldier",
-                2
-              ],
-              [
-                "archer",
-                2
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "scout",
-                3
-              ],
-              [
-                "guard",
-                2
-              ],
-              [
-                "paladin",
-                2
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "soldier",
-                3
-              ],
-              [
-                "archer",
-                2
-              ],
-              [
-                "duelist",
-                2
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "guard",
-                3
-              ],
-              [
-                "brute",
-                2
-              ],
-              [
-                "vampire",
-                2
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "archer",
-                3
-              ],
-              [
-                "scout",
-                2
-              ],
-              [
-                "paladin",
-                2
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "brute",
-                3
-              ],
-              [
-                "soldier",
-                3
-              ],
-              [
-                "duelist",
-                2
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "scout",
-                3
-              ],
-              [
-                "guard",
-                3
-              ],
-              [
-                "vampire",
-                2
               ]
             ]
           }
@@ -958,15 +820,15 @@
             "ai": "smart",
             "deck": [
               [
-                "duelist",
-                3
+                "giv",
+                2
               ],
               [
-                "guard",
-                3
+                "gordafarid",
+                1
               ],
               [
-                "brute",
+                "bijan",
                 2
               ]
             ]
@@ -975,15 +837,15 @@
             "ai": "smart",
             "deck": [
               [
-                "vampire",
-                3
+                "bijan",
+                1
               ],
               [
-                "archer",
-                3
+                "kaveh",
+                2
               ],
               [
-                "scout",
+                "arash",
                 2
               ]
             ]
@@ -992,15 +854,32 @@
             "ai": "smart",
             "deck": [
               [
-                "paladin",
+                "arash",
                 3
               ],
               [
-                "brute",
+                "giv",
                 3
               ],
               [
-                "soldier",
+                "gordafarid",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "gordafarid",
+                3
+              ],
+              [
+                "bijan",
+                2
+              ],
+              [
+                "kaveh",
                 3
               ]
             ]
@@ -1009,32 +888,15 @@
             "ai": "smart",
             "deck": [
               [
-                "duelist",
+                "kaveh",
+                2
+              ],
+              [
+                "arash",
                 3
               ],
               [
-                "scout",
-                3
-              ],
-              [
-                "guard",
-                3
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "vampire",
-                3
-              ],
-              [
-                "soldier",
-                3
-              ],
-              [
-                "archer",
+                "giv",
                 3
               ]
             ]
@@ -1043,15 +905,32 @@
             "ai": "smart",
             "deck": [
               [
-                "paladin",
+                "giv",
                 3
               ],
               [
-                "guard",
+                "gordafarid",
                 3
               ],
               [
-                "brute",
+                "bijan",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "bijan",
+                3
+              ],
+              [
+                "kaveh",
+                2
+              ],
+              [
+                "arash",
                 3
               ]
             ]
@@ -1060,32 +939,15 @@
             "ai": "smart",
             "deck": [
               [
-                "duelist",
-                4
+                "arash",
+                2
               ],
               [
-                "archer",
+                "giv",
                 3
               ],
               [
-                "scout",
-                3
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "vampire",
-                4
-              ],
-              [
-                "brute",
-                3
-              ],
-              [
-                "soldier",
+                "gordafarid",
                 3
               ]
             ]
@@ -1094,16 +956,16 @@
             "ai": "smart",
             "deck": [
               [
-                "paladin",
-                4
-              ],
-              [
-                "scout",
+                "gordafarid",
                 3
               ],
               [
-                "guard",
+                "bijan",
                 3
+              ],
+              [
+                "kaveh",
+                2
               ]
             ]
           },
@@ -1111,32 +973,15 @@
             "ai": "smart",
             "deck": [
               [
-                "duelist",
-                4
-              ],
-              [
-                "soldier",
+                "kaveh",
                 3
               ],
               [
-                "archer",
-                3
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "vampire",
-                4
+                "arash",
+                2
               ],
               [
-                "paladin",
-                4
-              ],
-              [
-                "archer",
+                "giv",
                 3
               ]
             ]
@@ -1145,15 +990,15 @@
             "ai": "smart",
             "deck": [
               [
-                "paladin",
-                4
+                "giv",
+                2
               ],
               [
-                "duelist",
-                4
+                "arash",
+                3
               ],
               [
-                "brute",
+                "kaveh",
                 3
               ]
             ]
@@ -1162,15 +1007,32 @@
             "ai": "smart",
             "deck": [
               [
-                "duelist",
-                4
+                "bijan",
+                3
               ],
               [
-                "vampire",
-                4
+                "gordafarid",
+                3
               ],
               [
-                "scout",
+                "sohrab",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "arash",
+                3
+              ],
+              [
+                "kaveh",
+                2
+              ],
+              [
+                "giv",
                 3
               ]
             ]
@@ -1179,15 +1041,32 @@
             "ai": "smart",
             "deck": [
               [
-                "vampire",
+                "gordafarid",
+                3
+              ],
+              [
+                "sohrab",
                 4
               ],
               [
-                "paladin",
+                "bijan",
+                4
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "kaveh",
                 4
               ],
               [
-                "soldier",
+                "giv",
+                4
+              ],
+              [
+                "arash",
                 3
               ]
             ]
@@ -1196,15 +1075,15 @@
             "ai": "smart",
             "deck": [
               [
-                "paladin",
+                "sohrab",
                 4
               ],
               [
-                "duelist",
-                4
+                "bijan",
+                3
               ],
               [
-                "guard",
+                "gordafarid",
                 4
               ]
             ]
@@ -1213,15 +1092,15 @@
             "ai": "smart",
             "deck": [
               [
-                "duelist",
+                "giv",
+                3
+              ],
+              [
+                "arash",
                 4
               ],
               [
-                "vampire",
-                4
-              ],
-              [
-                "archer",
+                "kaveh",
                 4
               ]
             ]
@@ -1230,15 +1109,32 @@
             "ai": "smart",
             "deck": [
               [
-                "vampire",
+                "bijan",
                 4
               ],
               [
-                "paladin",
+                "gordafarid",
                 4
               ],
               [
-                "brute",
+                "sohrab",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "arash",
+                4
+              ],
+              [
+                "kaveh",
+                3
+              ],
+              [
+                "giv",
                 4
               ]
             ]
@@ -1247,49 +1143,15 @@
             "ai": "smart",
             "deck": [
               [
-                "paladin",
+                "gordafarid",
+                3
+              ],
+              [
+                "sohrab",
                 4
               ],
               [
-                "duelist",
-                4
-              ],
-              [
-                "scout",
-                4
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "duelist",
-                5
-              ],
-              [
-                "vampire",
-                4
-              ],
-              [
-                "soldier",
-                4
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "vampire",
-                5
-              ],
-              [
-                "paladin",
-                4
-              ],
-              [
-                "guard",
+                "bijan",
                 4
               ]
             ]
@@ -1302,16 +1164,16 @@
             "ai": "smart",
             "deck": [
               [
-                "phoenix",
-                5
-              ],
-              [
-                "duelist",
+                "kaveh",
                 4
               ],
               [
-                "soldier",
+                "giv",
                 4
+              ],
+              [
+                "arash",
+                3
               ]
             ]
           },
@@ -1319,32 +1181,15 @@
             "ai": "smart",
             "deck": [
               [
-                "warlord",
-                5
-              ],
-              [
-                "vampire",
+                "sohrab",
                 4
               ],
               [
-                "guard",
-                4
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "reaper",
-                5
+                "bijan",
+                3
               ],
               [
-                "paladin",
-                5
-              ],
-              [
-                "archer",
+                "gordafarid",
                 4
               ]
             ]
@@ -1353,15 +1198,15 @@
             "ai": "smart",
             "deck": [
               [
-                "phoenix",
-                5
+                "giv",
+                3
               ],
               [
-                "duelist",
-                5
+                "arash",
+                4
               ],
               [
-                "brute",
+                "kaveh",
                 4
               ]
             ]
@@ -1370,15 +1215,66 @@
             "ai": "smart",
             "deck": [
               [
-                "warlord",
+                "bijan",
+                4
+              ],
+              [
+                "gordafarid",
+                4
+              ],
+              [
+                "sohrab",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "arash",
                 5
               ],
               [
-                "vampire",
+                "kaveh",
+                4
+              ],
+              [
+                "giv",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "gordafarid",
+                4
+              ],
+              [
+                "sohrab",
                 5
               ],
               [
-                "scout",
+                "bijan",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "kaveh",
+                5
+              ],
+              [
+                "giv",
+                5
+              ],
+              [
+                "arash",
                 4
               ]
             ]
@@ -1387,15 +1283,49 @@
             "ai": "smart",
             "deck": [
               [
-                "reaper",
+                "sohrab",
                 5
               ],
               [
-                "paladin",
+                "bijan",
+                4
+              ],
+              [
+                "gordafarid",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "giv",
+                4
+              ],
+              [
+                "arash",
                 5
               ],
               [
-                "soldier",
+                "kaveh",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "bijan",
+                5
+              ],
+              [
+                "gordafarid",
+                5
+              ],
+              [
+                "sohrab",
                 4
               ]
             ]
@@ -1404,32 +1334,15 @@
             "ai": "smart",
             "deck": [
               [
-                "phoenix",
+                "arash",
                 5
               ],
               [
-                "duelist",
-                5
+                "kaveh",
+                4
               ],
               [
-                "guard",
-                5
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "warlord",
-                5
-              ],
-              [
-                "vampire",
-                5
-              ],
-              [
-                "archer",
+                "giv",
                 5
               ]
             ]
@@ -1438,32 +1351,15 @@
             "ai": "smart",
             "deck": [
               [
-                "reaper",
+                "gordafarid",
+                4
+              ],
+              [
+                "sohrab",
                 5
               ],
               [
-                "paladin",
-                5
-              ],
-              [
-                "brute",
-                5
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "phoenix",
-                5
-              ],
-              [
-                "duelist",
-                5
-              ],
-              [
-                "scout",
+                "bijan",
                 5
               ]
             ]
@@ -1472,15 +1368,32 @@
             "ai": "smart",
             "deck": [
               [
-                "warlord",
-                6
-              ],
-              [
-                "reaper",
+                "kaveh",
                 5
               ],
               [
-                "vampire",
+                "giv",
+                5
+              ],
+              [
+                "arash",
+                4
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "sohrab",
+                5
+              ],
+              [
+                "bijan",
+                4
+              ],
+              [
+                "gordafarid",
                 5
               ]
             ]
@@ -1489,32 +1402,15 @@
             "ai": "smart",
             "deck": [
               [
-                "reaper",
-                6
+                "giv",
+                4
               ],
               [
-                "phoenix",
+                "arash",
                 5
               ],
               [
-                "paladin",
-                5
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "phoenix",
-                6
-              ],
-              [
-                "warlord",
-                5
-              ],
-              [
-                "duelist",
+                "kaveh",
                 5
               ]
             ]
@@ -1523,32 +1419,15 @@
             "ai": "smart",
             "deck": [
               [
-                "warlord",
+                "bijan",
                 6
               ],
               [
-                "reaper",
-                5
-              ],
-              [
-                "vampire",
-                5
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "reaper",
+                "gordafarid",
                 6
               ],
               [
-                "phoenix",
-                6
-              ],
-              [
-                "paladin",
+                "sohrab",
                 5
               ]
             ]
@@ -1557,15 +1436,49 @@
             "ai": "smart",
             "deck": [
               [
-                "phoenix",
+                "arash",
                 6
               ],
               [
-                "warlord",
+                "kaveh",
+                5
+              ],
+              [
+                "giv",
+                6
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "gordafarid",
+                5
+              ],
+              [
+                "sohrab",
                 6
               ],
               [
-                "duelist",
+                "bijan",
+                6
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "kaveh",
+                6
+              ],
+              [
+                "giv",
+                6
+              ],
+              [
+                "arash",
                 5
               ]
             ]
@@ -1574,66 +1487,15 @@
             "ai": "smart",
             "deck": [
               [
-                "warlord",
+                "sohrab",
                 6
               ],
               [
-                "reaper",
-                6
-              ],
-              [
-                "vampire",
+                "bijan",
                 5
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "reaper",
-                6
               ],
               [
-                "phoenix",
-                6
-              ],
-              [
-                "warlord",
-                5
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "phoenix",
-                6
-              ],
-              [
-                "warlord",
-                6
-              ],
-              [
-                "reaper",
-                6
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "warlord",
-                6
-              ],
-              [
-                "reaper",
-                6
-              ],
-              [
-                "phoenix",
+                "gordafarid",
                 6
               ]
             ]

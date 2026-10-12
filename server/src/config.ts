@@ -22,7 +22,9 @@ export function validateConfig(cfg: GameConfig): GameConfig {
     if (typeof c.name !== 'string' || !c.name.trim() || c.name.length > 40) bad(`نام کارت ${c.id} نامعتبر است`);
     if (!['common', 'rare', 'epic'].includes(c.rarity)) bad(`نادری ${c.id} نامعتبر است`);
     if (!isNum(c.hp, 1) || !isNum(c.atk, 0) || !isNum(c.shield, 0)) bad(`آمار ${c.id} نامعتبر است`);
-    if (c.ability && !ABILITIES[c.ability.id]) bad(`توانایی ناشناخته: ${c.ability.id}`);
+    for (const a of c.abilities ?? []) if (!a || !ABILITIES[a.id]) bad(`توانایی ناشناخته: ${a?.id}`);
+    const okParams = (p: unknown) => p === undefined || (!!p && typeof p === 'object' && Object.values(p as object).every((v) => isNum(v)));
+    if (!okParams(c.params) || (c.levels ?? []).some((l) => !okParams(l?.params))) bad(`عددهای توانایی ${c.id} نامعتبر است`);
     if (c.levels !== undefined && (!Array.isArray(c.levels) || c.levels.length > 20 || c.levels.some((l) => !l || !isNum(l.hp, 1) || !isNum(l.atk) || !isNum(l.shield)))) bad(`آمار لول‌های ${c.id} نامعتبر است`);
     if (c.image !== undefined && (typeof c.image !== 'string' || !/^\/uploads\/cards\/[a-z0-9_]+\.(png|jpg|webp)(\?v=\d+)?$/.test(c.image))) bad(`آدرس عکس ${c.id} نامعتبر است`);
   }
@@ -90,6 +92,14 @@ export function loadConfigWithOverride(overridePath: string, basePath = CONFIG_P
   let raw: any;
   try { raw = JSON.parse(readFileSync(overridePath, 'utf8')); } catch { return base; }
   const merged: any = { ...raw };
+  // نسخه‌ی محتوا: اگر کارت‌ها/ترکیب اولیه/سولو در کد عوض شده، نسخه‌ی ذخیره‌شده‌ی قدیمی جایگزین می‌شود (عکس کارت‌های هم‌شناسه می‌ماند)
+  if ((raw.contentVersion ?? 0) < (base.contentVersion ?? 0)) {
+    const oldCards: any[] = Array.isArray(raw.cards) ? raw.cards : [];
+    merged.cards = base.cards.map((c) => { const o = oldCards.find((x) => x.id === c.id); return o?.image ? { ...c, image: o.image } : c; });
+    merged.startingDeck = base.startingDeck;
+    merged.solo = base.solo;
+    merged.contentVersion = base.contentVersion;
+  }
   for (const k of Object.keys(base) as (keyof GameConfig)[]) if (merged[k] === undefined) merged[k] = base[k];
   // جدول ارتقای قدیمی (یک جدول برای همه) → همان برای هر سه نوع کارت
   if (!merged.upgrade?.byRarity) {

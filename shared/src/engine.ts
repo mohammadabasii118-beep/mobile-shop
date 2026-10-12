@@ -10,17 +10,18 @@ export function upgradeStep(cfg: GameConfig, rarity: Rarity, level: number) {
   return cfg.upgrade.byRarity[rarity]?.[level - 1];
 }
 
-/** آمار کارت در یک لول (از جدول آمار خودِ کارت) */
+/** آمار کارت در یک لول (از جدول آمار خودِ کارت) به‌همراه عددهای توانایی همان لول */
 export function cardStatsAt(def: CardDef, level: number): CardStats {
   const lv = def.levels ?? [];
-  if (level <= 1 || lv.length === 0) return { hp: def.hp, atk: def.atk, shield: def.shield };
-  return lv[Math.min(level - 2, lv.length - 1)];
+  if (level <= 1 || lv.length === 0) return { hp: def.hp, atk: def.atk, shield: def.shield, params: def.params };
+  const row = lv[Math.min(level - 2, lv.length - 1)];
+  return { ...row, params: { ...def.params, ...row.params } };
 }
 
-/** کارت را با آمارِ لولش برای نبرد آماده می‌کند. (پارامتر سوم برای سازگاری با کدهای قبلی است و استفاده نمی‌شود) */
+/** کارت را با آمار و عددهای توانایی لولش برای نبرد آماده می‌کند. (پارامتر سوم برای سازگاری است و استفاده نمی‌شود) */
 export function resolveCard(def: CardDef, level: number, _cfg?: unknown): UnitInit {
   const s = cardStatsAt(def, level);
-  return { cardId: def.id, name: def.name, hp: s.hp, atk: s.atk, shield: s.shield, ability: def.ability, level };
+  return { cardId: def.id, name: def.name, hp: s.hp, atk: s.atk, shield: s.shield, abilities: def.abilities, params: s.params ?? {}, level };
 }
 
 export function createBattle(
@@ -43,7 +44,7 @@ export function createBattle(
       }),
     );
   }
-  return {
+  const state: BattleState = {
     units,
     firstSide,
     nextSide: firstSide,
@@ -55,6 +56,10 @@ export function createBattle(
     winner: null,
     maxRounds,
   };
+  // توانایی‌های «اول مبارزه» (مثل سپر هم‌تیمی) یک‌بار اعمال می‌شوند؛ نمایش اولیه‌ی کارت‌ها همین آمار نهایی است
+  for (const u of units) for (const ab of abilitiesOf(u)) ab.onBattleStart?.({ state, unit: u, params: u.params ?? {}, emit: () => {} });
+  for (const u of units) u.maxShield = Math.max(u.maxShield, u.shield);
+  return state;
 }
 
 export const getUnit = (s: BattleState, uid: string): Unit | undefined =>
@@ -66,9 +71,13 @@ export const aliveUnits = (s: BattleState, side: Side): Unit[] =>
 const power = (s: BattleState, side: Side) =>
   aliveUnits(s, side).reduce((t, u) => t + u.hp + u.shield, 0);
 
-function ctxFor(s: BattleState, unit: Unit, events: BattleEvent[]): AbilityCtx | null {
-  if (!unit.ability) return null;
-  return { state: s, unit, params: unit.ability.params ?? {}, emit: (e) => events.push(e) };
+/** توانایی‌های اجراییِ یک کارت */
+function abilitiesOf(u: Unit) {
+  return (u.abilities ?? []).map((a) => ABILITIES[a.id]).filter((a): a is NonNullable<typeof a> => !!a);
+}
+
+function ctxFor(s: BattleState, unit: Unit, events: BattleEvent[]): AbilityCtx {
+  return { state: s, unit, params: unit.params ?? {}, emit: (e) => events.push(e) };
 }
 
 function finish(s: BattleState, winner: Side, reason: 'kills' | 'round_cap', events: BattleEvent[]) {
@@ -105,9 +114,9 @@ export function startNextTurn(s: BattleState): BattleEvent[] {
   s.nextSide = other(side);
   events.push({ type: 'turn', uid: unit.uid, round: s.round });
   const ctx = ctxFor(s, unit, events);
-  const ab = unit.ability && ABILITIES[unit.ability.id];
-  if (ctx && ab?.onTurnStart) ab.onTurnStart(ctx);
-  const attacks = ab?.attacksPerTurn?.(unit.ability!.params ?? {}) ?? 1;
+  const abs = abilitiesOf(unit);
+  for (const ab of abs) ab.onTurnStart?.(ctx);
+  const attacks = Math.max(1, ...abs.map((ab) => ab.attacksPerTurn?.(unit.params ?? {}) ?? 1));
   s.current = { uid: unit.uid, attacksLeft: attacks };
   return events;
 }
@@ -120,21 +129,24 @@ export function attack(s: BattleState, targetUid: string): BattleEvent[] {
   const target = getUnit(s, targetUid);
   if (!target || !target.alive || target.side === attacker.side) throw new Error('bad target');
 
-  const dmg = attacker.atk;
-  const shieldLost = Math.min(target.shield, dmg);
+  const aCtx = ctxFor(s, attacker, events);
+  const aAbs = abilitiesOf(attacker);
+  // عدد حمله با توانایی‌هایی مثل خشم؛ نفوذ: بخشی از ضربه شیلد را رد می‌کند و مستقیم از جان کم می‌شود
+  let dmg = attacker.atk;
+  for (const ab of aAbs) if (ab.modifyAttack) dmg = ab.modifyAttack(aCtx, dmg);
+  const pierceP = Math.min(100, aAbs.reduce((t, ab) => t + (ab.pierce?.(attacker.params ?? {}) ?? 0), 0));
+  const direct = Math.floor((dmg * pierceP) / 100);
+  const normal = dmg - direct;
+  const shieldLost = Math.min(target.shield, normal);
   target.shield -= shieldLost;
-  const hpLost = Math.min(target.hp, dmg - shieldLost);
+  const hpLost = Math.min(target.hp, direct + (normal - shieldLost));
   target.hp -= hpLost;
   events.push({ type: 'attack', from: attacker.uid, to: target.uid, dmg, shieldLost, hpLost });
-
-  const aCtx = ctxFor(s, attacker, events);
-  const aAb = attacker.ability && ABILITIES[attacker.ability.id];
-  if (aCtx && aAb?.onAttack) aAb.onAttack(aCtx, target, shieldLost + hpLost);
+  for (const ab of aAbs) ab.onAttack?.(aCtx, target, shieldLost + hpLost);
 
   if (target.hp <= 0) {
     const tCtx = ctxFor(s, target, events);
-    const tAb = target.ability && ABILITIES[target.ability.id];
-    const saved = tCtx && tAb?.onDeath ? tAb.onDeath(tCtx) : false;
+    const saved = abilitiesOf(target).some((ab) => ab.onDeath?.(tCtx) === true);
     if (!saved) {
       target.alive = false;
       target.hp = 0;

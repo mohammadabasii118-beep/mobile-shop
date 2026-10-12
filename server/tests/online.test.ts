@@ -99,9 +99,9 @@ describe('online', () => {
 
   it('REST: deck, box lifecycle (dev skip), upgrade errors', async () => {
     await api(300, '/api/me');
-    expect((await api(300, '/api/deck', { cards: ['soldier', 'x', 'guard'] })).error).toBeTruthy();
+    expect((await api(300, '/api/deck', { cards: ['giv', 'x', 'bijan'] })).error).toBeTruthy();
     expect((await api(300, '/api/box/start', { slot: 0 })).error).toBeTruthy();
-    const r = await api(300, '/api/upgrade', { cardId: 'soldier' });
+    const r = await api(300, '/api/upgrade', { cardId: 'giv' });
     expect(r.error).toMatch(/تعداد کارت/);
   });
 });

@@ -25,10 +25,10 @@ describe('game economy', () => {
   });
 
   it('deck must be 3 distinct owned cards', () => {
-    expect(() => game.setDeck(uid, ['soldier', 'soldier', 'guard'])).toThrow(GameError);
-    expect(() => game.setDeck(uid, ['soldier', 'guard', 'phoenix'])).toThrow(GameError);
-    game.setDeck(uid, ['archer', 'guard', 'soldier']);
-    expect(game.profile(uid).deck).toEqual(['archer', 'guard', 'soldier']);
+    expect(() => game.setDeck(uid, ['giv', 'giv', 'bijan'])).toThrow(GameError);
+    expect(() => game.setDeck(uid, ['giv', 'bijan', 'sohrab'])).toThrow(GameError);
+    game.setDeck(uid, ['arash', 'bijan', 'giv']);
+    expect(game.profile(uid).deck).toEqual(['arash', 'bijan', 'giv']);
   });
 
   it('box: 4 slots, one opening at a time, server timer', () => {
@@ -100,44 +100,44 @@ describe('game economy', () => {
   });
 
   it('card stats come from the explicit per-level table (no growth formula)', () => {
-    const soldier = cfg.cards.find((c) => c.id === 'soldier')!;
-    const custom = { ...soldier, levels: [{ hp: 500, atk: 50, shield: 5 }, { hp: 600, atk: 60, shield: 6 }] };
-    expect(resolveCard(custom, 1).hp).toBe(soldier.hp);
+    const giv = cfg.cards.find((c) => c.id === 'giv')!;
+    const custom = { ...giv, levels: [{ hp: 500, atk: 50, shield: 5 }, { hp: 600, atk: 60, shield: 6 }] };
+    expect(resolveCard(custom, 1).hp).toBe(giv.hp);
     expect(resolveCard(custom, 2)).toMatchObject({ hp: 500, atk: 50, shield: 5, level: 2 });
     expect(resolveCard(custom, 3).hp).toBe(600);
     expect(resolveCard(custom, 6).hp).toBe(600);          // بعد از آخرین ردیف: آخرین ردیف
-    expect(resolveCard({ ...soldier, levels: undefined }, 4).hp).toBe(soldier.hp); // بدون جدول: بدون رشد
+    expect(resolveCard({ ...giv, levels: undefined }, 4).hp).toBe(giv.hp); // بدون جدول: بدون رشد
   });
 
   it('upgrade cost depends on the card type (ساده / معمولی / کمیاب)', () => {
     const db = (game as any).d.db;
-    db.prepare("INSERT INTO user_cards (user_id, card_id, copies) VALUES (?, 'duelist', 1), (?, 'phoenix', 1)").run(uid, uid);
+    db.prepare("INSERT INTO user_cards (user_id, card_id, copies) VALUES (?, 'gordafarid', 1), (?, 'sohrab', 1)").run(uid, uid);
     db.prepare('UPDATE users SET coins = 150').run();
     // ساده: ۲ کارت و ۵۰ سکه — معمولی: ۲ کارت و ۱۰۰ — کمیاب: ۱ کارت و ۲۰۰
     expect(cfg.upgrade.byRarity.common[0]).toEqual({ copies: 2, coins: 50 });
     expect(cfg.upgrade.byRarity.rare[0]).toEqual({ copies: 2, coins: 100 });
     expect(cfg.upgrade.byRarity.epic[0]).toEqual({ copies: 1, coins: 200 });
-    expect(() => game.upgradeCard(uid, 'duelist')).toThrow(/تعداد کارت/);   // ۱ از ۲
-    expect(() => game.upgradeCard(uid, 'phoenix')).toThrow(/سکه/);         // ۱۵۰ از ۲۰۰
-    db.prepare("UPDATE user_cards SET copies = 2 WHERE card_id = 'duelist'").run();
-    game.upgradeCard(uid, 'duelist');
+    expect(() => game.upgradeCard(uid, 'gordafarid')).toThrow(/تعداد کارت/);   // ۱ از ۲
+    expect(() => game.upgradeCard(uid, 'sohrab')).toThrow(/سکه/);         // ۱۵۰ از ۲۰۰
+    db.prepare("UPDATE user_cards SET copies = 2 WHERE card_id = 'gordafarid'").run();
+    game.upgradeCard(uid, 'gordafarid');
     const p = game.profile(uid);
-    expect(p.cards.find((c) => c.id === 'duelist')).toMatchObject({ level: 2, copies: 0 });
+    expect(p.cards.find((c) => c.id === 'gordafarid')).toMatchObject({ level: 2, copies: 0 });
     expect(p.coins).toBe(50);
   });
 
   it('upgrade needs duplicates and coins', () => {
-    expect(() => game.upgradeCard(uid, 'soldier')).toThrow(/تعداد کارت/);
+    expect(() => game.upgradeCard(uid, 'giv')).toThrow(/تعداد کارت/);
     const db = (game as any).d.db;
-    db.prepare('UPDATE user_cards SET copies = 5 WHERE card_id = ?').run('soldier');
+    db.prepare('UPDATE user_cards SET copies = 5 WHERE card_id = ?').run('giv');
     db.prepare('UPDATE users SET coins = 10').run();
-    expect(() => game.upgradeCard(uid, 'soldier')).toThrow(/سکه/);
+    expect(() => game.upgradeCard(uid, 'giv')).toThrow(/سکه/);
     db.prepare('UPDATE users SET coins = 500').run();
-    game.upgradeCard(uid, 'soldier');
+    game.upgradeCard(uid, 'giv');
     const p = game.profile(uid);
-    expect(p.cards.find((c) => c.id === 'soldier')).toMatchObject({ level: 2, copies: 3 });
+    expect(p.cards.find((c) => c.id === 'giv')).toMatchObject({ level: 2, copies: 3 });
     expect(p.coins).toBe(450);
-    expect(game.deckUnits(uid)[0].hp).toBe(121);
+    expect(game.deckUnits(uid)[0].hp).toBe(189);
   });
 
   it('only winners get boxes; results are counted', () => {
@@ -145,5 +145,23 @@ describe('game economy', () => {
     expect(game.recordResult(uid, true, 0)).toEqual({ box: 0, type: 'bronze', noSlot: false });
     const p = game.profile(uid);
     expect([p.wins, p.losses, p.soloStage]).toEqual([1, 1, 1]);
+  });
+
+  it('new players start with only the 3 common starter cards', () => {
+    const p = game.profile(uid);
+    expect(p.cards.map((c) => c.id).sort()).toEqual(['arash', 'bijan', 'giv']);
+    expect(p.deck).toEqual(['giv', 'bijan', 'arash']);
+  });
+
+  it('migrateCards removes cards that no longer exist and refills the deck from the starters', () => {
+    const db = (game as any).d.db;
+    db.prepare("INSERT INTO user_cards (user_id, card_id, copies) VALUES (?, 'old_card', 3)").run(uid);
+    db.prepare("UPDATE deck SET card_id = 'old_card' WHERE user_id = ? AND slot = 0").run(uid);
+    game.migrateCards();
+    const p = game.profile(uid);
+    expect(p.cards.some((c) => c.id === 'old_card')).toBe(false);
+    expect(p.deck).toHaveLength(3);
+    expect(new Set(p.deck).size).toBe(3);
+    expect(p.deck.every((id) => p.cards.some((c) => c.id === id))).toBe(true);
   });
 });

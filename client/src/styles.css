@@ -372,3 +372,7 @@ html, body, #root, .app, .screen, .battle, .admin { overscroll-behavior: none; }
 .slot.empty::after { display: none; }
 .slot.empty span { font-size: 12px; }
 @media (prefers-reduced-motion: reduce) { .slot.ready, .slot.ready .chest { animation: none; } }
+
+.lockedcard .card { filter: grayscale(.85) brightness(.7); }
+.lockedcard .dup { color: var(--muted, #aab); }
+.ability b { color: #ffd76a; }
