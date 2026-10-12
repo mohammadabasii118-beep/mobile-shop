@@ -21,7 +21,7 @@ EXEMPT_CHATS: set[str] = set()
 # is made in this group first, copied into the channel with copyMessage (which keeps the custom_emoji entities), checked by reading the
 # copy back, and the temporary group message is removed. If anything fails the normal direct post is sent instead.
 RELAY_CHAT: str | None = None
-RELAY_MODE = "forward"          # forward: the post stays in the group and is forwarded to the channel · copy: clean post, the group copy is removed
+RELAY_MODE = "copy"             # copy: = "hide sender name" (no Forwarded-from label), the group copy is removed · forward: post stays in the group, label shown
 _KIND: dict[str, str] = {}
 
 

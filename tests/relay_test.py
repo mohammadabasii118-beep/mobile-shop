@@ -61,7 +61,8 @@ async def run():
     await emojis.load()
     outgoing.RELAY_CHAT = "-1009"
     # 1) forward mode (default): staged in the group and KEPT there, forwarded to the channel; no direct post, nothing deleted
-    assert outgoing.RELAY_MODE == "forward"
+    assert outgoing.RELAY_MODE == "copy"                                  # default: no Forwarded-from label
+    outgoing.RELAY_MODE = "forward"
     req = Req()
     res = await send(req, "-1001")
     kinds = [type(c).__name__ for c in req.calls]
@@ -91,7 +92,7 @@ async def run():
     await send(req, "-1001")
     assert [type(c).__name__ for c in req.calls][-1] == "SendPhoto" and req.calls[-1].chat_id == "-1001", [type(c).__name__ for c in req.calls]
     assert any(isinstance(c, DeleteMessage) and str(c.chat_id) == "-1001" for c in req.calls)         # the useless copy was deleted
-    outgoing.RELAY_MODE = "forward"
+    outgoing.RELAY_MODE = "copy"
     # 4) no premium emoji in the post → no relay; no relay group configured → direct post
     req = Req()
     await send(req, "-1001", caption="plain text")
