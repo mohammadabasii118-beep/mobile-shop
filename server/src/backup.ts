@@ -34,7 +34,7 @@ export interface BackupFile { file: string; name: string }
  * فایل env سرور (توکن ربات) عمداً داخلش نیست.
  * اگر از سقف تلگرام (۵۰ مگابایت) بزرگ‌تر شود، چیزی حذف نمی‌شود؛ فایل به تکه‌های ۴۵ مگابایتی تقسیم می‌شود.
  */
-export async function makeBackup(o: BackupOpts & { partBytes?: number }): Promise<{ files: BackupFile[]; totalBytes: number; cleanup: () => void }> {
+export async function makeBackup(o: BackupOpts & { partBytes?: number }): Promise<{ files: BackupFile[]; totalBytes: number; summary: string; cleanup: () => void }> {
   const work = mkdtempSync(join(o.tmp ?? tmpdir(), 'miras-backup-'));
   const cleanup = () => rmSync(work, { recursive: true, force: true });
   try {
@@ -53,12 +53,17 @@ export async function makeBackup(o: BackupOpts & { partBytes?: number }): Promis
     await run('tar', ['-czf', full, '--exclude=./data', '--exclude=./.node', '--exclude=./.tmp', '--transform', 's,^\\./,code/,', '-C', o.codeDir, '.',
       '--transform', 's,^data-backup,data,', '-C', work, 'data-backup', 'README-RESTORE.txt']);
     const totalBytes = statSync(full).size;
+    // خلاصه‌ی محتوا برای اینکه ادمین بتواند مطمئن شود چیزی جا نیفتاده
+    const listing = (await run('tar', ['-tzf', full], { maxBuffer: 256 * 1024 * 1024 })).stdout.split('\n').filter(Boolean);
+    const count = (re: RegExp) => listing.filter((x) => re.test(x) && !x.endsWith('/')).length;
+    const users = Number((o.db.prepare('SELECT COUNT(*) AS n FROM users').get() as { n: number }).n);
+    const summary = `داخلش: ${count(/^code\//)} فایل کد (${count(/^code\/node_modules\//)} فایل node_modules، ${count(/^code\/client\/dist\//)} فایل build) + دیتابیس ${users} بازیکن + ${count(/^data\/uploads\//)} عکس آپلودی`;
     const limit = o.partBytes ?? PART_BYTES;
-    if (totalBytes <= limit) return { files: [{ file: full, name }], totalBytes, cleanup };
+    if (totalBytes <= limit) return { files: [{ file: full, name }], totalBytes, summary, cleanup };
     await run('split', ['-b', String(limit), '-d', '-a', '2', full, `${full}.part`]);
     const files = readdirSync(work).filter((f) => f.startsWith(`${name}.part`)).sort().map((f) => ({ file: join(work, f), name: f }));
     rmSync(full);
-    return { files, totalBytes, cleanup };
+    return { files, totalBytes, summary, cleanup };
   } catch (e) { cleanup(); throw e; }
 }
 
@@ -86,8 +91,8 @@ export async function backupToAdmins(o: BackupOpts & { token: string; adminIds: 
       try {
         for (const [i, f] of b.files.entries()) {
           const cap = n === 1
-            ? `💾 بکاپ «میراث» — ${when} UTC (${mb} MB)`
-            : `💾 بکاپ «میراث» — ${when} UTC (${mb} MB)\nقسمت ${i + 1} از ${n}${i === 0 ? '\n\nحجم از سقف تلگرام بیشتر است، پس چند تکه فرستاده شد. بعد از دانلود همه‌ی تکه‌ها در یک پوشه، به هم وصل کن.\nلینوکس/مک: cat miras-backup-*.tar.gz.part* > miras-backup.tar.gz\nویندوز (CMD): copy /b miras-backup-*.part* miras-backup.tar.gz' : ''}`;
+            ? `💾 بکاپ «میراث» — ${when} UTC (${mb} MB)\n${b.summary}`
+            : `💾 بکاپ «میراث» — ${when} UTC (${mb} MB)\n${b.summary}\nقسمت ${i + 1} از ${n}${i === 0 ? '\n\nحجم از سقف تلگرام بیشتر است، پس چند تکه فرستاده شد. بعد از دانلود همه‌ی تکه‌ها در یک پوشه، به هم وصل کن.\nلینوکس/مک: cat miras-backup-*.tar.gz.part* > miras-backup.tar.gz\nویندوز (CMD): copy /b miras-backup-*.part* miras-backup.tar.gz' : ''}`;
           await sendDocument(o.apiBase ?? 'https://api.telegram.org', o.token, id, f.file, f.name, cap);
         }
         ok++;
