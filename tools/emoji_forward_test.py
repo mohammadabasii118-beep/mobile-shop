@@ -66,14 +66,32 @@ def main():
     ids2 = custom_ids(r2["result"])
     print(f"→ custom_emoji in the channel message: {ids2 or 'NONE'}\n")
 
+    print("2b) sendMessage straight to the channel (what the bot does today)")
+    r3 = call(tok, "sendMessage", chat_id=a.channel, parse_mode="HTML", text=f'direct <tg-emoji emoji-id="{a.emoji}">🔴</tg-emoji>')
+    ids3 = custom_ids(r3["result"]) if r3.get("ok") else None
+    print(f"→ custom_emoji in the direct channel post: {ids3 or 'NONE'}\n")
+
+    print("2c) copyMessage group → channel (no 'forwarded from' header), then read it back to see what the channel really stored")
+    r4 = call(tok, "copyMessage", chat_id=a.channel, from_chat_id=a.group, message_id=sent["message_id"])
+    ids4 = None
+    if r4.get("ok"):
+        back = call(tok, "forwardMessage", chat_id=a.group, from_chat_id=a.channel, message_id=r4["result"]["message_id"])
+        if back.get("ok"):
+            ids4 = custom_ids(back["result"])
+            call(tok, "deleteMessage", chat_id=a.group, message_id=back["result"]["message_id"])
+    else:
+        print(json.dumps(r4, ensure_ascii=False))
+    print(f"→ custom_emoji in the copied channel message: {ids4 or 'NONE'}\n")
+
     print("3) verdict")
     if not ids1:
         print("✗ The emoji was already lost when posting to the group: the bot may not use custom emoji there (Telegram only allows it when the "
               "bot owner has Premium / the bot has an extra username bought on Fragment), or the ID is not a valid custom emoji.")
-    elif ids1 == ids2:
-        print("✓ custom_emoji is PRESERVED through forwardMessage (the channel message carries the same custom_emoji_id).")
     else:
-        print("✗ custom_emoji was LOST on the forward: group had", ids1, "but the channel message has", ids2 or "none")
+        print("group post (sendMessage)        :", "✓ kept" if ids1 else "✗ lost")
+        print("channel, direct sendMessage      :", "✓ kept" if ids3 else "✗ lost")
+        print("channel, forwardMessage          :", "✓ kept (but shows 'Forwarded from')" if ids1 == ids2 else "✗ lost")
+        print("channel, copyMessage (clean post):", "✓ kept  → the relay in the bot will work" if ids4 else "✗ lost  → relay via copyMessage cannot help")
     print("\nIDs to delete the test posts: group", sent["message_id"], "· channel", r2["result"]["message_id"])
 
 
