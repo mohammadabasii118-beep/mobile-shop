@@ -37,6 +37,14 @@ class QuizSt(StatesGroup):
     import_file = State()
 
 
+class XiSt(StatesGroup):
+    title = State()
+    pid = State()
+    photo = State()
+    team = State()
+    logo = State()
+
+
 class DestSt(StatesGroup):
     pick = State()
 

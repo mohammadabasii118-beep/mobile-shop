@@ -128,6 +128,25 @@ def rank_group(teams: list[int], matches: list[tuple], decisions: dict[str, list
     return rows, unresolved
 
 
+def clinch(rows: list[dict], remaining: list[tuple[int, int]], qualifiers: int | None) -> dict[int, str | None]:
+    """Real qualification status from points only (ties are never guessed): 'in' = certain to finish in the top `qualifiers`,
+    'out' = certain not to, None = still open. rows need `team` and `Pts`; remaining = unplayed (team_a, team_b) pairs."""
+    if not qualifiers:
+        return {}
+    pts = {r["team"]: r["Pts"] for r in rows}
+    left = dict.fromkeys(pts, 0)
+    for a, b in remaining:
+        left[a] += 1
+        left[b] += 1
+    top = {t: pts[t] + 3 * left[t] for t in pts}
+    out: dict[int, str | None] = {}
+    for t in pts:
+        could_catch = sum(1 for o in pts if o != t and top[o] >= pts[t])      # worst case for t: loses everything left
+        surely_above = sum(1 for o in pts if o != t and pts[o] > top[t])      # best case for t: wins everything left
+        out[t] = "in" if could_catch < qualifiers else "out" if surely_above >= qualifiers else None
+    return out
+
+
 def signature(team_ids) -> str:
     return ",".join(str(t) for t in sorted(team_ids))
 

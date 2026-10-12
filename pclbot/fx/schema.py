@@ -58,6 +58,11 @@ CREATE TABLE IF NOT EXISTS fx_q_results(
     name TEXT NOT NULL DEFAULT '', score INTEGER NOT NULL, total_ms INTEGER NOT NULL, rank INTEGER NOT NULL,
     PRIMARY KEY(contest_id, user_id));
 
+-- ---- team of the tournament: the unfinished work of an admin (survives restarts) + players seen before (re-usable data)
+CREATE TABLE IF NOT EXISTS fx_xi_drafts(admin_id INTEGER PRIMARY KEY, data TEXT NOT NULL, updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS fx_xi_known(
+    player_id TEXT PRIMARY KEY COLLATE NOCASE, team_name TEXT, photo_file TEXT, logo_file TEXT, updated_at INTEGER NOT NULL);
+
 -- ---- Here We Go (transfers from the PCL app API) -------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS fx_hwg_seen(id TEXT PRIMARY KEY, posted_at INTEGER NOT NULL);
 """

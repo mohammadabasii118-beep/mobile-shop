@@ -334,11 +334,8 @@ async def run():
     await preview("fx:agp2:r:last"); await d.press("fx:agm", A); await d.press("fx:agr:r", A); await preview("fx:agp2:r:0")
     await d.press("fx:agm", A); await d.press("fx:agr:r", A); await d.press("fx:agp2:r:5", A)               # stale round index
     assert "قدیمی" in " ".join(d.session.alerts)
-    await d.press("fx:agm", A); await d.press("fx:agxi", A)
-    d.snap("Team of the round — choose", A)
-    await preview("fx:agp2:x:all", snap="App graphic — team of the round (pitch)")
-    await d.press("fx:agm", A); await d.press("fx:agxi", A); await d.press("fx:agp2:x:2", A)                  # round 3 has no XI
-    assert "تیم منتخبی" in d.text(A) or "تیم منتخبی" in " ".join(m["text"] for m in [d.screen(A)] if m)
+    await d.press("fx:agm", A); await d.press("fx:agxi", A)                                             # ⭐ opens the Team of the Tournament manager
+    assert [t for t, _ in d.buttons(A)][:2] == ["🤖 بر اساس آمار اپ — AUTO", "✍️ انتخاب دستی — MANUAL"], d.buttons(A)
     await d.press("fx:agm", A); await d.press("fx:agd", A)                                                  # daily schedule: days that have matches
     assert "2026/10/12" in " ".join(t for t, _ in d.buttons(A)), d.buttons(A)
     d.snap("Daily schedule — choose the day", A)

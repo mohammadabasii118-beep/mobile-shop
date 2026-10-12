@@ -55,7 +55,7 @@ async def sets_open(c: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "onc:xsn")
 async def set_new(c: CallbackQuery):
-    rows = [[ob(f"🎨 {templates.THEME_FA[t]}", f"onc:xsc:{t}") for t in templates.THEMES]]
+    rows = [[ob(f"🎨 {templates.THEME_FA[t]}"[:40], f"onc:xsc:{t}")] for t in templates.THEMES]
     await show(c, "➕ <b>ست تمپلیت جدید</b>\n\nیک رنگ‌بندی انتخاب کن (بعداً می‌توانی پس‌زمینه‌ی خودت را آپلود کنی):", okb(rows + [[ob("🔙 بازگشت", "onc:xs")]]))
     await c.answer()
 

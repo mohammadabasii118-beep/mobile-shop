@@ -527,6 +527,13 @@ async def _confirmed_group_matches(gid: int) -> tuple[list[tuple], int, int]:
     return [(r["team_a"], r["team_b"], r["goals_a"], r["goals_b"]) for r in rows], len(rows), total
 
 
+async def group_remaining(gid: int) -> list[tuple[int, int]]:
+    rows = await dbx.fetchall(
+        "SELECT m.team_a, m.team_b FROM onc_matches m WHERE m.group_id=? AND NOT EXISTS "
+        "(SELECT 1 FROM onc_results r WHERE r.match_id=m.id AND r.status='CONFIRMED')", gid)
+    return [(r["team_a"], r["team_b"]) for r in rows]
+
+
 async def group_tables(tid: int) -> list[dict]:
     """Per group: rows (ordered), unresolved ties, status, qualified team ids. Computed from CONFIRMED results only."""
     names = await team_names(tid)

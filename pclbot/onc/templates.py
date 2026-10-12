@@ -4,14 +4,14 @@ import json
 import os
 
 from .. import config
-from . import dbx
+from . import dbx, themes
 
 ONC_TYPES = ["SCHEDULE", "GROUP_TABLE", "ROUND_RESULTS", "QUALIFIED", "KO_MATCHES", "BRACKET", "CHAMPION"]   # needed to start a tournament
 EXTRA_TYPES = ["TRANSFER", "PLAYER_STATS", "BEST_XI"]                                                          # graphics made from the PCL app data
 TYPES = ONC_TYPES + EXTRA_TYPES
 TYPE_LABEL = {"SCHEDULE": "برنامه بازی‌ها", "GROUP_TABLE": "جدول گروه", "ROUND_RESULTS": "نتایج راند",
               "QUALIFIED": "تیم‌های صعودکننده", "KO_MATCHES": "بازی‌های حذفی", "BRACKET": "جدول مرحله حذفی", "CHAMPION": "پوستر قهرمان", "TRANSFER": "ترنسفر نیوز (Here We Go)",
-              "PLAYER_STATS": "آمار بازیکنان (اپ)", "BEST_XI": "تیم منتخب (اپ)"}
+              "PLAYER_STATS": "آمار بازیکنان (اپ)", "BEST_XI": "تیم منتخب تورنمنت"}
 THEME_FA = {"RED": "قرمز", "BLUE": "آبی", "GOLD": "طلایی"}
 ELEMENT_FA = {"pcl_logo": "لوگوی PCL", "eyebrow": "برچسب انگلیسی", "footer": "فوتر", "brand": "نام رویداد", "title": "عنوان", "subtitle": "زیرعنوان", "page": "شماره صفحه", "logo": "لوگو", "team": "نام تیم",
               "stage": "نام مرحله", "rows": "ردیف‌ها", "col:slot": "ساعت و راند", "col:match": "ردیف بازی", "col:a": "تیم اول", "col:b": "تیم دوم",
@@ -24,6 +24,7 @@ THEMES = {
     "BLUE": {"bg1": "#050d1f", "bg2": "#0f3a7a", "accent": "#3b9bff", "panel": "#ffffff14", "gold": "#ffd24a"},
     "GOLD": {"bg1": "#140f02", "bg2": "#5c4408", "accent": "#ffc933", "panel": "#ffffff14", "gold": "#fff0b0"},
 }
+LEGACY_THEMES = ["RED", "BLUE", "GOLD"]
 COLORS = ["#ffffff", "#ffd24a", "#ff3b4e", "#3b9bff", "#45e08a", "#111111", "#b8c0cc"]
 ALIGNS = ["left", "center", "right"]
 FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
@@ -49,6 +50,10 @@ def fonts() -> list[tuple[str, str]]:
     return [(n, p) for n, p in out if p]
 
 
+THEMES.update(themes.PALETTES)                      # ten new themes (own style per theme, see themes.py)
+THEME_FA.update({k: f"{themes.NAMES_FA[k]} · {themes.NAMES[k]}" for k in themes.PALETTES})
+
+
 def _el(x, y, size, color="#ffffff", align="center", max_w=900, min_=24, font=F_BOLD, text=None, track=0):
     d = {"x": x, "y": y, "size": size, "min": min_, "color": color, "align": align, "max_w": max_w, "font": font}
     if text is not None:
@@ -59,9 +64,9 @@ def _el(x, y, size, color="#ffffff", align="center", max_w=900, min_=24, font=F_
 
 
 EYEBROW = {"SCHEDULE": "MATCH SCHEDULE", "GROUP_TABLE": "GROUP STAGE", "ROUND_RESULTS": "ROUND RESULTS", "QUALIFIED": "QUALIFIED TEAMS",
-           "KO_MATCHES": "KNOCKOUT", "BRACKET": "KNOCKOUT BRACKET", "CHAMPION": "CHAMPION", "TRANSFER": "TRANSFER NEWS", "PLAYER_STATS": "PLAYER STATS", "BEST_XI": "TEAM OF THE ROUND"}
+           "KO_MATCHES": "KNOCKOUT", "BRACKET": "KNOCKOUT BRACKET", "CHAMPION": "CHAMPION", "TRANSFER": "TRANSFER NEWS", "PLAYER_STATS": "PLAYER STATS", "BEST_XI": "BEST XI"}
 TITLE_FA = {"SCHEDULE": "برنامه بازی‌ها", "GROUP_TABLE": "GROUP STANDINGS", "ROUND_RESULTS": "نتایج", "QUALIFIED": "تیم‌های صعودکننده",
-            "KO_MATCHES": "مرحله حذفی", "BRACKET": "جدول مرحله حذفی", "CHAMPION": "قهرمان", "TRANSFER": "HERE WE GO", "PLAYER_STATS": "آمار بازیکنان", "BEST_XI": "BEST XI"}
+            "KO_MATCHES": "مرحله حذفی", "BRACKET": "جدول مرحله حذفی", "CHAMPION": "قهرمان", "TRANSFER": "HERE WE GO", "PLAYER_STATS": "آمار بازیکنان", "BEST_XI": "TEAM OF THE TOURNAMENT"}
 
 
 def default_config(type_: str, theme: str = "RED") -> dict:
@@ -172,6 +177,23 @@ async def upgrade_designs() -> int:
             await dbx.execute("UPDATE onc_templates SET config=? WHERE id=?", json.dumps(default_config(r["type"], theme)), r["id"])
             n += 1
     return n
+
+
+def apply_theme(cfg: dict, theme_id: str, type_: str) -> dict:
+    """The same data and layout in another theme: palette + style swapped, baked colours remapped (user edits to positions stay)."""
+    new = THEMES[theme_id]
+    old = cfg.get("theme", {})
+    if old.get("style") == new.get("style") and old.get("bg1") == new.get("bg1"):
+        return cfg                                                 # already this theme
+    if old.get("gold", "").lower() == "#ffffff" or old.get("style") == new.get("style"):
+        return default_config(type_, theme_id)                     # white highlight can't be remapped safely → fresh layout of that theme
+    cfg = copy.deepcopy(cfg)
+    m = {old["gold"].lower(): new["gold"], old["accent"].lower(): new["accent"], "#b9c0cc": new.get("muted", "#b9c0cc"), old.get("ink", "#14080c").lower(): new.get("ink", "#14080c")}
+    for st in list(cfg["elements"].values()) + list(cfg.get("cols", {}).values()):
+        if isinstance(st, dict) and isinstance(st.get("color"), str):
+            st["color"] = m.get(st["color"].lower(), st["color"])
+    cfg["theme"] = dict(new)
+    return cfg
 
 
 async def sets() -> list[dict]:

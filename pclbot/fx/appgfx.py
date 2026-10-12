@@ -24,7 +24,7 @@ from .states import DestSt, GfxSt
 router = Router()
 router.message.filter(lambda m: is_admin(m.from_user.id))
 router.callback_query.filter(lambda c: is_admin(c.from_user.id))
-PREVIEW: dict[int, tuple[list[bytes], str]] = {}
+PREVIEW: dict[int, dict] = {}
 TYPE_FA = {"league": "🏅 لیگ", "cup": "🏆 جام", "champions": "🌐 تورنمنت"}
 STAGES = (("thirdplace", "رده‌بندی"), ("3rdplace", "رده‌بندی"), ("semifinal", "نیمه‌نهایی"), ("quarterfinal", "یک‌چهارم نهایی"),
           ("roundof16", "یک‌هشتم نهایی"), ("roundof32", "یک‌شانزدهم نهایی"), ("final", "فینال"))
@@ -146,15 +146,42 @@ def xi_data(comp: dict, xi: list[dict], stage: str | None) -> dict:
 
 
 # ------------------------------------------------------------------ screens
-async def _render(type_: str, data: dict) -> list[bytes]:
-    return await gfx._render(type_, {**core.APP_LOOK, **data})
+async def _render_jobs(jobs: list[tuple[str, dict]], theme: str | None = None) -> list[bytes]:
+    out: list[bytes] = []
+    for type_, data in jobs:
+        out += await gfx._render(type_, {**core.APP_LOOK, **data}, theme)
+    return out
 
 
-async def _send_preview(target: Message, uid: int, images: list[bytes], caption: str):
-    PREVIEW[uid] = (images, caption)
-    for i, img in enumerate(images):
+async def _send_preview(target: Message, uid: int, jobs: list[tuple[str, dict]], caption: str, theme: str | None = None):
+    """jobs = [(template type, data)]: kept so the same data can be redrawn in another theme without asking for anything again."""
+    imgs = await _render_jobs(jobs, theme)
+    PREVIEW[uid] = {"images": imgs, "caption": caption, "jobs": jobs}
+    for i, img in enumerate(imgs):
         await target.answer_photo(BufferedInputFile(img, f"app_{i}.png"), caption=caption if i == 0 else None)
-    await target.answer("پیش‌نمایش بالاست. منتشر شود؟", reply_markup=okb([[ob("📣 انتشار", "fx:agp")], [ob("🔙 بازگشت به مسابقه", "fx:agm")]]))
+    await target.answer("پیش‌نمایش بالاست. منتشر شود؟", reply_markup=okb([[ob("📣 انتشار", "fx:agp")], [ob("🎭 تغییر تم همین تصویر", "fx:agth")],
+                                                                          [ob("🔙 بازگشت به مسابقه", "fx:agm")]]))
+
+
+@router.callback_query(F.data == "fx:agth")
+async def theme_menu(c: CallbackQuery):
+    if c.from_user.id not in PREVIEW:
+        return await c.answer("پیش‌نمایشی نیست؛ دوباره بساز.", show_alert=True)
+    from ..onc import themes as th
+    btns = [ob(f"{i + 1}. {th.NAMES[t]}", f"fx:agtn:{i}") for i, t in enumerate(th.ORDER)]
+    await c.message.answer("🎭 <b>تم جدید</b> را انتخاب کن (اطلاعات همان می‌ماند):", reply_markup=okb([btns[i:i + 2] for i in range(0, len(btns), 2)] + [[ob("❌ بستن", "fx:agm")]]))
+    await c.answer()
+
+
+@router.callback_query(F.data.regexp(r"^fx:agtn:\d+$"))
+async def theme_apply(c: CallbackQuery):
+    from ..onc import themes as th
+    pv = PREVIEW.get(c.from_user.id)
+    i = int(c.data.split(":")[2])
+    if not pv or i >= len(th.ORDER):
+        return await c.answer("پیش‌نمایشی نیست؛ دوباره بساز.", show_alert=True)
+    await c.answer("⏳ در حال ساخت…")
+    await _send_preview(c.message, c.from_user.id, pv["jobs"], pv["caption"], th.ORDER[i])
 
 
 async def _comp(state: FSMContext) -> dict | None:
@@ -252,7 +279,7 @@ async def table(c: CallbackQuery, state: FSMContext):
         pages = table_data(comp, await appapi.standings(comp))
         if not pages:
             return "جدولی برای این مسابقه ثبت نشده."
-        return [i for p in pages for i in await _render("GROUP_TABLE", p)], f"📊 <b>{E(comp['name'])}</b>"
+        return [("GROUP_TABLE", p) for p in pages], f"📊 <b>{E(comp['name'])}</b>"
     await _build(c, state, fn)
 
 
@@ -263,7 +290,7 @@ async def bracket(c: CallbackQuery, state: FSMContext):
         d = bracket_data(await appapi.bracket(comp))
         if not d["stages"]:
             return "براکتی برای این مسابقه ثبت نشده."
-        return await _render("BRACKET", d), f"🏆 <b>{E(comp['name'])}</b>"
+        return [("BRACKET", d)], f"🏆 <b>{E(comp['name'])}</b>"
     await _build(c, state, fn)
 
 
@@ -290,7 +317,7 @@ async def player_stats(c: CallbackQuery, state: FSMContext):
         done = [m for m in await appapi.all_matches(comp) if m.get("status") == "finished"]
         upto = rounds_of(done)[-1] if done else None
         sub = comp["name"] + (f" · تا {stage_name(upto)}" if upto else "")
-        return await _render("PLAYER_STATS", {"subtitle": sub, "cards": cards}), f"📈 <b>آمار بازیکنان — {E(comp['name'])}</b>" + (f"\nتا {stage_name(upto)}" if upto else "")
+        return [("PLAYER_STATS", {"subtitle": sub, "cards": cards})], f"📈 <b>آمار بازیکنان — {E(comp['name'])}</b>" + (f"\nتا {stage_name(upto)}" if upto else "")
     await _build(c, state, fn)
 
 
@@ -322,7 +349,11 @@ async def round_menu(c: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "fx:agxi")
 async def xi_menu(c: CallbackQuery, state: FSMContext):
-    await _round_picker(c, state, "x")
+    from . import xi
+    comp = await _comp(state)
+    if not comp:
+        return await c.answer("اول مسابقه را انتخاب کن.", show_alert=True)
+    await xi.entry(c, state, comp)
 
 
 @router.callback_query(F.data.regexp(r"^fx:agp2:(s|r|x):(\d+|last|all)$"))
@@ -339,18 +370,18 @@ async def round_pick(c: CallbackQuery, state: FSMContext):
             xi = await appapi.best_xi(comp, raw)
             if not xi:
                 return "برای این بازه تیم منتخبی ثبت نشده."
-            return await _render("BEST_XI", xi_data(comp, xi, stage_name(raw) if raw else None)), f"⭐ <b>تیم منتخب — {E(comp['name'])}</b>" + (f"\n{stage_name(raw)}" if raw else "")
+            return [("BEST_XI", xi_data(comp, xi, stage_name(raw) if raw else None))], f"⭐ <b>تیم منتخب — {E(comp['name'])}</b>" + (f"\n{stage_name(raw)}" if raw else "")
         matches = await appapi.all_matches(comp)
         if mode == "r":
             sel = matches if raw is None else [m for m in matches if str(m.get("round")) == raw]
             data = results_data(comp["name"] + (f" · {stage_name(raw)}" if raw else ""), sel)
             if not data["rows"]:
                 return "نتیجه‌ای ثبت نشده."
-            return await _render("ROUND_RESULTS", data), f"✅ <b>نتایج — {E(comp['name'])}</b>" + (f"\n{stage_name(raw)}" if raw else "")
+            return [("ROUND_RESULTS", data)], f"✅ <b>نتایج — {E(comp['name'])}</b>" + (f"\n{stage_name(raw)}" if raw else "")
         sel = [m for m in matches if str(m.get("round")) == raw]
         if not sel:
             return "بازی‌ای در این مرحله نیست."
-        return await _render("SCHEDULE", schedule_data(sel, comp["name"], title=f"برنامه {stage_name(raw)}")), f"🗓 <b>برنامه {stage_name(raw)} — {E(comp['name'])}</b>"
+        return [("SCHEDULE", schedule_data(sel, comp["name"], title=f"برنامه {stage_name(raw)}"))], f"🗓 <b>برنامه {stage_name(raw)} — {E(comp['name'])}</b>"
     await _build(c, state, fn)
 
 
@@ -364,8 +395,8 @@ async def _day_graphic(c_or_m, uid: int, state: FSMContext, day: date, target: M
         return await target.answer(f"⚠️ {ex}")
     if not ms:
         return await target.answer(f"برای {day.isoformat()} در «{E(comp['name'])}» بازی‌ای ثبت نشده.", reply_markup=okb([[ob("📅 روز دیگر", "fx:agd")], [ob("🔙 بازگشت به مسابقه", "fx:agm")]]))
-    imgs = await _render("SCHEDULE", schedule_data(ms, f"{comp['name']} · {day.strftime('%Y/%m/%d')}", label_with="round"))
-    await _send_preview(target, uid, imgs, f"📅 <b>برنامه بازی‌ها — {E(comp['name'])}</b>\n{day.strftime('%Y/%m/%d')}")
+    jobs = [("SCHEDULE", schedule_data(ms, f"{comp['name']} · {day.strftime('%Y/%m/%d')}", label_with="round"))]
+    await _send_preview(target, uid, jobs, f"📅 <b>برنامه بازی‌ها — {E(comp['name'])}</b>\n{day.strftime('%Y/%m/%d')}")
 
 
 @router.callback_query(F.data == "fx:agd")
@@ -424,8 +455,8 @@ async def publish(c: CallbackQuery, bot: Bot):
         return await c.answer("پیش‌نمایشی نیست؛ دوباره بساز.", show_alert=True)
     outgoing.EXEMPT_CHATS.discard(str(chat))                      # Premium emoji stay Premium in the channel
     try:
-        for i, img in enumerate(pv[0]):
-            await bot.send_photo(chat, BufferedInputFile(img, f"app_{i}.png"), caption=pv[1] if i == 0 else None)
+        for i, img in enumerate(pv["images"]):
+            await bot.send_photo(chat, BufferedInputFile(img, f"app_{i}.png"), caption=pv["caption"] if i == 0 else None)
     except TelegramAPIError as ex:
         return await c.answer(f"انتشار ناموفق: {str(ex)[:120]}", show_alert=True)
     PREVIEW.pop(c.from_user.id, None)

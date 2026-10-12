@@ -3,13 +3,27 @@ import io
 
 from aiogram import Bot
 
-from . import algo, render, service, templates
+from . import algo, dbx, render, service, templates
 from .ui import en_group as ui_en_group
 
 
-async def _render(type_: str, data: dict) -> list[bytes]:
+async def resolve_theme(type_: str, explicit: str | None = None) -> str | None:
+    """Theme for this graphic: the one asked for now > the default of this section > the default for the whole bot > none (template as is)."""
+    if explicit in templates.THEMES:
+        return explicit
+    for key in (f"theme_{type_}", "theme_default"):
+        v = await dbx.scalar("SELECT value FROM fx_settings WHERE key=?", key)
+        if v in templates.THEMES:
+            return v
+    return None
+
+
+async def _render(type_: str, data: dict, theme: str | None = None) -> list[bytes]:
     tpl = await templates.active_template(type_)
     cfg = tpl["config"] if tpl else templates.default_config(type_)
+    tid = await resolve_theme(type_, theme)
+    if tid:
+        cfg = templates.apply_theme(cfg, tid, type_)
     return render.render(type_, cfg, data, tpl["bg_path"] if tpl else None)
 
 
@@ -33,9 +47,15 @@ async def schedule(tid: int) -> list[bytes]:
 
 async def group_table(tid: int, gid: int) -> list[bytes]:
     tbl = next(t for t in await service.group_tables(tid) if t["group"]["id"] == gid)
+    q = tbl["group"]["qualifiers"]
+    if tbl["complete"]:                                    # final table: qualified (in) / eliminated (out) — an unresolved tie at the line stays open
+        st = tbl["status"]
+        status = {r["team"]: ("in" if r["team"] in st["qualified"] else "out") for r in tbl["rows"]} if st["state"] == "FINAL" and q else {}
+    else:                                                  # matches left: only what is mathematically certain
+        status = algo.clinch(tbl["rows"], await service.group_remaining(gid), q)
     rows = [{"pos": r["pos"], "team": r["name"], "P": r["P"], "W": r["W"], "D": r["D"], "L": r["L"], "GF": r["GF"], "GA": r["GA"],
              "GD": f"{r['GD']:+d}" if r["GD"] else "0", "PTS": r["Pts"],
-             "qualified": bool(tbl["group"]["qualifiers"]) and r["pos"] <= tbl["group"]["qualifiers"]} for r in tbl["rows"]]
+             "status": status.get(r["team"])} for r in tbl["rows"]]
     return await _render("GROUP_TABLE", {"title": f"{ui_en_group(tbl['group']['name'])} — STANDINGS", "subtitle": (await service.get_tournament(tid))["name"], "rows": rows})
 
 
