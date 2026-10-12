@@ -116,7 +116,7 @@ svg.i.f { fill: currentColor; stroke: none; }
 .card .pips { display: flex; justify-content: center; gap: 2px; padding: 2px 0; background: rgba(0,0,0,.55); }
 .pip { width: clamp(5px, 8cqw, 9px); height: clamp(5px, 8cqw, 9px); background: rgba(255,255,255,.25); clip-path: polygon(50% 0, 62% 36%, 100% 38%, 70% 60%, 80% 100%, 50% 76%, 20% 100%, 30% 60%, 0 38%, 38% 36%); }
 .pip.on { background: var(--gold); }
-.card[data-r="epic"] .in::after, .card[data-tier="gold"] .in::after { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,.28) 50%, transparent 65%); transform: translateX(-120%); animation: sheen 3.6s ease-in-out infinite; pointer-events: none; }
+.card[data-tier="gold"] .in::after { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,.28) 50%, transparent 65%); transform: translateX(-120%); animation: sheen 3.6s ease-in-out infinite; pointer-events: none; }
 @keyframes sheen { 60%, 100% { transform: translateX(120%); } }
 button.card { cursor: pointer; padding: 4px; }
 button.card:not(:disabled):active { transform: scale(.96); }

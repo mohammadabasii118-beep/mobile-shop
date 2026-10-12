@@ -14,6 +14,8 @@ export const sortByPower = <T extends { def: CardDef; level: number }>(a: T[], c
   });
 
 /** قاب کارت با لول عوض می‌شود: برنزی (۱–۲)، نقره‌ای (۳–۴)، زرین (۵ به بعد) */
+/** قاب کارت فقط به نوع کارت بستگی دارد: ساده برنزی، معمولی نقره‌ای، کمیاب طلایی (لول فقط ستاره‌ها را زیاد می‌کند) */
+export const frameOf = (r: string) => (r === 'epic' ? 'gold' : r === 'rare' ? 'silver' : 'bronze');
 export const tierOf = (level: number) => (level >= 5 ? 'gold' : level >= 3 ? 'silver' : 'bronze');
 
 export function Icon({ n }: { n: 'heart' | 'sword' | 'shield' | 'coin' | 'spark' }) {
@@ -73,8 +75,8 @@ export function CardTile(p: TileProps) {
   return (
     <div className="cardwrap">
       {p.onClick || p.disabled !== undefined
-        ? <button className={cls} data-r={p.def.rarity} data-tier={tierOf(p.level)} onClick={p.onClick} disabled={!p.onClick || p.disabled}>{body}</button>
-        : <div className={cls} data-r={p.def.rarity} data-tier={tierOf(p.level)}>{body}</div>}
+        ? <button className={cls} data-r={p.def.rarity} data-tier={frameOf(p.def.rarity)} onClick={p.onClick} disabled={!p.onClick || p.disabled}>{body}</button>
+        : <div className={cls} data-r={p.def.rarity} data-tier={frameOf(p.def.rarity)}>{body}</div>}
       {p.badge}
     </div>
   );
