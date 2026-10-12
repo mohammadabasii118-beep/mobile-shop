@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS ads(
     photo TEXT, status TEXT, special INTEGER DEFAULT 0, created_at INTEGER,
     expires_at INTEGER, msg_id INTEGER, chat_id TEXT, fingerprint TEXT,
     counted INTEGER DEFAULT 0, reject_reason TEXT);
+CREATE TABLE IF NOT EXISTS ad_posts(          -- one row per destination chat the ad was posted to (several channels / groups are allowed)
+    ad_id INTEGER NOT NULL, chat_id TEXT NOT NULL, msg_id INTEGER NOT NULL, PRIMARY KEY(ad_id, chat_id));
 CREATE TABLE IF NOT EXISTS transactions(
     id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, amount INTEGER, type TEXT,
     note TEXT, status TEXT DEFAULT 'done', authority TEXT, ref_id TEXT, created_at INTEGER);
@@ -63,6 +65,11 @@ CREATE INDEX IF NOT EXISTS ads_status ON ads(status);
 """
 
 _db: aiosqlite.Connection | None = None
+
+
+def parse_chats(value: str | None) -> list[str]:
+    """The publish setting is a comma separated list of chat ids / @usernames."""
+    return [x.strip() for x in (value or "").split(",") if x.strip()]
 
 
 def now() -> int:

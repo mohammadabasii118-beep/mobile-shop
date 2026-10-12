@@ -363,12 +363,12 @@ async def channel_set_do(m: Message, state: FSMContext, bot: Bot):
         raw = m.text.strip()
     if not raw or not re.fullmatch(r"@[A-Za-z0-9_]{4,}|-?\d{5,}", raw):
         return await m.answer("⚠️ @username، آیدی عددی مثل -1001234567890 یا یک پست فورواردشده از کانال بفرست.")
-    transfer = (await service.main_db.get_setting("publish_chat")).strip()
+    transfer_all = service.main_db.parse_chats(await service.main_db.get_setting("publish_chat"))
     try:
         chat = await bot.get_chat(raw)
     except TelegramAPIError as e:
         return await m.answer(f"⚠️ تلگرام این چت را باز نکرد: {E(str(e))}")
-    if transfer and (str(chat.id) == transfer or (chat.username and f"@{chat.username}".lower() == transfer.lower())):
+    if any(str(chat.id) == t or (chat.username and f"@{chat.username}".lower() == t.lower()) for t in transfer_all):
         return await m.answer("⛔ این همان گروه آگهی‌های ترنسفر است. کانال وان نایت چمپیون باید چت دیگری باشد.")
     await service.set_setting("channel_id", str(chat.id))
     await service.audit(m.from_user.id, "SET CHANNEL", f"{chat.title} ({chat.id})")

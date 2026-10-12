@@ -110,6 +110,7 @@ REGISTRY: list[tuple[str, str]] = [
     ('🚫 بلک\u200cلیست', 'user'),
     ('📝 درفت', 'user'),
     ('🎥 پنل Streamer', 'user'),
+    ('➕ افزودن گروه/کانال', 'admin'),
     ('⚙️ پنل ویژگی\u200cهای جدید', 'admin'),
 ]
 

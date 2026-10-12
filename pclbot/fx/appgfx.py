@@ -205,11 +205,11 @@ async def pick_competition(c: CallbackQuery, state: FSMContext, bot: Bot):
 
 
 @router.callback_query(F.data == "fx:agdst")
-async def dest(c: CallbackQuery, state: FSMContext):
+async def dest(c: CallbackQuery, state: FSMContext, bot: Bot):
+    from .hwg import dest_screen
     comps = (await state.get_data()).get("comps")
-    await state.set_state(DestSt.pick)
-    await state.update_data(key="gfx_chat", back="fx:ag", comps=comps)
-    await show(c, "📍 کانال انتشار گرافیک‌ها: یک پست فوروارد کن یا @username / آیدی عددی بفرست.", okb([[ob("❌ لغو", "fx:ag")]]))
+    await dest_screen(c.message, state, bot, "gfx_chat", c)
+    await state.update_data(comps=comps)
     await c.answer()
 
 
@@ -447,18 +447,23 @@ async def day_typed(m: Message, state: FSMContext):
 # ---- publish
 @router.callback_query(F.data == "fx:agp")
 async def publish(c: CallbackQuery, bot: Bot):
-    chat = await core.get("gfx_chat")
-    if not chat:
-        return await c.answer("اول کانال انتشار را تعیین کن (📍 در فهرست مسابقه‌ها).", show_alert=True)
+    chats = await core.dests("gfx_chat")
+    if not chats:
+        return await c.answer("اول مقصد انتشار را تعیین کن (📍 در فهرست مسابقه‌ها).", show_alert=True)
     pv = PREVIEW.get(c.from_user.id)
     if not pv:
         return await c.answer("پیش‌نمایشی نیست؛ دوباره بساز.", show_alert=True)
-    outgoing.EXEMPT_CHATS.discard(str(chat))                      # Premium emoji stay Premium in the channel
-    try:
-        for i, img in enumerate(pv["images"]):
-            await bot.send_photo(chat, BufferedInputFile(img, f"app_{i}.png"), caption=pv["caption"] if i == 0 else None)
-    except TelegramAPIError as ex:
-        return await c.answer(f"انتشار ناموفق: {str(ex)[:120]}", show_alert=True)
+    sent, failed = 0, []
+    for chat in chats:
+        outgoing.EXEMPT_CHATS.discard(str(chat))                  # Premium emoji stay Premium in the channel
+        try:
+            for i, img in enumerate(pv["images"]):
+                await bot.send_photo(chat, BufferedInputFile(img, f"app_{i}.png"), caption=pv["caption"] if i == 0 else None)
+            sent += 1
+        except TelegramAPIError as ex:
+            failed.append(f"{chat}: {str(ex)[:60]}")
+    if not sent:
+        return await c.answer(f"انتشار ناموفق: {failed[0]}"[:190], show_alert=True)
     PREVIEW.pop(c.from_user.id, None)
     await c.answer("✅ منتشر شد")
-    await c.message.answer("✅ منتشر شد.", reply_markup=okb([[ob("🔙 بازگشت به مسابقه", "fx:agm")]]))
+    await c.message.answer(f"✅ در {sent} مقصد منتشر شد." + (f"\n⚠️ ناموفق: {E(chr(10).join(failed))}" if failed else ""), reply_markup=okb([[ob("🔙 بازگشت به مسابقه", "fx:agm")]]))

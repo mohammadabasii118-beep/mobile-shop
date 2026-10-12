@@ -79,10 +79,38 @@ async def resolve_chat(bot: Bot, m: Message):
     return str(chat.id), chat.title or chat.username or str(chat.id)
 
 
+def split_chats(v: str | None) -> list[str]:
+    return [x.strip() for x in (v or "").split(",") if x.strip()]
+
+
+async def dests(key: str) -> list[str]:
+    """Every chat a section publishes to (several channels / groups can be set; a post goes to all of them)."""
+    return split_chats(await get(key))
+
+
+async def add_dest(key: str, cid: str) -> None:
+    cur = await dests(key)
+    if str(cid) not in cur:
+        await put(key, ",".join(cur + [str(cid)]))
+
+
+async def del_dest(key: str, idx: int | None = None) -> None:
+    cur = await dests(key)
+    if idx is None:
+        cur = []
+    elif 0 <= idx < len(cur):
+        cur.pop(idx)
+    await put(key, ",".join(cur))
+
+
 async def dest_status(bot: Bot, key: str) -> str:
-    cid = await get(key)
-    if not cid:
+    chats = await dests(key)
+    if not chats:
         return "⚪ تنظیم نشده"
+    return "\n".join([await _one_status(bot, c) for c in chats])
+
+
+async def _one_status(bot: Bot, cid: str) -> str:
     try:
         chat = await bot.get_chat(cid)
         me = await bot.get_me()

@@ -308,14 +308,41 @@ async def setting_set(m: Message, state: FSMContext):
     await m.answer("✅ ذخیره شد.", reply_markup=kb([back("adm:set")]))
 
 
-# ---- publish chat ------------------------------------------------------
+# ---- publish chats (several channels / groups) -------------------------
+async def _pub_screen(c_or_m, state: FSMContext, note: str = ""):
+    await state.clear()
+    chats = db.parse_chats(await db.get_setting("publish_chat"))
+    lines = "\n".join(f"{i + 1}. <code>{ch}</code>" for i, ch in enumerate(chats)) or "تنظیم نشده"
+    rows = [[btn(f"➖ حذف {i + 1}", f"adm:pubd:{i}")] for i in range(len(chats))] + [[btn("➕ افزودن گروه/کانال", "adm:pubn")], back(PANEL)]
+    text = (f"{note}📡 <b>گروه‌ها / کانال‌های انتشار</b>\n\n{lines}\n\nآگهی‌ها به <b>همه‌ی</b> این‌ها فرستاده می‌شود. ربات باید در هر کدام ادمین باشد "
+            "(با دسترسی ارسال و حذف پیام).")
+    if isinstance(c_or_m, CallbackQuery):
+        await show(c_or_m, text, kb(rows))
+        await c_or_m.answer()
+    else:
+        await c_or_m.answer(text, reply_markup=kb(rows))
+
+
 @router.callback_query(F.data == "adm:pub")
 async def pub_menu(c: CallbackQuery, state: FSMContext):
+    await _pub_screen(c, state)
+
+
+@router.callback_query(F.data == "adm:pubn")
+async def pub_add(c: CallbackQuery, state: FSMContext):
     await state.set_state(AdminSt.publish)
-    cur = await db.get_setting("publish_chat") or "تنظیم نشده"
-    await show(c, f"📡 <b>گروه/کانال انتشار</b>\nفعلی: <code>{cur}</code>\n\nربات رو در گروه یا کانال ادمین کن (با دسترسی ارسال و حذف پیام) "
-                  "و آیدی عددی (مثل <code>-100123…</code>) یا @یوزرنیم رو بفرست:", kb([back(PANEL)]))
+    await show(c, "➕ آیدی عددی (مثل <code>-100123…</code>) یا @یوزرنیم گروه/کانال را بفرست:", kb([back("adm:pub")]))
     await c.answer()
+
+
+@router.callback_query(F.data.startswith("adm:pubd:"))
+async def pub_del(c: CallbackQuery, state: FSMContext):
+    chats = db.parse_chats(await db.get_setting("publish_chat"))
+    i = int(c.data.split(":")[2])
+    if i < len(chats):
+        chats.pop(i)
+        await db.set_setting("publish_chat", ",".join(chats))
+    await _pub_screen(c, state)
 
 
 @router.message(AdminSt.publish, F.text)
@@ -327,9 +354,11 @@ async def pub_set(m: Message, state: FSMContext, bot: Bot):
         await bot.delete_message(chat.id, test.message_id)
     except TelegramAPIError as ex:
         return await m.answer(f"⚠️ دسترسی ندارم یا آیدی اشتباهه: {ex}")
-    await db.set_setting("publish_chat", str(chat.id))
-    await state.clear()
-    await m.answer(f"✅ آگهی‌ها در «{chat.title}» منتشر می‌شن.", reply_markup=kb([back(PANEL)]))
+    chats = db.parse_chats(await db.get_setting("publish_chat"))
+    if str(chat.id) not in chats:
+        chats.append(str(chat.id))
+    await db.set_setting("publish_chat", ",".join(chats))
+    await _pub_screen(m, state, f"✅ «{chat.title}» اضافه شد.\n\n")
 
 
 # ---- gift codes --------------------------------------------------------

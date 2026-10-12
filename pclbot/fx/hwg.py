@@ -48,16 +48,24 @@ async def card(t: dict) -> bytes:
     return render.render("TRANSFER", cfg, data_of(t), tpl["bg_path"] if tpl else None)[0]
 
 
-async def post(bot: Bot, t: dict, chat: str) -> None:
-    outgoing.EXEMPT_CHATS.discard(str(chat))                      # Premium emoji stay Premium in the channel
-    await bot.send_photo(chat, BufferedInputFile(await card(t), "here_we_go.png"), caption=caption(t))
+async def post(bot: Bot, t: dict, chats: list[str]) -> int:
+    """Posts to every configured channel / group; returns how many accepted it."""
+    png, ok = await card(t), 0
+    for chat in chats:
+        outgoing.EXEMPT_CHATS.discard(str(chat))                  # Premium emoji stay Premium in the channel
+        try:
+            await bot.send_photo(chat, BufferedInputFile(png, "here_we_go.png"), caption=caption(t))
+            ok += 1
+        except TelegramAPIError as ex:
+            log.warning("HWG post to %s failed: %s", chat, ex)
+    return ok
 
 
 async def poll_once(bot: Bot) -> int:
     """One polling round; returns how many transfers were posted."""
     if await core.get("hwg_on") != "1":
         return 0
-    chat = await core.get("hwg_chat")
+    chats = await core.dests("hwg_chat")
     items = await appapi.transfers(20)
     first = await core.get("hwg_seeded") != "1"
     seen = {r["id"] for r in await dbx.fetchall("SELECT id FROM fx_hwg_seen")}
@@ -69,12 +77,8 @@ async def poll_once(bot: Bot) -> int:
         return 0
     n = 0
     for t in reversed(new):                       # oldest first
-        if chat:
-            try:
-                await post(bot, t, chat)
-            except TelegramAPIError as ex:
-                log.warning("HWG post failed: %s", ex)
-                break                              # keep it unseen → retried next round
+        if chats and not await post(bot, t, chats):
+            break                                  # no destination accepted it → keep it unseen, retried next round
         await dbx.execute("INSERT OR IGNORE INTO fx_hwg_seen(id,posted_at) VALUES(?,?)", t["id"], core.now())
         n += 1
     return n
@@ -112,20 +116,44 @@ async def home(c: CallbackQuery, state: FSMContext, bot: Bot):
 @router.callback_query(F.data == "fx:hw:t")
 async def toggle(c: CallbackQuery, bot: Bot):
     on = await core.get("hwg_on") == "1"
-    if not on and not await core.get("hwg_chat"):
+    if not on and not await core.dests("hwg_chat"):
         return await c.answer("اول کانال انتشار را تعیین کن.", show_alert=True)
     await core.put("hwg_on", "0" if on else "1")
     await _panel(c, bot)
     await c.answer("ذخیره شد")
 
 
-@router.callback_query(F.data == "fx:hw:d")
-async def dest(c: CallbackQuery, state: FSMContext):
+DEST_TITLE = {"hwg_chat": ("⚡ مقصدهای Here We Go", "fx:hw"), "gfx_chat": ("🎨 مقصدهای گرافیک‌های اپ", "fx:ag"), "plus_chat": ("🎥 مقصدهای پست Streamerها («پلاس»)", "fx:a")}
+
+
+async def dest_screen(target, state: FSMContext, bot: Bot, key: str, edit_from: CallbackQuery | None = None) -> None:
+    title, back = DEST_TITLE[key]
+    chats = await core.dests(key)
     await state.set_state(DestSt.pick)
-    await state.update_data(key="hwg_chat", back="fx:hw")
-    await show(c, "📍 کانال انتشار را تعیین کن: یک پست از آن کانال <b>فوروارد</b> کن یا @username / آیدی عددی بفرست.\n"
-                  "ربات باید ادمین کانال با دسترسی ارسال پیام باشد.", okb([[ob("❌ لغو", "fx:hw")]]))
+    await state.update_data(key=key, back=back)
+    rows = [[ob(f"➖ حذف {i + 1}", f"fx:dd:{key[0]}:{i}")] for i in range(len(chats))]
+    text = (f"<b>{title}</b>\n\n{await core.dest_status(bot, key)}\n\nبرای <b>افزودن</b> مقصد جدید یک پست از آن کانال/گروه فوروارد کن یا @username / آیدی عددی بفرست. "
+            "می‌توانی چند مقصد بگذاری؛ هر پست به همه‌ی آن‌ها می‌رود. (ربات باید در هر کدام ادمین با اجازه‌ی ارسال باشد.)")
+    kb = okb(rows + [[ob("🔙 بازگشت", back)]])
+    if edit_from is not None:
+        await show(edit_from, text, kb)
+    else:
+        await target.answer(text, reply_markup=kb)
+
+
+@router.callback_query(F.data == "fx:hw:d")
+async def dest(c: CallbackQuery, state: FSMContext, bot: Bot):
+    await dest_screen(c.message, state, bot, "hwg_chat", c)
     await c.answer()
+
+
+@router.callback_query(F.data.regexp(r"^fx:dd:[hgp]:\d+$"))
+async def dest_remove(c: CallbackQuery, state: FSMContext, bot: Bot):
+    _, _, k, i = c.data.split(":")
+    key = {"h": "hwg_chat", "g": "gfx_chat", "p": "plus_chat"}[k]
+    await core.del_dest(key, int(i))
+    await c.answer("حذف شد")
+    await dest_screen(c.message, state, bot, key, c)
 
 
 @router.callback_query(F.data == "fx:hw:p")
@@ -140,7 +168,7 @@ async def preview(c: CallbackQuery):
     await c.answer()
 
 
-# one handler for every "pick a destination chat" flow (plus_chat / hwg_chat / gfx_chat)
+# one handler for every "pick a destination chat" flow (plus_chat / hwg_chat / gfx_chat add to a list; emoji_relay is a single chat)
 @router.message(DestSt.pick)
 async def dest_got(m: Message, state: FSMContext, bot: Bot):
     d = await state.get_data()
@@ -148,8 +176,13 @@ async def dest_got(m: Message, state: FSMContext, bot: Bot):
         cid, title = await core.resolve_chat(bot, m)
     except ValueError as ex:
         return await m.answer(f"⚠️ {ex}")
-    await core.put(d["key"], cid)
-    if d["key"] == "emoji_relay":
+    key = d["key"]
+    if key in DEST_TITLE:
+        await core.add_dest(key, cid)
+        await m.answer(f"✅ «{E(title)}» به مقصدها اضافه شد.")
+        return await dest_screen(m, state, bot, key)
+    await core.put(key, cid)
+    if key == "emoji_relay":
         from .. import outgoing
         outgoing.RELAY_CHAT = cid
     await state.clear()

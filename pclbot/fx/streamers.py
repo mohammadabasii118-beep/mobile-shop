@@ -70,7 +70,7 @@ async def panel(c: CallbackQuery, state: FSMContext):
 async def start(c: CallbackQuery, state: FSMContext):
     if not await is_streamer(c.from_user.id):
         return await c.answer("⛔ تو Streamer نیستی.", show_alert=True)
-    if not await core.get("plus_chat"):
+    if not await core.dests("plus_chat"):
         return await c.answer("مقصد انتشار هنوز توسط ادمین تنظیم نشده.", show_alert=True)
     await state.clear()
     await state.set_state(StreamSt.photo)
@@ -136,18 +136,24 @@ async def publish(c: CallbackQuery, state: FSMContext, bot: Bot):
         await state.clear()
         return await c.answer("⛔ تو Streamer نیستی.", show_alert=True)
     d = await state.get_data()
-    chat = await core.get("plus_chat")
-    if not chat:
+    chats = await core.dests("plus_chat")
+    if not chats:
         return await c.answer("مقصد انتشار تنظیم نشده.", show_alert=True)
     from .. import outgoing
-    outgoing.EXEMPT_CHATS.discard(str(chat))                               # Premium emoji stay Premium here, even if the same chat was exempt before
-    try:
-        msg = await bot.send_photo(chat, d["photo"], caption=caption(d["title"], await streamer_name(c.from_user.id, c.from_user.full_name)),
-                                   reply_markup=okb(link_buttons(d["links"])))
-    except TelegramAPIError as ex:
-        return await c.answer(f"انتشار ناموفق بود: {str(ex)[:120]}", show_alert=True)
+    cap = caption(d["title"], await streamer_name(c.from_user.id, c.from_user.full_name))
+    markup = okb(link_buttons(d["links"]))
+    first, failed = None, []
+    for chat in chats:
+        outgoing.EXEMPT_CHATS.discard(str(chat))                           # Premium emoji stay Premium here, even if the same chat was exempt before
+        try:
+            msg = await bot.send_photo(chat, d["photo"], caption=cap, reply_markup=markup)
+            first = first or (chat, msg.message_id)
+        except TelegramAPIError as ex:
+            failed.append(f"{chat}: {str(ex)[:60]}")
+    if not first:
+        return await c.answer(f"انتشار ناموفق بود: {failed[0]}"[:190], show_alert=True)
     await dbx.execute("INSERT INTO fx_stream_posts(user_id,title,chat_id,message_id,created_at) VALUES(?,?,?,?,?)",
-                      c.from_user.id, d["title"], str(chat), msg.message_id, core.now())
+                      c.from_user.id, d["title"], str(first[0]), first[1], core.now())
     await state.clear()
     await c.answer("✅ منتشر شد")
     await c.message.answer("✅ پست استریم منتشر شد.", reply_markup=okb([[ob("▶️ پست دیگر", "fx:sts")], [ob("🔙 منوی اصلی", "home")]]))

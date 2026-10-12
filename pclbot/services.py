@@ -54,11 +54,15 @@ async def notify_admins(bot: Bot, text: str, **kw) -> None:
 
 
 async def unpublish(bot: Bot, ad: dict) -> None:
-    if ad.get("msg_id") and ad.get("chat_id"):
+    posts = {(r["chat_id"], r["msg_id"]) for r in await db.fetchall("SELECT chat_id, msg_id FROM ad_posts WHERE ad_id=?", ad["id"])}
+    if ad.get("msg_id") and ad.get("chat_id"):                                  # posts made before several destinations existed
+        posts.add((str(ad["chat_id"]), ad["msg_id"]))
+    for chat, mid in posts:
         try:
-            await bot.delete_message(ad["chat_id"], ad["msg_id"])
+            await bot.delete_message(chat, mid)
         except TelegramAPIError:
             pass
+    await db.execute("DELETE FROM ad_posts WHERE ad_id=?", ad["id"])
     await db.execute("UPDATE ads SET msg_id=NULL, chat_id=NULL WHERE id=?", ad["id"])
 
 
@@ -79,22 +83,28 @@ async def ad_markup(bot: Bot) -> InlineKeyboardMarkup | None:
 
 async def publish(bot: Bot, ad: dict) -> bool:
     """Post the ad to the transfers group/channel. Replaces an earlier post."""
-    chat = await db.get_setting("publish_chat")
-    if not chat:
+    chats = db.parse_chats(await db.get_setting("publish_chat"))
+    if not chats:
         return False
     await unpublish(bot, ad)
     user = await db.get_user(ad["user_id"])
     text = render_ad(ad, user)
-    try:
-        markup = await ad_markup(bot)
-        if ad["photo"]:
-            msg = await bot.send_photo(chat, ad["photo"], caption=text, reply_markup=markup)
-        else:
-            msg = await bot.send_message(chat, text, reply_markup=markup)
-    except TelegramAPIError as ex:
-        log.error("publish failed: %s", ex)
+    markup = await ad_markup(bot)
+    first = None
+    for chat in chats:                                       # every channel / group that was introduced gets the post
+        try:
+            if ad["photo"]:
+                msg = await bot.send_photo(chat, ad["photo"], caption=text, reply_markup=markup)
+            else:
+                msg = await bot.send_message(chat, text, reply_markup=markup)
+        except TelegramAPIError as ex:
+            log.error("publish to %s failed: %s", chat, ex)
+            continue
+        await db.execute("INSERT OR REPLACE INTO ad_posts(ad_id,chat_id,msg_id) VALUES(?,?,?)", ad["id"], str(chat), msg.message_id)
+        first = first or (msg.message_id, str(chat))
+    if not first:
         return False
-    await db.execute("UPDATE ads SET msg_id=?, chat_id=? WHERE id=?", msg.message_id, str(chat), ad["id"])
+    await db.execute("UPDATE ads SET msg_id=?, chat_id=? WHERE id=?", first[0], first[1], ad["id"])
     return True
 
 

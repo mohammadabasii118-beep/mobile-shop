@@ -57,10 +57,8 @@ async def load() -> None:
 
 @router.callback_query(F.data == "fx:ap")
 async def plus_dest(c: CallbackQuery, state: FSMContext, bot: Bot):
-    await state.set_state(DestSt.pick)
-    await state.update_data(key="plus_chat", back=PANEL)
-    await show(c, f"📍 <b>مقصد انتشار پست Streamerها («پلاس»)</b>\n\nفعلی: {await core.dest_status(bot, 'plus_chat')}\n\n"
-                  "یک پست از آن کانال/گروه فوروارد کن یا @username / آیدی عددی بفرست.", okb([[ob("❌ لغو", PANEL)]]))
+    from .hwg import dest_screen
+    await dest_screen(c.message, state, bot, "plus_chat", c)
     await c.answer()
 
 

@@ -350,6 +350,18 @@ async def run():
     await preview("fx:agbr", snap="App graphic — cup bracket")
     await d.press("fx:agm", A); await d.press("fx:agr:s", A)
     assert [t for t, _ in d.buttons(A)][:2] == ["یک‌چهارم نهایی", "نیمه‌نهایی"], d.buttons(A)
+    # several destinations: the same post goes to the channel AND to the second group; removal works
+    await d.press("fx:ag", A); await d.press("fx:agdst", A)
+    await d.say("-1007777", A)
+    assert await core.dests("gfx_chat") == [str(CHANNEL), "-1007777"], await core.dests("gfx_chat")
+    await d.press("fx:ag", A); await d.press("fx:agc:0", A)
+    await preview("fx:agtb")
+    before = len(d.session.log)
+    await d.press("fx:agp", A)
+    sent_to = {str(x[1]["chat_id"]) for x in d.session.log[before:] if x[0] == "SendPhoto"}
+    assert sent_to == {str(CHANNEL), "-1007777"}, sent_to
+    await d.press("fx:ag", A); await d.press("fx:agdst", A); await d.press("fx:dd:g:1", A)
+    assert await core.dests("gfx_chat") == [str(CHANNEL)]
     await d.press("fx:ag", V)                                                                          # a user can't open app graphics
     assert "گرافیک‌های اپ" not in d.text(V)
     assert not any(c[0] == "/matches/calendar" for c in calls)
