@@ -8,7 +8,7 @@ import logging
 from aiogram.client.default import Default
 from aiogram.client.session.middlewares.base import BaseRequestMiddleware
 from aiogram.exceptions import TelegramBadRequest
-from aiogram.methods import CopyMessage, DeleteMessage
+from aiogram.methods import CopyMessage, DeleteMessage, EditMessageReplyMarkup, ForwardMessage, GetChat
 from aiogram.types import InlineKeyboardMarkup, Message
 
 from . import buttons, emojis
@@ -17,35 +17,72 @@ log = logging.getLogger("pclbot")
 
 # chats that can't render custom (Premium) emoji — e.g. the ONC news channel; requests to them are never converted
 EXEMPT_CHATS: set[str] = set()
-# A group where Premium emoji work. When Telegram silently strips them from a channel post, the same post is made in this group
-# and copied (copyMessage keeps the custom_emoji entities) into the channel, then both temporary messages are removed.
+# A group where Premium emoji work. Telegram drops a bot's custom emoji from CHANNEL posts, so a channel post that carries Premium emoji
+# is made in this group first, copied into the channel with copyMessage (which keeps the custom_emoji entities), checked by reading the
+# copy back, and the temporary group message is removed. If anything fails the normal direct post is sent instead.
 RELAY_CHAT: str | None = None
+RELAY_MODE = "forward"          # forward: the post stays in the group and is forwarded to the channel · copy: clean post, the group copy is removed
+_KIND: dict[str, str] = {}
 
 
-def _lost_premium(sent, res) -> bool:
-    text = getattr(sent, "text", None) or getattr(sent, "caption", None) or ""
-    chat = str(getattr(sent, "chat_id", ""))
-    ents = (getattr(sent, "entities", None) or []) + (getattr(sent, "caption_entities", None) or [])
-    wants = "<tg-emoji" in text or any(e.type == "custom_emoji" for e in ents)                  # HTML tag or ready-made entities
-    if not (isinstance(res, Message) and wants and chat.startswith("-100") and chat != RELAY_CHAT):
+def _wants(method) -> bool:
+    text = getattr(method, "text", None) or getattr(method, "caption", None) or ""
+    ents = (getattr(method, "entities", None) or []) + (getattr(method, "caption_entities", None) or [])
+    return "<tg-emoji" in text or any(e.type == "custom_emoji" for e in ents)
+
+
+def _kept(msg) -> bool:
+    return any(e.type == "custom_emoji" for e in (getattr(msg, "entities", None) or []) + (getattr(msg, "caption_entities", None) or []))
+
+
+async def _is_channel(make_request, bot, chat) -> bool:
+    chat = str(chat)
+    if not chat.startswith("-100"):
         return False
-    return not any(e.type == "custom_emoji" for e in (res.entities or []) + (res.caption_entities or []))
+    if chat not in _KIND:
+        try:
+            _KIND[chat] = (await make_request(bot, GetChat(chat_id=chat))).type
+        except Exception:
+            return False
+    return _KIND[chat] == "channel"
 
 
-async def _relay(make_request, bot, sent, res):
-    """Returns the Message of the copy in the channel, or None (then the plain post simply stays)."""
-    staged = None
+async def _relay_first(make_request, bot, sent):
+    """The channel Message of the relayed post, or None (the caller then posts directly)."""
+    chan, staged, out = sent.chat_id, None, None
     try:
-        staged = await make_request(bot, sent.model_copy(update={"chat_id": RELAY_CHAT}))
-        copied = await make_request(bot, CopyMessage(chat_id=sent.chat_id, from_chat_id=RELAY_CHAT, message_id=staged.message_id,
-                                                     reply_markup=getattr(sent, "reply_markup", None)))
-        await make_request(bot, DeleteMessage(chat_id=sent.chat_id, message_id=res.message_id))        # the plain original
-        return res.model_copy(update={"message_id": copied.message_id})
+        staged = await make_request(bot, sent.model_copy(update={"chat_id": RELAY_CHAT}))              # made where Premium emoji survive
+        markup = getattr(sent, "reply_markup", None)
+        if RELAY_MODE == "forward":
+            fwd = await make_request(bot, ForwardMessage(chat_id=chan, from_chat_id=RELAY_CHAT, message_id=staged.message_id))
+            if not _kept(fwd):
+                log.warning("Premium emoji relay: forwarding did not keep the emoji in %s — sending the post directly", chan)
+                await make_request(bot, DeleteMessage(chat_id=chan, message_id=fwd.message_id))
+                return None
+            if markup is not None and not getattr(fwd, "reply_markup", None):                           # buttons don't always survive a forward
+                try:
+                    await make_request(bot, EditMessageReplyMarkup(chat_id=chan, message_id=fwd.message_id, reply_markup=markup))
+                except Exception as ex:
+                    log.info("buttons could not be re-attached to the forwarded post: %s", ex)
+            out = staged.model_copy(update={"message_id": fwd.message_id})
+            staged = None                                                                              # forward mode keeps the post in the group
+            return out
+        copied = await make_request(bot, CopyMessage(chat_id=chan, from_chat_id=RELAY_CHAT, message_id=staged.message_id, reply_markup=markup))
+        back = await make_request(bot, ForwardMessage(chat_id=RELAY_CHAT, from_chat_id=chan, message_id=copied.message_id))   # what the channel really stored
+        try:
+            await make_request(bot, DeleteMessage(chat_id=RELAY_CHAT, message_id=back.message_id))
+        except Exception:
+            pass
+        if not _kept(back):
+            log.warning("Premium emoji relay: copyMessage did not keep the emoji in %s — sending the post directly", chan)
+            await make_request(bot, DeleteMessage(chat_id=chan, message_id=copied.message_id))
+            return None
+        return staged.model_copy(update={"message_id": copied.message_id})
     except Exception as ex:
-        log.warning("Premium emoji relay failed (%s) — the plain post stays", ex)
+        log.warning("Premium emoji relay failed (%s) — sending the post directly", ex)
         return None
     finally:
-        if staged is not None:
+        if staged is not None:                                                                         # copy mode / failures: remove the temporary group message
             try:
                 await make_request(bot, DeleteMessage(chat_id=RELAY_CHAT, message_id=staged.message_id))
             except Exception:
@@ -96,16 +133,16 @@ class OutgoingMiddleware(BaseRequestMiddleware):
         # premium needs the global switch on, and either mapped emoji or a button with its own custom emoji
         full = convert(method, premium=True) if emojis.enabled and (emojis.active() or buttons.has_premium()) else None
         first = full or plain
+        target = full or (method if _wants(method) else None)
+        if (RELAY_CHAT and target is not None and _wants(target) and str(getattr(target, "chat_id", "")) != RELAY_CHAT
+                and hasattr(target, "chat_id") and await _is_channel(make_request, bot, target.chat_id)):
+            res = await _relay_first(make_request, bot, target)
+            if res is not None:
+                return res
         if first is None:
-            res = await make_request(bot, method)
-            if RELAY_CHAT and _lost_premium(method, res):             # a message that already carries custom_emoji entities
-                res = await _relay(make_request, bot, method, res) or res
-            return res
+            return await make_request(bot, method)
         try:
-            res = await make_request(bot, first)
-            if RELAY_CHAT and first is full and _lost_premium(first, res):
-                res = await _relay(make_request, bot, first, res) or res
-            return res
+            return await make_request(bot, first)
         except TelegramBadRequest as ex:
             if full is None:
                 raise

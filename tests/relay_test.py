@@ -1,93 +1,113 @@
-"""Premium-emoji relay: a channel post that comes back without custom_emoji is redone in the relay group and copied.   python -m tests.relay_test"""
+"""Premium-emoji relay for CHANNEL posts: made in the relay group, copied (copyMessage), verified by reading the copy back.   python -m tests.relay_test"""
 import asyncio
 import os
+import sys
 import tempfile
+import traceback
 
 _TMP = tempfile.mkdtemp()
 os.environ["DB_PATH"] = os.path.join(_TMP, "t.db")
 os.environ["ONC_ASSETS_DIR"] = os.path.join(_TMP, "assets")
 os.environ["ADMIN_IDS"] = "1"
 
-from aiogram.methods import CopyMessage, DeleteMessage, SendPhoto
-from aiogram.types import Message, MessageEntity
+from aiogram.methods import CopyMessage, DeleteMessage, EditMessageReplyMarkup, ForwardMessage, GetChat, SendPhoto  # noqa: E402
+from aiogram.types import Chat, Message, MessageEntity, MessageId  # noqa: E402
 
-from pclbot import outgoing
+from pclbot import emojis, outgoing  # noqa: E402
+
+ENT = [MessageEntity(type="custom_emoji", offset=0, length=2, custom_emoji_id="5368324170671202286")]
 
 
 class Req:
-    def __init__(self, strip):
-        self.calls, self.mid, self.strip = [], 100, strip
+    """Stub of Telegram: the relay group keeps custom emoji; the channel drops them from direct posts; copyMessage keeps them only if `copy_keeps`."""
 
-    async def __call__(self, bot, method):
-        self.calls.append(method)
+    def __init__(self, copy_keeps=True, kinds=None, forward_keeps=True):
+        self.calls, self.mid, self.copy_keeps, self.forward_keeps = [], 100, copy_keeps, forward_keeps
+        self.kinds = kinds or {"-1001": "channel", "-1002": "supergroup"}
+        self.stored: dict[tuple[str, int], bool] = {}
+
+    async def __call__(self, bot, m):
+        self.calls.append(m)
         self.mid += 1
-        if isinstance(method, (SendPhoto,)):
-            keep = (method.chat_id == "-1009") or not self.strip           # the relay group keeps the emoji, the channel strips it
-            ents = [MessageEntity(type="custom_emoji", offset=0, length=2, custom_emoji_id="1")] if keep else None
-            return Message.model_construct(message_id=self.mid, caption_entities=ents, entities=None)
-        if isinstance(method, CopyMessage):
-            return type("MI", (), {"message_id": self.mid})()
+        if isinstance(m, GetChat):
+            return Chat(id=int(m.chat_id), type=self.kinds.get(str(m.chat_id), "supergroup"))
+        if isinstance(m, SendPhoto):
+            keep = str(m.chat_id) != "-1001"                                   # direct channel post → stripped
+            self.stored[(str(m.chat_id), self.mid)] = keep
+            return Message.model_construct(message_id=self.mid, caption_entities=ENT if keep else None, entities=None, chat=Chat(id=int(m.chat_id), type="x"))
+        if isinstance(m, CopyMessage):
+            self.stored[(str(m.chat_id), self.mid)] = self.copy_keeps and self.stored[(str(m.from_chat_id), m.message_id)]
+            return MessageId(message_id=self.mid)
+        if isinstance(m, ForwardMessage):
+            keep = self.stored[(str(m.from_chat_id), m.message_id)] and self.forward_keeps
+            self.stored[(str(m.chat_id), self.mid)] = keep
+            return Message.model_construct(message_id=self.mid, caption_entities=ENT if keep else None, entities=None, chat=Chat(id=int(m.chat_id), type="x"))
         return True
 
 
+CAP = '<tg-emoji emoji-id="5368324170671202286">🔴</tg-emoji> hi'
+
+
+async def send(req, chat, caption=CAP):
+    outgoing._KIND.clear()
+    mw = outgoing.OutgoingMiddleware()
+    await emojis.set_id("🔴", "5368324170671202286") if emojis.id_of("🔴") != "5368324170671202286" else None
+    return await mw(req, None, SendPhoto(chat_id=chat, photo="x", caption=caption))
+
+
 async def run():
-    # drive the same logic the middleware uses
-    m = SendPhoto(chat_id="-1001", photo="x", caption='<tg-emoji emoji-id="1">🔴</tg-emoji> hi')
+    from pclbot import db
+    await db.init()
+    await emojis.load()
     outgoing.RELAY_CHAT = "-1009"
-    req = Req(strip=True)
-    res = await req(None, m)
-    assert outgoing._lost_premium(m, res)                                        # stripped in the channel → relay needed
-    out = await outgoing._relay(req, None, m, res)
+    # 1) forward mode (default): staged in the group and KEPT there, forwarded to the channel; no direct post, nothing deleted
+    assert outgoing.RELAY_MODE == "forward"
+    req = Req()
+    res = await send(req, "-1001")
     kinds = [type(c).__name__ for c in req.calls]
-    assert kinds == ["SendPhoto", "SendPhoto", "CopyMessage", "DeleteMessage", "DeleteMessage"], kinds
-    assert req.calls[1].chat_id == "-1009" and req.calls[2].from_chat_id == "-1009" and req.calls[2].chat_id == "-1001"
-    deleted = [(c.chat_id, c.message_id) for c in req.calls if isinstance(c, DeleteMessage)]
-    assert ("-1001", res.message_id) in deleted and any(cid == "-1009" for cid, _ in deleted)   # plain original + temporary copy removed
-    assert out.message_id != res.message_id
-    # emoji kept → no relay; plain text → no relay; the relay group itself → no relay
-    req2 = Req(strip=False)
-    assert not outgoing._lost_premium(m, await req2(None, m))
-    assert not outgoing._lost_premium(SendPhoto(chat_id="-1001", photo="x", caption="hi"), await req(None, m))
-    assert not outgoing._lost_premium(m.model_copy(update={"chat_id": "-1009"}), await req(None, m))
+    assert kinds == ["GetChat", "SendPhoto", "ForwardMessage"], kinds
+    assert req.calls[1].chat_id == "-1009" and req.calls[2].chat_id == "-1001" and req.calls[2].from_chat_id == "-1009"
+    assert res.message_id > 100
+    # forwarding does not keep the emoji either → the forward is removed and the post goes out directly
+    req = Req(forward_keeps=False)
+    await send(req, "-1001")
+    k = [type(c).__name__ for c in req.calls]
+    assert k[-1] == "SendPhoto" and req.calls[-1].chat_id == "-1001" and "DeleteMessage" in k, k
+    # copy mode: clean post (copyMessage), verified by reading it back, temporary group messages removed
+    outgoing.RELAY_MODE = "copy"
+    req = Req()
+    res = await send(req, "-1001")
+    kinds = [type(c).__name__ for c in req.calls]
+    assert kinds == ["GetChat", "SendPhoto", "CopyMessage", "ForwardMessage", "DeleteMessage", "DeleteMessage"], kinds
+    assert all(str(c.chat_id) == "-1009" for c in req.calls if isinstance(c, DeleteMessage))
+    outgoing.RELAY_MODE = "forward"
+    # 2) a plain group (not a channel) is posted directly — it already works there
+    req = Req()
+    await send(req, "-1002")
+    assert [type(c).__name__ for c in req.calls] == ["GetChat", "SendPhoto"] and req.calls[1].chat_id == "-1002"
+    # 3) copyMessage does not keep the emoji → the copy is removed and the post is sent directly (never lost)
+    outgoing.RELAY_MODE = "copy"
+    req = Req(copy_keeps=False)
+    await send(req, "-1001")
+    assert [type(c).__name__ for c in req.calls][-1] == "SendPhoto" and req.calls[-1].chat_id == "-1001", [type(c).__name__ for c in req.calls]
+    assert any(isinstance(c, DeleteMessage) and str(c.chat_id) == "-1001" for c in req.calls)         # the useless copy was deleted
+    outgoing.RELAY_MODE = "forward"
+    # 4) no premium emoji in the post → no relay; no relay group configured → direct post
+    req = Req()
+    await send(req, "-1001", caption="plain text")
+    assert [type(c).__name__ for c in req.calls] == ["SendPhoto"]
     outgoing.RELAY_CHAT = None
+    req = Req()
+    await send(req, "-1001")
+    assert [type(c).__name__ for c in req.calls] == ["SendPhoto"]
     print("RELAY OK")
 
 
-async def hub_test():
-    """The in-bot test (⚙️ → ✨ گروه واسط → 🧪): group ✅, direct channel ❌ (stripped), copyMessage ✅."""
-    from tests.onc_driver import ADMIN, CHANNEL, Driver
-    from pclbot import emojis
-    from pclbot.fx import core
-    d = await Driver.create()
-    A = ADMIN
-    await d.say("/start", A)
-    await d.press("fx:a", A); await d.press("fx:ar", A)
-    await d.say("-1008888", A)                                                  # the relay group
-    assert outgoing.RELAY_CHAT == "-1008888"
-    await d.press("fx:aet", A)
-    assert "ست" in " ".join(d.session.alerts)                                 # no premium emoji configured yet
-    await emojis.set_id("🔴", "5368324170671202286")
-    await d.press("fx:ap", A); await d.say(str(CHANNEL), A)                    # a channel destination to test against
-    d.session.strip_emoji_chats.add(CHANNEL)
-    await d.press("fx:ar", A); await d.press("fx:aet", A)
-    d.snap("In-bot test: choose the channel", A)
-    await d.press("fx:aet:0", A)
-    t = d.text(A)
-    assert "ارسال به گروه واسط: ایموجی پریمیوم ماند" in t and "ارسال مستقیم به کانال: ایموجی معمولی شد" in t and "copyMessage): ایموجی پریمیوم ماند" in t, t
-    assert "گروه واسط کار می‌کند" in t
-    d.snap("In-bot test result", A)
-    assert outgoing.RELAY_CHAT == "-1008888"                                    # the automatic relay is switched back on
-    # your own test message: premium emoji typed by the admin → channel strips them → relayed through the group
-    from aiogram.types import MessageEntity
-    await d.press("fx:ar", A); await d.press("fx:aem", A); await d.press("fx:aem:0", A)
-    assert "پیام تست را بفرست" in d.text(A)
-    d.session.strip_emoji_chats.add(CHANNEL)
-    await d.say_entities("🔴 تست ایموجی", [MessageEntity(type="custom_emoji", offset=0, length=2, custom_emoji_id="5368324170671202286")], A)
-    assert "گروه واسط" in d.text(A) and "کانال گذاشته شد" in d.text(A), d.text(A)
-    d.snap("Own test message — result", A)
-    await d.close()
-    print("HUB TEST OK")
-
-
-asyncio.run(run())
-asyncio.run(hub_test())
+code = 0
+try:
+    asyncio.run(run())
+except BaseException:
+    traceback.print_exc()
+    code = 1
+sys.stdout.flush()
+os._exit(code)

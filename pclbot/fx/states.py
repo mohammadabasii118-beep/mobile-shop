@@ -45,10 +45,6 @@ class XiSt(StatesGroup):
     logo = State()
 
 
-class TestSt(StatesGroup):
-    msg = State()
-
-
 class DestSt(StatesGroup):
     pick = State()
 
