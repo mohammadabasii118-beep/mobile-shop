@@ -25,7 +25,9 @@ RELAY_CHAT: str | None = None
 def _lost_premium(sent, res) -> bool:
     text = getattr(sent, "text", None) or getattr(sent, "caption", None) or ""
     chat = str(getattr(sent, "chat_id", ""))
-    if not (isinstance(res, Message) and "<tg-emoji" in text and chat.startswith("-100") and chat != RELAY_CHAT):
+    ents = (getattr(sent, "entities", None) or []) + (getattr(sent, "caption_entities", None) or [])
+    wants = "<tg-emoji" in text or any(e.type == "custom_emoji" for e in ents)                  # HTML tag or ready-made entities
+    if not (isinstance(res, Message) and wants and chat.startswith("-100") and chat != RELAY_CHAT):
         return False
     return not any(e.type == "custom_emoji" for e in (res.entities or []) + (res.caption_entities or []))
 
@@ -95,7 +97,10 @@ class OutgoingMiddleware(BaseRequestMiddleware):
         full = convert(method, premium=True) if emojis.enabled and (emojis.active() or buttons.has_premium()) else None
         first = full or plain
         if first is None:
-            return await make_request(bot, method)
+            res = await make_request(bot, method)
+            if RELAY_CHAT and _lost_premium(method, res):             # a message that already carries custom_emoji entities
+                res = await _relay(make_request, bot, method, res) or res
+            return res
         try:
             res = await make_request(bot, first)
             if RELAY_CHAT and first is full and _lost_premium(first, res):

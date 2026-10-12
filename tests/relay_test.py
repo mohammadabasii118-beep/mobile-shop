@@ -1,5 +1,12 @@
 """Premium-emoji relay: a channel post that comes back without custom_emoji is redone in the relay group and copied.   python -m tests.relay_test"""
 import asyncio
+import os
+import tempfile
+
+_TMP = tempfile.mkdtemp()
+os.environ["DB_PATH"] = os.path.join(_TMP, "t.db")
+os.environ["ONC_ASSETS_DIR"] = os.path.join(_TMP, "assets")
+os.environ["ADMIN_IDS"] = "1"
 
 from aiogram.methods import CopyMessage, DeleteMessage, SendPhoto
 from aiogram.types import Message, MessageEntity
@@ -48,11 +55,6 @@ async def run():
 
 async def hub_test():
     """The in-bot test (⚙️ → ✨ گروه واسط → 🧪): group ✅, direct channel ❌ (stripped), copyMessage ✅."""
-    import os as _os
-    import tempfile
-    tmp = tempfile.mkdtemp()
-    _os.environ["DB_PATH"] = _os.path.join(tmp, "t.db")
-    _os.environ["ONC_ASSETS_DIR"] = _os.path.join(tmp, "assets")
     from tests.onc_driver import ADMIN, CHANNEL, Driver
     from pclbot import emojis
     from pclbot.fx import core
@@ -75,6 +77,14 @@ async def hub_test():
     assert "گروه واسط کار می‌کند" in t
     d.snap("In-bot test result", A)
     assert outgoing.RELAY_CHAT == "-1008888"                                    # the automatic relay is switched back on
+    # your own test message: premium emoji typed by the admin → channel strips them → relayed through the group
+    from aiogram.types import MessageEntity
+    await d.press("fx:ar", A); await d.press("fx:aem", A); await d.press("fx:aem:0", A)
+    assert "پیام تست را بفرست" in d.text(A)
+    d.session.strip_emoji_chats.add(CHANNEL)
+    await d.say_entities("🔴 تست ایموجی", [MessageEntity(type="custom_emoji", offset=0, length=2, custom_emoji_id="5368324170671202286")], A)
+    assert "گروه واسط" in d.text(A) and "کانال گذاشته شد" in d.text(A), d.text(A)
+    d.snap("Own test message — result", A)
     await d.close()
     print("HUB TEST OK")
 

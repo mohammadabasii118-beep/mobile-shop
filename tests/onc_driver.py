@@ -209,6 +209,13 @@ class Driver:
         await self._feed(message=m)
         self._track(uid, None)
 
+    async def say_entities(self, text: str, entities: list, uid: int = ADMIN):
+        self.session.alerts.clear()
+        self.uid_seq += 1
+        m = Message.model_construct(message_id=self.uid_seq + 5000, date=dt.datetime.now(), chat=Chat(id=uid, type="private"), from_user=self._user(uid), text=text, entities=entities)
+        await self._feed(message=m)
+        self._track(uid, None)
+
     async def photo(self, data: bytes, uid: int = ADMIN):
         self.session.alerts.clear()
         fid = f"file{len(self.session.files)}"

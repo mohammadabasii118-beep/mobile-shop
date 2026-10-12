@@ -3,13 +3,13 @@ import asyncio
 
 from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, Message
 
 from ..onc.ui import ob, okb
 from ..utils import is_admin, show
 from . import appgfx, blacklist, core, draft, hwg, quiz, streamers, subs, themes_ui, xi
 from .core import E
-from .states import DestSt
+from .states import DestSt, TestSt
 
 PANEL = "fx:a"
 router = Router()
@@ -38,7 +38,7 @@ async def relay_dest(c: CallbackQuery, state: FSMContext, bot: Bot):
     await show(c, f"✨ <b>گروه واسط ایموجی پریمیوم</b>\n\nفعلی: {await core.dest_status(bot, 'emoji_relay')}\n\n"
                   "گروهی که ایموجی پریمیوم در آن درست نمایش داده می‌شود (ربات ادمین با اجازه‌ی ارسال و حذف پیام). اگر تلگرام ایموجی پریمیوم را از پست کانال حذف کند، "
                   "ربات همان پست را در این گروه می‌سازد، با copyMessage به کانال می‌برد و پیام‌های موقت را پاک می‌کند.\n\n"
-                  "یک پست از گروه فوروارد کن یا آیدی عددی (مثل -100…) بفرست:", okb([[ob("🧪 تست داخل ربات", "fx:aet")], [ob("🗑 غیرفعال کردن", "fx:ar0")], [ob("❌ لغو", PANEL)]]))
+                  "یک پست از گروه فوروارد کن یا آیدی عددی (مثل -100…) بفرست:", okb([[ob("🧪 تست داخل ربات", "fx:aet")], [ob("✉️ پیام تست خودم", "fx:aem")], [ob("🗑 غیرفعال کردن", "fx:ar0")], [ob("❌ لغو", PANEL)]]))
     await c.answer()
 
 
@@ -123,6 +123,52 @@ async def test_run(c: CallbackQuery, bot: Bot):
     verdict = ("✅ گروه واسط کار می‌کند؛ پست‌های کانال با ایموجی پریمیوم می‌روند." if copied_ok else
                "⚠️ copyMessage هم ایموجی پریمیوم را نگه نداشت؛ از این راه نمی‌شود." if copied_ok is False else "⚠️ تست کامل نشد.")
     await c.message.answer("🧪 <b>نتیجه‌ی تست</b>\n\n" + "\n".join(lines) + f"\n\n{verdict}", reply_markup=okb([[ob("🔁 دوباره", "fx:aet")], [ob("🔙 بازگشت", "fx:ar")]]))
+
+
+@router.callback_query(F.data == "fx:aem")
+async def own_pick(c: CallbackQuery, state: FSMContext, bot: Bot):
+    await state.clear()
+    chats = await _all_dests()
+    rows = []
+    for i, ch in enumerate(chats):
+        try:
+            rows.append([ob(f"📣 {(await bot.get_chat(ch)).title or ch}"[:50], f"fx:aem:{i}")])
+        except Exception:
+            rows.append([ob(f"📣 {ch}"[:50], f"fx:aem:{i}")])
+    await show(c, "✉️ <b>پیام تست خودم</b>\n\nکانال را انتخاب کن؛ بعد خودت پیام را (با ایموجی‌های پریمیومی که می‌خواهی) بفرست تا همان‌طور که هست در آن کانال گذاشته شود."
+                  + ("" if chats else "\n\nهنوز مقصدی تنظیم نشده."), okb(rows + [[ob("🔙 بازگشت", "fx:ar")]]))
+    await c.answer()
+
+
+@router.callback_query(F.data.regexp(r"^fx:aem:\d+$"))
+async def own_ask(c: CallbackQuery, state: FSMContext):
+    chats = await _all_dests()
+    i = int(c.data.split(":")[2])
+    if i >= len(chats):
+        return await c.answer("فهرست قدیمی شده.", show_alert=True)
+    await state.set_state(TestSt.msg)
+    await state.update_data(chan=chats[i])
+    await show(c, "✉️ پیام تست را بفرست (متن با ایموجی پریمیوم؛ همین‌طور که می‌فرستی در کانال گذاشته می‌شود):", okb([[ob("❌ لغو", "fx:aem")]]))
+    await c.answer()
+
+
+@router.message(TestSt.msg, F.text)
+async def own_send(m: Message, state: FSMContext, bot: Bot):
+    from .. import outgoing
+    chan = (await state.get_data())["chan"]
+    await state.clear()
+    asked = [e for e in (m.entities or []) if e.type == "custom_emoji"]
+    try:
+        res = await bot.send_message(chan, m.text, entities=m.entities, parse_mode=None)
+    except Exception as ex:
+        return await m.answer(f"❌ ارسال نشد: {E(str(ex)[:150])}")
+    kept = any(e.type == "custom_emoji" for e in (res.entities or []))
+    relayed = bool(asked) and not kept and bool(outgoing.RELAY_CHAT)
+    note = ("ℹ️ پیامت ایموجی پریمیوم نداشت (فقط ایموجی‌های پریمیوم واقعی را بفرست)." if not asked else
+            "✅ ایموجی پریمیوم همان‌طور که هست در کانال ماند." if kept else
+            "🔁 تلگرام ایموجی را حذف کرده بود؛ ربات از گروه واسط کپی کرد (اگر ایموجی در کانال پریمیوم است، گروه واسط کار می‌کند)." if relayed else
+            "❌ تلگرام ایموجی پریمیوم را از پست کانال حذف کرد و گروه واسط تنظیم نیست.")
+    await m.answer(f"✉️ پیام تست در کانال گذاشته شد.\n{note}", reply_markup=okb([[ob("✉️ پیام تست دیگر", "fx:aem")], [ob("🔙 بازگشت", "fx:ar")]]))
 
 
 @router.callback_query(F.data == "fx:ar0")
