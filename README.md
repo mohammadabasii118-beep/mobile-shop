@@ -117,3 +117,6 @@ docker run -d -p 3000:3000 -e BOT_TOKEN="توکن" -v cardbattle-data:/data card
 curl -fsSL https://raw.githubusercontent.com/mohammadabasii118-beep/mobile-shop/claude/card-battle-game/scripts/https.sh | bash
 ```
 بدون دامنه از آدرس رایگان `miras.<IP>.sslip.io` استفاده می‌کند. با دامنه‌ی خودت: `DOMAIN=miras.example.com` (قبلش A رکورد را به IP سرور بزن).
+
+## بکاپ روزانه در ربات
+در حالت واقعی (BOT_TOKEN و ADMIN_IDS تنظیم شده) هر روز بعد از ساعت ۳ بامداد UTC (حدود ۶:۳۰ ایران) یک فایل `miras-backup-تاریخ.tar.gz` فقط برای ادمین‌ها در پیام خصوصی ربات فرستاده می‌شود: کد + دیتابیس (کاربرها) + عکس‌ها + تنظیمات پنل (بدون node_modules). هر ادمین باید یک‌بار به ربات /start بزند. بکاپ فوری: ارسال `/backup` به ربات. ساعت: `BACKUP_HOUR_UTC` در /etc/miras.env؛ خاموش: `BACKUP=off`.

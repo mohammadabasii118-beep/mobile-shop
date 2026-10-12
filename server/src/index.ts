@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { loadConfigWithOverride, saveConfig } from './config';
 import { openDb } from './db';
 import { startBot } from './bot';
+import { backupToAdmins, scheduleDailyBackup } from './backup';
 import { versionTag } from './version';
 import { createGameServer } from './server';
 
@@ -25,7 +26,17 @@ const { http } = createGameServer({
   db, cfg, auth: { botToken, devAuth }, dataDir, adminIds, telegramApi: process.env.TELEGRAM_API, saveCfg: (c) => saveConfig(c, configPath),
   staticDir,
 });
-if (botToken && process.env.WEBAPP_URL) startBot({ token: botToken, webAppUrl: `${process.env.WEBAPP_URL}${process.env.WEBAPP_URL.includes('?') ? '&' : '?'}v=${versionTag(staticDir)}`, welcomeText: () => cfg.ui?.welcome });
+// بکاپ روزانه: فقط برای ادمین‌ها (ADMIN_IDS) در پیام خصوصی ربات فرستاده می‌شود؛ خاموش‌کردن: BACKUP=off
+const backupOpts = { db, dataDir, codeDir: fileURLToPath(new URL('../../', import.meta.url)) };
+if (botToken && isProd && adminIds.length && process.env.BACKUP !== 'off') scheduleDailyBackup({ ...backupOpts, token: botToken, adminIds, apiBase: process.env.TELEGRAM_API, hourUtc: Number(process.env.BACKUP_HOUR_UTC ?? 3) });
+if (botToken && process.env.WEBAPP_URL) startBot({
+  token: botToken, webAppUrl: `${process.env.WEBAPP_URL}${process.env.WEBAPP_URL.includes('?') ? '&' : '?'}v=${versionTag(staticDir)}`, welcomeText: () => cfg.ui?.welcome,
+  onBackup: async (fromId, chatId) => {
+    if (!adminIds.includes(fromId)) return 'این دستور فقط برای ادمین‌هاست.';
+    const ok = await backupToAdmins({ ...backupOpts, token: botToken, adminIds, apiBase: process.env.TELEGRAM_API, chatIds: [chatId] });
+    return ok ? '✅ بکاپ فرستاده شد.' : '❌ ارسال بکاپ نشد؛ لاگ سرور را ببین.';
+  },
+});
 else if (botToken) console.log('[bot] WEBAPP_URL تنظیم نشده؛ ربات به /start جواب نمی‌دهد.');
 http.listen(port, () => {
   console.log(`سرور «میراث» روی http://localhost:${port} بالا آمد ${devAuth ? '(حالت توسعه: ورود آزمایشی و پنل مدیریت برای همه باز است)' : `(ادمین‌ها: ${adminIds.join(', ') || 'هیچ‌کس'})`}`);

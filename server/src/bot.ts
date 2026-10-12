@@ -23,6 +23,8 @@ export interface BotOptions {
   apiBase?: string;
   /** متن سفارشی پیام اول (اگر خالی باشد متن پیش‌فرض) */
   welcomeText?: () => string | undefined;
+  /** دستور /backup؛ تشخیص ادمین‌بودن با خود تابع است و متن جواب را برمی‌گرداند */
+  onBackup?: (fromId: number, chatId: number) => Promise<string>;
   log?: (s: string) => void;
 }
 
@@ -80,6 +82,9 @@ export function startBot(o: BotOptions) {
           offset = u.update_id + 1;
           const m = u.message;
           if (m?.chat?.type === 'private' && typeof m.text === 'string' && m.text.startsWith('/start')) await welcome(m.chat.id);
+          else if (m?.chat?.type === 'private' && typeof m.text === 'string' && m.text.startsWith('/backup') && o.onBackup) {
+            try { await api('sendMessage', { chat_id: m.chat.id, text: await o.onBackup(m.from?.id, m.chat.id) }); } catch (e) { log(`backup: ${(e as Error).message}`); }
+          }
         }
       } catch (e) {
         if (stopped) return;
