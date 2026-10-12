@@ -165,8 +165,9 @@ class Canvas:
             sx = S(px) - (total / 2 if al == "center" else total if al == "right" else 0)
             if shadow:
                 cx = sx
+                sx_, sy_, sa_ = (1, 2, 78) if shadow == "title" else (2, 3, 120)
                 for ch in text:
-                    self.d.text((cx + S(2), S(py) + S(3)), ch, font=f, fill=(0, 0, 0, 120), anchor="lm")
+                    self.d.text((cx + S(sx_), S(py) + S(sy_)), ch, font=f, fill=(0, 0, 0, sa_), anchor="lm")
                     cx += self.d.textlength(ch, font=f) + S(tr)
             for ch in text:
                 self.d.text((sx, S(py)), ch, font=f, fill=col, anchor="lm")
@@ -174,7 +175,8 @@ class Canvas:
             return
         anchor = {"left": "lm", "center": "mm", "right": "rm"}[al]
         if shadow:
-            self.d.text((S(px) + S(2), S(py) + S(3)), text, font=f, fill=(0, 0, 0, 130), anchor=anchor, **kw)
+            sx_, sy_, sa_ = (1, 2, 78) if shadow == "title" else (2, 3, 130)         # titles: a subtle, refined shadow only
+            self.d.text((S(px) + S(sx_), S(py) + S(sy_)), text, font=f, fill=(0, 0, 0, sa_), anchor=anchor, **kw)
         self.d.text((S(px), S(py)), text, font=f, fill=col, anchor=anchor, **kw)
 
     def gradient_text(self, text, st, y, size, c1, c2, x=None):
@@ -193,8 +195,8 @@ class Canvas:
             grad.putpixel((0, i), mix(c1, c2, i / max(grad.height - 1, 1))[:3])
         full = Image.new("RGB", self.im.size, (0, 0, 0))
         full.paste(grad.resize((bbox[2] - bbox[0], grad.height)), (bbox[0], bbox[1]))
-        shadow = mask.filter(ImageFilter.GaussianBlur(S(6)))
-        self.im.paste((0, 0, 0), (S(0), S(5)), shadow.point(lambda v: int(v * .55)))
+        shadow = mask.filter(ImageFilter.GaussianBlur(S(3)))
+        self.im.paste((0, 0, 0), (S(0), S(2)), shadow.point(lambda v: int(v * .30)))
         self.im.paste(full, (0, 0), mask)
 
     def png(self) -> bytes:
@@ -289,6 +291,13 @@ def draw_pcl_logo(cv: Canvas) -> None:
     cv.text("LOGO", {"x": x, "y": y + size * .34, "size": size * .13, "min": 8, "color": "#b9c0cc", "align": "center", "max_w": size * .8, "font": templates.O_MED}, track=3)
 
 
+def title_style(st: dict, text: str) -> dict:
+    """Persian titles use the heavy Persian display face, Latin titles the wide geometric one (unless the font was changed by hand)."""
+    if st.get("font") == templates.T_EN and _RTL.search(text or ""):
+        return dict(st, font=templates.T_FA)
+    return st
+
+
 def chrome(cv: Canvas, data: dict, page_i: int, pages_n: int) -> None:
     """Header + title + footer shared by all graphics."""
     cfg, el = cv.cfg, cv.cfg["elements"]
@@ -309,7 +318,7 @@ def chrome(cv: Canvas, data: dict, page_i: int, pages_n: int) -> None:
     cv.text(data.get("brand", el["brand"].get("text")), el["brand"], shadow=True)
     cv.text(data.get("eyebrow", el["eyebrow"].get("text")), el["eyebrow"])
     title = data.get("title", el["title"].get("text"))
-    cv.text(title, el["title"], shadow=True)
+    cv.text(title, title_style(el["title"], title), shadow="title")
     if "subtitle" in el and data.get("subtitle"):
         cv.text(data["subtitle"], el["subtitle"])
     if not wide:
@@ -565,7 +574,7 @@ def render_champion(cfg: dict, data: dict, bg_path: str | None = None) -> list[b
     cv.im.paste(rays.convert("RGB"), (0, 0), rays.getchannel("A"))
     cv.glow(lambda d: d.ellipse([S(cx - size * .75), S(cy - size * .75), S(cx + size * .75), S(cy + size * .75)], fill=cv.gold[:3] + (150,)), 60, .55)
     chrome(cv, data, 1, 1)
-    cv.gradient_text(data.get("title", el["title"].get("text")), el["title"], el["title"]["y"] + 0, el["title"]["size"], mix(cv.gold, (255, 255, 255, 255), .55), mix(cv.gold, (0, 0, 0, 255), .18))
+    cv.gradient_text(data.get("title", el["title"].get("text")), title_style(el["title"], data.get("title", el["title"].get("text"))), el["title"]["y"] + 0, el["title"]["size"], mix(cv.gold, (255, 255, 255, 255), .55), mix(cv.gold, (0, 0, 0, 255), .18))
     # trophy-style double ring (+ tick marks)
     for r_, wd, col in ((size / 2 + 36, 4, hex_rgba(cfg["theme"]["gold"], .45)), (size / 2 + 18, 10, cv.gold)):
         cv.ellipse((cx - r_, cy - r_, cx + r_, cy + r_), outline=col, width=wd)

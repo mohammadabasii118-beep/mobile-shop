@@ -31,10 +31,13 @@ FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
 # indexes are part of the template format (`font` in every style): keep the order
 FONT_FILES = [("Vazirmatn Black", "Vazirmatn-Black.ttf"), ("Vazirmatn ExtraBold", "Vazirmatn-ExtraBold.ttf"),
               ("Vazirmatn Bold", "Vazirmatn-Bold.ttf"), ("Vazirmatn Medium", "Vazirmatn-Medium.ttf"),
-              ("Oswald Bold", "Oswald_700Bold.ttf"), ("Oswald SemiBold", "Oswald_600SemiBold.ttf"), ("Oswald Medium", "Oswald_500Medium.ttf")]
+              ("Oswald Bold", "Oswald_700Bold.ttf"), ("Oswald SemiBold", "Oswald_600SemiBold.ttf"), ("Oswald Medium", "Oswald_500Medium.ttf"),
+              ("Unbounded ExtraBold", "Unbounded_800ExtraBold.ttf"), ("Unbounded Black", "Unbounded_900Black.ttf"),
+              ("Estedad Black", "Estedad-Black.ttf"), ("Estedad ExtraBold", "Estedad-ExtraBold.ttf")]
 F_BLACK, F_XBOLD, F_BOLD, F_MED, O_BOLD, O_SEMI, O_MED = range(7)
+T_EN, T_EN_BLACK, T_FA, T_FA_XB = 7, 8, 9, 10          # title typefaces: wide geometric display (Latin) / heavy geometric display (Persian)
 SYSTEM_FALLBACK = ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"]
-DESIGN_VERSION = 2
+DESIGN_VERSION = 3
 
 
 def fonts() -> list[tuple[str, str]]:
@@ -83,9 +86,10 @@ def default_config(type_: str, theme: str = "RED") -> dict:
     bx = 214 if not wide else 190
     el["brand"] = _el(bx, 92 if not wide else 72, 56 if not wide else 52, "#ffffff", "left", 800, 30, O_BOLD, "ONE NIGHT CHAMPION", track=3)
     el["eyebrow"] = _el(bx, 150 if not wide else 124, 27, gold, "left", 700, 16, O_SEMI, EYEBROW[type_], track=6)
-    el["title"] = _el(540 if not wide else 1860, 268 if not wide else 96, 76 if not wide else 58, "#ffffff", "center" if not wide else "right",
-                      940, 36, F_BLACK, TITLE_FA[type_])
-    el["subtitle"] = _el(540, 350, 34, gold, "center", 940, 20, F_MED)
+    # main title (global rule): premium display type, ~13% smaller than v2, lower inside its band — clear of the header line and the divider
+    el["title"] = _el(540 if not wide else 1860, 292 if not wide else 108, 66 if not wide else 50, "#ffffff", "center" if not wide else "right",
+                      880 if not wide else 940, 30 if not wide else 26, T_EN, TITLE_FA[type_], track=1)
+    el["subtitle"] = _el(540, 358, 34, gold, "center", 940, 20, F_MED)
     el["page"] = _el(1024, 1312, 26, grey, "right", 300, 16, F_MED)
     el["footer"] = _el(56 if not wide else 60, 1312 if not wide else 1046, 26, grey, "left", 700, 16, O_MED, "@Onenightchampion", track=2)
     if wide:
@@ -121,7 +125,7 @@ def default_config(type_: str, theme: str = "RED") -> dict:
         el["team"] = _el(0, 0, 30, "#ffffff", "left", 330, 16, F_BOLD)
         cfg["bracket"] = {"top": 230, "bottom": 1010, "left": 60, "right": 1860}
     elif type_ == "TRANSFER":
-        el["title"] = _el(540, 300, 118, gold, "center", 940, 60, O_BOLD, "HERE WE GO", track=6)
+        el["title"] = _el(540, 304, 92, gold, "center", 860, 40, T_EN, "HERE WE GO", track=2)
         el["subtitle"] = _el(540, 445, 34, grey, "center", 940, 20, F_MED)
         el["player"] = _el(540, 640, 112, "#ffffff", "center", 960, 40, F_BLACK)
         el["team"] = _el(540, 0, 54, "#ffffff", "center", 400, 24, F_XBOLD)
@@ -138,7 +142,7 @@ def default_config(type_: str, theme: str = "RED") -> dict:
         el["rating"] = _el(0, 0, 25, gold, "center", 90, 14, O_BOLD)
     elif type_ == "CHAMPION":
         el["subtitle"]["y"] = 1176
-        el["title"] = _el(540, 330, 110, gold, "center", 940, 50, F_BLACK, "قهرمان")
+        el["title"] = _el(540, 322, 92, gold, "center", 940, 46, T_FA, "قهرمان")
         el["logo"] = {"x": 540, "y": 700, "size": 440}
         el["team"] = _el(540, 1050, 104, "#ffffff", "center", 960, 44, F_BLACK)
     return cfg
@@ -172,6 +176,15 @@ async def upgrade_designs() -> int:
         for r in await dbx.fetchall("SELECT * FROM onc_templates"):
             cfg = json.loads(r["config"])
             if cfg.get("v") == DESIGN_VERSION:
+                continue
+            if cfg.get("v") == 2:                              # v2 → v3: only the main title / subtitle move to the new typography and spacing
+                new = default_config(r["type"], next((k for k, v in THEMES.items() if v["bg1"] == cfg.get("theme", {}).get("bg1")), "RED"))
+                for k in ("title", "subtitle"):
+                    if k in new["elements"] and k in cfg["elements"]:
+                        cfg["elements"][k] = new["elements"][k]
+                cfg["v"] = DESIGN_VERSION
+                await dbx.execute("UPDATE onc_templates SET config=? WHERE id=?", json.dumps(cfg), r["id"])
+                n += 1
                 continue
             theme = next((k for k, v in THEMES.items() if v["bg1"] == cfg.get("theme", {}).get("bg1")), "RED")
             await dbx.execute("UPDATE onc_templates SET config=? WHERE id=?", json.dumps(default_config(r["type"], theme)), r["id"])

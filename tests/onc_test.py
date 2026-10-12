@@ -495,13 +495,23 @@ async def run():
         assert all(os.path.exists(pth) and "/fonts/" in pth for _, pth in fl), "bundled fonts"
         for t_ in templates.TYPES:
             c_ = templates.default_config(t_)
-            assert c_["v"] == 2 and "pcl_logo" in c_["elements"] and "footer" in c_["elements"] and "brand" in c_["elements"], t_   # every graphic has the PCL slot
+            assert c_["v"] == templates.DESIGN_VERSION and "pcl_logo" in c_["elements"] and "footer" in c_["elements"] and "brand" in c_["elements"], t_   # every graphic has the PCL slot
         # old (v1) templates are moved to the new design once; backgrounds / active flags survive
         old = (await templates.templates_of((await templates.active_set())["id"]))[0]
         v1 = dict(old["config"]); v1.pop("v", None); v1["elements"] = {"title": {"x": 1, "y": 2, "size": 3, "min": 1, "color": "#fff", "align": "center", "max_w": 9, "font": 0}}
         await templates.save_config(old["id"], v1)
-        assert await templates.upgrade_designs() == 1 and (await templates.get_template(old["id"]))["config"]["v"] == 2
+        assert await templates.upgrade_designs() == 1 and (await templates.get_template(old["id"]))["config"]["v"] == templates.DESIGN_VERSION
         assert (await templates.get_template(old["id"]))["active"] == old["active"]
+        # v2 → v3 keeps everything the admin edited except the main title / subtitle (new typography + spacing)
+        cur = (await templates.get_template(old["id"]))["config"]
+        v2 = dict(cur, v=2)
+        v2["elements"] = {**cur["elements"], "title": dict(cur["elements"]["title"], y=250, size=76, font=0)}
+        v2["elements"]["footer"] = dict(cur["elements"]["footer"], x=99)
+        await templates.save_config(old["id"], v2)
+        assert await templates.upgrade_designs() == 1
+        c3 = (await templates.get_template(old["id"]))["config"]
+        assert c3["v"] == 3 and c3["elements"]["footer"]["x"] == 99 and c3["elements"]["title"]["font"] == templates.T_EN and c3["elements"]["title"]["size"] < 76
+        assert c3["elements"]["title"]["y"] > 250
         # PCL logo upload from the panel → drawn on every graphic (placeholder monogram until then)
         from PIL import Image as _I
         import io as _io
