@@ -72,6 +72,19 @@ def parse_chats(value: str | None) -> list[str]:
     return [x.strip() for x in (value or "").split(",") if x.strip()]
 
 
+FILTER_FA = {"all": "همه‌ی آگهی‌ها", "player": "فقط بازیکنان آزاد", "team": "فقط جذب بازیکن"}
+FILTER_ORDER = ["all", "player", "team"]
+
+
+async def publish_filters() -> dict[str, str]:
+    """Which kind of ad each publish chat receives: {chat: all|player|team} (default: all)."""
+    try:
+        import json
+        return json.loads(await get_setting("publish_filters") or "{}")
+    except ValueError:
+        return {}
+
+
 def now() -> int:
     return int(time.time())
 

@@ -312,9 +312,11 @@ async def setting_set(m: Message, state: FSMContext):
 async def _pub_screen(c_or_m, state: FSMContext, note: str = ""):
     await state.clear()
     chats = db.parse_chats(await db.get_setting("publish_chat"))
-    lines = "\n".join(f"{i + 1}. <code>{ch}</code>" for i, ch in enumerate(chats)) or "تنظیم نشده"
-    rows = [[btn(f"➖ حذف {i + 1}", f"adm:pubd:{i}")] for i in range(len(chats))] + [[btn("➕ افزودن گروه/کانال", "adm:pubn")], back(PANEL)]
-    text = (f"{note}📡 <b>گروه‌ها / کانال‌های انتشار</b>\n\n{lines}\n\nآگهی‌ها به <b>همه‌ی</b> این‌ها فرستاده می‌شود. ربات باید در هر کدام ادمین باشد "
+    flt = await db.publish_filters()
+    lines = "\n".join(f"{i + 1}. <code>{ch}</code> — {db.FILTER_FA[flt.get(ch, 'all')]}" for i, ch in enumerate(chats)) or "تنظیم نشده"
+    rows = [[btn(f"🎯 {i + 1}: {db.FILTER_FA[flt.get(ch, 'all')]}", f"adm:pubf:{i}"), btn(f"➖ حذف {i + 1}", f"adm:pubd:{i}")] for i, ch in enumerate(chats)]
+    rows += [[btn("➕ افزودن گروه/کانال", "adm:pubn")], back(PANEL)]
+    text = (f"{note}📡 <b>گروه‌ها / کانال‌های انتشار</b>\n\n{lines}\n\nهر گروه فقط آگهی‌هایی را می‌گیرد که فیلتر خودش اجازه می‌دهد (🎯 را بزن تا عوض شود: همه / فقط بازیکنان آزاد / فقط جذب بازیکن). ربات باید در هر کدام ادمین باشد "
             "(با دسترسی ارسال و حذف پیام).")
     if isinstance(c_or_m, CallbackQuery):
         await show(c_or_m, text, kb(rows))
@@ -333,6 +335,19 @@ async def pub_add(c: CallbackQuery, state: FSMContext):
     await state.set_state(AdminSt.publish)
     await show(c, "➕ آیدی عددی (مثل <code>-100123…</code>) یا @یوزرنیم گروه/کانال را بفرست:", kb([back("adm:pub")]))
     await c.answer()
+
+
+@router.callback_query(F.data.startswith("adm:pubf:"))
+async def pub_filter(c: CallbackQuery, state: FSMContext):
+    import json
+    chats = db.parse_chats(await db.get_setting("publish_chat"))
+    i = int(c.data.split(":")[2])
+    if i < len(chats):
+        flt = await db.publish_filters()
+        cur = flt.get(chats[i], "all")
+        flt[chats[i]] = db.FILTER_ORDER[(db.FILTER_ORDER.index(cur) + 1) % 3]
+        await db.set_setting("publish_filters", json.dumps(flt))
+    await _pub_screen(c, state)
 
 
 @router.callback_query(F.data.startswith("adm:pubd:"))

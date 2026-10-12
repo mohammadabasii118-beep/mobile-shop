@@ -53,6 +53,14 @@ async def run():
     assert {c for c, _ in bot.deleted} == {"-1001", "-1002"} and len(bot.sent) == 4
     await services.unpublish(bot, await db.get_ad(aid))
     assert len(bot.deleted) == 4 and not await db.fetchall("SELECT * FROM ad_posts WHERE ad_id=?", aid)
+    # per-group filter: -1001 gets everything, -1002 only team ads (this ad is a player ad)
+    await db.set_setting("publish_filters", json.dumps({"-1002": "team"}))
+    bot.sent.clear()
+    await services.publish(bot, await db.get_ad(aid))
+    assert [c for c, _ in bot.sent] == ["-1001"], bot.sent
+    await db.set_setting("publish_filters", json.dumps({"-1001": "team", "-1002": "team"}))
+    assert not await services.publish(bot, await db.get_ad(aid))         # nobody wants a player ad → no post, no crash
+    await db.set_setting("publish_filters", "{}")
     await db.set_setting("publish_chat", "")
     assert not await services.publish(bot, await db.get_ad(aid))         # no destination → nothing, no crash
     # an old single-chat setting keeps working

@@ -91,7 +91,10 @@ async def publish(bot: Bot, ad: dict) -> bool:
     text = render_ad(ad, user)
     markup = await ad_markup(bot)
     first = None
-    for chat in chats:                                       # every channel / group that was introduced gets the post
+    filters = await db.publish_filters()
+    for chat in chats:                                       # every channel / group that was introduced gets the post that matches its filter
+        if filters.get(chat, "all") not in ("all", ad["kind"]):
+            continue
         try:
             if ad["photo"]:
                 msg = await bot.send_photo(chat, ad["photo"], caption=text, reply_markup=markup)
