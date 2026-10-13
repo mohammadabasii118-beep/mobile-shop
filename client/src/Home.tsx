@@ -73,7 +73,7 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
           </div>
           <button className="mode solo" onClick={() => setView('solo')}>
             <span className="medal8"><svg className="i" viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9 16h6"/></svg></span>
-            <span className="mtitle">سولو</span><FeePill n={cfg.fees?.solo} />
+            <span className="mtitle">تک‌نفره</span><FeePill n={cfg.fees?.solo} />
           </button>
           <button className="mode multi" disabled={queued} onClick={() => sock.send({ t: 'queue' })}>
             <span className="medal8"><svg className="i" viewBox="0 0 24 24"><path d="M4 4l9 9M9 4H4v5M20 4l-9 9M15 4h5v5M7 17l-3 3M17 17l3 3"/></svg></span>
@@ -82,7 +82,7 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
         </section>
       ) : (
         <section className="menu">
-          <h2><button className="back" onClick={() => setView('menu')}>→</button> سولو <FeePill n={cfg.fees?.solo} small /></h2>
+          <h2><button className="back" onClick={() => setView('menu')}>→</button> تک‌نفره <FeePill n={cfg.fees?.solo} small /></h2>
           <div className="pits" role="tablist" aria-label="گودال‌ها">
             {pits.map((pit, pi) => (
               <button key={pi} role="tab" aria-selected={pi === pitIdx} className={`pit ${pits[pi].first > p.soloStage ? 'locked' : ''}`}
@@ -132,7 +132,7 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
           <div className="settings">
             <h3>تنظیمات</h3>
             <VolumeRow ch="menu" label="🎵 موسیقی بازی" />
-            <VolumeRow ch="battle" label="⚔️ صدای نبرد (سولو و آنلاین)" />
+            <VolumeRow ch="battle" label="⚔️ صدای نبرد" />
             <button className="btn" onClick={() => setPage(null)}>بستن</button>
           </div>
         </Modal>

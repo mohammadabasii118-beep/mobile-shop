@@ -53,7 +53,7 @@ export function Admin({ ctx, onExit }: { ctx: Ctx; onExit: () => void }) {
         </div>
       )}
       <div className="tabs" role="tablist">
-        {([['cards', 'کارت‌ها و عکس‌ها'], ['eco', 'جعبه و اقتصاد'], ['solo', 'سولو (گودال‌ها)'], ['look', 'ظاهر و بنر'], ['players', 'بازیکن‌ها'], ['json', 'پیشرفته']] as [Tab, string][]).map(([k, l]) => (
+        {([['cards', 'کارت‌ها و عکس‌ها'], ['eco', 'جعبه و اقتصاد'], ['solo', 'تک‌نفره (گودال‌ها)'], ['look', 'ظاهر و بنر'], ['players', 'بازیکن‌ها'], ['json', 'پیشرفته']] as [Tab, string][]).map(([k, l]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{l}</button>
         ))}
       </div>
@@ -211,7 +211,7 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
         <div className="fgrid">{f('اسلات', d.box.slots, (x) => upd((c) => { c.box.slots = x; }))}</div>
         <h3>هزینه‌ی ورود به نبرد (سکه)</h3>
         <div className="fgrid">
-          {f('هر مرحله‌ی سولو', d.fees?.solo ?? 0, (x) => upd((c) => { c.fees = { solo: x, multi: c.fees?.multi ?? 0 }; }))}
+          {f('هر مرحله‌ی تک‌نفره', d.fees?.solo ?? 0, (x) => upd((c) => { c.fees = { solo: x, multi: c.fees?.multi ?? 0 }; }))}
           {f('ورود به مولتی‌پلیر', d.fees?.multi ?? 0, (x) => upd((c) => { c.fees = { solo: c.fees?.solo ?? 0, multi: x }; }))}
         </div>
         <h3>نبرد</h3>
@@ -225,7 +225,7 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
         <small className="hint" style={{ textAlign: 'start' }}>برای هر حالت، با هر برد کدام جعبه به بازیکن می‌رسد؟ عددها درصدند و مجموعشان حداکثر ۱۰۰ است؛ باقی‌مانده یعنی «این بار جعبه‌ای نمی‌آید».</small>
         <div className="pits" role="tablist" aria-label="حالت بازی">
           {(['solo', 'multi'] as const).map((m) => (
-            <button key={m} role="tab" aria-selected={dm === m} className="pit" onClick={() => setDm(m)}>{m === 'solo' ? 'سولو' : 'آنلاین'}</button>
+            <button key={m} role="tab" aria-selected={dm === m} className="pit" onClick={() => setDm(m)}>{m === 'solo' ? 'تک‌نفره' : 'آنلاین'}</button>
           ))}
         </div>
         <div className="fgrid">
