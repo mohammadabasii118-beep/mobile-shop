@@ -101,6 +101,14 @@ describe('player management', () => {
     expect((await coins({ delta: -30 })).user.coins).toBe(120);
     expect((await coins({ delta: -99999 })).user.coins).toBe(0);   // هیچ‌وقت منفی نمی‌شود
     expect((await coins({ set: 777 })).user.coins).toBe(777);
+    // الماس سرخ: همه ۵۰ شروع می‌کنند؛ کم/زیاد و تنظیم دقیق؛ هیچ‌وقت منفی نمی‌شود
+    const gems = async (b: object) => (await (await call(42, '/api/admin/balance', { userId: id, currency: 'gems', ...b })).json() as any);
+    expect((await gems({ delta: 25 })).user.gems).toBe(75);
+    expect((await gems({ delta: -99999 })).user.gems).toBe(0);
+    expect((await gems({ set: 50 })).user.gems).toBe(50);
+    expect((await call(42, '/api/admin/balance', { userId: id, currency: 'gems', delta: 0.5 })).status).toBe(400);
+    expect((await call(42, '/api/admin/balance', { userId: id, currency: 'hack', delta: 5 })).status).toBe(400);
+    expect((await call(43, '/api/admin/balance', { userId: id, currency: 'gems', delta: 5 })).status).toBe(403);
     expect((await call(42, '/api/admin/coins', { userId: id, delta: 1.5 })).status).toBe(400);
     expect((await call(42, '/api/admin/coins', { userId: id, set: -1 })).status).toBe(400);
     expect((await call(42, '/api/admin/coins', { userId: id, delta: 'abc' })).status).toBe(400);

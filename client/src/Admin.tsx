@@ -8,7 +8,7 @@ import { CardTile, Modal, RARITY_FA, fa } from './ui';
 
 type Tab = 'cards' | 'eco' | 'solo' | 'look' | 'players' | 'json';
 interface Stats { users: number; battles: number; pendingBoxes: number; coins: number; banned: number }
-interface AdminUser { id: number; tg_id: number; name: string; avatar: string | null; level: number; coins: number; wins: number; losses: number; banned: number }
+interface AdminUser { id: number; tg_id: number; name: string; avatar: string | null; level: number; coins: number; gems: number; wins: number; losses: number; banned: number }
 
 /** عکس را قبل از آپلود کوچک می‌کند (حداکثر ۶۴۰ پیکسل، WebP) تا سبک و سریع باشد */
 async function shrink(file: File, max = 640): Promise<Blob> {
@@ -248,7 +248,7 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
         <small className="hint" style={{ textAlign: 'start' }}>نوع کارت را انتخاب کن؛ هزینه‌ی ارتقای همین نوع در جدول زیر ویرایش می‌شود.</small>
         {f('حداکثر لول کارت (برای هر سه نوع)', d.upgrade.maxLevel, setMax)}
         <div className="tblwrap"><table>
-          <thead><tr><th>از لول</th><th>تعداد کارت</th><th>سکه</th></tr></thead>
+          <thead><tr><th>از لول</th><th>تعداد کارت</th><th>سکه</th><th>الماس</th></tr></thead>
           <tbody>{urows.map((l, i) => (
             <tr key={i}><td>{fa(i + 1)} ← {fa(i + 2)}</td>
               <td><input className="cell" type="number" min={1} value={l.copies} onChange={(e) => upd((c) => { c.upgrade.byRarity[ur][i].copies = n(e.target.value); })} /></td>
@@ -403,17 +403,16 @@ function PlayersTab({ cfg, run }: { cfg: GameConfig; run: Run }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [d, setD] = useState<Detail | null>(null);
   const [amount, setAmount] = useState('');
-  const [exact, setExact] = useState('');
+  const [cur, setCur] = useState<'coins' | 'gems'>('coins');
   const [g, setG] = useState({ xp: 0, cardId: '' });
   const load = () => run(async () => { setUsers((await call(`/api/admin/users?q=${encodeURIComponent(q)}`)).users); });
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
-  const open = (id: number) => run(async () => { const j = await call(`/api/admin/user?id=${id}`); setD(j.user); setAmount(''); setExact(String(j.user.coins)); setG({ xp: 0, cardId: '' }); });
-  const coins = (body: { delta?: number; set?: number }, ok: string) => d && run(async () => {
-    const j = await call('/api/admin/coins', { userId: d.id, ...body });
-    setD(j.user); setExact(String(j.user.coins)); setAmount(''); await load();
-  }, ok);
+  const open = (id: number) => run(async () => { const j = await call(`/api/admin/user?id=${id}`); setD(j.user); setAmount(''); setG({ xp: 0, cardId: '' }); });
+  const change = (sign: 1 | -1) => d && run(async () => {
+    const j = await call('/api/admin/balance', { userId: d.id, currency: cur, delta: sign * amt });
+    setD(j.user); setAmount(''); await load();
+  }, `${fa(amt)} ${cur === 'coins' ? 'سکه' : 'الماس'} ${sign > 0 ? 'اضافه' : 'کم'} شد`);
   const amt = Math.floor(Number(amount));
-  const quick = [-500, -100, -50, -10, 10, 50, 100, 500];
   const cardName = (id: string) => cfg.cards.find((c) => c.id === id)?.name ?? id;
   const when = (t: number) => new Date(t).toLocaleDateString('fa-IR');
 
@@ -423,18 +422,18 @@ function PlayersTab({ cfg, run }: { cfg: GameConfig; run: Run }) {
         <label className="field" style={{ flex: 1 }}>جستجو (نام یا شناسه‌ی تلگرام)<input value={q} onChange={(e) => setQ(e.target.value)} /></label>
         <button className="btn">جستجو</button>
       </form>
-      <small className="hint" style={{ textAlign: 'start' }}>روی هر بازیکن بزن تا اطلاعات کامل و مدیریت سکه‌اش باز شود.</small>
+      <small className="hint" style={{ textAlign: 'start' }}>روی هر بازیکن بزن تا اطلاعات کامل و مدیریت سکه و الماسش باز شود.</small>
       <div className="tblwrap"><table className="clickable">
-        <thead><tr><th>بازیکن</th><th>شناسه</th><th>لول</th><th>برد / باخت</th><th>سکه</th></tr></thead>
+        <thead><tr><th>بازیکن</th><th>شناسه</th><th>لول</th><th>برد / باخت</th><th>سکه</th><th>الماس</th></tr></thead>
         <tbody>
           {users.map((u) => (
             <tr key={u.id} tabIndex={0} onClick={() => void open(u.id)} onKeyDown={(e) => { if (e.key === 'Enter') void open(u.id); }}>
               <td><span className="who"><Av url={u.avatar} name={u.name} /> <span>{u.name}</span>{u.banned ? <span className="tag bad">مسدود</span> : null}</span></td>
               <td className="num">{u.tg_id}</td><td>{fa(u.level)}</td>
-              <td>{fa(u.wins)} / {fa(u.losses)}</td><td>{fa(u.coins)}</td>
+              <td>{fa(u.wins)} / {fa(u.losses)}</td><td>{fa(u.coins)}</td><td>{fa(u.gems ?? 0)}</td>
             </tr>
           ))}
-          {users.length === 0 && <tr><td colSpan={5}>بازیکنی پیدا نشد</td></tr>}
+          {users.length === 0 && <tr><td colSpan={6}>بازیکنی پیدا نشد</td></tr>}
         </tbody>
       </table></div>
 
@@ -462,23 +461,17 @@ function PlayersTab({ cfg, run }: { cfg: GameConfig; run: Run }) {
 
             <div className="coinbox">
               <div className="coinnow">سکه‌ی فعلی <b className="num">{fa(d.coins)}</b></div>
-              <div className="quick">
-                {quick.map((n) => (
-                  <button key={n} dir="ltr" className={`btn ghost ${n < 0 ? 'neg' : 'pos'}`} onClick={() => void coins({ delta: n }, n > 0 ? `${fa(n)} سکه اضافه شد` : `${fa(-n)} سکه کم شد`)}>{n > 0 ? '+' : '−'}{fa(Math.abs(n))}</button>
-                ))}
+              <div className="coinnow">الماس سرخ فعلی <b className="num" style={{ color: '#ff8a98' }}>{fa(d.gems ?? 0)}</b></div>
+              <div className="tabs" role="tablist" aria-label="نوع دارایی">
+                <button role="tab" aria-selected={cur === 'coins'} onClick={() => setCur('coins')}>🪙 سکه</button>
+                <button role="tab" aria-selected={cur === 'gems'} onClick={() => setCur('gems')}>💎 الماس</button>
               </div>
               <div className="searchrow">
                 <label className="field" style={{ flex: 1 }}>مقدار دلخواه
                   <input type="number" min={1} value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="مثلاً ۲۵۰" />
                 </label>
-                <button className="btn ghost pos" disabled={!(amt > 0)} onClick={() => void coins({ delta: amt }, 'سکه اضافه شد')}>+ اضافه</button>
-                <button className="btn ghost neg" disabled={!(amt > 0)} onClick={() => void coins({ delta: -amt }, 'سکه کم شد')}>− کم کن</button>
-              </div>
-              <div className="searchrow">
-                <label className="field" style={{ flex: 1 }}>تنظیم دقیق موجودی
-                  <input type="number" min={0} value={exact} onChange={(e) => setExact(e.target.value)} />
-                </label>
-                <button className="btn ghost" disabled={exact === '' || !(Number(exact) >= 0)} onClick={() => void coins({ set: Math.floor(Number(exact)) }, 'موجودی تنظیم شد')}>تنظیم</button>
+                <button className="btn ghost pos" disabled={!(amt > 0)} onClick={() => void change(1)}>+ اضافه</button>
+                <button className="btn ghost neg" disabled={!(amt > 0)} onClick={() => void change(-1)}>− کم کن</button>
               </div>
             </div>
 

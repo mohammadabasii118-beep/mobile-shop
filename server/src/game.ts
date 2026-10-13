@@ -261,7 +261,7 @@ export class Game {
 
   adminUsers(q: string) {
     const like = `%${q.replace(/[%_]/g, '')}%`;
-    return (this.d.db.prepare('SELECT id, tg_id, name, avatar, level, xp, coins, wins, losses, banned, created_at FROM users WHERE name LIKE ? OR CAST(tg_id AS TEXT) LIKE ? ORDER BY id DESC LIMIT 100').all(like, like) as any[]);
+    return (this.d.db.prepare('SELECT id, tg_id, name, avatar, level, xp, coins, gems, wins, losses, banned, created_at FROM users WHERE name LIKE ? OR CAST(tg_id AS TEXT) LIKE ? ORDER BY id DESC LIMIT 100').all(like, like) as any[]);
   }
 
   adminGift(userId: number, g: { coins?: number; xp?: number; cardId?: string }) {
@@ -285,19 +285,23 @@ export class Game {
     return { ...this.profile(userId), tgId: u.tg_id as number, banned: !!u.banned, createdAt: u.created_at as number };
   }
 
-  /** سکه را کم/زیاد (delta) یا دقیق تنظیم (set) می‌کند؛ هیچ‌وقت زیر صفر نمی‌رود */
-  adminCoins(userId: number, o: { delta?: unknown; set?: unknown }) {
+  /** سکه یا الماس را کم/زیاد (delta) یا دقیق تنظیم (set) می‌کند؛ هیچ‌وقت زیر صفر نمی‌رود */
+  adminBalance(userId: number, currency: 'coins' | 'gems', o: { delta?: unknown; set?: unknown }) {
     const { db } = this.d;
+    if (currency !== 'coins' && currency !== 'gems') throw new GameError('نوع دارایی نامعتبر است');
     if (!db.prepare('SELECT 1 FROM users WHERE id = ?').get(userId)) throw new GameError('بازیکن پیدا نشد');
     const LIM = 10_000_000;
+    const name = currency === 'coins' ? 'سکه' : 'الماس';
     if (o.set !== undefined) {
-      if (!Number.isInteger(o.set) || (o.set as number) < 0 || (o.set as number) > LIM) throw new GameError('عدد سکه نامعتبر است');
-      db.prepare('UPDATE users SET coins = ? WHERE id = ?').run(o.set as number, userId);
+      if (!Number.isInteger(o.set) || (o.set as number) < 0 || (o.set as number) > LIM) throw new GameError(`عدد ${name} نامعتبر است`);
+      db.prepare(`UPDATE users SET ${currency} = ? WHERE id = ?`).run(o.set as number, userId);
     } else {
-      if (!Number.isInteger(o.delta) || Math.abs(o.delta as number) > LIM) throw new GameError('عدد سکه نامعتبر است');
-      db.prepare('UPDATE users SET coins = MAX(0, coins + ?) WHERE id = ?').run(o.delta as number, userId);
+      if (!Number.isInteger(o.delta) || Math.abs(o.delta as number) > LIM) throw new GameError(`عدد ${name} نامعتبر است`);
+      db.prepare(`UPDATE users SET ${currency} = MAX(0, ${currency} + ?) WHERE id = ?`).run(o.delta as number, userId);
     }
   }
+
+  adminCoins(userId: number, o: { delta?: unknown; set?: unknown }) { this.adminBalance(userId, 'coins', o); }
 
   adminBan(userId: number, banned: boolean) {
     this.d.db.prepare('UPDATE users SET banned = ? WHERE id = ?').run(banned ? 1 : 0, userId);
