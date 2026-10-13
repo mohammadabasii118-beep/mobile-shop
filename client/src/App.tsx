@@ -84,8 +84,14 @@ export function App() {
             {tab === 'home' ? <Home ctx={ctx} queued={queued} onAdmin={() => setTab('admin')} /> : <CardsScreen ctx={ctx} />}
           </div>
           <nav className="nav">
-            <button className={tab === 'home' ? 'on' : ''} onClick={() => setTab('home')}>⚔️<span>بازی</span></button>
-            <button className={tab === 'cards' ? 'on' : ''} onClick={() => setTab('cards')}>🃏<span>کارت‌ها</span></button>
+            <button className={tab === 'home' ? 'on' : ''} onClick={() => setTab('home')} aria-current={tab === 'home' ? 'page' : undefined}>
+              <svg className="ni" viewBox="0 0 24 24" aria-hidden><path d="M5 4l14 14M19 4L5 18" /><path d="M12.500 18.500l5-5M6.500 13.500l5 5" /><path d="M19 18l2 2M5 18l-2 2" /></svg>
+              <span>بازی</span>
+            </button>
+            <button className={tab === 'cards' ? 'on' : ''} onClick={() => setTab('cards')} aria-current={tab === 'cards' ? 'page' : undefined}>
+              <svg className="ni" viewBox="0 0 24 24" aria-hidden><rect x="4" y="5" width="11" height="15" rx="2" /><path d="M9 3.500h8a2 2 0 0 1 2 2V16" /><path d="M7.500 12l1.500-3 1.500 3-1.500 3z" /></svg>
+              <span>کارت‌ها</span>
+            </button>
           </nav>
         </>
       )}
