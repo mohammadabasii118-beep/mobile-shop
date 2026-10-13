@@ -461,3 +461,7 @@ html, body, #root, .app, .screen, .battle, .admin { overscroll-behavior: none; }
 .mtitle { font-size: 28px; }
 .mode .fee { transform: scale(.92); }
 .boxes { margin-top: clamp(24px, 9vh, 80px); }
+
+/* سکه همه‌جا یک آیکون و یک رنگ */
+.coinv { display: inline-flex; align-items: center; gap: 4px; color: var(--gold); font-weight: 800; vertical-align: middle; }
+.coinv .i { width: 14px; height: 14px; }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { abilityLines, resolveCard, type CardDef } from '@game/shared';
 import type { Ctx } from './App';
 import { call } from './net';
-import { Bar, CardTile, Modal, RARITY_FA, fa, sortByPower } from './ui';
+import { Bar, CardTile, Icon, Modal, RARITY_FA, fa, sortByPower } from './ui';
 
 export function CardsScreen({ ctx }: { ctx: Ctx }) {
   const { profile: p, cfg, setProfile, toast } = ctx;
@@ -90,7 +90,7 @@ function Detail({ flash, locked, def, level, copies, cfg, coins, deck, onClose, 
       {locked ? <p className="hint">🔒 این کارت را هنوز نداری؛ از جعبه‌ها به‌دست می‌آید.</p> : need ? (
         <>
           <Bar value={copies} max={need.copies} />
-          <small>تعداد کارت {fa(copies)}/{fa(need.copies)} — هزینه 🪙 {fa(need.coins)}</small>
+          <small>تعداد کارت {fa(copies)}/{fa(need.copies)} — هزینه <span className="coinv"><Icon n="coin" /> {fa(need.coins)}</span></small>
           <button className="btn" disabled={!can} onClick={onUpgrade}>ارتقا به لول {fa(level + 1)}</button>
         </>
       ) : <p>این کارت در بالاترین لول است 👑</p>}

@@ -4,7 +4,7 @@ import { resolveCard } from '@game/shared';
 import type { Ctx } from './App';
 import { call, loadConfig } from './net';
 import { initData } from './telegram';
-import { CardTile, Modal, RARITY_FA, fa } from './ui';
+import { CardTile, Icon, Modal, RARITY_FA, fa } from './ui';
 
 type Tab = 'cards' | 'eco' | 'solo' | 'look' | 'players' | 'json';
 interface Stats { users: number; battles: number; pendingBoxes: number; coins: number; banned: number }
@@ -463,7 +463,7 @@ function PlayersTab({ cfg, run }: { cfg: GameConfig; run: Run }) {
               <div className="coinnow">سکه‌ی فعلی <b className="num">{fa(d.coins)}</b></div>
               <div className="coinnow">الماس سرخ فعلی <b className="num" style={{ color: '#ff8a98' }}>{fa(d.gems ?? 0)}</b></div>
               <div className="tabs" role="tablist" aria-label="نوع دارایی">
-                <button role="tab" aria-selected={cur === 'coins'} onClick={() => setCur('coins')}>🪙 سکه</button>
+                <button role="tab" aria-selected={cur === 'coins'} onClick={() => setCur('coins')}><Icon n="coin" /> سکه</button>
                 <button role="tab" aria-selected={cur === 'gems'} onClick={() => setCur('gems')}>💎 الماس</button>
               </div>
               <div className="searchrow">

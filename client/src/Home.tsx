@@ -253,7 +253,7 @@ function Boxes({ ctx }: { ctx: Ctx }) {
         <Modal onClose={() => setReward(null)}>
           <div className="center-in">
             <h3>🎉 جعبه‌ی {cfg.box.types[reward.type as 'bronze']?.name} باز شد</h3>
-            <p>🪙 {fa(reward.coins)} سکه</p>
+            <p><span className="coinv"><Icon n="coin" /> {fa(reward.coins)}</span> سکه</p>
             <p>⭐ {fa(reward.xp)} XP {reward.levelsGained ? `— لول‌آپ! (+${fa(reward.levelsGained)})` : ''}</p>
             {reward.cards.length === 0 && <p>این بار کارتی نیامد</p>}
             <div className="row">
