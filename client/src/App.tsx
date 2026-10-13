@@ -7,6 +7,7 @@ import { BattleScreen, type BattleInit } from './BattleScreen';
 import { Admin } from './Admin';
 import { Gate } from './Gate';
 import { initDebug } from './telegram';
+import { setScene } from './music';
 import { Modal, fa } from './ui';
 import type { BattleReward } from '@game/shared';
 
@@ -30,6 +31,9 @@ export function App() {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const sock = useRef(new Socket()).current;
   const timer = useRef<number>();
+
+  // آهنگ نبرد فقط وقتی داخل دوئل (سولو یا آنلاین) هستیم
+  useEffect(() => { setScene(battle ? 'battle' : 'menu'); }, [!!battle]);
 
   const toast = useCallback((s: string) => {
     setToastMsg(s);

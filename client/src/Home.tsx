@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Ctx } from './App';
 import { call } from './net';
 import { isDev, openLink } from './telegram';
-import { setMuted, setVolume, useMusic } from './music';
+import { setMuted, setVolume, useMusic, type Channel } from './music';
 import { Bar, Modal, fa, fmtTime, CardTile, RARITY_FA, Icon } from './ui';
 
 export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAdmin: () => void }) {
@@ -17,7 +17,6 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
   const [showProfile, setShowProfile] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [page, setPage] = useState<'about' | 'news' | 'settings' | null>(null);
-  const music = useMusic();
 
   return (
     <>
@@ -132,17 +131,8 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
         <Modal onClose={() => setPage(null)}>
           <div className="settings">
             <h3>تنظیمات</h3>
-            <div className="srow">
-              <span>🎵 موسیقی</span>
-              <button className={`switch ${music.muted || music.volume === 0 ? '' : 'on'}`} role="switch" aria-checked={!(music.muted || music.volume === 0)} aria-label="روشن/خاموش موسیقی"
-                onClick={() => (music.volume === 0 ? setVolume(0.5) : setMuted(!music.muted))}><i /></button>
-            </div>
-            <div className="srow vol">
-              <span>🔈</span>
-              <input type="range" min={0} max={100} step={1} dir="ltr" value={music.muted ? 0 : Math.round(music.volume * 100)} onChange={(e) => setVolume(Number(e.target.value) / 100)} aria-label="بلندی صدای موسیقی" />
-              <span>🔊</span>
-              <b className="num">{fa(music.muted ? 0 : Math.round(music.volume * 100))}٪</b>
-            </div>
+            <VolumeRow ch="menu" label="🎵 موسیقی بازی" />
+            <VolumeRow ch="battle" label="⚔️ صدای نبرد (سولو و آنلاین)" />
             <button className="btn" onClick={() => setPage(null)}>بستن</button>
           </div>
         </Modal>
@@ -275,5 +265,26 @@ function Boxes({ ctx }: { ctx: Ctx }) {
         </Modal>
       )}
     </section>
+  );
+}
+
+/** یک ردیف تنظیم صدا: کلید روشن/خاموش + نوار صدا از ۰ تا ۱۰۰ */
+function VolumeRow({ ch, label }: { ch: Channel; label: string }) {
+  const m = useMusic(ch);
+  const off = m.muted || m.volume === 0;
+  return (
+    <div className="vrow">
+      <div className="srow">
+        <span>{label}</span>
+        <button className={`switch ${off ? '' : 'on'}`} role="switch" aria-checked={!off} aria-label={`روشن/خاموش ${label}`}
+          onClick={() => (m.volume === 0 ? setVolume(ch, 0.5) : setMuted(ch, !m.muted))}><i /></button>
+      </div>
+      <div className="srow vol">
+        <span>🔈</span>
+        <input type="range" min={0} max={100} step={1} dir="ltr" value={m.muted ? 0 : Math.round(m.volume * 100)} onChange={(e) => setVolume(ch, Number(e.target.value) / 100)} aria-label={`بلندی ${label}`} />
+        <span>🔊</span>
+        <b className="num">{fa(m.muted ? 0 : Math.round(m.volume * 100))}٪</b>
+      </div>
+    </div>
   );
 }
