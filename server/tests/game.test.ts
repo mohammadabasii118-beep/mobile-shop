@@ -147,6 +147,10 @@ describe('game economy', () => {
     expect([p.wins, p.losses, p.soloStage]).toEqual([1, 1, 1]);
   });
 
+  it('every player starts with 50 red gems', () => {
+    expect(game.profile(uid).gems).toBe(50);
+  });
+
   it('new players start with only the 3 common starter cards', () => {
     const p = game.profile(uid);
     expect(p.cards.map((c) => c.id).sort()).toEqual(['arash', 'bijan', 'giv']);

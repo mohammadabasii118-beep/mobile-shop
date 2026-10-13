@@ -10,7 +10,7 @@ export interface BoxView { slot: number; type: BoxType; state: 'locked' | 'openi
 export interface CardView { id: string; level: number; copies: number }
 export interface Profile {
   id: number; name: string; avatar: string | null;
-  level: number; xp: number; xpNeeded: number; coins: number;
+  level: number; xp: number; xpNeeded: number; coins: number; /** الماس سرخ */ gems: number;
   wins: number; losses: number; soloStage: number; isAdmin: boolean;
   /** آیا شرط عضویت کانال برقرار است (یا لازم نیست)؟ */
   channelOk: boolean;

@@ -75,7 +75,7 @@ export class Game {
     });
     return {
       id: u.id, name: u.name, avatar: u.avatar, level: u.level, xp: u.xp,
-      xpNeeded: this.xpNeeded(u.level), coins: u.coins, wins: u.wins, losses: u.losses,
+      xpNeeded: this.xpNeeded(u.level), coins: u.coins, gems: u.gems ?? 0, wins: u.wins, losses: u.losses,
       soloStage: u.solo_stage, cards, deck, boxes, isAdmin: this.d.isAdmin?.(u.tg_id) ?? false,
       channelOk: this.d.channelRequired?.(u.tg_id) ? !!u.channel_ok : true,
     };
