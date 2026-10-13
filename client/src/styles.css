@@ -389,3 +389,32 @@ html, body, #root, .app, .screen, .battle, .admin { overscroll-behavior: none; }
 .switch.on i { transform: translateX(-22px); }
 
 .vrow { display: flex; flex-direction: column; gap: 6px; }
+
+/* افکت‌های کارت در نبرد */
+.card.hit { animation: shake .4s, hitflash .45s ease-out; }
+@keyframes hitflash { 0% { filter: brightness(1.7) saturate(2.4) hue-rotate(-25deg); } 100% { filter: none; } }
+.spark { position: absolute; left: 50%; top: 40%; width: 5px; height: 5px; border-radius: 50%; background: #ffd9a0; box-shadow: 0 0 8px #ff9a4a; pointer-events: none; z-index: 6; animation: sparkfly .6s ease-out forwards; }
+@keyframes sparkfly { to { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
+.card.shatter-hide { visibility: hidden; }
+.shards { position: absolute; top: 0; left: 0; right: 0; aspect-ratio: 3 / 4.15; pointer-events: none; z-index: 6; }
+.shard { position: absolute; inset: 0; animation: shardfly 1.1s cubic-bezier(.3,0,.6,1) forwards; }
+@keyframes shardfly { 0% { transform: none; opacity: 1; } 20% { transform: translate(calc(var(--dx) * .15), calc(var(--dy) * .15)) rotate(calc(var(--rot) * .2)); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; } }
+/* پایان نبرد */
+.overlay.res { align-items: flex-end; overflow: hidden; }
+.overlay.res.win { background: radial-gradient(90% 60% at 50% 0%, rgba(110,80,10,.55), rgba(5,10,18,.62)); }
+.overlay.res.lose { background: rgba(4,7,16,.6); }
+.overlay.res .sheet { position: relative; z-index: 2; }
+.rays { position: absolute; left: 50%; top: -20%; width: 190vmax; aspect-ratio: 1; transform: translateX(-50%); background: repeating-conic-gradient(from 0deg, rgba(255,214,110,.22) 0 7deg, transparent 7deg 18deg); -webkit-mask: radial-gradient(circle, #000 0 22%, transparent 55%); mask: radial-gradient(circle, #000 0 22%, transparent 55%); animation: raysp 16s linear infinite, fade 1s ease-out both; pointer-events: none; z-index: 0; }
+@keyframes raysp { to { transform: translateX(-50%) rotate(360deg); } }
+.confetti { position: absolute; top: -12px; width: 8px; height: 12px; opacity: 0; animation: confall linear forwards; pointer-events: none; z-index: 1; }
+@keyframes confall { 0% { opacity: 1; transform: translate(0, 0) rotate(0); } 100% { opacity: 1; transform: translate(var(--dx), 105vh) rotate(var(--rot)); } }
+.vig { position: absolute; inset: 0; background: radial-gradient(circle at 50% 40%, transparent 30%, rgba(0,0,0,.7) 100%); pointer-events: none; z-index: 0; animation: fade 1.2s ease-out both; }
+.rain { position: absolute; top: -20px; width: 1.5px; height: 18px; background: linear-gradient(transparent, rgba(160,180,230,.5)); animation: rainfall linear infinite; pointer-events: none; z-index: 1; }
+@keyframes rainfall { to { transform: translateY(105vh); } }
+.ember { position: absolute; bottom: -6px; width: 4px; height: 4px; border-radius: 50%; background: #ff8a4a; box-shadow: 0 0 6px #ff6a2a; opacity: 0; animation: emberup linear forwards; pointer-events: none; z-index: 1; }
+@keyframes emberup { 0% { opacity: 0; transform: translate(0, 0); } 15% { opacity: .9; } 100% { opacity: 0; transform: translate(var(--dx), -60vh); } }
+/* کارت‌های خودم: برد = درخشش طلایی، باخت = سنگین و خاکستری */
+.battle.won .mine .card { box-shadow: 0 0 0 1px rgba(0,0,0,.4), 0 0 20px rgba(255,210,100,.75), 0 0 42px rgba(255,200,70,.4); animation: wonpulse 1.8s ease-in-out infinite alternate; }
+@keyframes wonpulse { from { filter: brightness(1); } to { filter: brightness(1.18) saturate(1.15); } }
+.battle.lost .mine .card:not(.dead) { filter: grayscale(.9) brightness(.55); transform: translateY(6px) rotate(-2deg) scale(.97); transition: filter 1.2s ease-in, transform 1.2s ease-in; }
+@media (prefers-reduced-motion: reduce) { .rays, .confetti, .rain, .ember, .battle.won .mine .card { animation: none; } }
