@@ -34,7 +34,7 @@ export default function AdminNav({ groups, storeName, userName, logout, children
     <div className="ad-shell">
       {open && <div className="ad-scrim" onClick={() => setOpen(false)} />}
       <aside className={`ad-side${open ? ' open' : ''}`} aria-label="منوی مدیریت">
-        <div className="ad-brand"><LogoMark size={32} /><div>{storeName}<small>پنل مدیریت</small></div></div>
+        <div className="ad-brand"><LogoMark size={40} /><div>{storeName}<small>پنل مدیریت</small></div></div>
         {groups.map((g) => (
           <nav key={g.title} className="ad-group" aria-label={g.title}>
             <h4>{g.title}</h4>

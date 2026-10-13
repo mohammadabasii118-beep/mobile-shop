@@ -10,7 +10,7 @@ export default function Footer({ settings, categories }: { settings: Settings; c
         <div className="f-top">
           <div>
             <Link className="logo" href="/" style={{ color: '#fff' }}>
-              <LogoMark size={34} />
+              <LogoMark size={44} />
               <bdi>{settings.store_name}</bdi>
             </Link>
             <p style={{ marginTop: 12, maxWidth: '34ch' }}>{settings.footer_about}</p>

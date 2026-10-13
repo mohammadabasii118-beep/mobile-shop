@@ -35,21 +35,21 @@ export default function Sprite() {
           <rect x="50" y="56" width="100" height="112" rx="22" fill="url(#gLight)" />
           <rect x="50" y="56" width="100" height="112" rx="22" fill="none" stroke="#fff" strokeWidth="1.5" />
           <rect x="78" y="118" width="44" height="14" rx="7" fill="#1d1f24" /><rect x="86" y="123" width="28" height="4" rx="2" fill="#4a4e58" />
-          <circle cx="100" cy="86" r="5" fill="#d6ff3d" stroke="#111216" strokeWidth="2" />
+          <circle cx="100" cy="86" r="5" fill="#7fe3f3" stroke="#111216" strokeWidth="2" />
           <path d="M58 70 Q 100 62 142 70" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" opacity=".8" />
         </symbol>
         <symbol id="p-bank" viewBox="0 0 200 200">
           <rect x="54" y="20" width="92" height="160" rx="22" fill="url(#gDark)" />
           <rect x="54" y="20" width="92" height="160" rx="22" fill="none" stroke="#fff" strokeOpacity=".18" strokeWidth="1.5" />
           <rect x="72" y="40" width="56" height="8" rx="4" fill="#0c0d10" />
-          <circle cx="80" cy="44" r="2.6" fill="#d6ff3d" /><circle cx="92" cy="44" r="2.6" fill="#d6ff3d" /><circle cx="104" cy="44" r="2.6" fill="#d6ff3d" /><circle cx="116" cy="44" r="2.6" fill="#4a4e58" />
+          <circle cx="80" cy="44" r="2.6" fill="#7fe3f3" /><circle cx="92" cy="44" r="2.6" fill="#7fe3f3" /><circle cx="104" cy="44" r="2.6" fill="#7fe3f3" /><circle cx="116" cy="44" r="2.6" fill="#4a4e58" />
           <rect x="86" y="150" width="28" height="12" rx="6" fill="#0c0d10" />
-          <path d="M96 78 L84 106 H98 L92 130 L116 96 H101 L106 78 Z" fill="#d6ff3d" opacity=".95" />
+          <path d="M96 78 L84 106 H98 L92 130 L116 96 H101 L106 78 Z" fill="#7fe3f3" opacity=".95" />
         </symbol>
         <symbol id="p-buds" viewBox="0 0 200 200">
           <rect x="46" y="96" width="108" height="76" rx="34" fill="url(#gLight)" />
           <rect x="46" y="96" width="108" height="76" rx="34" fill="none" stroke="#fff" strokeWidth="1.5" />
-          <path d="M48 130 H152" stroke="#c4c8d0" strokeWidth="2" /><circle cx="100" cy="146" r="4" fill="#d6ff3d" stroke="#111216" strokeWidth="1.5" />
+          <path d="M48 130 H152" stroke="#c4c8d0" strokeWidth="2" /><circle cx="100" cy="146" r="4" fill="#7fe3f3" stroke="#111216" strokeWidth="1.5" />
           <ellipse cx="76" cy="62" rx="15" ry="20" fill="url(#gLight)" stroke="#c4c8d0" strokeWidth="1.5" /><rect x="84" y="62" width="8" height="34" rx="4" fill="#e3e6eb" stroke="#c4c8d0" strokeWidth="1.2" />
           <ellipse cx="124" cy="62" rx="15" ry="20" fill="url(#gLight)" stroke="#c4c8d0" strokeWidth="1.5" /><rect x="108" y="62" width="8" height="34" rx="4" fill="#e3e6eb" stroke="#c4c8d0" strokeWidth="1.2" />
         </symbol>
@@ -63,7 +63,7 @@ export default function Sprite() {
           <rect x="92" y="108" width="16" height="56" rx="8" fill="url(#gSilver)" />
           <rect x="64" y="156" width="72" height="18" rx="9" fill="url(#gDark)" />
           <circle cx="100" cy="72" r="48" fill="url(#gDark)" /><circle cx="100" cy="72" r="48" fill="none" stroke="#fff" strokeOpacity=".2" strokeWidth="1.5" />
-          <circle cx="100" cy="72" r="32" fill="none" stroke="#6b6f7a" strokeWidth="2" /><circle cx="100" cy="72" r="16" fill="#0c0d10" /><circle cx="100" cy="72" r="4" fill="#d6ff3d" />
+          <circle cx="100" cy="72" r="32" fill="none" stroke="#6b6f7a" strokeWidth="2" /><circle cx="100" cy="72" r="16" fill="#0c0d10" /><circle cx="100" cy="72" r="4" fill="#7fe3f3" />
         </symbol>
         <symbol id="p-flash" viewBox="0 0 200 200">
           <rect x="132" y="82" width="46" height="36" rx="6" fill="url(#gSilver)" /><rect x="144" y="92" width="8" height="16" rx="2" fill="#6b6f7a" /><rect x="158" y="92" width="8" height="16" rx="2" fill="#6b6f7a" />
