@@ -109,3 +109,12 @@ export function App() {
 
 export const rewardText = (r: BattleReward | null, boxName?: string) =>
   !r ? '' : r.box === null && !r.noSlot ? 'این بار جعبه‌ای نیامد.' : r.box !== null ? `🎁 یک جعبه‌ی ${boxName ?? ''} گرفتی! (اسلات ${fa(r.box + 1)})` : '📦 اسلات‌های جعبه پر است؛ این بار جعبه‌ای نگرفتی.';
+
+/** خطوط جایزه‌ی آنلاین (XP و کاپ؛ سکه با آیکون جدا نمایش داده می‌شود) برای صفحه‌ی پایان نبرد */
+export const onlineRewardLines = (r: BattleReward | null): string[] => {
+  if (!r || r.trophies === undefined) return [];
+  const out: string[] = [];
+  if (r.xp) out.push(`⭐ +${fa(r.xp)} XP${r.levelsGained ? ' — لول‌آپ!' : ''}`);
+  out.push(`🏆 ${r.trophies >= 0 ? '+' : '−'}${fa(Math.abs(r.trophies))} کاپ`);
+  return out;
+};

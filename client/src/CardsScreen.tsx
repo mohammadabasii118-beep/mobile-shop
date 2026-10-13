@@ -36,7 +36,7 @@ export function CardsScreen({ ctx }: { ctx: Ctx }) {
     try { setProfile((await call('/api/deck', { cards: next })).profile); setOpen(null); } catch (e) { toast((e as Error).message); }
   };
   const upgrade = async (id: string) => {
-    try { setProfile((await call('/api/upgrade', { cardId: id })).profile); toast('ارتقا انجام شد ✨'); setFlash(id); setTimeout(() => setFlash(null), 900); } catch (e) { toast((e as Error).message); }
+    try { const j = await call('/api/upgrade', { cardId: id }); setProfile(j.profile); toast(`ارتقا انجام شد ✨${j.upgrade?.xp ? ` +${fa(j.upgrade.xp)} XP` : ''}${j.upgrade?.levelsGained ? ' — لول‌آپ!' : ''}`); setFlash(id); setTimeout(() => setFlash(null), 900); } catch (e) { toast((e as Error).message); }
   };
 
   const sel = open ? { def: defOf(open), c: owned.get(open) ?? null } : null;

@@ -311,67 +311,82 @@
       "common": [
         {
           "copies": 2,
-          "coins": 50
+          "coins": 50,
+          "xp": 10
         },
         {
           "copies": 4,
-          "coins": 150
+          "coins": 150,
+          "xp": 20
         },
         {
           "copies": 8,
-          "coins": 400
+          "coins": 400,
+          "xp": 30
         },
         {
           "copies": 16,
-          "coins": 1000
+          "coins": 1000,
+          "xp": 50
         },
         {
           "copies": 32,
-          "coins": 2500
+          "coins": 2500,
+          "xp": 80
         }
       ],
       "rare": [
         {
           "copies": 2,
-          "coins": 100
+          "coins": 100,
+          "xp": 20
         },
         {
           "copies": 3,
-          "coins": 300
+          "coins": 300,
+          "xp": 35
         },
         {
           "copies": 6,
-          "coins": 800
+          "coins": 800,
+          "xp": 55
         },
         {
           "copies": 12,
-          "coins": 2000
+          "coins": 2000,
+          "xp": 85
         },
         {
           "copies": 24,
-          "coins": 5000
+          "coins": 5000,
+          "xp": 125
         }
       ],
       "epic": [
         {
           "copies": 1,
-          "coins": 200
+          "coins": 200,
+          "xp": 40
         },
         {
           "copies": 2,
-          "coins": 600
+          "coins": 600,
+          "xp": 70
         },
         {
           "copies": 4,
-          "coins": 1600
+          "coins": 1600,
+          "xp": 110
         },
         {
           "copies": 8,
-          "coins": 4000
+          "coins": 4000,
+          "xp": 170
         },
         {
           "copies": 16,
-          "coins": 10000
+          "coins": 10000,
+          "xp": 250
         }
       ]
     }
@@ -398,10 +413,6 @@
           40,
           90
         ],
-        "xp": [
-          30,
-          60
-        ],
         "cardCountRange": [
           1,
           1
@@ -419,10 +430,6 @@
           120,
           260
         ],
-        "xp": [
-          80,
-          160
-        ],
         "cardCountRange": [
           1,
           2
@@ -439,10 +446,6 @@
         "coins": [
           400,
           800
-        ],
-        "xp": [
-          200,
-          400
         ],
         "cardCountRange": [
           2,
@@ -1503,5 +1506,11 @@
         ]
       }
     ]
+  },
+  "online": {
+    "winCoins": 70,
+    "winXp": 5,
+    "trophiesWin": 10,
+    "trophiesLoss": 6
   }
 }

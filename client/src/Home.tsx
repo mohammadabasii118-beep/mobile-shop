@@ -4,6 +4,7 @@ import { call } from './net';
 import { isDev, openLink } from './telegram';
 import { setMuted, setVolume, useMusic, type Channel } from './music';
 import { Bar, Modal, fa, fmtTime, CardTile, RARITY_FA, Icon } from './ui';
+import type { LeaderRow } from '@game/shared';
 
 export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAdmin: () => void }) {
   const { profile: p, cfg, sock } = ctx;
@@ -16,6 +17,11 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
   const [pitIdx, setPitIdx] = useState(() => Math.max(0, pits.findIndex((q) => q.first + q.stages.length > ctx.profile.soloStage)));
   const [showProfile, setShowProfile] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [lb, setLb] = useState<{ rows: LeaderRow[]; myRank: number } | 'loading' | 'error' | null>(null);
+  const openLb = async () => {
+    setLb('loading');
+    try { const j = await call('/api/leaderboard'); setLb({ rows: j.leaders, myRank: j.myRank }); } catch { setLb('error'); }
+  };
   const [page, setPage] = useState<'about' | 'news' | 'settings' | null>(null);
 
   return (
@@ -72,6 +78,16 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
       {view === 'menu' ? (
         <section className="menu">
           <div className="hero">
+            <button className="cupbtn" onClick={() => void openLb()} aria-label="نفرات برتر">
+              <svg viewBox="0 0 24 24" aria-hidden>
+                <defs><linearGradient id="cupg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff0b0" /><stop offset=".55" stop-color="#f3c969" /><stop offset="1" stop-color="#b8862b" /></linearGradient></defs>
+                <path d="M7 3.500h10v6a5 5 0 0 1-10 0z" fill="url(#cupg)" stroke="#7a5412" strokeWidth=".9" strokeLinejoin="round" />
+                <path d="M7 5.500H4.200v2.300A3.200 3.200 0 0 0 7.300 11M17 5.500h2.800v2.300a3.200 3.200 0 0 1-3.100 3.200" fill="none" stroke="url(#cupg)" strokeWidth="1.700" strokeLinecap="round" />
+                <path d="M12 14.500v3M9 17.500h6l.8 3H8.200z" fill="url(#cupg)" stroke="#7a5412" strokeWidth=".9" strokeLinejoin="round" />
+                <path d="M9.300 5.800l5.400 5M14.700 5.800l-5.400 5" stroke="#5a3a08" strokeWidth="1.300" strokeLinecap="round" />
+                <path d="M8.600 6.700l1.200-1.200M15.400 6.700l-1.200-1.200" stroke="#5a3a08" strokeWidth="1.200" strokeLinecap="round" />
+              </svg>
+            </button>
             {cfg.ui?.banner ? <img className="bannerimg" src={cfg.ui.banner} alt="میراث" /> : <><div className="brand">میراث</div><p>سه کارت، یک میراث</p></>}
           </div>
           <button className="mode solo" onClick={() => setView('solo')}>
@@ -113,6 +129,34 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
 
       <Boxes ctx={ctx} />
 
+      {lb && (
+        <div className="overlay glass" onClick={() => setLb(null)}>
+          <div className="lbpanel" role="dialog" aria-label="نفرات برتر" onClick={(e) => e.stopPropagation()}>
+            <header>
+              <button className="lbx" onClick={() => setLb(null)} aria-label="بستن">✕</button>
+              <h3>نفرات برتر</h3>
+            </header>
+            {lb === 'loading' && <p className="lbmsg">در حال بارگذاری…</p>}
+            {lb === 'error' && <p className="lbmsg">دریافت جدول ممکن نشد؛ دوباره امتحان کن.</p>}
+            {typeof lb === 'object' && (
+              <>
+                <ol className="lblist">
+                  {lb.rows.map((r) => (
+                    <li key={r.id} className={`${r.me ? 'me' : ''} ${r.rank <= 3 ? `top${r.rank}` : ''}`}>
+                      <b className="rk num">{r.rank <= 3 ? ['🥇', '🥈', '🥉'][r.rank - 1] : fa(r.rank)}</b>
+                      <Avatar url={r.avatar} name={r.name} />
+                      <span className="nm"><b>{r.name}</b><small>لول {fa(r.level)}</small></span>
+                      <span className="tr num">{fa(r.trophies)}<Cup /></span>
+                    </li>
+                  ))}
+                  {lb.rows.length === 0 && <li className="lbmsg">هنوز کسی کاپ نگرفته.</li>}
+                </ol>
+                <footer>جایگاه تو: <b className="num">{fa(lb.myRank)}</b> · کاپ‌های تو: <b className="num">{fa(p.trophies ?? 0)}</b><Cup /></footer>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       {showProfile && <ProfileModal ctx={ctx} onClose={() => setShowProfile(false)} />}
       {page === 'about' && (
         <Modal onClose={() => setPage(null)}>
@@ -254,7 +298,6 @@ function Boxes({ ctx }: { ctx: Ctx }) {
           <div className="center-in">
             <h3>🎉 جعبه‌ی {cfg.box.types[reward.type as 'bronze']?.name} باز شد</h3>
             <p><span className="coinv"><Icon n="coin" /> {fa(reward.coins)}</span> سکه</p>
-            <p>⭐ {fa(reward.xp)} XP {reward.levelsGained ? `— لول‌آپ! (+${fa(reward.levelsGained)})` : ''}</p>
             {reward.cards.length === 0 && <p>این بار کارتی نیامد</p>}
             <div className="row">
               {reward.cards.map((c: { id: string; isNew: boolean }) => {
@@ -290,4 +333,9 @@ function VolumeRow({ ch, label }: { ch: Channel; label: string }) {
       </div>
     </div>
   );
+}
+
+/** جام کوچک برای کنار عدد کاپ */
+function Cup() {
+  return <svg className="cupi" viewBox="0 0 24 24" aria-hidden><path d="M7 3.500h10v6a5 5 0 0 1-10 0z" fill="#f3c969" /><path d="M7 5.500H4.200v2.300A3.200 3.200 0 0 0 7.300 11M17 5.500h2.800v2.300a3.200 3.200 0 0 1-3.100 3.200" fill="none" stroke="#f3c969" strokeWidth="1.700" strokeLinecap="round" /><path d="M12 14.500v3M9 17.500h6l.8 3H8.200z" fill="#f3c969" /></svg>;
 }

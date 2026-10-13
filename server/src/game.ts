@@ -75,7 +75,7 @@ export class Game {
     });
     return {
       id: u.id, name: u.name, avatar: u.avatar, level: u.level, xp: u.xp,
-      xpNeeded: this.xpNeeded(u.level), coins: u.coins, gems: u.gems ?? 0, wins: u.wins, losses: u.losses,
+      xpNeeded: this.xpNeeded(u.level), coins: u.coins, gems: u.gems ?? 0, trophies: u.trophies ?? 0, wins: u.wins, losses: u.losses,
       soloStage: u.solo_stage, cards, deck, boxes, isAdmin: this.d.isAdmin?.(u.tg_id) ?? false,
       channelOk: this.d.channelRequired?.(u.tg_id) ? !!u.channel_ok : true,
     };
@@ -136,6 +136,9 @@ export class Game {
     if (coins < need.coins) throw new GameError(`سکه کافی نیست (${coins}/${need.coins})`);
     db.prepare('UPDATE user_cards SET level = level + 1, copies = copies - ? WHERE user_id = ? AND card_id = ?').run(need.copies, userId, cardId);
     db.prepare('UPDATE users SET coins = coins - ? WHERE id = ?').run(need.coins, userId);
+    // هر ارتقا XP هم می‌دهد (مقدارش در جدول ارتقا برای هر نوع کارت و لول)
+    const levelsGained = need.xp > 0 ? this.addXp(userId, need.xp) : 0;
+    return { xp: need.xp, levelsGained };
   }
 
   // ---------- جعبه ----------
@@ -192,7 +195,6 @@ export class Game {
     const type = this.boxType(box.type);
     const bc: BoxTypeCfg = cfg.box.types[type];
     const coins = randInt(rng, bc.coins);
-    const xp = randInt(rng, bc.xp);
     const gotCards: { id: string; isNew: boolean }[] = [];
     const n = randInt(rng, bc.cardCountRange);
     for (let i = 0; i < n; i++) {
@@ -207,8 +209,7 @@ export class Game {
     }
     db.prepare('DELETE FROM boxes WHERE user_id = ? AND slot = ?').run(userId, slot);
     db.prepare('UPDATE users SET coins = coins + ? WHERE id = ?').run(coins, userId);
-    const levelsGained = this.addXp(userId, xp);
-    return { type, coins, xp, cards: gotCards, levelsGained };
+    return { type, coins, cards: gotCards };
   }
 
   private rollRarity(bc: BoxTypeCfg): Rarity | null {
@@ -232,18 +233,45 @@ export class Game {
   }
 
   // ---------- نتیجه‌ی مبارزه ----------
-  recordResult(userId: number, won: boolean, soloStage?: number): BattleReward | null {
-    const { db } = this.d;
+  /**
+   * تک‌نفره: برد فقط جعبه می‌دهد (طبق شانس تنظیم‌شده) و پیشرفت مرحله را باز می‌کند؛ کاپ و سکه و XP ندارد.
+   * آنلاین: برد = جعبه (طبق شانس) + سکه + XP + کاپ؛ باخت = کم‌شدن کاپ (هیچ‌وقت زیر صفر نمی‌رود).
+   */
+  recordResult(userId: number, won: boolean, mode: 'solo' | 'multi', soloStage?: number): BattleReward | null {
+    const { db, cfg } = this.d;
+    const on = cfg.online;
     if (!won) {
       db.prepare('UPDATE users SET losses = losses + 1 WHERE id = ?').run(userId);
+      if (mode === 'multi') {
+        db.prepare('UPDATE users SET trophies = MAX(0, trophies - ?) WHERE id = ?').run(on.trophiesLoss, userId);
+        return { box: null, type: null, noSlot: false, trophies: -on.trophiesLoss };
+      }
       return null;
     }
     db.prepare('UPDATE users SET wins = wins + 1 WHERE id = ?').run(userId);
-    if (soloStage !== undefined) {
+    if (mode === 'solo' && soloStage !== undefined) {
       db.prepare('UPDATE users SET solo_stage = MAX(solo_stage, ?) WHERE id = ?').run(soloStage + 1, userId);
     }
-    const type = this.rewardBoxType(soloStage !== undefined ? 'solo' : 'multi');
-    return type ? this.grantBox(userId, type) : { box: null, type: null, noSlot: false };
+    const type = this.rewardBoxType(mode);
+    const box = type ? this.grantBox(userId, type) : { box: null, type: null, noSlot: false };
+    if (mode === 'solo') return box;
+    db.prepare('UPDATE users SET coins = coins + ?, trophies = trophies + ? WHERE id = ?').run(on.winCoins, on.trophiesWin, userId);
+    const levelsGained = on.winXp > 0 ? this.addXp(userId, on.winXp) : 0;
+    return { ...box, coins: on.winCoins, xp: on.winXp, trophies: on.trophiesWin, levelsGained };
+  }
+
+  /** جایگاه یک بازیکن در جدول (۱ = بالاترین) */
+  trophyRank(userId: number): number {
+    const u = this.d.db.prepare('SELECT trophies, level FROM users WHERE id = ?').get(userId) as any;
+    if (!u) return 0;
+    const n = this.d.db.prepare('SELECT COUNT(*) n FROM users WHERE banned = 0 AND (trophies > ? OR (trophies = ? AND (level > ? OR (level = ? AND id < ?))))').get(u.trophies, u.trophies, u.level, u.level, userId) as any;
+    return Number(n.n) + 1;
+  }
+
+  /** نفرات برتر بر اساس بیشترین کاپ (در تساوی: لول بالاتر، بعد قدیمی‌تر) */
+  leaderboard(meId: number, limit = 50) {
+    const rows = this.d.db.prepare('SELECT id, name, avatar, level, trophies FROM users WHERE banned = 0 ORDER BY trophies DESC, level DESC, id ASC LIMIT ?').all(limit) as any[];
+    return rows.map((r, i) => ({ rank: i + 1, id: r.id as number, name: r.name as string, avatar: (r.avatar ?? null) as string | null, level: r.level as number, trophies: r.trophies as number, me: r.id === meId }));
   }
 
   // ---------- ابزارهای مدیریت ----------
@@ -261,7 +289,7 @@ export class Game {
 
   adminUsers(q: string) {
     const like = `%${q.replace(/[%_]/g, '')}%`;
-    return (this.d.db.prepare('SELECT id, tg_id, name, avatar, level, xp, coins, gems, wins, losses, banned, created_at FROM users WHERE name LIKE ? OR CAST(tg_id AS TEXT) LIKE ? ORDER BY id DESC LIMIT 100').all(like, like) as any[]);
+    return (this.d.db.prepare('SELECT id, tg_id, name, avatar, level, xp, coins, gems, trophies, wins, losses, banned, created_at FROM users WHERE name LIKE ? OR CAST(tg_id AS TEXT) LIKE ? ORDER BY id DESC LIMIT 100').all(like, like) as any[]);
   }
 
   adminGift(userId: number, g: { coins?: number; xp?: number; cardId?: string }) {

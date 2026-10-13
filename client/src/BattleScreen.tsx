@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { BattleEvent, ServerMsg, Side, UnitView } from '@game/shared';
 import type { Ctx } from './App';
-import { rewardText } from './App';
-import { CardTile, Modal, fa } from './ui';
+import { onlineRewardLines, rewardText } from './App';
+import { CardTile, Icon, Modal, fa } from './ui';
 import { haptic, setClosingConfirm } from './telegram';
 
 type Start = Extract<ServerMsg, { t: 'battleStart' }>;
@@ -206,6 +206,8 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
             <div className="center-in result">
               <h1>{result.youWon ? '🏆 پیروز شدی!' : '💀 باختی'}</h1>
               {reasonText && <small>{reasonText}</small>}
+              {result.reward?.coins ? <p className="rwline"><span className="coinv"><Icon n="coin" /> +{fa(result.reward.coins)}</span> سکه</p> : null}
+              {onlineRewardLines(result.reward).map((l) => <p key={l} className="rwline">{l}</p>)}
               {result.youWon && <p>{rewardText(result.reward, result.reward?.type ? cfg.box.types[result.reward.type]?.name : undefined)}</p>}
               <button className="btn" onClick={onExit}>بازگشت به منو</button>
             </div>

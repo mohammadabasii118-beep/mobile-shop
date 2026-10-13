@@ -10,14 +10,19 @@ export interface BoxView { slot: number; type: BoxType; state: 'locked' | 'openi
 export interface CardView { id: string; level: number; copies: number }
 export interface Profile {
   id: number; name: string; avatar: string | null;
-  level: number; xp: number; xpNeeded: number; coins: number; /** الماس سرخ */ gems: number;
+  level: number; xp: number; xpNeeded: number; coins: number; /** الماس سرخ */ gems: number; /** کاپ‌ها (فقط از بخش آنلاین) */ trophies: number;
   wins: number; losses: number; soloStage: number; isAdmin: boolean;
   /** آیا شرط عضویت کانال برقرار است (یا لازم نیست)؟ */
   channelOk: boolean;
   cards: CardView[]; deck: string[]; boxes: BoxView[];
 }
 
-export interface BattleReward { box: number | null; type: BoxType | null; noSlot: boolean }
+export interface BattleReward {
+  box: number | null; type: BoxType | null; noSlot: boolean;
+  /** فقط آنلاین: سکه و XP برد، تغییر کاپ (برای باخت منفی) و لول‌آپ */
+  coins?: number; xp?: number; trophies?: number; levelsGained?: number;
+}
+export interface LeaderRow { rank: number; id: number; name: string; avatar: string | null; level: number; trophies: number; me: boolean }
 
 export type ClientMsg =
   | { t: 'hello'; initData: string }

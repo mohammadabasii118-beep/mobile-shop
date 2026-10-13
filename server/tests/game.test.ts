@@ -56,7 +56,7 @@ describe('game economy', () => {
     expect(cfg.cards.find((c) => c.id === r.cards[0].id)!.rarity).toBe('epic');
     const p = game.profile(uid);
     expect(p.coins).toBe(100 + cfg.box.types.bronze.coins[0]);
-    expect(p.xp).toBe(cfg.box.types.bronze.xp[0]);
+    expect(p.xp).toBe(0); // جعبه دیگر XP نمی‌دهد
     expect(game.addXp(uid, 100000)).toBeGreaterThan(1);
   });
 
@@ -92,11 +92,11 @@ describe('game economy', () => {
     rngVal = 0.999; expect(g2.rewardBoxType('multi')).toBe('gold');
     // برد بدون جعبه: چیزی ساخته نمی‌شود و «اسلات پر» هم نیست
     rngVal = 0.5;
-    expect(g2.recordResult(id, true, 0)).toEqual({ box: null, type: null, noSlot: false });
+    expect(g2.recordResult(id, true, 'solo', 0)).toEqual({ box: null, type: null, noSlot: false });
     expect(g2.profile(id).boxes).toHaveLength(0);
     rngVal = 0.05;
-    expect(g2.recordResult(id, true, 1)).toMatchObject({ box: 0, type: 'bronze' });
-    expect(g2.recordResult(id, true)).toMatchObject({ type: 'gold' });  // مولتی‌پلیر
+    expect(g2.recordResult(id, true, 'solo', 1)).toMatchObject({ box: 0, type: 'bronze' });
+    expect(g2.recordResult(id, true, 'multi')).toMatchObject({ type: 'gold' });  // آنلاین
   });
 
   it('card stats come from the explicit per-level table (no growth formula)', () => {
@@ -114,9 +114,9 @@ describe('game economy', () => {
     db.prepare("INSERT INTO user_cards (user_id, card_id, copies) VALUES (?, 'gordafarid', 1), (?, 'sohrab', 1)").run(uid, uid);
     db.prepare('UPDATE users SET coins = 150').run();
     // ساده: ۲ کارت و ۵۰ سکه — معمولی: ۲ کارت و ۱۰۰ — کمیاب: ۱ کارت و ۲۰۰
-    expect(cfg.upgrade.byRarity.common[0]).toEqual({ copies: 2, coins: 50 });
-    expect(cfg.upgrade.byRarity.rare[0]).toEqual({ copies: 2, coins: 100 });
-    expect(cfg.upgrade.byRarity.epic[0]).toEqual({ copies: 1, coins: 200 });
+    expect(cfg.upgrade.byRarity.common[0]).toMatchObject({ copies: 2, coins: 50 });
+    expect(cfg.upgrade.byRarity.rare[0]).toMatchObject({ copies: 2, coins: 100 });
+    expect(cfg.upgrade.byRarity.epic[0]).toMatchObject({ copies: 1, coins: 200 });
     expect(() => game.upgradeCard(uid, 'gordafarid')).toThrow(/تعداد کارت/);   // ۱ از ۲
     expect(() => game.upgradeCard(uid, 'sohrab')).toThrow(/سکه/);         // ۱۵۰ از ۲۰۰
     db.prepare("UPDATE user_cards SET copies = 2 WHERE card_id = 'gordafarid'").run();
@@ -141,10 +141,45 @@ describe('game economy', () => {
   });
 
   it('only winners get boxes; results are counted', () => {
-    expect(game.recordResult(uid, false)).toBeNull();
-    expect(game.recordResult(uid, true, 0)).toEqual({ box: 0, type: 'bronze', noSlot: false });
+    expect(game.recordResult(uid, false, 'solo')).toBeNull();
+    expect(game.recordResult(uid, true, 'solo', 0)).toEqual({ box: 0, type: 'bronze', noSlot: false });
     const p = game.profile(uid);
     expect([p.wins, p.losses, p.soloStage]).toEqual([1, 1, 1]);
+    // تک‌نفره هیچ سکه/XP/کاپی نمی‌دهد
+    expect([p.coins, p.xp, p.trophies]).toEqual([100, 0, 0]);
+  });
+
+  it('online: win = +10 trophies, +5 xp, +70 coins (plus box chance); loss = -6 trophies, never below 0', () => {
+    rngVal = 0.999; // بدون جعبه‌ی بیش‌ازحد: فقط ببینیم سکه/XP/کاپ
+    const win = game.recordResult(uid, true, 'multi');
+    expect(win).toMatchObject({ coins: 70, xp: 5, trophies: 10 });
+    let p = game.profile(uid);
+    expect([p.trophies, p.coins, p.xp]).toEqual([10, 170, 5]);
+    expect(game.recordResult(uid, false, 'multi')).toMatchObject({ trophies: -6 });
+    expect(game.profile(uid).trophies).toBe(4);
+    game.recordResult(uid, false, 'multi');
+    expect(game.profile(uid).trophies).toBe(0);   // 4 - 6 → 0
+    p = game.profile(uid);
+    expect([p.wins, p.losses]).toEqual([1, 2]);
+  });
+
+  it('upgrading a card gives xp from the upgrade table', () => {
+    const db = (game as any).d.db;
+    db.prepare('UPDATE user_cards SET copies = 5 WHERE card_id = ?').run('giv');
+    db.prepare('UPDATE users SET coins = 500').run();
+    const r = game.upgradeCard(uid, 'giv');
+    expect(r.xp).toBe(cfg.upgrade.byRarity.common[0].xp);
+    expect(game.profile(uid).xp).toBe(cfg.upgrade.byRarity.common[0].xp);
+  });
+
+  it('leaderboard is sorted by trophies and marks me', () => {
+    const b = game.upsertUser({ tgId: 2, name: 'B', avatar: null });
+    const c = game.upsertUser({ tgId: 3, name: 'C', avatar: null });
+    (game as any).d.db.prepare('UPDATE users SET trophies = ? WHERE id = ?').run(30, b);
+    (game as any).d.db.prepare('UPDATE users SET trophies = ? WHERE id = ?').run(50, c);
+    const rows = game.leaderboard(b);
+    expect(rows.map((r) => [r.name, r.trophies, r.rank])).toEqual([['C', 50, 1], ['B', 30, 2], ['T', 0, 3]]);
+    expect(rows.find((r) => r.me)!.name).toBe('B');
   });
 
   it('every player starts with 50 red gems', () => {

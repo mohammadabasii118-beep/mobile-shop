@@ -164,7 +164,7 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
   );
   const [ur, setUr] = useState<Rarity>('common');
   const urows = d.upgrade.byRarity[ur];
-  const total = urows.reduce((s, l) => ({ c: s.c + l.copies, k: s.k + l.coins }), { c: 0, k: 0 });
+  const total = urows.reduce((s, l) => ({ c: s.c + l.copies, k: s.k + l.coins, x: s.x + (l.xp ?? 0) }), { c: 0, k: 0, x: 0 });
   const [bt, setBt] = useState<BoxType>('bronze');
   const [dm, setDm] = useState<'solo' | 'multi'>('solo');
   const dropSum = BOX_TYPES.reduce((t, k) => t + (Number(d.box.drops[dm][k]) || 0), 0);
@@ -176,7 +176,7 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
     c.upgrade.maxLevel = m;
     for (const r of RARITIES) {
       const rows = c.upgrade.byRarity[r];
-      while (rows.length < m - 1) { const last = rows[rows.length - 1] ?? { copies: 2, coins: 50 }; rows.push({ copies: last.copies * 2, coins: last.coins * 2 }); }
+      while (rows.length < m - 1) { const last = rows[rows.length - 1] ?? { copies: 2, coins: 50, xp: 10 }; rows.push({ copies: last.copies * 2, coins: last.coins * 2, xp: Math.round(last.xp * 1.5) }); }
       rows.length = Math.max(1, m - 1);
     }
   });
@@ -195,8 +195,6 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
           {f('زمان باز شدن (ساعت)', box.durationSeconds / 3600, (x) => upd((c) => { c.box.types[bt].durationSeconds = Math.round(x * 3600); }), 0.25)}
           {f('سکه — حداقل', box.coins[0], (x) => upd((c) => { c.box.types[bt].coins[0] = x; }))}
           {f('سکه — حداکثر', box.coins[1], (x) => upd((c) => { c.box.types[bt].coins[1] = x; }))}
-          {f('XP — حداقل', box.xp[0], (x) => upd((c) => { c.box.types[bt].xp[0] = x; }))}
-          {f('XP — حداکثر', box.xp[1], (x) => upd((c) => { c.box.types[bt].xp[1] = x; }))}
           {f('تعداد کارت — حداقل', box.cardCountRange[0], (x) => upd((c) => { c.box.types[bt].cardCountRange[0] = x; }))}
           {f('تعداد کارت — حداکثر', box.cardCountRange[1], (x) => upd((c) => { c.box.types[bt].cardCountRange[1] = x; }))}
         </div>
@@ -248,14 +246,26 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
         <small className="hint" style={{ textAlign: 'start' }}>نوع کارت را انتخاب کن؛ هزینه‌ی ارتقای همین نوع در جدول زیر ویرایش می‌شود.</small>
         {f('حداکثر لول کارت (برای هر سه نوع)', d.upgrade.maxLevel, setMax)}
         <div className="tblwrap"><table>
-          <thead><tr><th>از لول</th><th>تعداد کارت</th><th>سکه</th><th>الماس</th></tr></thead>
+          <thead><tr><th>از لول</th><th>تعداد کارت</th><th>سکه</th><th>XP دریافتی</th></tr></thead>
           <tbody>{urows.map((l, i) => (
             <tr key={i}><td>{fa(i + 1)} ← {fa(i + 2)}</td>
               <td><input className="cell" type="number" min={1} value={l.copies} onChange={(e) => upd((c) => { c.upgrade.byRarity[ur][i].copies = n(e.target.value); })} /></td>
-              <td><input className="cell" type="number" min={0} value={l.coins} onChange={(e) => upd((c) => { c.upgrade.byRarity[ur][i].coins = n(e.target.value); })} /></td></tr>
+              <td><input className="cell" type="number" min={0} value={l.coins} onChange={(e) => upd((c) => { c.upgrade.byRarity[ur][i].coins = n(e.target.value); })} /></td>
+              <td><input className="cell" type="number" min={0} value={l.xp} onChange={(e) => upd((c) => { c.upgrade.byRarity[ur][i].xp = n(e.target.value); })} /></td></tr>
           ))}</tbody>
         </table></div>
-        <small className="hint">رساندن یک کارت {RARITY_FA[ur]} تا لول آخر: {fa(total.c)} کارت (تعداد) و {fa(total.k)} سکه</small>
+        <small className="hint">رساندن یک کارت {RARITY_FA[ur]} تا لول آخر: {fa(total.c)} کارت (تعداد)، {fa(total.k)} سکه و {fa(total.x)} XP برای بازیکن</small>
+        <button className="btn" onClick={() => run(async () => refresh((await call('/api/admin/config', { config: d })) as GameConfig), 'ذخیره شد و اعمال شد')}>ذخیره و اعمال</button>
+      </div>
+      <div className="box">
+        <h3>جایزه‌ی نبرد آنلاین</h3>
+        <small className="hint" style={{ textAlign: 'start' }}>XP فقط از دو راه می‌آید: ارتقای کارت و برد آنلاین. جعبه‌ها XP نمی‌دهند. تک‌نفره فقط جعبه می‌دهد (طبق «شانس جعبه»).</small>
+        <div className="fgrid">
+          {f('سکه‌ی هر برد', d.online.winCoins, (x) => upd((c) => { c.online.winCoins = x; }))}
+          {f('XP هر برد', d.online.winXp, (x) => upd((c) => { c.online.winXp = x; }))}
+          {f('کاپِ هر برد (+)', d.online.trophiesWin, (x) => upd((c) => { c.online.trophiesWin = x; }))}
+          {f('کاپِ هر باخت (−)', d.online.trophiesLoss, (x) => upd((c) => { c.online.trophiesLoss = x; }))}
+        </div>
         <button className="btn" onClick={() => run(async () => refresh((await call('/api/admin/config', { config: d })) as GameConfig), 'ذخیره شد و اعمال شد')}>ذخیره و اعمال</button>
       </div>
     </div>

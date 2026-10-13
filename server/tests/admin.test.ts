@@ -147,6 +147,23 @@ describe('banner', () => {
 });
 
 describe('config override (survives code updates)', () => {
+  it('migrates old saved settings: box xp removed, upgrade xp and online rewards filled from base', async () => {
+    const { writeFileSync } = await import('node:fs');
+    const { loadConfigWithOverride } = await import('../src/config');
+    const base = loadConfig();
+    const file = join(dataDir, 'override-xp.json');
+    const old: any = JSON.parse(JSON.stringify(base));
+    delete old.online;
+    for (const t of Object.values(old.box.types) as any[]) t.xp = [30, 60];
+    for (const rows of Object.values(old.upgrade.byRarity) as any[][]) for (const r of rows) delete r.xp;
+    old.upgrade.byRarity.rare[0].copies = 30; // تغییر ادمین حفظ می‌شود
+    writeFileSync(file, JSON.stringify(old));
+    const m = loadConfigWithOverride(file);
+    expect(m.online).toEqual(base.online);
+    expect((m.box.types.bronze as any).xp).toBeUndefined();
+    expect(m.upgrade.byRarity.rare[0]).toMatchObject({ copies: 30, xp: base.upgrade.byRarity.rare[0].xp });
+  });
+
   it('replaces cards, starting deck and solo when the saved content is from an older contentVersion', async () => {
     const { writeFileSync } = await import('node:fs');
     const { loadConfigWithOverride } = await import('../src/config');

@@ -37,14 +37,16 @@ export function validateConfig(cfg: GameConfig): GameConfig {
   for (const r of ['common', 'rare', 'epic'] as const) {
     const rows = up.byRarity[r];
     if (!Array.isArray(rows) || rows.length !== up.maxLevel - 1) bad('جدول ارتقا برای هر نوع کارت باید دقیقاً (حداکثر لول - ۱) ردیف داشته باشد');
-    for (const l of rows) if (!isNum(l.copies, 1) || !isNum(l.coins)) bad('ردیف جدول ارتقا نامعتبر است');
+    for (const l of rows) if (!isNum(l.copies, 1) || !isNum(l.coins) || !isNum(l.xp)) bad('ردیف جدول ارتقا نامعتبر است');
   }
   if (!Array.isArray(cfg.xpPerLevel) || cfg.xpPerLevel.length < 1 || cfg.xpPerLevel.some((x) => !isNum(x, 1))) bad('جدول XP نامعتبر است');
+  const on = cfg.online;
+  if (!on || !isNum(on.winCoins) || !isNum(on.winXp) || !isNum(on.trophiesWin) || !isNum(on.trophiesLoss)) bad('جایزه‌ی نبرد آنلاین نامعتبر است');
   const b = cfg.box;
   if (!b || !isNum(b.slots, 1) || !b.types || !b.drops) bad('تنظیمات جعبه نامعتبر است');
   for (const t of ['bronze', 'silver', 'gold'] as const) {
     const bt = b.types[t];
-    if (!bt || typeof bt.name !== 'string' || !bt.name.trim() || !isNum(bt.durationSeconds, 0) || !isRange(bt.coins) || !isRange(bt.xp) || !isRange(bt.cardCountRange)) bad(`تنظیمات جعبه‌ی ${t} نامعتبر است`);
+    if (!bt || typeof bt.name !== 'string' || !bt.name.trim() || !isNum(bt.durationSeconds, 0) || !isRange(bt.coins) || !isRange(bt.cardCountRange)) bad(`تنظیمات جعبه‌ی ${t} نامعتبر است`);
     const cc = bt.cardChance;
     if (!cc || !isNum(cc.common) || !isNum(cc.rare) || !isNum(cc.epic) || cc.common + cc.rare + cc.epic > 1.0001) bad(`مجموع شانس کارت جعبه‌ی ${bt.name} نباید بیشتر از ۱۰۰٪ باشد`);
     for (const r of ['common', 'rare', 'epic'] as const) {
@@ -105,6 +107,14 @@ export function loadConfigWithOverride(overridePath: string, basePath = CONFIG_P
   if (!merged.upgrade?.byRarity) {
     const lv = merged.upgrade?.levels;
     merged.upgrade = Array.isArray(lv) ? { maxLevel: merged.upgrade.maxLevel, byRarity: { common: lv, rare: lv, epic: lv } } : base.upgrade;
+  }
+  // جایزه‌ی آنلاین (جدید): اگر نبود از پایه
+  if (!merged.online) merged.online = base.online;
+  // XP دیگر از جعبه نمی‌آید (حذف از نوع‌ها) و هر ردیف ارتقا مقدار XP دارد (اگر نبود از پایه‌ی همان نوع و ردیف)
+  for (const t of Object.values(merged.box?.types ?? {}) as any[]) delete t.xp;
+  for (const r of ['common', 'rare', 'epic'] as const) {
+    const rows = merged.upgrade?.byRarity?.[r];
+    if (Array.isArray(rows)) merged.upgrade.byRarity[r] = rows.map((row: any, i: number) => (typeof row?.xp === 'number' ? row : { ...row, xp: base.upgrade.byRarity[r][i]?.xp ?? 0 }));
   }
   // ساختار قدیمی جعبه (بدون types) → جعبه‌های جدید از پایه
   if (!merged.box?.types) merged.box = base.box;

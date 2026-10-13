@@ -78,7 +78,7 @@ export function createGameServer(opt: ServerOptions) {
           const side = battle.sideOf(c.userId)!;
           const won = side === winner;
           let reward = null;
-          try { reward = game.recordResult(c.userId, won, won ? soloStage : undefined); } catch (e) { console.error(e); }
+          try { reward = game.recordResult(c.userId, won, mode === 'solo' ? 'solo' : 'multi', won ? soloStage : undefined); } catch (e) { console.error(e); }
           send(c, { t: 'battleEnd', battleId: id, winner, youWon: won, reason, reward, profile: game.profile(c.userId) });
         }
       },
@@ -376,7 +376,8 @@ export function createGameServer(opt: ServerOptions) {
       switch (path) {
         case '/api/me': break;
         case '/api/deck': game.setDeck(userId, body.cards); break;
-        case '/api/upgrade': game.upgradeCard(userId, String(body.cardId)); break;
+        case '/api/upgrade': extra = { upgrade: game.upgradeCard(userId, String(body.cardId)) }; break;
+        case '/api/leaderboard': extra = { leaders: game.leaderboard(userId), myRank: game.trophyRank(userId) }; break;
         case '/api/box/start': game.startBox(userId, Number(body.slot)); break;
         case '/api/box/open': extra = { reward: game.openBox(userId, Number(body.slot)) }; break;
         case '/api/box/skip':

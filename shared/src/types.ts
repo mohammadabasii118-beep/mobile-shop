@@ -14,7 +14,6 @@ export interface BoxTypeCfg {
   name: string;
   durationSeconds: number;
   coins: [number, number];
-  xp: [number, number];
   cardCountRange: [number, number];
   cardChance: Record<Rarity, number>;
 }
@@ -60,8 +59,10 @@ export interface GameConfig {
   channel?: { username: string; required: boolean };
   cards: CardDef[];
   /** هزینه‌ی ارتقا برای هر نوع کارت (ساده/معمولی/کمیاب)؛ ردیف i = از لول i+1 به i+2 */
-  upgrade: { maxLevel: number; byRarity: Record<Rarity, { copies: number; coins: number }[]> };
+  upgrade: { maxLevel: number; byRarity: Record<Rarity, { copies: number; coins: number; /** XP که بازیکن با همین ارتقا می‌گیرد */ xp: number }[]> };
   xpPerLevel: number[];
+  /** جایزه‌ی هر برد در بخش آنلاین (سولو فقط جعبه می‌دهد) و کاپ‌ها */
+  online: { winCoins: number; winXp: number; trophiesWin: number; trophiesLoss: number };
   box: {
     slots: number;
     types: Record<BoxType, BoxTypeCfg>;
