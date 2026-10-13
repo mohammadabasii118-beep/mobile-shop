@@ -460,7 +460,9 @@ html, body, #root, .app, .screen, .battle, .admin { overscroll-behavior: none; }
 .medal8 svg { width: 22px; height: 22px; }
 .mtitle { font-size: 28px; }
 .mode .fee { transform: scale(.92); }
-.boxes { margin-top: clamp(24px, 9vh, 80px); }
+.boxes { margin-top: clamp(8px, 3vh, 30px); }
+/* دکمه‌ها پایین‌تر، نزدیک جعبه‌ها؛ بالای صفحه برای چیزهای بعدی خالی می‌ماند */
+.hero + .mode { margin-top: clamp(24px, 7vh, 64px); }
 
 /* سکه همه‌جا یک آیکون و یک رنگ */
 .coinv { display: inline-flex; align-items: center; gap: 4px; color: var(--gold); font-weight: 800; vertical-align: middle; }
