@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import LogoMark from './LogoMark';
 import type { Category, Settings } from '@/lib/catalog';
 import NewsletterForm from './NewsletterForm';
 
@@ -9,8 +10,8 @@ export default function Footer({ settings, categories }: { settings: Settings; c
         <div className="f-top">
           <div>
             <Link className="logo" href="/" style={{ color: '#fff' }}>
-              {settings.store_name}
-              <i style={{ boxShadow: '0 0 0 2px #fff' }} />
+              <LogoMark size={34} />
+              <bdi>{settings.store_name}</bdi>
             </Link>
             <p style={{ marginTop: 12, maxWidth: '34ch' }}>{settings.footer_about}</p>
             <NewsletterForm />

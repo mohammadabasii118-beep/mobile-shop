@@ -4,6 +4,7 @@ import SearchBox from './SearchBox';
 import MobileMenu from './MobileMenu';
 import HeaderActions from './HeaderActions';
 import CatNav from './CatNav';
+import LogoMark from './LogoMark';
 
 export default function Header({ settings, categories, userName }: { settings: Settings; categories: Category[]; userName: string | null }) {
   const msgs = settings.announcements.split('\n').map((s) => s.trim()).filter(Boolean);
@@ -20,8 +21,8 @@ export default function Header({ settings, categories, userName }: { settings: S
           <div className="bar">
             <MobileMenu categories={top} storeName={settings.store_name} phone={settings.phone} />
             <Link className="logo" href="/" aria-label={`${settings.store_name}، صفحه اصلی`}>
+              <LogoMark size={34} />
               <bdi>{settings.store_name}</bdi>
-              <i />
               {settings.store_name_en && <small className="logo-en" dir="ltr">{settings.store_name_en}</small>}
             </Link>
             <SearchBox />

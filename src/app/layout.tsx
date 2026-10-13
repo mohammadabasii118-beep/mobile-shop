@@ -10,8 +10,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const s = getSettings();
   return {
     metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
-    title: { default: `${s.store_name} | ${s.tagline}`, template: `%s | ${s.store_name}` },
-    description: s.footer_about,
+    title: { default: s.store_name, template: `%s | ${s.store_name}` },
+    description: `${s.tagline}. ${s.footer_about}`,
     openGraph: { siteName: s.store_name, locale: 'fa_IR', type: 'website' },
   };
 }

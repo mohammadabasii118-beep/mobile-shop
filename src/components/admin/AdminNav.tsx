@@ -8,6 +8,7 @@ import {
   SlidersHorizontal, Store, Tag, Ticket, Users, BadgeCheck, LogOut, Plus,
 } from 'lucide-react';
 import CommandPalette from './CommandPalette';
+import LogoMark from '../shop/LogoMark';
 import { AdminToaster } from './client';
 
 const ICONS = { dashboard: LayoutDashboard, orders: ShoppingCart, payments: CreditCard, coupons: Ticket, discounts: Percent, products: Package, attributes: SlidersHorizontal, categories: FolderTree, brands: BadgeCheck, inventory: Boxes, reviews: MessageSquare, users: Users, banners: GalleryHorizontal, reports: BarChart3, settings: Settings, plus: Plus, tag: Tag };
@@ -33,7 +34,7 @@ export default function AdminNav({ groups, storeName, userName, logout, children
     <div className="ad-shell">
       {open && <div className="ad-scrim" onClick={() => setOpen(false)} />}
       <aside className={`ad-side${open ? ' open' : ''}`} aria-label="منوی مدیریت">
-        <div className="ad-brand"><i /><div>{storeName}<small>پنل مدیریت</small></div></div>
+        <div className="ad-brand"><LogoMark size={32} /><div>{storeName}<small>پنل مدیریت</small></div></div>
         {groups.map((g) => (
           <nav key={g.title} className="ad-group" aria-label={g.title}>
             <h4>{g.title}</h4>

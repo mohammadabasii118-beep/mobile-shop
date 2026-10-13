@@ -106,10 +106,9 @@ section.sec.tight-top { padding-top: 0; }
 .hdr { position: sticky; top: 0; z-index: 40; background: var(--frost); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid var(--hairline); }
 .bar { display: flex; align-items: center; gap: 8px; height: 60px; }
 @media (min-width: 768px) { .bar { height: 68px; gap: 16px; } }
-.logo { display: flex; align-items: center; gap: 6px; font-weight: 800; font-size: 24px; color: var(--ink); line-height: 1; }
+.logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 24px; color: var(--ink); line-height: 1; }
 .logo .logo-en { display: none; font-size: 11px; font-weight: 600; letter-spacing: .14em; color: var(--mute); text-transform: uppercase; align-self: flex-end; padding-bottom: 3px; }
 @media (min-width: 480px) { .logo .logo-en { display: inline; } }
-.logo i { width: 9px; height: 9px; border-radius: 50%; background: var(--charge); box-shadow: 0 0 0 2px var(--ink); margin-top: -8px; }
 .acts { display: flex; margin-inline-start: auto; }
 .acts .hide-m { display: none; }
 @media (min-width: 768px) { .acts .hide-m { display: inline-grid; } .acts { margin-inline-start: 0; } }
