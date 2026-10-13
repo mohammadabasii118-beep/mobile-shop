@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { Ctx } from './App';
 import { call } from './net';
 import { isDev, openLink } from './telegram';
+import { setMuted, setVolume, useMusic } from './music';
 import { Bar, Modal, fa, fmtTime, CardTile, RARITY_FA, Icon } from './ui';
 
 export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAdmin: () => void }) {
@@ -15,7 +16,8 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
   const [pitIdx, setPitIdx] = useState(() => Math.max(0, pits.findIndex((q) => q.first + q.stages.length > ctx.profile.soloStage)));
   const [showProfile, setShowProfile] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [page, setPage] = useState<'about' | 'news' | null>(null);
+  const [page, setPage] = useState<'about' | 'news' | 'settings' | null>(null);
+  const music = useMusic();
 
   return (
     <>
@@ -49,6 +51,9 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
             </button>
             <button onClick={() => { setMenuOpen(false); setPage('about'); }}>
               <svg className="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 11v6M12 7.500h.01" /></svg><span>درباره</span><em>‹</em>
+            </button>
+            <button onClick={() => { setMenuOpen(false); setPage('settings'); }}>
+              <svg className="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.600 5.600l2.100 2.100M16.300 16.300l2.100 2.100M18.400 5.600l-2.100 2.100M7.700 16.300l-2.100 2.100" /></svg><span>تنظیمات</span><em>‹</em>
             </button>
             <button onClick={() => { setMenuOpen(false); setPage('news'); }}>
               <svg className="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M8 9h8M8 13h8M8 17h4" /></svg><span>خبرگزاری</span><b className="soon">به‌زودی</b><em>‹</em>
@@ -118,6 +123,25 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
               <span>✅ پشتیبانی و گزارش باگ:</span>
               <TgLink id="BHK_Su" />
               <TgLink id="Mhmdabasiiii" />
+            </div>
+            <button className="btn" onClick={() => setPage(null)}>بستن</button>
+          </div>
+        </Modal>
+      )}
+      {page === 'settings' && (
+        <Modal onClose={() => setPage(null)}>
+          <div className="settings">
+            <h3>تنظیمات</h3>
+            <div className="srow">
+              <span>🎵 موسیقی</span>
+              <button className={`switch ${music.muted || music.volume === 0 ? '' : 'on'}`} role="switch" aria-checked={!(music.muted || music.volume === 0)} aria-label="روشن/خاموش موسیقی"
+                onClick={() => (music.volume === 0 ? setVolume(0.5) : setMuted(!music.muted))}><i /></button>
+            </div>
+            <div className="srow vol">
+              <span>🔈</span>
+              <input type="range" min={0} max={100} step={1} dir="ltr" value={music.muted ? 0 : Math.round(music.volume * 100)} onChange={(e) => setVolume(Number(e.target.value) / 100)} aria-label="بلندی صدای موسیقی" />
+              <span>🔊</span>
+              <b className="num">{fa(music.muted ? 0 : Math.round(music.volume * 100))}٪</b>
             </div>
             <button className="btn" onClick={() => setPage(null)}>بستن</button>
           </div>

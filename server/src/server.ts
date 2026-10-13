@@ -29,7 +29,7 @@ interface Conn { ws: WebSocket; userId: number; name: string; battle: Battle | n
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
-  '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.jpeg': 'image/jpeg', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.jpeg': 'image/jpeg', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.mp3': 'audio/mpeg',
 };
 
 export function createGameServer(opt: ServerOptions) {
@@ -387,13 +387,27 @@ export function createGameServer(opt: ServerOptions) {
     }
   }
 
-  function serveStatic(res: ServerResponse, path: string) {
+  function serveStatic(req: IncomingMessage, res: ServerResponse, path: string) {
     const dir = opt.staticDir;
     if (!dir || !existsSync(dir)) { res.writeHead(404); return res.end('client not built'); }
     let file = normalize(join(dir, path));
     if (!file.startsWith(dir)) { res.writeHead(403); return res.end(); }
     if (!existsSync(file) || statSync(file).isDirectory()) file = join(dir, 'index.html'); // SPA
     const hashed = /\/assets\/[^/]+-[A-Za-z0-9_-]{8}\.(js|css)$/.test(file); // فقط فایل‌های ساخته‌شده با هش؛ عکس‌های ثابت (پس‌زمینه و آرت کارت) یک ساعت کش می‌شوند تا جایگزینی‌شان دیده شود
+    if (file.endsWith('.mp3')) { // موزیک: پشتیبانی از Range برای آیفون/سافاری (بدون آن پخش نمی‌شود)
+      const buf = readFileSync(file);
+      const m = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range ?? ''));
+      const head = { 'content-type': 'audio/mpeg', 'accept-ranges': 'bytes', 'cache-control': 'public, max-age=3600' };
+      if (m && (m[1] || m[2])) {
+        const start = m[1] ? Number(m[1]) : Math.max(0, buf.length - Number(m[2]));
+        const end = m[1] && m[2] ? Math.min(Number(m[2]), buf.length - 1) : buf.length - 1;
+        if (start > end || start >= buf.length) { res.writeHead(416, { 'content-range': `bytes */${buf.length}` }); return res.end(); }
+        res.writeHead(206, { ...head, 'content-range': `bytes ${start}-${end}/${buf.length}`, 'content-length': end - start + 1 });
+        return res.end(buf.subarray(start, end + 1));
+      }
+      res.writeHead(200, { ...head, 'content-length': buf.length });
+      return res.end(buf);
+    }
     res.writeHead(200, { 'content-type': MIME[extname(file)] ?? 'application/octet-stream', 'cache-control': hashed ? 'public, max-age=31536000, immutable' : /\.(jpg|png|webp)$/.test(file) ? 'public, max-age=3600' : 'no-cache' });
     res.end(readFileSync(file));
   }
@@ -415,7 +429,7 @@ export function createGameServer(opt: ServerOptions) {
       res.writeHead(200, { 'content-type': MIME[extname(f)] ?? (f.endsWith('.jpg') ? 'image/jpeg' : 'application/octet-stream'), 'cache-control': 'public, max-age=31536000, immutable', 'x-content-type-options': 'nosniff' });
       return res.end(readFileSync(f));
     }
-    serveStatic(res, path);
+    serveStatic(req, res, path);
   });
   http.on('upgrade', (req, socket, head) => {
     if (new URL(req.url ?? '/', 'http://x').pathname !== '/ws') return socket.destroy();
