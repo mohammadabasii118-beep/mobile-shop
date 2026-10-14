@@ -507,6 +507,19 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+@app.post("/api/users/{user_id}/rotate", dependencies=[Depends(require_admin)])
+def rotate_user(user_id: int, request: Request, db: Session = Depends(get_db)):
+    """New subscription token and new credentials (uuid, passwords, WireGuard key): every link handed out before stops
+    working. Name, quota, expiry and usage stay. Nodes pick the change up on their next pass (about 30 s)."""
+    user = db.get(User, user_id) or _404()
+    user.sub_token = secrets.token_urlsafe(16)
+    user.uuid = str(uuidlib.uuid4())
+    user.password = secrets.token_urlsafe(12)
+    user.wg_private, user.wg_public = new_wg_keypair()
+    db.commit()
+    return user_out(user, request)
+
+
 @app.get("/api/users/by-name/{name}", dependencies=[Depends(require_admin)])
 def user_by_name(name: str, request: Request, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.name == name)) or _404()

@@ -747,3 +747,24 @@ def test_location_can_be_renamed_with_emoji_and_links_follow():
         c.patch(url, headers=h, json={"address": "3.3.3.3"})
         assert "@3.3.3.3:" in c.get(f"/api/users/{user['id']}/configs", headers=h).json()[0]["link"]
         assert c.post("/api/node/report", headers=nh, json={}).status_code == 200
+
+
+def test_rotate_replaces_the_link_and_credentials_but_keeps_the_quota():
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "Rot", "cc": "de", "address": "4.4.4.4"}).json()
+        nh = {"Authorization": "Bearer " + node["install_command"].split("--token ")[1].split()[0]}
+        user = c.post("/api/users", headers=h, json={"name": "rotme", "quota_gb": 7, "days": 20, "protos": ["vless_tcp", "l2tp"],
+                                                      "node_ids": [node["id"]]}).json()
+        old_path = user["sub_url"].replace("https://panel.test", "")
+        old_cfg = next(u for u in c.get("/api/node/config", headers=nh).json()["users"] if u["name"] == "rotme")
+        assert c.get(old_path).status_code == 200
+
+        new = c.post(f"/api/users/{user['id']}/rotate", headers=h).json()
+        assert new["sub_url"] != user["sub_url"] and new["name"] == "rotme" and new["quota_gb"] == 7.0
+        assert c.get(old_path).status_code == 404                                # the old link is dead
+        assert c.get(new["sub_url"].replace("https://panel.test", "")).status_code == 200
+        new_cfg = next(u for u in c.get("/api/node/config", headers=nh).json()["users"] if u["name"] == "rotme")
+        assert new_cfg["uuid"] != old_cfg["uuid"] and new_cfg["password"] != old_cfg["password"] and new_cfg["wg_pub"] != old_cfg["wg_pub"]
+        assert c.post("/api/users/999999/rotate", headers=h).status_code == 404
+        assert c.post(f"/api/users/{user['id']}/rotate").status_code == 401
