@@ -151,6 +151,9 @@ persist-key
 persist-tun
 status /var/lib/vpn-node/ovpn/status.log 10
 EOF2
+# Ubuntu's unit allows only 10 processes per user and Xray also runs as nobody: OpenVPN could not fork its auth script
+mkdir -p /etc/systemd/system/openvpn-server@.service.d
+printf '[Service]\nLimitNPROC=infinity\n' > /etc/systemd/system/openvpn-server@.service.d/vpn-node.conf
 mkdir -p /var/lib/vpn-node/ovpn; chown nobody:nogroup /var/lib/vpn-node/ovpn
 
 # IKEv2 and AnyConnect reuse the TLS certificate

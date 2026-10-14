@@ -398,6 +398,20 @@ def ensure_conf_line(path, key, value):
     return write_if_changed(path, text.rstrip("\n") + f"\n{key} = {value}\n", 0o644)
 
 
+OPENVPN_DROPIN = "/etc/systemd/system/openvpn-server@.service.d/vpn-node.conf"
+# Ubuntu starts openvpn-server@ with LimitNPROC=10, counted per user. Xray also runs as `nobody` with many
+# threads, so OpenVPN could not fork its auth script ("unable to fork") and exited on every login.
+OPENVPN_DROPIN_TEXT = "[Service]\nLimitNPROC=infinity\n"
+
+
+def ensure_openvpn_limits(path=OPENVPN_DROPIN, conf="/etc/openvpn/server/server.conf"):
+    """Install the systemd drop-in once. True when it was written (the service then needs a restart)."""
+    if not os.path.exists(conf):
+        return False
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    return write_if_changed(path, OPENVPN_DROPIN_TEXT, 0o644)
+
+
 def restart(service):
     sh("systemctl", "reset-failed", service)  # after repeated crashes systemd refuses to start it again
     sh("systemctl", "restart", service)
@@ -435,6 +449,9 @@ def apply(cfg, reality, tls, wg):
             sh("wg", "syncconf", "wg0", tmp)  # live update, keeps existing sessions
         else:
             sh("systemctl", "restart", "wg-quick@wg0")
+    if ensure_openvpn_limits():
+        sh("systemctl", "daemon-reload")
+        restart("openvpn-server@server")
     apply_port("/etc/openvpn/server/server.conf", {"port": cfg["protocols"].get("ovpn")}, "openvpn-server@server")
     if ensure_conf_line("/etc/ocserv/ocserv.conf", "occtl-socket-file", "/run/occtl.socket"):
         restart("ocserv")  # without this socket `occtl` (users, traffic) cannot talk to ocserv

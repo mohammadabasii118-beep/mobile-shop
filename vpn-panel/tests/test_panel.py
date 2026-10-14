@@ -546,3 +546,13 @@ def test_wireguard_and_openvpn_files_download():
         # a disabled user gets nothing
         c.patch(f"/api/users/{user['id']}", headers=h, json={"enabled": False})
         assert c.get(f"{base}/file/{node['id']}/wg").status_code == 404
+
+
+def test_openvpn_nproc_dropin_is_installed_once():
+    root = Path(tempfile.mkdtemp())
+    conf, drop = root / "server.conf", root / "d" / "vpn-node.conf"
+    assert agent.ensure_openvpn_limits(str(drop), str(conf)) is False          # OpenVPN not installed: do nothing
+    conf.write_text("port 1194\n")
+    assert agent.ensure_openvpn_limits(str(drop), str(conf)) is True
+    assert "LimitNPROC=infinity" in drop.read_text()
+    assert agent.ensure_openvpn_limits(str(drop), str(conf)) is False          # already there: no restart loop
