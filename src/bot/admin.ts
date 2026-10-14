@@ -42,10 +42,13 @@ export function adminHandlers() {
     { id: 'set', title: '⚙️ تنظیمات و ابزارها', hint: 'متن‌ها، کانال‌های اجباری، تنظیمات و گزارش تغییرات', items: [['texts.manage', '✏️ ویرایش متن‌های ربات', 'tx:l'], ['settings.manage', '📢 کانال‌های اجباری', 'ch:l'], ['settings.manage', '⚙️ تنظیمات', 'adm:settings'], ['audit.view', '🧾 Audit Log', 'adm:audit']] },
   ];
 
+  /** Two buttons per row (a lone last button keeps its own row). */
+  const pairUp = (btns: Button[]): Button[][] => { const out: Button[][] = []; for (let i = 0; i < btns.length; i += 2) out.push(btns.slice(i, i + 2)); return out; };
+
   async function visibleItems(ctx: Ctx, g: (typeof GROUPS)[number]) {
-    const out: Button[][] = [];
-    for (const [perm, text, data] of g.items) if (await hasPermission(BigInt(ctx.from!.id), perm)) out.push([{ text, data }]);
-    return out;
+    const out: Button[] = [];
+    for (const [perm, text, data] of g.items) if (await hasPermission(BigInt(ctx.from!.id), perm)) out.push({ text, data });
+    return pairUp(out);
   }
 
   async function groupView(ctx: Ctx, id: string) {
@@ -61,13 +64,18 @@ export function adminHandlers() {
     const a = await getAdmin(BigInt(ctx.from!.id));
     if (!a) throw new ForbiddenError();
     ctx.session.step = undefined;
+    const uid = BigInt(ctx.from!.id);
     const rows: Button[][] = [];
-    if (await hasPermission(BigInt(ctx.from!.id), 'stats.view')) rows.push([{ text: '📊 داشبورد', data: 'adm:dash' }]);
-    for (const g of GROUPS) if ((await visibleItems(ctx, g)).length) rows.push([{ text: g.title, data: `adm:g:${g.id}` }]);
-    if (await hasPermission(BigInt(ctx.from!.id), 'support.reply')) rows.push([{ text: '🎫 پشتیبانی', data: 'adm:tickets' }]);
-    if (await hasPermission(BigInt(ctx.from!.id), 'broadcast.manage')) rows.push([{ text: '📣 پیام همگانی', data: 'bm:h' }]);
-    if (panelEnabled()) rows.push([{ text: '🖥 ورود به پنل وب', data: 'adm:web' }]);
-    rows.push([{ text: '🏠 منوی کاربر', data: 'menu:main' }]);
+    if (await hasPermission(uid, 'stats.view')) rows.push([{ text: '📊 داشبورد', data: 'adm:dash' }]);
+    const tools: Button[] = [];
+    for (const g of GROUPS) if ((await visibleItems(ctx, g)).length) tools.push({ text: g.title, data: `adm:g:${g.id}` });
+    if (await hasPermission(uid, 'support.reply')) tools.push({ text: '🎫 پشتیبانی', data: 'adm:tickets' });
+    if (await hasPermission(uid, 'broadcast.manage')) tools.push({ text: '📣 پیام همگانی', data: 'bm:h' });
+    rows.push(...pairUp(tools));
+    const foot: Button[] = [];
+    if (panelEnabled()) foot.push({ text: '🖥 ورود به پنل وب', data: 'adm:web' });
+    foot.push({ text: '🏠 منوی کاربر', data: 'menu:main' });
+    rows.push(foot);
     await show(ctx, `🛠 پنل مدیریت (${a.role})\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\nیک بخش را انتخاب کنید:`, rows);
   }
 
