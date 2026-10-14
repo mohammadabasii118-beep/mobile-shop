@@ -14,7 +14,7 @@ import { Game, GameError } from './game';
 export interface ServerOptions {
   db: Db; cfg: GameConfig; auth: AuthOptions; staticDir?: string;
   now?: () => number; rng?: () => number;
-  pauseMs?: number; botDelayMs?: number; turnMs?: number; heartbeatMs?: number; inviteMs?: number;
+  pauseMs?: number; botDelayMs?: number; turnMs?: number; heartbeatMs?: number; inviteMs?: number; botUsername?: () => string | undefined;
   /** آدرس API تلگرام (برای تست قابل تغییر) */
   telegramApi?: string;
   /** پوشه‌ی داده (عکس‌های آپلودشده) */
@@ -92,6 +92,7 @@ export function createGameServer(opt: ServerOptions) {
     return res === 'delivered' ? '✅ پرداخت انجام شد و الماس به حسابت اضافه شد. موفق باشی!' : null;
   };
 
+  const refLink = (id: number) => { const u = opt.botUsername?.() ?? process.env.BOT_USERNAME; return u ? `https://t.me/${u}?start=ref_${id}` : null; };
   const decorateFriends = (s: ReturnType<Game['friendsState']>) => ({
     ...s,
     friends: s.friends.map((f): FriendView => { const c = conns.get(f.id); return { ...f, online: !!c && c.ws.readyState === 1, busy: !!c && (!!c.battle || c.queued) }; })
@@ -149,7 +150,7 @@ export function createGameServer(opt: ServerOptions) {
         if (!peer || peer.ws.readyState !== 1) return send(c, { t: 'inviteResult', status: 'offline' });
         if (busy(peer) || [...invites.values()].some((i) => i.to === to)) return send(c, { t: 'inviteResult', status: 'busy' });
         dropInvite(c.userId);
-        const timer = setTimeout(() => dropInvite(c.userId, 'expired'), opt.inviteMs ?? 30_000);
+        const timer = setTimeout(() => dropInvite(c.userId, 'expired'), opt.inviteMs ?? 10_000);
         timer.unref();
         invites.set(c.userId, { to, timer });
         return send(peer, { t: 'invited', from: c.userId, name: c.name });
@@ -482,7 +483,8 @@ export function createGameServer(opt: ServerOptions) {
           try { extra = { order: o, url: await createStarsInvoice(o) }; } catch (e) { game.cancelOrder(o.id); console.error('[stars]', (e as Error).message); throw new GameError('ساخت فاکتور استار ممکن نشد؛ کمی بعد دوباره امتحان کن'); }
           break;
         }
-        case '/api/friends': extra = { ...decorateFriends(game.friendsState(userId)), code: userId }; break;
+        case '/api/friends': extra = { ...decorateFriends(game.friendsState(userId)), code: userId, refLink: refLink(userId) }; break;
+        case '/api/friends/search': extra = game.searchPlayer(userId, body.code); break;
         case '/api/friends/add': {
           const r = game.addFriend(userId, body.code);
           const peer = conns.get(r.to);
@@ -490,8 +492,8 @@ export function createGameServer(opt: ServerOptions) {
           extra = { ...decorateFriends(game.friendsState(userId)), code: userId, accepted: r.accepted };
           break;
         }
-        case '/api/friends/accept': game.acceptFriend(userId, Number(body.id)); extra = { ...decorateFriends(game.friendsState(userId)), code: userId }; break;
-        case '/api/friends/remove': game.removeFriend(userId, Number(body.id)); extra = { ...decorateFriends(game.friendsState(userId)), code: userId }; break;
+        case '/api/friends/accept': game.acceptFriend(userId, Number(body.id)); extra = { ...decorateFriends(game.friendsState(userId)), code: userId, refLink: refLink(userId) }; break;
+        case '/api/friends/remove': game.removeFriend(userId, Number(body.id)); extra = { ...decorateFriends(game.friendsState(userId)), code: userId, refLink: refLink(userId) }; break;
         case '/api/leaderboard': extra = { leaders: game.leaderboard(userId), myRank: game.trophyRank(userId) }; break;
         case '/api/box/start': game.startBox(userId, Number(body.slot)); break;
         case '/api/box/open': extra = { reward: game.openBox(userId, Number(body.slot)) }; break;

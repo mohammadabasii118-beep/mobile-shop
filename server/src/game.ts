@@ -48,6 +48,7 @@ export class Game {
     }
     const res = db.prepare('INSERT INTO users (tg_id, name, avatar, created_at) VALUES (?,?,?,?)').run(u.tgId, u.name, u.avatar, this.d.now());
     const id = Number(res.lastInsertRowid);
+    this.applyPendingReferral(u.tgId, id);
     this.d.cfg.startingDeck.forEach((cardId, slot) => {
       db.prepare('INSERT INTO user_cards (user_id, card_id) VALUES (?,?)').run(id, cardId);
       db.prepare('INSERT INTO deck (user_id, slot, card_id) VALUES (?,?,?)').run(id, slot, cardId);
@@ -324,6 +325,36 @@ export class Game {
     if (db.prepare("SELECT 1 FROM friends WHERE a = ? AND b = ? AND status = 'pending'").get(id, userId)) { this.acceptFriend(userId, id); return { accepted: true, to: id }; }
     db.prepare('INSERT INTO friends (a, b, status, created_at) VALUES (?,?,?,?)').run(userId, id, 'pending', this.d.now());
     return { accepted: false, to: id };
+  }
+  private befriend(a: number, b: number) {
+    if (a === b || this.areFriends(a, b)) return;
+    const { db } = this.d;
+    db.prepare('DELETE FROM friends WHERE (a = ? AND b = ?) OR (a = ? AND b = ?)').run(a, b, b, a);
+    db.prepare("INSERT INTO friends (a, b, status, created_at) VALUES (?,?,'accepted',?)").run(a, b, this.d.now());
+  }
+  /** لینک رفرال: کسی که با لینک دعوت وارد ربات شد، مستقیم دوست دعوت‌کننده می‌شود (اگر هنوز بازیکن نیست، موقع اولین ورود) */
+  refStart(tgId: number, referrerId: number) {
+    const { db } = this.d;
+    if (!Number.isInteger(referrerId) || referrerId <= 0 || !db.prepare('SELECT 1 FROM users WHERE id = ? AND banned = 0').get(referrerId)) return;
+    const me = db.prepare('SELECT id FROM users WHERE tg_id = ?').get(tgId) as { id: number } | undefined;
+    if (me) return this.befriend(me.id, referrerId);
+    db.prepare('INSERT OR IGNORE INTO referrals (tg_id, referrer) VALUES (?,?)').run(tgId, referrerId);
+  }
+  private applyPendingReferral(tgId: number, userId: number) {
+    const { db } = this.d;
+    const r = db.prepare('SELECT referrer FROM referrals WHERE tg_id = ?').get(tgId) as { referrer: number } | undefined;
+    if (!r) return;
+    db.prepare('DELETE FROM referrals WHERE tg_id = ?').run(tgId);
+    this.befriend(userId, r.referrer);
+  }
+  /** جستجو با شناسه‌ی عددی: بازیکن + رابطه‌ی فعلی با او */
+  searchPlayer(userId: number, code: unknown): { player: FriendBase; relation: 'self' | 'friend' | 'outgoing' | 'incoming' | 'none' } {
+    const { db } = this.d;
+    const id = Number(String(code ?? '').replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))).replace(/[^0-9]/g, ''));
+    if (!Number.isInteger(id) || id <= 0 || !db.prepare('SELECT 1 FROM users WHERE id = ? AND banned = 0').get(id)) throw new GameError('بازیکنی با این شناسه پیدا نشد');
+    const st = db.prepare('SELECT a, status FROM friends WHERE (a = ? AND b = ?) OR (a = ? AND b = ?)').get(userId, id, id, userId) as { a: number; status: string } | undefined;
+    const relation = id === userId ? 'self' : !st ? 'none' : st.status === 'accepted' ? 'friend' : st.a === userId ? 'outgoing' : 'incoming';
+    return { player: this.friendBase(id), relation };
   }
   acceptFriend(userId: number, fromId: number) {
     const r = this.d.db.prepare("UPDATE friends SET status = 'accepted' WHERE a = ? AND b = ? AND status = 'pending'").run(fromId, userId);

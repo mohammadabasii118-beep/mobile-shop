@@ -114,16 +114,7 @@ export function App() {
             <button className="btn ghost" onClick={() => { sock.send({ t: 'leaveQueue' }); setQueued(false); }}>انصراف</button></div>
         </Modal>
       )}
-      {invited && !battle && (
-        <Modal>
-          <div className="center-in"><h3>⚔ {invited.name} تو را به بازی دوستانه دعوت کرد</h3>
-            <small>بدون جایزه و کاپ</small>
-            <div className="row">
-              <button className="btn" onClick={() => { sock.send({ t: 'inviteReply', from: invited.from, accept: true }); setInvited(null); }}>قبول</button>
-              <button className="btn ghost" onClick={() => { sock.send({ t: 'inviteReply', from: invited.from, accept: false }); setInvited(null); }}>رد</button>
-            </div></div>
-        </Modal>
-      )}
+      {invited && !battle && <InviteBanner key={invited.from} inv={invited} onReply={(accept) => { sock.send({ t: 'inviteReply', from: invited.from, accept }); setInvited(null); }} />}
       {!profile.channelOk && <Gate ctx={ctx} />}
       {toastMsg && <div className="toast">{toastMsg}</div>}
     </div>
@@ -141,3 +132,23 @@ export const onlineRewardLines = (r: BattleReward | null): string[] => {
   out.push(`🏆 ${r.trophies >= 0 ? '+' : '−'}${fa(Math.abs(r.trophies))} کاپ`);
   return out;
 };
+
+/** پیام بالای صفحه: دعوت به بازی دوستانه؛ ۱۰ ثانیه می‌ماند و اگر جواب ندهی از بین می‌رود */
+function InviteBanner({ inv, onReply }: { inv: { from: number; name: string }; onReply: (accept: boolean) => void }) {
+  const [left, setLeft] = useState(10);
+  useEffect(() => {
+    const t = setInterval(() => setLeft((s) => s - 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => { if (left <= 0) onReply(false); }, [left]);
+  return (
+    <div className="invbanner" role="alert">
+      <div><b>{inv.name}</b> بهت درخواست مبارزه‌ی دوستانه داده. شرکت می‌کنی؟ <small className="num">({fa(Math.max(0, left))})</small></div>
+      <div className="row">
+        <button className="btn" onClick={() => onReply(true)}>قبول</button>
+        <button className="btn ghost" onClick={() => onReply(false)}>رد</button>
+      </div>
+      <i className="invbar" style={{ animationDuration: '10s' }} />
+    </div>
+  );
+}

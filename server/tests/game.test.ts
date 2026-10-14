@@ -253,6 +253,25 @@ describe('game economy', () => {
     expect(game.deckUnits(uid)).toHaveLength(3);
   });
 
+  it('player search shows the relation; referral link makes friends (even before the first login)', () => {
+    const other = game.upsertUser({ tgId: 777001, name: 'دوست', avatar: null });
+    expect(game.searchPlayer(uid, other).relation).toBe('none');
+    expect(game.searchPlayer(uid, uid).relation).toBe('self');
+    expect(() => game.searchPlayer(uid, 99999)).toThrow();
+    game.addFriend(uid, other);
+    expect(game.searchPlayer(uid, other).relation).toBe('outgoing');
+    expect(game.searchPlayer(other, uid).relation).toBe('incoming');
+    // رفرال قبل از اولین ورود: بعد از ساخته شدن کاربر خودکار دوست می‌شوند
+    game.refStart(888002, uid);
+    const fresh = game.upsertUser({ tgId: 888002, name: 'تازه', avatar: null });
+    expect(game.areFriends(uid, fresh)).toBe(true);
+    // رفرال برای کاربر موجود: فوری
+    game.refStart(777001, uid);
+    expect(game.areFriends(uid, other)).toBe(true);
+    game.refStart(888003, 424242); // دعوت‌کننده‌ی ناموجود نادیده گرفته می‌شود
+    expect(game.friendsState(game.upsertUser({ tgId: 888003, name: 'x', avatar: null })).friends).toHaveLength(0);
+  });
+
   it('old unconfirmed orders (window opened only) are hidden after the update', () => {
     const dir = mkdtempSync(join(tmpdir(), 'ord-'));
     const file = join(dir, 'x.db');

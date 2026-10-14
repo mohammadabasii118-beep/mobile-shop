@@ -79,5 +79,7 @@ export function openDb(path = ':memory:'): Db {
     a INTEGER NOT NULL, b INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created_at INTEGER NOT NULL,
     PRIMARY KEY (a, b)
   )`);
+  // دعوت با لینک رفرال: اگر کاربر هنوز وارد بازی نشده، تا اولین ورود نگه داشته می‌شود
+  db.exec('CREATE TABLE IF NOT EXISTS referrals (tg_id INTEGER PRIMARY KEY, referrer INTEGER NOT NULL)');
   return db;
 }

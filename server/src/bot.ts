@@ -29,6 +29,10 @@ export interface BotOptions {
   onPreCheckout?: (q: any) => string | null;
   /** استار تلگرام: بعد از پرداخت موفق؛ متنی که برای بازیکن فرستاده شود (یا null) */
   onPayment?: (m: any) => string | null;
+  /** کاربری با /start (و متن بعدش، مثل ref_123) آمد */
+  onStart?: (fromId: number, payload: string) => void;
+  /** نام کاربری ربات بعد از اتصال */
+  onReady?: (username: string) => void;
   log?: (s: string) => void;
 }
 
@@ -70,6 +74,7 @@ export function startBot(o: BotOptions) {
       const me = await api('getMe');
       if (!me.ok) { log(`توکن نامعتبر است: ${me.description ?? ''}`); return; }
       log(`فعال شد: @${me.result.username}`);
+      o.onReady?.(me.result.username);
       await api('setChatMenuButton', { menu_button: { type: 'web_app', text: 'میراث', web_app: { url: o.webAppUrl } } });
     } catch (e) { log(`خطا در اتصال به تلگرام: ${(e as Error).message}`); }
 
@@ -95,7 +100,10 @@ export function startBot(o: BotOptions) {
             try { const t = o.onPayment(m); if (t) await api('sendMessage', { chat_id: m.chat.id, text: t }); } catch (e) { log(`payment: ${(e as Error).message}`); }
             continue;
           }
-          if (m?.chat?.type === 'private' && typeof m.text === 'string' && m.text.startsWith('/start')) await welcome(m.chat.id);
+          if (m?.chat?.type === 'private' && typeof m.text === 'string' && m.text.startsWith('/start')) {
+            try { o.onStart?.(m.from?.id, m.text.slice(6).trim()); } catch (e) { log(`start: ${(e as Error).message}`); }
+            await welcome(m.chat.id);
+          }
           else if (m?.chat?.type === 'private' && typeof m.text === 'string' && m.text.startsWith('/backup') && o.onBackup) {
             try { await api('sendMessage', { chat_id: m.chat.id, text: await o.onBackup(m.from?.id, m.chat.id) }); } catch (e) { log(`backup: ${(e as Error).message}`); }
           }
