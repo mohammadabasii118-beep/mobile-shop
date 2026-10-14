@@ -1,6 +1,6 @@
 {
-  "contentVersion": 2,
-  "turnSeconds": 10,
+  "contentVersion": 3,
+  "turnSeconds": 15,
   "maxRounds": 100,
   "startingDeck": [
     "giv",
@@ -177,7 +177,8 @@
             "rage": 40
           }
         }
-      ]
+      ],
+      "chargeAttacks": 3
     },
     {
       "id": "kaveh",
@@ -235,7 +236,8 @@
             "teamShield": 26
           }
         }
-      ]
+      ],
+      "chargeAttacks": 3
     },
     {
       "id": "sohrab",
@@ -302,7 +304,8 @@
             "lifesteal": 20
           }
         }
-      ]
+      ],
+      "chargeAttacks": 3
     }
   ],
   "upgrade": {
@@ -720,53 +723,6 @@
               [
                 "bijan",
                 1
-              ]
-            ]
-          },
-          {
-            "ai": "random",
-            "deck": [
-              [
-                "bijan",
-                2
-              ],
-              [
-                "kaveh",
-                1
-              ],
-              [
-                "arash",
-                2
-              ]
-            ]
-          },
-          {
-            "ai": "random",
-            "deck": [
-              [
-                "arash",
-                1
-              ],
-              [
-                "giv",
-                2
-              ],
-              [
-                "gordafarid",
-                2
-              ]
-            ]
-          },
-          {
-            "ai": "random",
-            "deck": [
-              [
-                "gordafarid",
-                2
-              ],
-              [
-                "bijan",
-                2
               ],
               [
                 "kaveh",
@@ -778,6 +734,69 @@
             "ai": "random",
             "deck": [
               [
+                "bijan",
+                2
+              ],
+              [
+                "kaveh",
+                1
+              ],
+              [
+                "arash",
+                2
+              ],
+              [
+                "sohrab",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "random",
+            "deck": [
+              [
+                "arash",
+                1
+              ],
+              [
+                "giv",
+                2
+              ],
+              [
+                "gordafarid",
+                2
+              ],
+              [
+                "bijan",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "random",
+            "deck": [
+              [
+                "gordafarid",
+                2
+              ],
+              [
+                "bijan",
+                2
+              ],
+              [
+                "kaveh",
+                1
+              ],
+              [
+                "arash",
+                2
+              ]
+            ]
+          },
+          {
+            "ai": "random",
+            "deck": [
+              [
                 "kaveh",
                 2
               ],
@@ -787,6 +806,10 @@
               ],
               [
                 "giv",
+                2
+              ],
+              [
+                "gordafarid",
                 2
               ]
             ]
@@ -805,6 +828,10 @@
               [
                 "bijan",
                 2
+              ],
+              [
+                "kaveh",
+                2
               ]
             ]
           },
@@ -822,6 +849,10 @@
               [
                 "arash",
                 1
+              ],
+              [
+                "sohrab",
+                2
               ]
             ]
           },
@@ -838,6 +869,14 @@
               ],
               [
                 "gordafarid",
+                2
+              ],
+              [
+                "sohrab",
+                2
+              ],
+              [
+                "bijan",
                 2
               ]
             ]
@@ -856,6 +895,14 @@
               [
                 "kaveh",
                 2
+              ],
+              [
+                "giv",
+                2
+              ],
+              [
+                "arash",
+                2
               ]
             ]
           },
@@ -873,6 +920,14 @@
               [
                 "giv",
                 1
+              ],
+              [
+                "bijan",
+                2
+              ],
+              [
+                "gordafarid",
+                2
               ]
             ]
           }
@@ -894,6 +949,10 @@
               [
                 "bijan",
                 2
+              ],
+              [
+                "arash",
+                2
               ]
             ]
           },
@@ -911,6 +970,10 @@
               [
                 "arash",
                 2
+              ],
+              [
+                "gordafarid",
+                2
               ]
             ]
           },
@@ -927,91 +990,10 @@
               ],
               [
                 "gordafarid",
-                2
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "gordafarid",
-                3
-              ],
-              [
-                "bijan",
                 2
               ],
               [
                 "kaveh",
-                3
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "kaveh",
-                2
-              ],
-              [
-                "arash",
-                3
-              ],
-              [
-                "giv",
-                3
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "giv",
-                3
-              ],
-              [
-                "gordafarid",
-                3
-              ],
-              [
-                "bijan",
-                2
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "bijan",
-                3
-              ],
-              [
-                "kaveh",
-                2
-              ],
-              [
-                "arash",
-                3
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "arash",
-                2
-              ],
-              [
-                "giv",
-                3
-              ],
-              [
-                "gordafarid",
                 3
               ]
             ]
@@ -1025,11 +1007,120 @@
               ],
               [
                 "bijan",
+                2
+              ],
+              [
+                "kaveh",
+                3
+              ],
+              [
+                "sohrab",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "kaveh",
+                2
+              ],
+              [
+                "arash",
+                3
+              ],
+              [
+                "giv",
+                3
+              ],
+              [
+                "sohrab",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "giv",
+                3
+              ],
+              [
+                "gordafarid",
+                3
+              ],
+              [
+                "bijan",
+                2
+              ],
+              [
+                "sohrab",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "bijan",
                 3
               ],
               [
                 "kaveh",
                 2
+              ],
+              [
+                "arash",
+                3
+              ],
+              [
+                "giv",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "arash",
+                2
+              ],
+              [
+                "giv",
+                3
+              ],
+              [
+                "gordafarid",
+                3
+              ],
+              [
+                "bijan",
+                3
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "gordafarid",
+                3
+              ],
+              [
+                "bijan",
+                3
+              ],
+              [
+                "kaveh",
+                2
+              ],
+              [
+                "arash",
+                3
               ]
             ]
           },
@@ -1047,6 +1138,10 @@
               [
                 "giv",
                 3
+              ],
+              [
+                "gordafarid",
+                3
               ]
             ]
           },
@@ -1063,6 +1158,14 @@
               ],
               [
                 "kaveh",
+                3
+              ],
+              [
+                "sohrab",
+                3
+              ],
+              [
+                "bijan",
                 3
               ]
             ]
@@ -1081,6 +1184,14 @@
               [
                 "sohrab",
                 2
+              ],
+              [
+                "giv",
+                3
+              ],
+              [
+                "arash",
+                3
               ]
             ]
           },
@@ -1098,6 +1209,14 @@
               [
                 "giv",
                 3
+              ],
+              [
+                "bijan",
+                3
+              ],
+              [
+                "gordafarid",
+                3
               ]
             ]
           },
@@ -1114,6 +1233,14 @@
               ],
               [
                 "bijan",
+                4
+              ],
+              [
+                "arash",
+                4
+              ],
+              [
+                "kaveh",
                 4
               ]
             ]
@@ -1132,6 +1259,14 @@
               [
                 "arash",
                 3
+              ],
+              [
+                "gordafarid",
+                4
+              ],
+              [
+                "sohrab",
+                4
               ]
             ]
           },
@@ -1148,6 +1283,14 @@
               ],
               [
                 "gordafarid",
+                4
+              ],
+              [
+                "kaveh",
+                4
+              ],
+              [
+                "giv",
                 4
               ]
             ]
@@ -1166,6 +1309,14 @@
               [
                 "kaveh",
                 4
+              ],
+              [
+                "sohrab",
+                4
+              ],
+              [
+                "bijan",
+                4
               ]
             ]
           },
@@ -1183,6 +1334,14 @@
               [
                 "sohrab",
                 3
+              ],
+              [
+                "giv",
+                4
+              ],
+              [
+                "arash",
+                4
               ]
             ]
           },
@@ -1200,6 +1359,14 @@
               [
                 "giv",
                 4
+              ],
+              [
+                "bijan",
+                4
+              ],
+              [
+                "gordafarid",
+                4
               ]
             ]
           },
@@ -1216,6 +1383,14 @@
               ],
               [
                 "bijan",
+                4
+              ],
+              [
+                "arash",
+                4
+              ],
+              [
+                "kaveh",
                 4
               ]
             ]
@@ -1238,6 +1413,14 @@
               [
                 "arash",
                 3
+              ],
+              [
+                "bijan",
+                4
+              ],
+              [
+                "gordafarid",
+                4
               ]
             ]
           },
@@ -1255,6 +1438,14 @@
               [
                 "gordafarid",
                 4
+              ],
+              [
+                "arash",
+                4
+              ],
+              [
+                "kaveh",
+                4
               ]
             ]
           },
@@ -1272,6 +1463,14 @@
               [
                 "kaveh",
                 4
+              ],
+              [
+                "gordafarid",
+                4
+              ],
+              [
+                "sohrab",
+                4
               ]
             ]
           },
@@ -1289,15 +1488,6 @@
               [
                 "sohrab",
                 3
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "arash",
-                5
               ],
               [
                 "kaveh",
@@ -1305,91 +1495,6 @@
               ],
               [
                 "giv",
-                5
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "gordafarid",
-                4
-              ],
-              [
-                "sohrab",
-                5
-              ],
-              [
-                "bijan",
-                5
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "kaveh",
-                5
-              ],
-              [
-                "giv",
-                5
-              ],
-              [
-                "arash",
-                4
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "sohrab",
-                5
-              ],
-              [
-                "bijan",
-                4
-              ],
-              [
-                "gordafarid",
-                5
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "giv",
-                4
-              ],
-              [
-                "arash",
-                5
-              ],
-              [
-                "kaveh",
-                5
-              ]
-            ]
-          },
-          {
-            "ai": "smart",
-            "deck": [
-              [
-                "bijan",
-                5
-              ],
-              [
-                "gordafarid",
-                5
-              ],
-              [
-                "sohrab",
                 4
               ]
             ]
@@ -1408,6 +1513,14 @@
               [
                 "giv",
                 5
+              ],
+              [
+                "sohrab",
+                5
+              ],
+              [
+                "bijan",
+                5
               ]
             ]
           },
@@ -1424,6 +1537,14 @@
               ],
               [
                 "bijan",
+                5
+              ],
+              [
+                "giv",
+                5
+              ],
+              [
+                "arash",
                 5
               ]
             ]
@@ -1442,6 +1563,14 @@
               [
                 "arash",
                 4
+              ],
+              [
+                "bijan",
+                5
+              ],
+              [
+                "gordafarid",
+                5
               ]
             ]
           },
@@ -1459,6 +1588,14 @@
               [
                 "gordafarid",
                 5
+              ],
+              [
+                "arash",
+                5
+              ],
+              [
+                "kaveh",
+                5
               ]
             ]
           },
@@ -1476,6 +1613,164 @@
               [
                 "kaveh",
                 5
+              ],
+              [
+                "gordafarid",
+                5
+              ],
+              [
+                "sohrab",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "bijan",
+                5
+              ],
+              [
+                "gordafarid",
+                5
+              ],
+              [
+                "sohrab",
+                4
+              ],
+              [
+                "kaveh",
+                5
+              ],
+              [
+                "giv",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "arash",
+                5
+              ],
+              [
+                "kaveh",
+                4
+              ],
+              [
+                "giv",
+                5
+              ],
+              [
+                "sohrab",
+                5
+              ],
+              [
+                "bijan",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "gordafarid",
+                4
+              ],
+              [
+                "sohrab",
+                5
+              ],
+              [
+                "bijan",
+                5
+              ],
+              [
+                "giv",
+                5
+              ],
+              [
+                "arash",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "kaveh",
+                5
+              ],
+              [
+                "giv",
+                5
+              ],
+              [
+                "arash",
+                4
+              ],
+              [
+                "bijan",
+                5
+              ],
+              [
+                "gordafarid",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "sohrab",
+                5
+              ],
+              [
+                "bijan",
+                4
+              ],
+              [
+                "gordafarid",
+                5
+              ],
+              [
+                "arash",
+                5
+              ],
+              [
+                "kaveh",
+                5
+              ]
+            ]
+          },
+          {
+            "ai": "smart",
+            "deck": [
+              [
+                "giv",
+                4
+              ],
+              [
+                "arash",
+                5
+              ],
+              [
+                "kaveh",
+                5
+              ],
+              [
+                "gordafarid",
+                5
+              ],
+              [
+                "sohrab",
+                5
               ]
             ]
           },
@@ -1493,6 +1788,14 @@
               [
                 "sohrab",
                 5
+              ],
+              [
+                "kaveh",
+                6
+              ],
+              [
+                "giv",
+                6
               ]
             ]
           },
@@ -1510,6 +1813,14 @@
               [
                 "giv",
                 6
+              ],
+              [
+                "sohrab",
+                6
+              ],
+              [
+                "bijan",
+                6
               ]
             ]
           },
@@ -1526,6 +1837,14 @@
               ],
               [
                 "bijan",
+                6
+              ],
+              [
+                "giv",
+                6
+              ],
+              [
+                "arash",
                 6
               ]
             ]
@@ -1544,6 +1863,14 @@
               [
                 "arash",
                 5
+              ],
+              [
+                "bijan",
+                6
+              ],
+              [
+                "gordafarid",
+                6
               ]
             ]
           },
@@ -1560,6 +1887,14 @@
               ],
               [
                 "gordafarid",
+                6
+              ],
+              [
+                "arash",
+                6
+              ],
+              [
+                "kaveh",
                 6
               ]
             ]
@@ -1660,5 +1995,7 @@
       "bank": ""
     },
     "starsEnabled": true
-  }
+  },
+  "deckSize": 5,
+  "rev": 2
 }

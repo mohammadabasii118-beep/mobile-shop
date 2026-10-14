@@ -13,6 +13,7 @@ export function validateConfig(cfg: GameConfig): GameConfig {
   if (!cfg || typeof cfg !== 'object') bad('کانفیگ نامعتبر است');
   if (!isNum(cfg.turnSeconds, 1)) bad('turnSeconds نامعتبر است');
   if (!isNum(cfg.maxRounds, 1)) bad('maxRounds نامعتبر است');
+  if (!Number.isInteger(cfg.deckSize) || cfg.deckSize < 3 || cfg.deckSize > 5) bad('تعداد کارت ترکیب باید بین ۳ و ۵ باشد');
   if (!Array.isArray(cfg.cards) || cfg.cards.length < 3) bad('حداقل ۳ کارت لازم است');
   const ids = new Set<string>();
   for (const c of cfg.cards) {
@@ -22,13 +23,14 @@ export function validateConfig(cfg: GameConfig): GameConfig {
     if (typeof c.name !== 'string' || !c.name.trim() || c.name.length > 40) bad(`نام کارت ${c.id} نامعتبر است`);
     if (!['common', 'rare', 'epic'].includes(c.rarity)) bad(`نادری ${c.id} نامعتبر است`);
     if (!isNum(c.hp, 1) || !isNum(c.atk, 0) || !isNum(c.shield, 0)) bad(`آمار ${c.id} نامعتبر است`);
+    if (c.chargeAttacks !== undefined && (!Number.isInteger(c.chargeAttacks) || c.chargeAttacks < 0 || c.chargeAttacks > 20)) bad(`تعداد حمله‌ی قدرت ویژه‌ی ${c.id} باید عدد صحیح ۰ تا ۲۰ باشد`);
     for (const a of c.abilities ?? []) if (!a || !ABILITIES[a.id]) bad(`توانایی ناشناخته: ${a?.id}`);
     const okParams = (p: unknown) => p === undefined || (!!p && typeof p === 'object' && Object.values(p as object).every((v) => isNum(v)));
     if (!okParams(c.params) || (c.levels ?? []).some((l) => !okParams(l?.params))) bad(`عددهای توانایی ${c.id} نامعتبر است`);
     if (c.levels !== undefined && (!Array.isArray(c.levels) || c.levels.length > 20 || c.levels.some((l) => !l || !isNum(l.hp, 1) || !isNum(l.atk) || !isNum(l.shield)))) bad(`آمار لول‌های ${c.id} نامعتبر است`);
     if (c.image !== undefined && (typeof c.image !== 'string' || !/^\/uploads\/cards\/[a-z0-9_]+\.(png|jpg|webp)(\?v=\d+)?$/.test(c.image))) bad(`آدرس عکس ${c.id} نامعتبر است`);
   }
-  if (!Array.isArray(cfg.startingDeck) || cfg.startingDeck.length !== 3 || new Set(cfg.startingDeck).size !== 3) bad('ترکیب اولیه باید ۳ کارت متفاوت باشد');
+  if (!Array.isArray(cfg.startingDeck) || cfg.startingDeck.length < 3 || cfg.startingDeck.length > cfg.deckSize || new Set(cfg.startingDeck).size !== cfg.startingDeck.length) bad('ترکیب اولیه باید ۳ تا ۵ کارت متفاوت باشد');
   for (const id of cfg.startingDeck) if (!ids.has(id)) bad(`ترکیب اولیه: کارت ناشناخته ${id}`);
   if (cfg.fees && (!Number.isInteger(cfg.fees.solo) || !Number.isInteger(cfg.fees.multi) || cfg.fees.solo < 0 || cfg.fees.multi < 0 || cfg.fees.solo > 100000 || cfg.fees.multi > 100000)) bad('هزینه‌ی ورود باید عدد صحیح بین ۰ و ۱۰۰٬۰۰۰ باشد');
   if (cfg.channel && (typeof cfg.channel.required !== 'boolean' || !/^[A-Za-z0-9_]{4,32}$/.test(cfg.channel.username ?? ''))) bad('آیدی کانال نامعتبر است (بدون @، فقط حروف انگلیسی، عدد و _)');
@@ -93,7 +95,7 @@ export function validateConfig(cfg: GameConfig): GameConfig {
   for (const pit of cfg.solo.pits) {
     if (!pit || !Array.isArray(pit.stages) || pit.stages.length < 1) bad('هر گودال حداقل یک لول لازم دارد');
     for (const st of pit.stages) {
-      if (!['random', 'smart'].includes(st.ai) || !Array.isArray(st.deck) || st.deck.length !== 3) bad('لول سولو نامعتبر است');
+      if (!['random', 'smart'].includes(st.ai) || !Array.isArray(st.deck) || st.deck.length < 3 || st.deck.length > cfg.deckSize) bad('لول سولو نامعتبر است');
       for (const [id, lvl] of st.deck) {
         if (!ids.has(id)) bad(`سولو: کارت ناشناخته ${id}`);
         if (!Number.isInteger(lvl) || lvl < 1 || lvl > up.maxLevel) bad(`سولو: لول نامعتبر برای ${id}`);
@@ -130,6 +132,14 @@ export function loadConfigWithOverride(overridePath: string, basePath = CONFIG_P
     merged.startingDeck = base.startingDeck;
     merged.solo = base.solo;
     merged.contentVersion = base.contentVersion;
+  }
+  // مهاجرت یک‌بار (rev ۲): مهلت نوبت ۱۵ ثانیه، ترکیب ۵کارتی، قدرت ویژه‌ی کارت‌ها و لول‌های سولوی ۳/۴/۵ کارتی
+  if ((raw.rev ?? 0) < 2) {
+    merged.turnSeconds = base.turnSeconds;
+    merged.deckSize = base.deckSize;
+    merged.solo = base.solo;
+    merged.cards = (merged.cards ?? []).map((c: any) => (c.chargeAttacks === undefined ? { ...c, chargeAttacks: base.cards.find((x) => x.id === c.id)?.chargeAttacks ?? 0 } : c));
+    merged.rev = 2;
   }
   for (const k of Object.keys(base) as (keyof GameConfig)[]) if (merged[k] === undefined) merged[k] = base[k];
   // جدول ارتقای قدیمی (یک جدول برای همه) → همان برای هر سه نوع کارت

@@ -1,5 +1,5 @@
 import {
-  attack, createBattle, getUnit, aliveUnits, other, pickTarget, snapshot, startNextTurn,
+  attack, createBattle, getUnit, aliveUnits, other, pickAttacker, pickTarget, snapshot, startNextTurn,
   type BattleEvent, type BattleState, type GameConfig, type ServerMsg, type Side, type UnitInit, type UnitView,
 } from '@game/shared';
 
@@ -23,6 +23,7 @@ export interface BattleOpts {
   onEnd: (r: { winner: Side; reason: string; forfeit: Side | null }) => void;
 }
 
+type Choice = { from: string; to: string };
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /** یک مبارزه‌ی کامل. منطق از engine مشترک می‌آید؛ اینجا فقط نوبت‌دهی، تایمر و ارتباط است. */
@@ -30,7 +31,7 @@ export class Battle {
   readonly state: BattleState;
   private parts: Record<Side, Participant>;
   private ended = false;
-  private pending: { part: Participant; resolve: (uid: string) => void; timer: NodeJS.Timeout } | null = null;
+  private pending: { part: Participant; resolve: (c: Choice) => void; timer: NodeJS.Timeout } | null = null;
   readonly first: Side;
 
   constructor(private o: BattleOpts, a: Participant, b: Participant) {
@@ -56,6 +57,7 @@ export class Battle {
       uid: u.uid, side: u.side, slot: u.slot, cardId: u.cardId, name: u.name,
       rarity: this.o.cfg.cards.find((c) => c.id === u.cardId)?.rarity ?? null,
       hp: u.hp, maxHp: u.maxHp, shield: u.shield, atk: u.atk, alive: u.alive, abilities: (u.abilities ?? []).map((a) => a.id), level: u.level ?? 1,
+      charge: u.charge, chargeNeed: u.chargeAttacks ?? 0, empowered: u.empowered, cooldown: u.cooldown,
     }));
   }
 
@@ -70,18 +72,18 @@ export class Battle {
     while (!this.state.over && !this.ended) {
       this.broadcast(startNextTurn(this.state));
       if (this.state.over) break;
-      const actor = getUnit(this.state, this.state.current!.uid)!;
-      const part = this.parts[actor.side];
+      const cur = () => this.state.current!;
+      const part = this.parts[cur().side];
       while (this.state.current && !this.state.over && !this.ended) {
         for (const p of this.humans()) {
           p.send!({
-            t: 'prompt', battleId: this.id, actor: actor.uid, attacksLeft: this.state.current.attacksLeft,
-            remainingMs: part.send ? this.o.turnMs : 0, mine: p === part,
+            t: 'prompt', battleId: this.id, mine: p === part, available: cur().available, attacker: cur().uid,
+            attacksLeft: cur().attacksLeft, remainingMs: part.send ? this.o.turnMs : 0,
           });
         }
-        const target = await this.chooseTarget(part);
+        const c = await this.choose(part);
         if (this.ended) return;
-        this.broadcast(attack(this.state, target));
+        this.broadcast(attack(this.state, c.from, c.to));
         await sleep(this.o.pauseMs);
       }
     }
@@ -91,31 +93,32 @@ export class Battle {
     this.o.onEnd({ winner: this.state.winner!, reason, forfeit: null });
   }
 
-  private chooseTarget(part: Participant): Promise<string> {
-    const foes = () => aliveUnits(this.state, other(part.side));
-    if (!part.send) {
-      return sleep(this.o.botDelayMs).then(() => pickTarget(this.state, part.side, part.ai ?? 'random', this.o.rng));
-    }
+  /** کارتِ حمله‌کننده (اگر قبلاً انتخاب نشده) و هدف را از بازیکن می‌گیرد؛ ربات سریع، و با اتمام وقت رندوم */
+  private choose(part: Participant): Promise<Choice> {
+    const auto = (mode: 'random' | 'smart'): Choice => {
+      const from = pickAttacker(this.state, mode, this.o.rng);
+      return { from, to: pickTarget(this.state, part.side, mode, this.o.rng, from) };
+    };
+    if (!part.send) return sleep(this.o.botDelayMs).then(() => auto(part.ai ?? 'random'));
     return new Promise((resolve) => {
-      const timer = setTimeout(() => {
-        // وقت تموم شد → هدف رندوم
-        this.pending = null;
-        const f = foes();
-        resolve(f[Math.floor(this.o.rng() * f.length)].uid);
-      }, this.o.turnMs);
+      const timer = setTimeout(() => { this.pending = null; resolve(auto('random')); }, this.o.turnMs);
       this.pending = { part, resolve, timer };
     });
   }
 
-  /** انتخاب هدف از سمت بازیکن (کاملاً اعتبارسنجی می‌شود) */
-  handleTarget(userId: number, uid: string) {
+  /** حمله از سمت بازیکن: from = کارت خودش، uid = کارت حریف (کاملاً اعتبارسنجی می‌شود) */
+  handleTarget(userId: number, from: string, uid: string) {
     const p = this.pending;
-    if (!p || p.part.userId !== userId) return;
+    const cur = this.state.current;
+    if (!p || !cur || p.part.userId !== userId) return;
+    const f = getUnit(this.state, from);
     const t = getUnit(this.state, uid);
+    if (!f || !f.alive || f.side !== p.part.side) return;
+    if (cur.uid ? cur.uid !== from : !cur.available.includes(from)) return;
     if (!t || !t.alive || t.side === p.part.side) return;
     clearTimeout(p.timer);
     this.pending = null;
-    p.resolve(uid);
+    p.resolve({ from, to: uid });
   }
 
   /** قطع اتصال یا خروج: همون لحظه می‌بازه */

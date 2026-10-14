@@ -241,6 +241,18 @@ describe('game economy', () => {
     expect(p.deck.every((id) => p.cards.some((c) => c.id === id))).toBe(true);
   });
 
+  it('deck may have 3 to 5 cards; new cards fill free deck slots automatically', () => {
+    const db = (game as any).d.db;
+    for (const c of ['kaveh', 'sohrab', 'gordafarid']) db.prepare('INSERT OR IGNORE INTO user_cards (user_id, card_id) VALUES (?,?)').run(uid, c);
+    game.setDeck(uid, ['giv', 'bijan', 'arash', 'kaveh', 'sohrab']);
+    expect(game.profile(uid).deck).toHaveLength(5);
+    expect(game.deckUnits(uid)).toHaveLength(5);
+    expect(() => game.setDeck(uid, ['giv', 'bijan', 'arash', 'kaveh', 'sohrab', 'gordafarid'])).toThrow();
+    expect(() => game.setDeck(uid, ['giv', 'bijan'])).toThrow();
+    game.setDeck(uid, ['giv', 'bijan', 'arash']);
+    expect(game.deckUnits(uid)).toHaveLength(3);
+  });
+
   it('old unconfirmed orders (window opened only) are hidden after the update', () => {
     const dir = mkdtempSync(join(tmpdir(), 'ord-'));
     const file = join(dir, 'x.db');

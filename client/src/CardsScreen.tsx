@@ -31,9 +31,12 @@ export function CardsScreen({ ctx }: { ctx: Ctx }) {
   const setDeckSlot = async (slot: number, cardId: string) => {
     const next = [...p.deck];
     const existing = next.indexOf(cardId);
-    if (existing >= 0) next[existing] = next[slot]; // جابجایی
-    next[slot] = cardId;
+    if (slot >= next.length) { if (existing >= 0) next.splice(existing, 1); next.push(cardId); } // جای خالی: اضافه می‌شود
+    else { if (existing >= 0) next[existing] = next[slot]; /* جابجایی */ next[slot] = cardId; }
     try { setProfile((await call('/api/deck', { cards: next })).profile); setOpen(null); } catch (e) { toast((e as Error).message); }
+  };
+  const removeFromDeck = async (cardId: string) => {
+    try { setProfile((await call('/api/deck', { cards: p.deck.filter((x) => x !== cardId) })).profile); setOpen(null); } catch (e) { toast((e as Error).message); }
   };
   const upgrade = async (id: string) => {
     try { const j = await call('/api/upgrade', { cardId: id }); setProfile(j.profile); toast(`ارتقا انجام شد ✨${j.upgrade?.xp ? ` +${fa(j.upgrade.xp)} XP` : ''}${j.upgrade?.levelsGained ? ' — لول‌آپ!' : ''}`); setFlash(id); setTimeout(() => setFlash(null), 900); } catch (e) { toast((e as Error).message); }
@@ -43,7 +46,7 @@ export function CardsScreen({ ctx }: { ctx: Ctx }) {
 
   return (
     <>
-      <h2 className="title">ترکیب من <small>(۳ کارت)</small></h2>
+      <h2 className="title">ترکیب من <small>({fa(p.deck.length)} از {fa(cfg.deckSize)} کارت)</small></h2>
       <div className="deck">{p.deck.map((id) => tile(id, () => setOpen(id), { selected: true }))}</div>
       {spare.length > 0 && (
         <>
@@ -59,14 +62,14 @@ export function CardsScreen({ ctx }: { ctx: Ctx }) {
       )}
       <p className="hint">کارت‌های قفل را از جعبه‌ها به‌دست می‌آوری. برای ارتقا تعداد کارت و سکه لازم است.</p>
 
-      {sel && <Detail flash={flash === sel.def.id} def={sel.def} level={sel.c?.level ?? 1} copies={sel.c?.copies ?? 0} locked={!sel.c} cfg={ctx.cfg} coins={p.coins} deck={p.deck}
+      {sel && <Detail flash={flash === sel.def.id} def={sel.def} level={sel.c?.level ?? 1} copies={sel.c?.copies ?? 0} locked={!sel.c} cfg={ctx.cfg} coins={p.coins} deck={p.deck} deckSize={cfg.deckSize} onRemove={() => removeFromDeck(sel.def.id)}
         onClose={() => setOpen(null)} onUpgrade={() => upgrade(sel.def.id)} onSlot={(s) => setDeckSlot(s, sel.def.id)} />}
     </>
   );
 }
 
-function Detail({ flash, locked, def, level, copies, cfg, coins, deck, onClose, onUpgrade, onSlot }: {
-  flash: boolean; locked: boolean; def: CardDef; level: number; copies: number; cfg: Ctx['cfg']; coins: number; deck: string[];
+function Detail({ flash, locked, def, level, copies, cfg, coins, deck, deckSize, onRemove, onClose, onUpgrade, onSlot }: {
+  flash: boolean; locked: boolean; def: CardDef; level: number; copies: number; cfg: Ctx['cfg']; coins: number; deck: string[]; deckSize: number; onRemove: () => void;
   onClose: () => void; onUpgrade: () => void; onSlot: (s: number) => void;
 }) {
   const s = resolveCard(def, level, cfg);
@@ -84,6 +87,7 @@ function Detail({ flash, locked, def, level, copies, cfg, coins, deck, onClose, 
           <p>⚔ حمله: {fa(s.atk)}{d(s.atk, next?.atk)}</p>
           <p>🛡 شیلد: {fa(s.shield)}{d(s.shield, next?.shield)}</p>
           {abilityLines(def.abilities, s.params, fa).map((a) => <p key={a.label} className="ability">✦ <b>{a.label}:</b> {a.text}</p>)}
+          {(def.chargeAttacks ?? 0) > 0 && (def.abilities?.length ?? 0) > 0 && <p className="ability">🔥 <b>قدرت ویژه:</b> بعد از {fa(def.chargeAttacks!)} حمله، حمله‌ی بعدی همه‌ی توانایی‌هایش ۲ برابر می‌شود</p>}
           {def.desc && <p className="ability">✦ {def.desc}</p>}
         </div>
       </div>
@@ -97,10 +101,11 @@ function Detail({ flash, locked, def, level, copies, cfg, coins, deck, onClose, 
       {!locked && <div className="slotpick">
         <small>قرار دادن در ترکیب:</small>
         <div className="row">
-          {[0, 1, 2].map((i) => (
-            <button key={i} className="btn ghost" disabled={deck[i] === def.id} onClick={() => onSlot(i)}>جایگاه {fa(i + 1)}</button>
+          {Array.from({ length: deckSize }, (_, i) => (
+            <button key={i} className="btn ghost" disabled={deck[i] === def.id || i > deck.length} onClick={() => onSlot(i)}>جایگاه {fa(i + 1)}</button>
           ))}
         </div>
+        {deck.includes(def.id) && deck.length > 3 && <button className="btn ghost" onClick={onRemove}>خارج کردن از ترکیب</button>}
       </div>}
     </Modal>
   );

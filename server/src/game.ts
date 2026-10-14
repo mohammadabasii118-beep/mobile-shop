@@ -24,7 +24,7 @@ export class Game {
       const owned = (db.prepare('SELECT card_id FROM user_cards WHERE user_id = ?').all(id) as any[]).map((r) => r.card_id as string);
       const deck = (db.prepare('SELECT card_id FROM deck WHERE user_id = ? ORDER BY slot').all(id) as any[]).map((r) => r.card_id as string);
       const stale = owned.some((c) => !known.has(c));
-      if (!stale && deck.length === 3 && deck.every((c) => known.has(c))) continue;
+      if (!stale && deck.length >= 3 && deck.length <= cfg.deckSize && deck.every((c) => known.has(c))) continue;
       for (const c of owned) if (!known.has(c)) db.prepare('DELETE FROM user_cards WHERE user_id = ? AND card_id = ?').run(id, c);
       const have = new Set(owned.filter((c) => known.has(c)));
       let ids = deck.filter((c) => have.has(c));
@@ -105,9 +105,17 @@ export class Game {
     return fee <= 0 || (this.d.db.prepare('SELECT coins FROM users WHERE id = ?').get(userId) as any).coins >= fee;
   }
 
-  // ---------- ترکیب (۳ کارت) ----------
+  // ---------- ترکیب (۳ تا ۵ کارت) ----------
+  /** کارت تازه‌دریافت‌شده اگر جا در ترکیب باشد خودکار به آن اضافه می‌شود */
+  private addToDeckIfRoom(userId: number, cardId: string) {
+    const { db, cfg } = this.d;
+    const n = (db.prepare('SELECT COUNT(*) AS n FROM deck WHERE user_id = ?').get(userId) as any).n as number;
+    if (n < cfg.deckSize) db.prepare('INSERT INTO deck (user_id, slot, card_id) VALUES (?,?,?)').run(userId, n, cardId);
+  }
+
   setDeck(userId: number, ids: string[]) {
-    if (!Array.isArray(ids) || ids.length !== 3 || new Set(ids).size !== 3) throw new GameError('ترکیب باید دقیقاً ۳ کارت متفاوت باشد');
+    const max = this.d.cfg.deckSize;
+    if (!Array.isArray(ids) || ids.length < 3 || ids.length > max || new Set(ids).size !== ids.length) throw new GameError(`ترکیب باید ۳ تا ${max} کارت متفاوت باشد`);
     const { db } = this.d;
     for (const id of ids) {
       if (!db.prepare('SELECT 1 FROM user_cards WHERE user_id = ? AND card_id = ?').get(userId, id)) throw new GameError('این کارت را نداری');
@@ -121,7 +129,7 @@ export class Game {
     const rows = db.prepare(
       'SELECT d.card_id, c.level FROM deck d JOIN user_cards c ON c.user_id = d.user_id AND c.card_id = d.card_id WHERE d.user_id = ? ORDER BY d.slot',
     ).all(userId) as any[];
-    if (rows.length !== 3) throw new GameError('ترکیب کامل نیست');
+    if (rows.length < 3 || rows.length > cfg.deckSize) throw new GameError('ترکیب کامل نیست');
     return rows.map((r) => resolveCard(cfg.cards.find((c) => c.id === r.card_id)!, r.level, cfg));
   }
 
@@ -220,7 +228,7 @@ export class Game {
       const card = pool[Math.floor(rng() * pool.length)];
       const has = db.prepare('SELECT 1 FROM user_cards WHERE user_id = ? AND card_id = ?').get(userId, card.id);
       if (has) db.prepare('UPDATE user_cards SET copies = copies + 1 WHERE user_id = ? AND card_id = ?').run(userId, card.id);
-      else db.prepare('INSERT INTO user_cards (user_id, card_id) VALUES (?,?)').run(userId, card.id);
+      else { db.prepare('INSERT INTO user_cards (user_id, card_id) VALUES (?,?)').run(userId, card.id); this.addToDeckIfRoom(userId, card.id); }
       gotCards.push({ id: card.id, isNew: !has });
     }
     db.prepare('DELETE FROM boxes WHERE user_id = ? AND slot = ?').run(userId, slot);
@@ -322,7 +330,7 @@ export class Game {
     db.prepare('INSERT INTO shop_buys (user_id, slot, day, sig) VALUES (?,?,?,?)').run(userId, slot, day, sig);
     const has = db.prepare('SELECT 1 FROM user_cards WHERE user_id = ? AND card_id = ?').get(userId, o.cardId);
     if (has) db.prepare('UPDATE user_cards SET copies = copies + ? WHERE user_id = ? AND card_id = ?').run(o.count, userId, o.cardId);
-    else db.prepare('INSERT INTO user_cards (user_id, card_id, copies) VALUES (?,?,?)').run(userId, o.cardId, o.count - 1); // اولین کارت = داشتنِ کارت؛ بقیه = تعدادِ ارتقا
+    else db.prepare('INSERT INTO user_cards (user_id, card_id, copies) VALUES (?,?,?)').run(userId, o.cardId, o.count - 1), this.addToDeckIfRoom(userId, o.cardId); // اولین کارت = داشتنِ کارت؛ بقیه = تعدادِ ارتقا
     return { cardId: o.cardId, count: o.count, isNew: !has };
   }
 
@@ -447,7 +455,7 @@ export class Game {
       if (!cfg.cards.some((c) => c.id === g.cardId)) throw new GameError('کارت ناشناخته');
       const has = db.prepare('SELECT 1 FROM user_cards WHERE user_id = ? AND card_id = ?').get(userId, g.cardId);
       if (has) db.prepare('UPDATE user_cards SET copies = copies + 1 WHERE user_id = ? AND card_id = ?').run(userId, g.cardId);
-      else db.prepare('INSERT INTO user_cards (user_id, card_id) VALUES (?,?)').run(userId, g.cardId);
+      else { db.prepare('INSERT INTO user_cards (user_id, card_id) VALUES (?,?)').run(userId, g.cardId); this.addToDeckIfRoom(userId, g.cardId); }
     }
   }
 

@@ -245,6 +245,36 @@ describe('config override (survives code updates)', () => {
     expect(merged.contentVersion).toBe(base.contentVersion);
   });
 
+  it('rev migration: old saved config gets 15s turns, 5-card decks, new solo stages and chargeAttacks (admin card edits kept)', async () => {
+    const { writeFileSync } = await import('node:fs');
+    const { loadConfigWithOverride } = await import('../src/config');
+    const base = loadConfig();
+    const file = join(dataDir, 'override-rev.json');
+    const old: any = JSON.parse(JSON.stringify(base));
+    delete old.rev; delete old.deckSize; old.turnSeconds = 10; old.cards[0].hp = 321;
+    old.cards.forEach((c: any) => { delete c.chargeAttacks; });
+    old.solo.pits[0].stages[0].deck = [['giv', 1], ['bijan', 1], ['arash', 1]];
+    writeFileSync(file, JSON.stringify(old));
+    const m = loadConfigWithOverride(file);
+    expect(m.turnSeconds).toBe(15);
+    expect(m.deckSize).toBe(5);
+    expect(m.rev).toBe(2);
+    expect(m.cards[0].hp).toBe(321);
+    expect(m.cards.find((c) => c.id === 'sohrab')!.chargeAttacks).toBe(3);
+    expect(m.solo.pits[2].stages[0].deck).toHaveLength(5);
+    // بعد از مهاجرت، تغییر ادمین دیگر برنمی‌گردد
+    m.turnSeconds = 20; writeFileSync(file, JSON.stringify(m));
+    expect(loadConfigWithOverride(file).turnSeconds).toBe(20);
+  });
+
+  it('validateConfig rejects bad chargeAttacks and deckSize', () => {
+    const c: any = JSON.parse(JSON.stringify(loadConfig()));
+    c.cards[0].chargeAttacks = -1;
+    expect(() => validateConfig(c)).toThrow(/قدرت ویژه/);
+    c.cards[0].chargeAttacks = 3; c.deckSize = 7;
+    expect(() => validateConfig(c)).toThrow(/۳ و ۵/);
+  });
+
   it('uses the saved admin config, fills new keys from the base, and migrates the old solo shape', async () => {
     const { writeFileSync } = await import('node:fs');
     const { loadConfigWithOverride } = await import('../src/config');

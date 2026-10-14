@@ -94,6 +94,8 @@ svg.i.f { fill: currentColor; stroke: none; }
 .title { margin: 6px 0 10px; font-family: var(--f-display); font-weight: 400; font-size: 20px; }
 .title small { font-family: var(--f-body); font-size: 12px; }
 .deck, .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+.deck { grid-template-columns: repeat(5, 1fr); gap: 5px; }
+.deck .card .nm, .deck .card .st { font-size: 9px; }
 .hint { color: var(--muted); font-size: 12px; text-align: center; }
 
 /* ───── کارت ───── */
@@ -153,7 +155,8 @@ button.card:not(:disabled):active { transform: scale(.96); }
 /* مبارزه */
 .battle { flex: 1; display: flex; flex-direction: column; padding: 10px 10px 14px; gap: 8px; background: linear-gradient(rgba(5,9,20,.12), rgba(5,9,20,.12)), url('/assets/battle-bg.jpg') center / cover no-repeat, #0a0f20; overflow-y: auto; }
 .opp { text-align: center; font-weight: 800; }
-.row3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.row3 { display: flex; justify-content: center; gap: 5px; }
+.row3 .bcard-wrap { flex: 0 0 calc((100% - 20px) / 5); min-width: 0; }
 .mid { flex: 1; display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center; min-height: 90px; }
 .log { background: var(--panel); border: 1px solid var(--line); padding: 6px 12px; border-radius: 10px; font-size: 13px; text-align: center; }
 .turnbox { width: 100%; background: var(--panel); border-radius: 16px; padding: 10px; display: flex; flex-direction: column; gap: 6px; align-items: center; border: 1px solid var(--gold); }
@@ -561,3 +564,36 @@ html, body, #root, .app, .screen, .battle, .admin { overscroll-behavior: none; }
 .speedbtn:active { transform: scale(.94); }
 .gemv { display: inline-flex; align-items: center; gap: 4px; color: #ffb0ba; font-weight: 800; }
 .gemv .gemi { width: 16px; height: 16px; }
+
+/* ---- نبرد ۵ در ۵: درگ‌ودراپ، نوار قدرت ویژه، تایمر ---- */
+.battle .card .nm { font-size: 9px; }
+.battle .card .st { font-size: 9px; gap: 1px; }
+.battle .card .lvb { font-size: 8px; padding: 1px 4px; }
+.bcard-wrap { touch-action: none; }
+.bcard-wrap .card { transition: transform .18s, filter .2s, box-shadow .2s; }
+.card.draggable { cursor: grab; box-shadow: 0 0 0 2px rgba(255,215,106,.8), 0 0 12px rgba(255,215,106,.5); }
+.card.dragging { opacity: .35; }
+.card.resting { filter: grayscale(.85) brightness(.55); }
+.restb { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); font-size: 16px; z-index: 4; pointer-events: none; }
+.card.targetable { animation: none; outline: 2px dashed rgba(255,90,90,.7); }
+.bcard-wrap.over { z-index: 6; }
+.bcard-wrap.over .card { transform: scale(1.2); outline: 2px solid var(--ruby); box-shadow: 0 0 22px rgba(255,70,70,.9); animation: overpop .35s ease-out; }
+@keyframes overpop { 0% { transform: scale(1); } 60% { transform: scale(1.27); } 100% { transform: scale(1.2); } }
+.dragghost { position: fixed; z-index: 50; width: 22vw; max-width: 110px; pointer-events: none; opacity: .92; transform: translate(-50%, -88%) scale(1.15) rotate(-3deg); filter: drop-shadow(0 12px 14px rgba(0,0,0,.6)); }
+.dragghost .card { font-size: 10px; }
+.chbar { height: 5px; background: rgba(0,0,0,.4); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); border-radius: 4px; overflow: hidden; margin-top: 2px; }
+.chbar.none { visibility: hidden; }
+.chbar i { display: block; height: 100%; background: linear-gradient(90deg, #ff7a3d, #ff2d2d); transition: width .35s; }
+.bcard-wrap.empowered .chbar i { box-shadow: 0 0 8px #ff5a1f; }
+.flame { position: absolute; inset: -6px -4px 14px; pointer-events: none; z-index: 2; border-radius: 12px; box-shadow: 0 0 16px 4px rgba(255,110,30,.85), inset 0 0 14px rgba(255,150,40,.7); animation: flamepulse .6s ease-in-out infinite alternate; }
+.flame i { position: absolute; bottom: 100%; width: 16%; height: 22px; background: radial-gradient(ellipse at 50% 100%, #ffd35a, #ff6a1f 60%, transparent 72%); border-radius: 50% 50% 20% 20%; transform-origin: 50% 100%; animation: flick .5s ease-in-out infinite alternate; }
+.flame i:nth-child(1) { left: 4%; animation-delay: .05s; } .flame i:nth-child(2) { left: 24%; height: 28px; animation-delay: .2s; } .flame i:nth-child(3) { left: 42%; height: 32px; } .flame i:nth-child(4) { left: 62%; height: 26px; animation-delay: .12s; } .flame i:nth-child(5) { left: 80%; animation-delay: .3s; }
+@keyframes flick { from { transform: scaleY(.7) scaleX(.9); opacity: .8; } to { transform: scaleY(1.15) scaleX(1.05); opacity: 1; } }
+@keyframes flamepulse { from { box-shadow: 0 0 10px 2px rgba(255,110,30,.7), inset 0 0 10px rgba(255,150,40,.5); } to { box-shadow: 0 0 22px 6px rgba(255,140,30,1), inset 0 0 18px rgba(255,190,60,.85); } }
+.hint { color: var(--muted, #aab); min-height: 16px; }
+.tsecs { position: fixed; top: 10px; left: 12px; z-index: 20; font-family: var(--f-display); font-size: 30px; line-height: 1; color: var(--gold); text-shadow: 0 2px 6px #000; pointer-events: none; }
+.tsecs.foe { color: #cfd8ff; }
+.tline { position: fixed; left: 0; right: 0; bottom: 0; height: 4px; z-index: 20; background: rgba(0,0,0,.35); pointer-events: none; }
+.tline i { display: block; height: 100%; margin-inline-start: auto; background: linear-gradient(90deg, var(--ruby), var(--gold)); transition: width .1s linear; }
+.tline.foe i { background: #7f94ff; }
+@media (prefers-reduced-motion: reduce) { .flame, .flame i { animation: none; } }

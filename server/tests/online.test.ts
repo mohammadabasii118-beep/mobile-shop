@@ -82,11 +82,13 @@ describe('online', () => {
     const pa = await a.wait('prompt'); const pb = await b.wait('prompt');
     const mover = pa.mine ? a : b; const moverSide = pa.mine ? sa.you : sb.you;
     const foe = moverSide === 'A' ? 'B0' : 'A0';
-    mover.send({ t: 'target', battleId: sa.battleId, uid: moverSide + '1' }); // هم‌تیمی → نامعتبر
-    mover.send({ t: 'target', battleId: sa.battleId, uid: foe });
+    const pm = pa.mine ? pa : pb;
+    expect(pm.available).toContain(moverSide + '2');             // هر کارتی می‌تواند حمله‌کننده باشد
+    mover.send({ t: 'attack', battleId: sa.battleId, from: moverSide + '0', uid: moverSide + '1' }); // هم‌تیمی → نامعتبر
+    mover.send({ t: 'attack', battleId: sa.battleId, from: moverSide + '2', uid: foe });
     let atk: any;
     while (!atk) { const ev = await mover.wait('events'); atk = ev.events.find((e) => e.type === 'attack'); }
-    expect(atk).toMatchObject({ to: foe });
+    expect(atk).toMatchObject({ from: moverSide + '2', to: foe });
     // b قطع می‌شه → a برنده
     b.ws.close();
     const end = await a.wait('battleEnd', 5000);

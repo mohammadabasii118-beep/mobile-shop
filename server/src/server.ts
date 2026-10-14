@@ -163,8 +163,8 @@ export function createGameServer(opt: ServerOptions) {
         startBattle('solo', me, bot, [c], stage);
         return;
       }
-      case 'target':
-        if (c.battle && c.battle.id === m.battleId && typeof m.uid === 'string') c.battle.handleTarget(c.userId, m.uid);
+      case 'attack':
+        if (c.battle && c.battle.id === m.battleId && typeof m.uid === 'string' && typeof m.from === 'string') c.battle.handleTarget(c.userId, m.from, m.uid);
         return;
     }
   }
@@ -277,7 +277,7 @@ export function createGameServer(opt: ServerOptions) {
         const clean: CardDef = {
           id: card.id, name: card.name, rarity: card.rarity, hp: Number(card.hp), atk: Number(card.atk), shield: Number(card.shield),
           ...(Array.isArray(card.levels) ? { levels: card.levels.map((l) => ({ hp: Number(l.hp), atk: Number(l.atk), shield: Number(l.shield), ...(l.params ? { params: l.params } : {}) })) } : {}),
-          ...(card.abilities ? { abilities: card.abilities } : {}), ...(card.params ? { params: card.params } : {}), ...(card.desc ? { desc: String(card.desc).slice(0, 120) } : {}),
+          ...(card.abilities ? { abilities: card.abilities } : {}), ...(card.chargeAttacks !== undefined ? { chargeAttacks: Number(card.chargeAttacks) } : {}), ...(card.params ? { params: card.params } : {}), ...(card.desc ? { desc: String(card.desc).slice(0, 120) } : {}),
           ...(i >= 0 && next.cards[i].image ? { image: next.cards[i].image } : {}),
         };
         if (i >= 0) next.cards[i] = clean; else next.cards.push(clean);

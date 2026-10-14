@@ -18,6 +18,8 @@ export interface Ability {
   attacksPerTurn?(p: Record<string, number>): number;
   /** یک‌بار، اول مبارزه (قبل از نوبت اول) */
   onBattleStart?(ctx: AbilityCtx): void;
+  /** با قدرت ویژه، همین هوک دوباره (با عدد ۲ برابر) اجرا می‌شود */
+  retrigger?: boolean;
   /** موقع شروع نوبت کارت */
   onTurnStart?(ctx: AbilityCtx): void;
   /** تغییر عدد حمله (مثلاً خشم) */
@@ -39,9 +41,10 @@ export const ABILITIES: Record<string, Ability> = {
   },
   /** سپر هم‌تیمی: اول مبارزه، یک‌بار، به هر کارتِ زنده‌ی ترکیب (از جمله خودش) teamShield شیلد اضافه می‌شود */
   team_shield: {
-    onBattleStart({ state, unit, params }) {
+    retrigger: true,
+    onBattleStart({ state, unit, params, emit }) {
       const amount = params.teamShield ?? 0;
-      for (const u of state.units) if (u.side === unit.side && u.alive) u.shield += amount;
+      for (const u of state.units) if (u.side === unit.side && u.alive) { u.shield += amount; emit({ type: 'shield', uid: u.uid, amount }); }
     },
   },
   /** نفوذ: درصدِ pierce از هر ضربه شیلد را رد می‌کند و مستقیم از جان هدف کم می‌شود */
@@ -81,7 +84,7 @@ export const ABILITIES: Record<string, Ability> = {
 /** برچسب فارسی توانایی‌ها و متن توضیحشان (با عددهای همان لول) */
 export const ABILITY_META: Record<string, { label: string; text: (p: Record<string, number>, f: (n: number) => string) => string }> = {
   rage: { label: 'خشم', text: (p, f) => `وقتی جانش زیر ۵۰٪ جان کامل برسد، حمله‌اش ${f(p.rage ?? 0)}٪ بیشتر می‌شود.` },
-  team_shield: { label: 'سپر هم‌تیمی', text: (p, f) => `اول مبارزه، یک‌بار، به هر ۳ کارت ترکیب (از جمله خودش) ${f(p.teamShield ?? 0)} شیلد اضافه می‌کند.` },
+  team_shield: { label: 'سپر هم‌تیمی', text: (p, f) => `اول مبارزه، یک‌بار، به همه‌ی کارت‌های ترکیب (از جمله خودش) ${f(p.teamShield ?? 0)} شیلد اضافه می‌کند.` },
   pierce: { label: 'نفوذ', text: (p, f) => `${f(p.pierce ?? 0)}٪ از هر ضربه‌اش شیلد را رد می‌کند و مستقیم از جان هدف کم می‌شود.` },
   lifesteal: { label: 'جان‌ربایی', text: (p, f) => `بعد از هر ضربه، ${f(p.lifesteal ?? 0)}٪ از عدد حمله‌اش به جان خودش اضافه می‌شود.` },
   double_strike: { label: 'حمله‌ی چندگانه', text: (p, f) => `هر نوبت ${f(p.attacks ?? 2)} بار حمله می‌کند.` },

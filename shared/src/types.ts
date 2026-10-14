@@ -36,6 +36,8 @@ export interface CardDef {
   params?: Record<string, number>;
   /** توانایی‌ها (هر کارت می‌تواند چند توانایی داشته باشد) */
   abilities?: AbilityRef[];
+  /** قدرت ویژه: بعد از این‌همه حمله، حمله‌ی بعدی همه‌ی توانایی‌های کارت را ۲ برابر می‌کند (۰ یا خالی = ندارد) */
+  chargeAttacks?: number;
   desc?: string;
   /** آدرس عکس آپلودشده از پنل مدیریت (اختیاری) */
   image?: string;
@@ -71,7 +73,11 @@ export interface ShopCfg {
 export interface GameConfig {
   /** نسخه‌ی محتوای کارت‌ها/ترکیب اولیه/سولو: اگر عوض شود، تنظیمات ذخیره‌شده‌ی قدیمی این بخش‌ها با نسخه‌ی جدید جایگزین می‌شود */
   contentVersion?: number;
+  /** نسخه‌ی تنظیمات عمومی (برای مهاجرت یک‌بارِ مقدارهایی مثل مهلت نوبت) */
+  rev?: number;
   turnSeconds: number;
+  /** حداکثر تعداد کارت در ترکیب (۳ تا ۵) */
+  deckSize: number;
   maxRounds: number;
   startingDeck: string[];
   /** هزینه‌ی ورود به نبرد (سکه) */
@@ -109,6 +115,8 @@ export interface UnitInit {
   /** عددهای توانایی‌ها در همین لول */
   params?: Record<string, number>;
   level?: number;
+  /** قدرت ویژه: بعد از چند حمله، حمله‌ی بعدی توانایی‌ها را ۲ برابر می‌کند (۰ = ندارد) */
+  chargeAttacks?: number;
 }
 
 export interface Unit extends UnitInit {
@@ -119,11 +127,18 @@ export interface Unit extends UnitInit {
   maxShield: number;
   alive: boolean;
   abilityUsed: boolean;
+  /** تعداد حمله‌های انجام‌شده از آخرین ۲ برابر شدن */
+  charge: number;
+  /** قدرت ویژه آماده است: حمله‌ی بعدی توانایی‌ها ۲ برابر می‌شود */
+  empowered: boolean;
+  /** چند نوبتِ بعدیِ همین طرف را کارت خاموش است (۰ = می‌تواند حمله کند) */
+  cooldown: number;
 }
 
 export type BattleEvent =
-  | { type: 'turn'; uid: string; round: number }
-  | { type: 'attack'; from: string; to: string; dmg: number; shieldLost: number; hpLost: number }
+  | { type: 'turn'; side: Side; round: number; available: string[] }
+  | { type: 'attack'; from: string; to: string; dmg: number; shieldLost: number; hpLost: number; /** این حمله با قدرت ویژه (توانایی‌های ۲ برابر) بود */ empowered?: boolean }
+  | { type: 'charge'; uid: string; charge: number; need: number; empowered: boolean }
   | { type: 'heal'; uid: string; amount: number }
   | { type: 'shield'; uid: string; amount: number }
   | { type: 'death'; uid: string }
@@ -136,12 +151,11 @@ export interface BattleState {
   firstSide: Side;
   /** نوبت بعدی مال کدام طرف است (همیشه یکی‌درمیان) */
   nextSide: Side;
-  /** آخرین جایگاهِ کارتی که هر طرف بازی کرده (-1 = هنوز هیچ) */
-  lastSlot: Record<Side, number>;
   /** تعداد نوبت‌های انجام‌شده */
   turns: number;
   round: number;
-  current: { uid: string; attacksLeft: number } | null;
+  /** نوبت جاری: طرف، کارتِ حمله‌کننده (تا انتخاب‌نشده null)، حمله‌های باقی‌مانده، و کارت‌های آماده (غیرخاموش) */
+  current: { side: Side; uid: string | null; attacksLeft: number; available: string[] } | null;
   over: boolean;
   winner: Side | null;
   maxRounds: number;

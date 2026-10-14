@@ -89,7 +89,7 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
                 <path d="M8.600 6.700l1.200-1.200M15.400 6.700l-1.200-1.200" stroke="#5a3a08" strokeWidth="1.200" strokeLinecap="round" />
               </svg>
             </button>
-            {cfg.ui?.banner ? <img className="bannerimg" src={cfg.ui.banner} alt="میراث" /> : <><div className="brand">میراث</div><p>سه کارت، یک میراث</p></>}
+            {cfg.ui?.banner ? <img className="bannerimg" src={cfg.ui.banner} alt="میراث" /> : <><div className="brand">میراث</div><p>پنج کارت، یک میراث</p></>}
           </div>
           <button className="mode solo" onClick={() => setView('solo')}>
             <span className="medal8"><svg className="i" viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9 16h6"/></svg></span>
@@ -163,7 +163,7 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
         <Modal onClose={() => setPage(null)}>
           <div className="about">
             <h3>میراث، نسخه‌ی آزمایشی 0.0.1</h3>
-            <p>بازی کارتی دوئلی با کارت‌های اساطیری. سه کارت می‌چینی، هدف رو خودت انتخاب می‌کنی و حریف رو شکست می‌دی.</p>
+            <p>بازی کارتی دوئلی با کارت‌های اساطیری. تا پنج کارت می‌چینی، کارتت رو می‌کشی روی کارت حریف و حمله می‌کنی و حریف رو شکست می‌دی.</p>
             <div className="links">
               <span>✅ کانال رسمی:</span>
               <TgLink id="MirasGame" />

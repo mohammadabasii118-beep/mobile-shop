@@ -3,8 +3,10 @@ import type { BattleEvent, BoxType, Rarity, Side, Unit } from './types';
 export interface UnitView {
   uid: string; side: Side; slot: number; cardId: string; name: string; rarity: Rarity | null;
   hp: number; maxHp: number; shield: number; atk: number; alive: boolean; abilities: string[]; level: number;
+  /** قدرت ویژه: تعداد حمله‌ی انجام‌شده، تعدادِ لازم (۰ = ندارد)، آماده بودن (حمله‌ی بعدی ۲ برابر)، و نوبت‌های خاموشی */
+  charge: number; chargeNeed: number; empowered: boolean; cooldown: number;
 }
-export interface Snap { uid: string; hp: number; shield: number; alive: boolean }
+export interface Snap { uid: string; hp: number; shield: number; alive: boolean; charge: number; empowered: boolean; cooldown: number }
 
 export interface BoxView { slot: number; type: BoxType; /** از کجا آمده: تک‌نفره (دانجن) یا آنلاین */ source: 'solo' | 'multi'; state: 'locked' | 'opening' | 'ready'; remainingMs: number; totalMs: number }
 export interface CardView { id: string; level: number; copies: number }
@@ -29,7 +31,8 @@ export type ClientMsg =
   | { t: 'queue' }
   | { t: 'leaveQueue' }
   | { t: 'solo'; stage: number }
-  | { t: 'target'; battleId: string; uid: string };
+  /** حمله: from = کارتِ خودم، uid = کارتِ حریف */
+  | { t: 'attack'; battleId: string; from: string; uid: string };
 
 export type ServerMsg =
   | { t: 'ready'; profile: Profile }
@@ -37,7 +40,7 @@ export type ServerMsg =
   | { t: 'queued' }
   | { t: 'profile'; profile: Profile }
   | { t: 'battleStart'; battleId: string; you: Side; units: UnitView[]; mode: 'solo' | 'pvp'; opponent: string; first: Side }
-  | { t: 'prompt'; battleId: string; actor: string; attacksLeft: number; remainingMs: number; mine: boolean }
+  | { t: 'prompt'; battleId: string; mine: boolean; /** کارت‌هایی که می‌توانند حمله کنند */ available: string[]; /** اگر کارت قبلاً انتخاب شده (چندحمله‌ای) */ attacker: string | null; attacksLeft: number; remainingMs: number }
   | { t: 'events'; battleId: string; events: BattleEvent[]; snap: Snap[] }
   | { t: 'battleEnd'; battleId: string; winner: Side; youWon: boolean; reason: string; reward: BattleReward | null; profile: Profile };
 

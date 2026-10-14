@@ -54,8 +54,10 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
   const { cfg, sock } = ctx;
   const me: Side = start.you;
   const [units, setUnits] = useState<UnitView[]>(start.units);
-  const [prompt, setPrompt] = useState<{ actor: string; mine: boolean; attacksLeft: number; ms: number; at: number } | null>(null);
+  const [prompt, setPrompt] = useState<{ mine: boolean; available: string[]; attacker: string | null; attacksLeft: number; ms: number; at: number } | null>(null);
   const [active, setActive] = useState<string | null>(null);
+  /** کشیدن کارت: کارتِ در حال درگ، جای انگشت، و کارت حریفی که زیرش است */
+  const [drag, setDrag] = useState<{ uid: string; x: number; y: number; over: string | null } | null>(null);
   const [attacking, setAttacking] = useState<string | null>(null);
   const [hit, setHit] = useState<string | null>(null);
   const [floaters, setFloaters] = useState<Floater[]>([]);
@@ -85,14 +87,15 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
   async function play(ev: BattleEvent, list: UnitView[]) {
     switch (ev.type) {
       case 'turn':
-        setActive(ev.uid); setLog(`نوبت ${list.find((u) => u.uid === ev.uid)?.side === me ? ctx.profile.name : start.opponent}`); await sleep(350); break;
+        setLog(`نوبت ${ev.side === me ? ctx.profile.name : start.opponent}`); break;
       case 'attack':
-        setAttacking(ev.from); await sleep(260); haptic();
+        setActive(ev.from); setAttacking(ev.from); await sleep(260); haptic();
         setAttacking(null); setHit(ev.to);
         patch(ev.to, (u) => ({ shield: u.shield - ev.shieldLost, hp: u.hp - ev.hpLost }));
-        float(ev.to, `-${fa(ev.dmg)}`, ev.hpLost === 0 ? 'shieldhit' : 'dmg'); addFx(ev.to, 'spark', 700);
+        float(ev.to, `-${fa(ev.dmg)}`, ev.hpLost === 0 ? 'shieldhit' : 'dmg'); if (ev.empowered) float(ev.from, '🔥 ۲×', 'heal'); addFx(ev.to, 'spark', 700);
         setLog(`${nameOf(ev.from, list)} ← ${nameOf(ev.to, list)}  ${fa(ev.dmg)} آسیب`);
         await sleep(450); setHit(null); break;
+      case 'charge': patch(ev.uid, () => ({ charge: ev.charge, empowered: ev.empowered })); if (ev.empowered) { float(ev.uid, '🔥 قدرت ویژه!', 'heal'); setLog(`${nameOf(ev.uid, list)} آماده‌ی حمله‌ی ۲ برابر است`); await sleep(450); } break;
       case 'heal': patch(ev.uid, (u) => ({ hp: Math.min(u.maxHp, u.hp + ev.amount) })); float(ev.uid, `+${fa(ev.amount)}`, 'heal'); await sleep(350); break;
       case 'shield': patch(ev.uid, (u) => ({ shield: u.shield + ev.amount })); float(ev.uid, `🛡+${fa(ev.amount)}`, 'shieldup'); await sleep(350); break;
       case 'death': addFx(ev.uid, 'shatter', 1150); patch(ev.uid, () => ({ alive: false, hp: 0 })); setLog(`${nameOf(ev.uid, list)} از پا درآمد 💀`); await sleep(500); break;
@@ -127,8 +130,7 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
     alive.current = true;
     const off = sock.on((m) => {
       if (m.t === 'prompt' && m.battleId === start.battleId) {
-        setPrompt({ actor: m.actor, mine: m.mine, attacksLeft: m.attacksLeft, ms: m.remainingMs, at: Date.now() });
-        setActive(m.actor);
+        setPrompt({ mine: m.mine, available: m.available, attacker: m.attacker, attacksLeft: m.attacksLeft, ms: m.remainingMs, at: Date.now() });
       } else if ((m.t === 'events' || m.t === 'battleEnd') && m.battleId === start.battleId) {
         if (m.t === 'battleEnd') setPrompt(null);
         queue.current.push(m); void pump();
@@ -142,27 +144,50 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
 
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 100); return () => clearInterval(t); }, []);
 
-  const choose = (uid: string) => {
-    if (!prompt?.mine) return;
-    const u = units.find((x) => x.uid === uid);
-    if (!u || !u.alive || u.side === me) return;
-    sock.send({ t: 'target', battleId: start.battleId, uid });
-    setPrompt(null);
+  /** کارتِ من می‌تواند الان حمله کند؟ (نوبت من است، کارت آماده است؛ اگر چندحمله‌ای وسط کار است فقط همان کارت) */
+  const canDrag = (u: UnitView) => !!prompt?.mine && u.side === me && u.alive && (prompt.attacker ? prompt.attacker === u.uid : prompt.available.includes(u.uid));
+  const foeUnder = (x: number, y: number) => {
+    const el = document.elementFromPoint(x, y)?.closest('[data-uid]') as HTMLElement | null;
+    const uid = el?.dataset.uid;
+    const u = uid ? unitsRef.current.find((q) => q.uid === uid) : undefined;
+    return u && u.alive && u.side !== me ? u.uid : null;
+  };
+  const startDrag = (e: React.PointerEvent, u: UnitView) => {
+    if (!canDrag(u)) return;
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    setDrag({ uid: u.uid, x: e.clientX, y: e.clientY, over: null });
+  };
+  const moveDrag = (e: React.PointerEvent) => setDrag((d) => (d ? { ...d, x: e.clientX, y: e.clientY, over: foeUnder(e.clientX, e.clientY) } : d));
+  const endDrag = (e: React.PointerEvent, cancel = false) => {
+    const d = drag;
+    setDrag(null);
+    if (!d || cancel || !prompt?.mine) return;
+    const to = foeUnder(e.clientX, e.clientY);
+    if (to) { sock.send({ t: 'attack', battleId: start.battleId, from: d.uid, uid: to }); setPrompt(null); }
   };
 
-  const left = prompt?.mine ? Math.max(0, prompt.ms - (now - prompt.at)) : 0;
+  const left = prompt ? Math.max(0, prompt.ms - (now - prompt.at)) : 0;
   const side = (s: Side) => units.filter((u) => u.side === s).sort((a, b) => a.slot - b.slot);
   const enemy = me === 'A' ? 'B' : 'A';
 
   const tile = (u: UnitView) => {
     const def = cfg.cards.find((c) => c.id === u.cardId)!;
-    const targetable = !!prompt?.mine && u.side !== me && u.alive;
+    const dragging = drag?.uid === u.uid;
+    const droptarget = !!drag && drag.over === u.uid;
+    const targetable = !!drag && u.side !== me && u.alive;
+    const draggable = canDrag(u);
+    const resting = u.alive && (u.side === me ? (prompt?.mine ? !prompt.available.includes(u.uid) : u.cooldown > 0) : (prompt && !prompt.mine ? !prompt.available.includes(u.uid) : u.cooldown > 0));
     const shatter = fxs.find((f) => f.uid === u.uid && f.kind === 'shatter');
-    const cls = `bcard ${shatter ? 'shatter-hide' : ''} ${active === u.uid ? 'active' : ''} ${attacking === u.uid ? (u.side === me ? 'atk-up' : 'atk-down') : ''} ${hit === u.uid ? 'hit' : ''} ${targetable ? 'targetable' : ''}`;
+    const cls = `bcard ${shatter ? 'shatter-hide' : ''} ${active === u.uid ? 'active' : ''} ${draggable ? 'draggable' : ''} ${resting ? 'resting' : ''} ${dragging ? 'dragging' : ''} ${droptarget ? 'droptarget' : ''} ${attacking === u.uid ? (u.side === me ? 'atk-up' : 'atk-down') : ''} ${hit === u.uid ? 'hit' : ''} ${targetable ? 'targetable' : ''}`;
     return (
-      <div key={u.uid} className="bcard-wrap">
+      <div key={u.uid} data-uid={u.uid} className={`bcard-wrap ${u.empowered && u.alive ? 'empowered' : ''} ${droptarget ? 'over' : ''}`}
+        onPointerDown={draggable ? (e) => startDrag(e, u) : undefined} onPointerMove={dragging ? moveDrag : undefined}
+        onPointerUp={dragging ? (e) => endDrag(e) : undefined} onPointerCancel={dragging ? (e) => endDrag(e, true) : undefined}>
         <CardTile def={def} level={u.level} maxLevel={cfg.upgrade.maxLevel} hp={Math.max(0, u.hp)} atk={u.atk} shield={u.shield}
-          dead={!u.alive} className={cls} onClick={() => choose(u.uid)} disabled={!targetable} />
+          dead={!u.alive} className={cls} hidePips />
+        {u.empowered && u.alive && <div className="flame" aria-hidden><i /><i /><i /><i /><i /></div>}
+        {resting && <span className="restb">⏳</span>}
         {shatter && (
           <div className="shards" aria-hidden>
             {shatter.v.map((v, i) => (
@@ -176,6 +201,7 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
           <i key={`${f.id}-${i}`} className="spark" style={{ ['--dx' as string]: `${v.dx}px`, ['--dy' as string]: `${v.dy}px` }} />
         )))}
         <div className="hpbar"><i style={{ width: `${(Math.max(0, u.hp) / u.maxHp) * 100}%` }} /></div>
+        <div className={`chbar ${u.chargeNeed ? '' : 'none'}`}><i style={{ width: `${u.chargeNeed ? Math.min(100, (u.charge / u.chargeNeed) * 100) : 0}%` }} /></div>
         {floaters.filter((f) => f.uid === u.uid).map((f) => <span key={f.id} className={`float ${f.cls}`}>{f.text}</span>)}
       </div>
     );
@@ -189,15 +215,21 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
       <div className="row3 enemy">{side(enemy).map(tile)}</div>
       <div className="mid">
         <div className="log">{log}</div>
-        {prompt?.mine ? (
-          <div className="turnbox">
-            <b>هدف را انتخاب کن{prompt.attacksLeft > 1 ? ` (${fa(prompt.attacksLeft)} حمله)` : ''}</b>
-            <div className="timer"><i style={{ width: `${(left / prompt.ms) * 100}%` }} /></div>
-            <span className="secs num" aria-live="off">{fa(Math.ceil(left / 1000))}</span>
-          </div>
-        ) : <div className="turnbox idle"><small>{prompt ? 'حریف در حال انتخاب هدف…' : '…'}</small></div>}
+        <small className="hint">{prompt?.mine ? (prompt.attacker ? `حمله‌ی بعدی (${fa(prompt.attacksLeft)} باقی)` : 'کارتت را بکش و روی کارت حریف رها کن') : prompt ? 'حریف در حال انتخاب است…' : ''}</small>
       </div>
       <div className="row3 mine">{side(me).map(tile)}</div>
+
+      {prompt && prompt.ms > 0 && !result && (
+        <>
+          <div className={`tsecs num ${prompt.mine ? '' : 'foe'}`} aria-live="off">{fa(Math.ceil(left / 1000))}</div>
+          <div className={`tline ${prompt.mine ? '' : 'foe'}`}><i style={{ width: `${(left / prompt.ms) * 100}%` }} /></div>
+        </>
+      )}
+      {drag && (() => {
+        const u = units.find((x) => x.uid === drag.uid)!;
+        const def = cfg.cards.find((c) => c.id === u.cardId)!;
+        return <div className="dragghost" style={{ left: drag.x, top: drag.y }}><CardTile def={def} level={u.level} maxLevel={cfg.upgrade.maxLevel} hp={Math.max(0, u.hp)} atk={u.atk} shield={u.shield} hidePips /></div>;
+      })()}
 
       {result && (
         <div className={`overlay res ${result.youWon ? 'win' : 'lose'}`}>

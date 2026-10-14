@@ -87,10 +87,10 @@ function CardsTab({ cfg, refresh, run }: TabProps) {
   useEffect(() => { setDraft(saved ? { ...saved } : null); }, [sel, cfg]);
   if (!draft) return <p className="hint">کارتی نیست.</p>;
   const set = (p: Partial<CardDef>) => setDraft({ ...draft, ...p });
-  const dirty = !!saved && (saved.name !== draft.name || saved.rarity !== draft.rarity);
+  const dirty = !!saved && (saved.name !== draft.name || saved.rarity !== draft.rarity || (saved.chargeAttacks ?? 0) !== (draft.chargeAttacks ?? 0));
 
   const save = () => run(async () => {
-    refresh(await call('/api/admin/card', { card: { ...saved!, name: draft.name, rarity: draft.rarity } }));
+    refresh(await call('/api/admin/card', { card: { ...saved!, name: draft.name, rarity: draft.rarity, chargeAttacks: Math.max(0, Math.min(20, Math.round(draft.chargeAttacks ?? 0))) } }));
   }, 'ذخیره شد و همین الان در بازی اعمال شد');
   const upload = async (f: File | undefined) => {
     if (!f) return;
@@ -136,7 +136,11 @@ function CardsTab({ cfg, refresh, run }: TabProps) {
               {RARITIES.map((r) => <option key={r} value={r}>{RARITY_FA[r]}</option>)}
             </select>
           </label>
+          <label className="field">قدرت ویژه: بعد از چند حمله؟ (۰ = ندارد)
+            <input type="number" min={0} max={20} value={draft.chargeAttacks ?? 0} onChange={(e) => set({ chargeAttacks: e.target.value === '' ? 0 : Number(e.target.value) })} />
+          </label>
         </div>
+        <small className="hint" style={{ textAlign: 'start' }}>بعد از این‌همه حمله نوار قرمز کارت پر می‌شود و حمله‌ی بعدی همه‌ی توانایی‌های کارت ۲ برابر می‌شود (برای کارتِ بدون توانایی اثری ندارد).</small>
         <div className="btns"><button className="btn" disabled={!dirty} onClick={save}>ذخیره و اعمال</button></div>
 
         <h3>مسیر قدرت‌گیری <small>فقط نمایش؛ آمار هر لول از تنظیمات بازی خوانده می‌شود</small></h3>
@@ -232,7 +236,8 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
         </div>
         <h3>نبرد</h3>
         <div className="fgrid">
-          {f('مهلت انتخاب هدف (ثانیه)', d.turnSeconds, (x) => upd((c) => { c.turnSeconds = x; }))}
+          {f('مهلت هر نوبت (ثانیه)', d.turnSeconds, (x) => upd((c) => { c.turnSeconds = x; }))}
+          {f('حداکثر کارت ترکیب (۳ تا ۵)', d.deckSize, (x) => upd((c) => { c.deckSize = Math.max(3, Math.min(5, Math.round(x))); }))}
           {f('سقف دور (مخفی)', d.maxRounds, (x) => upd((c) => { c.maxRounds = x; }))}
         </div>
       </div>
@@ -413,7 +418,7 @@ function ShopTab({ cfg, refresh, run }: TabProps) {
   );
 }
 
-/** ویرایش حریف هر لول سولو: سه کارت (با لول) و هوش ربات */
+/** ویرایش حریف هر لول سولو: ۳ تا ۵ کارت (با لول) و هوش ربات */
 function SoloTab({ cfg, refresh, run }: TabProps) {
   const [d, setD] = useState<GameConfig>(() => JSON.parse(JSON.stringify(cfg)));
   const [pit, setPit] = useState(0);
@@ -444,6 +449,10 @@ function SoloTab({ cfg, refresh, run }: TabProps) {
             </label>
           </div>
         ))}
+      </div>
+      <div className="btns">
+        {stage.deck.length < d.deckSize && <button className="btn ghost" onClick={() => edit((s) => { s.deck.push([s.deck[s.deck.length - 1][0], s.deck[s.deck.length - 1][1]]); })}>+ افزودن کارت</button>}
+        {stage.deck.length > 3 && <button className="btn ghost" onClick={() => edit((s) => { s.deck.pop(); })}>− حذف آخرین کارت</button>}
       </div>
       <label className="field" style={{ maxWidth: 260 }}>هوش ربات در انتخاب هدف
         <select value={stage.ai} onChange={(e) => edit((s) => { s.ai = e.target.value as 'random' | 'smart'; })}>

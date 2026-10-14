@@ -64,7 +64,7 @@ export function CardArt({ card }: { card: Pick<CardDef, 'id' | 'name' | 'image'>
 export interface TileProps {
   def: CardDef; level: number; hp: number; atk: number; shield: number;
   dead?: boolean; selected?: boolean; onClick?: () => void; disabled?: boolean; badge?: ReactNode; className?: string; small?: boolean;
-  maxLevel?: number;
+  maxLevel?: number; hidePips?: boolean;
 }
 export function CardTile(p: TileProps) {
   const maxL = p.maxLevel ?? 6;
@@ -79,7 +79,7 @@ export function CardTile(p: TileProps) {
       <div className="st">
         <span><Icon n="heart" />{fa(p.hp)}</span><span><Icon n="sword" />{fa(p.atk)}</span><span><Icon n="shield" />{fa(p.shield)}</span>
       </div>
-      <div className="pips">{Array.from({ length: maxL }, (_, i) => <i key={i} className={`pip ${i < p.level ? 'on' : ''}`} />)}</div>
+      {!p.hidePips && <div className="pips">{Array.from({ length: maxL }, (_, i) => <i key={i} className={`pip ${i < p.level ? 'on' : ''}`} />)}</div>}
     </div>
   );
   const cls = `card ${p.dead ? 'dead' : ''} ${p.selected ? 'sel' : ''} ${p.small ? 'small' : ''} ${p.className ?? ''}`;
