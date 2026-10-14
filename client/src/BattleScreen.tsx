@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { BattleEvent, ServerMsg, Side, UnitView } from '@game/shared';
+import { CHAT_PHRASES, type BattleEvent, type ServerMsg, type Side, type UnitView } from '@game/shared';
 import type { Ctx } from './App';
 import { onlineRewardLines, rewardText } from './App';
 import { CardTile, Icon, Modal, fa } from './ui';
@@ -64,6 +64,9 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
   const [fxs, setFxs] = useState<Fx[]>([]);
   const [log, setLog] = useState<string>(`${start.first === me ? 'تو' : start.opponent} شروع می‌کند`);
   const [now, setNow] = useState(Date.now());
+  const [chatOpen, setChatOpen] = useState(false);
+  const [confirmExit, setConfirmExit] = useState(false);
+  const [bubbles, setBubbles] = useState<{ k: number; id: number; mine: boolean }[]>([]);
   const queue = useRef<ServerMsg[]>([]);
   const busy = useRef(false);
   const alive = useRef(true);
@@ -104,6 +107,13 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
     }
   }
 
+  const showBubble = (id: number, mine: boolean) => {
+    const b = { k: ++floaterId, id, mine };
+    setBubbles((x) => [...x.filter((y) => y.mine !== mine), b]);
+    setTimeout(() => setBubbles((x) => x.filter((y) => y.k !== b.k)), 3000);
+  };
+  const sendChat = (id: number) => { sock.send({ t: 'chat', battleId: start.battleId, id }); showBubble(id, true); setChatOpen(false); };
+
   async function pump() {
     if (busy.current) return;
     busy.current = true;
@@ -134,6 +144,8 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
       } else if ((m.t === 'events' || m.t === 'battleEnd') && m.battleId === start.battleId) {
         if (m.t === 'battleEnd') setPrompt(null);
         queue.current.push(m); void pump();
+      } else if (m.t === 'chat' && m.battleId === start.battleId) {
+        showBubble(m.id, false);
       } else if (m.t === 'closed') {
         setLog('ارتباط قطع شد');
       }
@@ -177,7 +189,7 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
     const droptarget = !!drag && drag.over === u.uid;
     const targetable = !!drag && u.side !== me && u.alive;
     const draggable = canDrag(u);
-    const resting = u.alive && (u.side === me ? (prompt?.mine ? !prompt.available.includes(u.uid) : u.cooldown > 0) : (prompt && !prompt.mine ? !prompt.available.includes(u.uid) : u.cooldown > 0));
+    const resting = u.alive && (u.side === me ? (prompt?.mine ? !prompt.available.includes(u.uid) : u.cooldown > 0) : (!!prompt && !prompt.mine && !prompt.available.includes(u.uid)));
     const shatter = fxs.find((f) => f.uid === u.uid && f.kind === 'shatter');
     const cls = `bcard ${shatter ? 'shatter-hide' : ''} ${active === u.uid ? 'active' : ''} ${draggable ? 'draggable' : ''} ${resting ? 'resting' : ''} ${dragging ? 'dragging' : ''} ${droptarget ? 'droptarget' : ''} ${attacking === u.uid ? (u.side === me ? 'atk-up' : 'atk-down') : ''} ${hit === u.uid ? 'hit' : ''} ${targetable ? 'targetable' : ''}`;
     return (
@@ -186,7 +198,7 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
         onPointerUp={dragging ? (e) => endDrag(e) : undefined} onPointerCancel={dragging ? (e) => endDrag(e, true) : undefined}>
         <CardTile def={def} level={u.level} maxLevel={cfg.upgrade.maxLevel} hp={Math.max(0, u.hp)} atk={u.atk} shield={u.shield}
           dead={!u.alive} className={cls} hidePips />
-        {u.empowered && u.alive && <div className="flame" aria-hidden><i /><i /><i /><i /><i /></div>}
+        {u.empowered && u.alive && <div className="flame" aria-hidden />}
         {resting && <span className="restb">⏳</span>}
         {shatter && (
           <div className="shards" aria-hidden>
@@ -207,18 +219,43 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
     );
   };
 
-  const reasonText = result?.reason === 'disconnect' ? (result.youWon ? 'حریف قطع شد' : 'ارتباط تو قطع شد') : result?.reason === 'round_cap' ? 'سقف دور‌ها' : '';
+  const reasonText = result?.reason === 'left' ? (result.youWon ? 'حریف از بازی خارج شد' : 'از بازی خارج شدی') : result?.reason === 'disconnect' ? (result.youWon ? 'حریف قطع شد' : 'ارتباط تو قطع شد') : result?.reason === 'round_cap' ? 'سقف دور‌ها' : '';
 
   return (
     <div className={`battle ${result ? (result.youWon ? 'won' : 'lost') : ''}`}>
       <div className="opp">{start.opponent} {start.mode === 'pvp' ? '🌐' : '🤖'}</div>
       <div className="row3 enemy">{side(enemy).map(tile)}</div>
       <div className="mid">
+        {bubbles.filter((b) => !b.mine).map((b) => <div key={b.k} className="cbubble foe">{CHAT_PHRASES[b.id]}</div>)}
         <div className="log">{log}</div>
         <small className="hint">{prompt?.mine ? (prompt.attacker ? `حمله‌ی بعدی (${fa(prompt.attacksLeft)} باقی)` : 'کارتت را بکش و روی کارت حریف رها کن') : prompt ? 'حریف در حال انتخاب است…' : ''}</small>
       </div>
+      {bubbles.filter((b) => b.mine).map((b) => <div key={b.k} className="cbubble me">{CHAT_PHRASES[b.id]}</div>)}
       <div className="row3 mine">{side(me).map(tile)}</div>
 
+      {!result && (
+        <div className="sidetools">
+          <button aria-label="خروج" onClick={() => { setConfirmExit(true); setChatOpen(false); }}>🚪</button>
+          {start.mode === 'pvp' && <button aria-label="چت" onClick={() => setChatOpen((o) => !o)}>💬</button>}
+        </div>
+      )}
+      {chatOpen && !result && (
+        <div className="chatpanel">
+          {CHAT_PHRASES.map((p, i) => <button key={i} onClick={() => sendChat(i)}>{p}</button>)}
+        </div>
+      )}
+      {confirmExit && !result && (
+        <Modal onClose={() => setConfirmExit(false)}>
+          <div className="center-in">
+            <h3>می‌خوای بازی رو ترک کنی؟</h3>
+            <small>اگه بری، حریف برنده می‌شه و تو بازنده حساب می‌شی.</small>
+            <div className="row">
+              <button className="btn" onClick={() => { sock.send({ t: 'leave', battleId: start.battleId }); setConfirmExit(false); }}>آره، ترک می‌کنم</button>
+              <button className="btn ghost" onClick={() => setConfirmExit(false)}>نه، ادامه می‌دم</button>
+            </div>
+          </div>
+        </Modal>
+      )}
       {prompt && prompt.ms > 0 && !result && (
         <>
           <div className={`tsecs num ${prompt.mine ? '' : 'foe'}`} aria-live="off">{fa(Math.ceil(left / 1000))}</div>
@@ -228,7 +265,7 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
       {drag && (() => {
         const u = units.find((x) => x.uid === drag.uid)!;
         const def = cfg.cards.find((c) => c.id === u.cardId)!;
-        return <div className="dragghost" style={{ left: drag.x, top: drag.y }}><CardTile def={def} level={u.level} maxLevel={cfg.upgrade.maxLevel} hp={Math.max(0, u.hp)} atk={u.atk} shield={u.shield} hidePips /></div>;
+        return <div className={`dragghost ${drag.over ? 'over' : ''}`} style={{ left: drag.x, top: drag.y }}><CardTile def={def} level={u.level} maxLevel={cfg.upgrade.maxLevel} hp={Math.max(0, u.hp)} atk={u.atk} shield={u.shield} hidePips /></div>;
       })()}
 
       {result && (

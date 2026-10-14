@@ -99,6 +99,22 @@ describe('online', () => {
     void pb;
   }, 20000);
 
+  it('pvp: preset chat reaches the opponent only; leaving = loss for the leaver', async () => {
+    const a = new Client(210), b = new Client(211);
+    await a.open(); await b.open();
+    a.send({ t: 'queue' }); await a.wait('queued');
+    b.send({ t: 'queue' });
+    const sa = await a.wait('battleStart'); await b.wait('battleStart');
+    a.send({ t: 'chat', battleId: sa.battleId, id: 99 });   // نامعتبر
+    a.send({ t: 'chat', battleId: sa.battleId, id: 3 });
+    expect((await b.wait('chat')).id).toBe(3);
+    b.send({ t: 'leave', battleId: sa.battleId });
+    const end = await a.wait('battleEnd', 5000);
+    expect(end.youWon).toBe(true);
+    expect(end.reason).toBe('left');
+    a.ws.close(); b.ws.close();
+  }, 20000);
+
   it('REST: deck, box lifecycle (dev skip), upgrade errors', async () => {
     await api(300, '/api/me');
     expect((await api(300, '/api/deck', { cards: ['giv', 'x', 'bijan'] })).error).toBeTruthy();

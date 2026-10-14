@@ -8,6 +8,9 @@ export interface UnitView {
 }
 export interface Snap { uid: string; hp: number; shield: number; alive: boolean; charge: number; empowered: boolean; cooldown: number }
 
+/** پیام‌های آماده‌ی چت در مبارزه‌ی آنلاین (فقط شماره‌شان رد و بدل می‌شود) */
+export const CHAT_PHRASES = ['درود', 'عالی بود', 'ضعیفی', 'موفق باشی', 'به سلامت', 'نه!'];
+
 export interface BoxView { slot: number; type: BoxType; /** از کجا آمده: تک‌نفره (دانجن) یا آنلاین */ source: 'solo' | 'multi'; state: 'locked' | 'opening' | 'ready'; remainingMs: number; totalMs: number }
 export interface CardView { id: string; level: number; copies: number }
 export interface Profile {
@@ -32,7 +35,11 @@ export type ClientMsg =
   | { t: 'leaveQueue' }
   | { t: 'solo'; stage: number }
   /** حمله: from = کارتِ خودم، uid = کارتِ حریف */
-  | { t: 'attack'; battleId: string; from: string; uid: string };
+  | { t: 'attack'; battleId: string; from: string; uid: string }
+  /** ترک بازی (= باخت) */
+  | { t: 'leave'; battleId: string }
+  /** پیام آماده‌ی چت (شماره‌ی جمله در CHAT_PHRASES) */
+  | { t: 'chat'; battleId: string; id: number };
 
 export type ServerMsg =
   | { t: 'ready'; profile: Profile }
@@ -41,6 +48,7 @@ export type ServerMsg =
   | { t: 'profile'; profile: Profile }
   | { t: 'battleStart'; battleId: string; you: Side; units: UnitView[]; mode: 'solo' | 'pvp'; opponent: string; first: Side }
   | { t: 'prompt'; battleId: string; mine: boolean; /** کارت‌هایی که می‌توانند حمله کنند */ available: string[]; /** اگر کارت قبلاً انتخاب شده (چندحمله‌ای) */ attacker: string | null; attacksLeft: number; remainingMs: number }
+  | { t: 'chat'; battleId: string; id: number }
   | { t: 'events'; battleId: string; events: BattleEvent[]; snap: Snap[] }
   | { t: 'battleEnd'; battleId: string; winner: Side; youWon: boolean; reason: string; reward: BattleReward | null; profile: Profile };
 

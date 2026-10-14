@@ -1,5 +1,5 @@
 import {
-  attack, createBattle, getUnit, aliveUnits, other, pickAttacker, pickTarget, snapshot, startNextTurn,
+  CHAT_PHRASES, attack, createBattle, getUnit, aliveUnits, other, pickAttacker, pickTarget, snapshot, startNextTurn,
   type BattleEvent, type BattleState, type GameConfig, type ServerMsg, type Side, type UnitInit, type UnitView,
 } from '@game/shared';
 
@@ -121,11 +121,22 @@ export class Battle {
     p.resolve({ from, to: uid });
   }
 
+  /** چت آماده: فقط آنلاین، حداکثر یک پیام در هر ثانیه؛ برای حریف فرستاده می‌شود */
+  private lastChat = 0;
+  chat(userId: number, id: number) {
+    const side = this.sideOf(userId);
+    if (!side || this.o.mode !== 'pvp' || this.ended || !Number.isInteger(id) || id < 0 || id >= CHAT_PHRASES.length) return;
+    const now = Date.now();
+    if (now - this.lastChat < 1000) return;
+    this.lastChat = now;
+    this.parts[other(side)].send?.({ t: 'chat', battleId: this.id, id });
+  }
+
   /** قطع اتصال یا خروج: همون لحظه می‌بازه */
-  forfeit(side: Side) {
+  forfeit(side: Side, reason = 'disconnect') {
     if (this.ended) return;
     this.ended = true;
     if (this.pending) { clearTimeout(this.pending.timer); this.pending = null; }
-    this.o.onEnd({ winner: other(side), reason: 'disconnect', forfeit: side });
+    this.o.onEnd({ winner: other(side), reason, forfeit: side });
   }
 }

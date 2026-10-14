@@ -163,6 +163,12 @@ export function createGameServer(opt: ServerOptions) {
         startBattle('solo', me, bot, [c], stage);
         return;
       }
+      case 'leave':
+        if (c.battle && c.battle.id === m.battleId) { const side = c.battle.sideOf(c.userId); if (side) c.battle.forfeit(side, 'left'); }
+        return;
+      case 'chat':
+        if (c.battle && c.battle.id === m.battleId) c.battle.chat(c.userId, m.id);
+        return;
       case 'attack':
         if (c.battle && c.battle.id === m.battleId && typeof m.uid === 'string' && typeof m.from === 'string') c.battle.handleTarget(c.userId, m.from, m.uid);
         return;
