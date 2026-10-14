@@ -112,7 +112,12 @@ async function openUser(id) {
 export function products(ctx, root) {
   const newBtn = can(ctx, 'products.manage') ? button('محصول جدید', { kind: 'primary', ico: 'plus', onClick: () => productForm(null, () => reload()) }) : null;
   const bulkBtn = can(ctx, 'products.manage') ? button('افزودن گروهی', { ico: 'plus', onClick: () => bulkProductsForm(() => reload()) }) : null;
-  root.append(pageHead('محصولات', 'پلن‌های قابل فروش و تنظیمات inbound', bulkBtn, newBtn));
+  const colorBtn = can(ctx, 'products.manage') ? button('رنگ همه‌ی دکمه‌ها', { ico: 'edit', onClick: () => {
+    const sel = h('select', { class: 'select', 'aria-label': 'رنگ' }, [['mix', '🌈 ترکیبی (آبی، سبز، قرمز به‌نوبت)'], ['primary', '🔵 همه آبی'], ['success', '🟢 همه سبز'], ['danger', '🔴 همه قرمز'], ['', 'پیش‌فرض (حذف رنگ اختصاصی)']].map(([v, l]) => h('option', { value: v }, l)));
+    const ok = button('اعمال روی همه‌ی محصولات', { kind: 'primary', onClick: async () => { try { const r = await api('/products/button-style', { method: 'POST', body: { style: sel.value } }); toast(`${r.count} محصول به‌روز شد`); m.close(); reload(); } catch (e) { toast(errMsg(e), 'err'); } } });
+    const m = modal({ title: 'رنگ دکمه‌ی محصولات در ربات', small: true, body: h('div', { class: 'field' }, h('label', { text: 'رنگ' }), sel, h('div', { class: 'hint', text: 'بعداً می‌توانید رنگ هر محصول را از ویرایش همان محصول عوض کنید.' })), footer: [ok, button('انصراف', { onClick: () => m.close() })] });
+  } }) : null;
+  root.append(pageHead('محصولات', 'پلن‌های قابل فروش و تنظیمات inbound', colorBtn, bulkBtn, newBtn));
   const card = h('div', { class: 'card' });
   root.append(card);
   async function reload() {
@@ -168,6 +173,7 @@ const catLabel = (c) => `${'· '.repeat(c.depth)}${c.icon || '📁'} ${c.name}`;
 
 function productForm(p, done) {
   const f = (label, name, type = 'text', val = '', hint) => h('div', { class: 'field' }, h('label', { for: `pf-${name}`, text: label }), h('input', { class: 'input', id: `pf-${name}`, name, type, value: val, inputmode: type === 'number' ? 'numeric' : false }), hint ? h('div', { class: 'hint', text: hint }) : null);
+  const styleSel = h('select', { class: 'select', id: 'pf-style', 'aria-label': 'رنگ دکمه' }, [['', 'پیش‌فرض (رنگ عمومی دکمه‌ی محصول)'], ['primary', '🔵 آبی'], ['success', '🟢 سبز'], ['danger', '🔴 قرمز']].map(([v, l]) => h('option', { value: v, selected: (p?.buttonStyle || '') === v }, l)));
   const catSel = h('select', { class: 'select', id: 'pf-category', 'aria-label': 'دسته‌بندی' }, h('option', { value: '' }, '🏠 بدون دسته (صفحه‌ی اول)'));
   loadCategories().then((cs) => cs.forEach((c) => catSel.append(h('option', { value: c.id, selected: p?.categoryId === c.id }, catLabel(c)))));
   const proto = h('select', { class: 'select', id: 'pf-protocol' }, ['VLESS', 'VMESS', 'TROJAN', 'SHADOWSOCKS'].map((x) => h('option', { value: x, selected: p?.protocol === x }, x)));
@@ -193,11 +199,11 @@ function productForm(p, done) {
     f('قیمت (تومان)', 'price', 'number', p?.price ?? '', 'عدد صحیح'), f('حجم (GB)', 'trafficGB', 'number', p?.trafficGB ?? ''), f('مدت (روز)', 'durationDays', 'number', p?.durationDays ?? ''),
     h('div', { class: 'field' }, h('label', { for: 'pf-panel', text: 'پنل X-UI' }), panelSel), h('div', { class: 'field' }, h('label', { for: 'pf-pick', text: 'Inbound از لیست پنل' }), pickSel),
     f('Inbound ID در X-UI', 'xuiInboundId', 'number', p?.xuiInboundId ?? '', 'با انتخاب از لیست بالا خودکار پر می‌شود'), h('div', { class: 'field' }, h('label', { for: 'pf-protocol', text: 'Protocol' }), proto), f('ترتیب نمایش', 'sortOrder', 'number', p?.sortOrder ?? 0),
-    h('div', { class: 'field' }, h('label', { text: 'دسته‌بندی در منوی خرید' }), catSel), h('div', { class: 'field' }, h('label', { text: 'وضعیت' }), h('div', { class: 'row' }, active, h('span', { class: 'muted', text: 'قابل خرید' }))), h('div', { class: 'full form-error', hidden: true, id: 'pf-err' }));
+    h('div', { class: 'field' }, h('label', { text: 'دسته‌بندی در منوی خرید' }), catSel), h('div', { class: 'field' }, h('label', { text: 'رنگ دکمه در ربات' }), styleSel), h('div', { class: 'field' }, h('label', { text: 'وضعیت' }), h('div', { class: 'row' }, active, h('span', { class: 'muted', text: 'قابل خرید' }))), h('div', { class: 'full form-error', hidden: true, id: 'pf-err' }));
   const save = button(p ? 'ذخیره تغییرات' : 'ایجاد محصول', { kind: 'primary', onClick: async () => {
     const v = (n) => form.querySelector(`[name=${n}]`).value.trim();
     const err = form.querySelector('#pf-err');
-    const body = { name: v('name'), description: v('description') || null, price: Number(v('price')), trafficGB: Number(v('trafficGB')), durationDays: Number(v('durationDays')), xuiInboundId: Number(v('xuiInboundId')), xuiProviderId: panelSel.value || 'default', sortOrder: Number(v('sortOrder') || 0), protocol: proto.value, isActive: active.getAttribute('aria-checked') === 'true', categoryId: catSel.value || null };
+    const body = { name: v('name'), description: v('description') || null, price: Number(v('price')), trafficGB: Number(v('trafficGB')), durationDays: Number(v('durationDays')), xuiInboundId: Number(v('xuiInboundId')), xuiProviderId: panelSel.value || 'default', sortOrder: Number(v('sortOrder') || 0), protocol: proto.value, isActive: active.getAttribute('aria-checked') === 'true', categoryId: catSel.value || null, buttonStyle: styleSel.value || null };
     const bad = !body.name ? 'نام محصول را وارد کنید' : ['price', 'trafficGB', 'durationDays', 'xuiInboundId'].find((k) => !Number.isInteger(body[k]) || body[k] < (k === 'price' ? 0 : 1)) ? 'قیمت، حجم، مدت و Inbound باید عدد صحیح معتبر باشند' : '';
     if (bad) { err.hidden = false; err.textContent = bad; return; }
     try { await api(p ? `/products/${p.id}` : '/products', { method: p ? 'PATCH' : 'POST', body }); toast(p ? 'تغییرات ذخیره شد' : 'محصول ساخته شد'); m.close(); done(); }

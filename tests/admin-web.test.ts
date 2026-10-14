@@ -309,4 +309,15 @@ describe('button looks', () => {
     expect(first('menu:orders').style).toBeUndefined();
     expect(first('menu:buy').style).toBe('success');
   });
+
+  it('per-product button colour: set in a product, bulk-applied, shown in the buy list', async () => {
+    const { toKb } = await import('../src/bot/ui');
+    const p1 = await makeProduct({ name: 'الف' }); const p2 = await makeProduct({ name: 'ب' });
+    await prisma.product.update({ where: { id: p1.id }, data: { buttonStyle: 'danger' } });
+    const kb = toKb([[{ text: 'x', data: `buy:${p1.id}`, style: 'danger' }], [{ text: 'y', data: `buy:${p2.id}` }]]);
+    expect((kb.inline_keyboard[0][0] as any).style).toBe('danger');
+    expect((kb.inline_keyboard[1][0] as any).style).toBe('success'); // global default for the buy button
+    const { prisma: db } = await import('../src/db/client');
+    expect((await db.product.findUniqueOrThrow({ where: { id: p1.id } })).buttonStyle).toBe('danger');
+  });
 });

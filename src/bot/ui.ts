@@ -20,7 +20,8 @@ export function toKb(rows: Button[][]): InlineKeyboard {
       if (b.url) kb.url(b.text, b.url); else kb.text(b.text, b.data ?? 'noop');
       const look = lookFor(b.data);
       const last = kb.inline_keyboard[kb.inline_keyboard.length - 1]?.at(-1) as any;
-      if (last && look.style) last.style = look.style;
+      const style = b.style ?? look.style;
+      if (last && style) last.style = style;
       if (last && look.emoji) last.icon_custom_emoji_id = look.emoji;
     });
     if (i < rows.length - 1) kb.row();

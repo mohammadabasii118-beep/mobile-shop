@@ -20,6 +20,7 @@ const F = {
   isActive: z.boolean(),
   sortOrder: z.number().int(),
   categoryId: z.string().min(1).nullable(),
+  buttonStyle: z.enum(['primary', 'success', 'danger']).nullable(),
 };
 export const productInput = z.object({
   ...F,
@@ -30,6 +31,7 @@ export const productInput = z.object({
   isActive: F.isActive.default(true),
   sortOrder: F.sortOrder.default(0),
   categoryId: F.categoryId.optional(),
+  buttonStyle: F.buttonStyle.optional(),
 });
 /** Update patch: same validators, but NO defaults — an edit must only touch the fields that were sent. */
 export const productPatch = z.object(F).partial();

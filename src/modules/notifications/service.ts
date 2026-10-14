@@ -3,7 +3,7 @@ import { prisma } from '../../db/client';
 import { logger } from '../../utils/logger';
 import { env } from '../../config/env';
 
-export interface Button { text: string; data?: string; url?: string }
+export interface Button { text: string; data?: string; url?: string; style?: 'primary' | 'success' | 'danger' }
 export interface OutMessage { chatId: bigint; text: string; buttons?: Button[][]; html?: boolean }
 export type Sender = (msg: OutMessage) => Promise<void>;
 

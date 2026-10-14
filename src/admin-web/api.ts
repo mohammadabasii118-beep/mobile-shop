@@ -84,7 +84,7 @@ const productBody = z.object({
   name: z.string().trim().min(1).max(80), description: z.string().trim().max(500).nullish().transform((v) => v ?? ''),
   durationDays: z.number().int(), trafficGB: z.number().int(), price: z.number().int(), xuiInboundId: z.number().int(), xuiProviderId: z.string().max(40).optional(),
   protocol: z.nativeEnum(Protocol), isActive: z.boolean().optional(), sortOrder: z.number().int().optional(),
-  categoryId: z.string().nullable().optional(),
+  categoryId: z.string().nullable().optional(), buttonStyle: z.enum(['primary', 'success', 'danger']).nullable().optional(),
 });
 
 const panelBody = z.object({
@@ -108,6 +108,14 @@ export const routes: Route[] = [
   { method: 'GET', re: /^\/users\/([\w-]+)$/, perm: 'users.view', run: async (c) => (await Q.getUserDetail(c.params[0])) ?? Promise.reject(new NotFoundError('user')) },
 
   { method: 'GET', re: /^\/products$/, perm: 'products.manage', run: async () => ({ items: await listAllProducts() }) },
+  { method: 'POST', re: /^\/products\/button-style$/, perm: 'products.manage', run: async (c) => {
+    const { style } = z.object({ style: z.enum(['', 'mix', 'primary', 'success', 'danger']) }).parse(c.body);
+    const all = await prisma.product.findMany({ orderBy: [{ sortOrder: 'asc' }, { price: 'asc' }], select: { id: true } });
+    const palette = ['primary', 'success', 'danger'];
+    await prisma.$transaction(all.map((p, i) => prisma.product.update({ where: { id: p.id }, data: { buttonStyle: style === '' ? null : style === 'mix' ? palette[i % 3] : style } })));
+    await audit({ actor: actor(c), action: 'product.button_style', target: 'Product', targetId: '*', metadata: { style, count: all.length } });
+    return { count: all.length };
+  } },
   { method: 'POST', re: /^\/products$/, perm: 'products.manage', run: async (c) => createProduct(actor(c), productBody.parse(c.body) as any) },
   {
     method: 'POST', re: /^\/products\/bulk$/, perm: 'products.manage',

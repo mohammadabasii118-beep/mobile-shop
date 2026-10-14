@@ -108,7 +108,7 @@ export function userHandlers(fetchFile: FileFetcher) {
     for (let k = 0; k < lvl.children.length; k += 2) {
       rows.push(lvl.children.slice(k, k + 2).map((c) => ({ text: `${c.icon ?? '📁'} ${c.name}`, data: `bc:${c.id}` })));
     }
-    rows.push(...lvl.products.map((p): Button[] => [{ text: `🛒 ${p.name}\u200f · ${money(p.price, p.currency)}`, data: `buy:${p.id}` }]));
+    rows.push(...lvl.products.map((p): Button[] => [{ text: `🛒 ${p.name}\u200f · ${money(p.price, p.currency)}`, data: `buy:${p.id}`, style: (p.buttonStyle as any) ?? undefined }]));
     rows.push(parentBack ? back(parentBack) : nav());
     const T = await loadTexts();
     const desc = lvl.here?.description ? `\n${i(lvl.here.description)}` : '';
