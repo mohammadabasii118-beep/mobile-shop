@@ -52,8 +52,8 @@ const views = {
     return `<div class="panel scroll"><table><thead><tr><th>لوکیشن</th><th>آدرس</th><th>بار</th><th>آخرین گزارش</th><th>وضعیت</th><th></th></tr></thead><tbody>
       ${S.nodes.map(n => `<tr><td><span class="cc">${esc(n.cc)}</span>${esc(n.name)}</td><td class="mono">${esc(n.address)}</td>
         <td>${n.online ? n.load + '%' : '—'}</td><td>${n.last_seen ? new Date(n.last_seen).toLocaleString('fa-IR') : 'هنوز وصل نشده'}</td>
-        <td><span class="pill ${n.online ? 'good' : 'warn'}">${n.online ? 'آنلاین' : 'آفلاین'}</span>${n.conflicts.length ? `<br><span class="pill bad" title="پورتی که برنامه‌ی دیگری گرفته؛ آن پروتکل روی این نود بالا نمی‌آید. پورت را در بخش پروتکل‌ها ← پورت‌ها عوض کنید.">تداخل پورت: ${esc(n.conflicts.join('، '))}</span>` : ''}</td>
-        <td><button class="btn sm" data-install="${n.id}">دستور نصب</button> <button class="btn sm" data-reality="${n.id}">Reality</button> <button class="btn sm" data-cf="${n.id}">کلادفلر${n.cf_domain ? ' ✓' : ''}</button> <button class="btn sm" data-delnode="${n.id}">حذف</button></td></tr>`).join('')
+        <td><span class="pill ${n.online ? 'good' : 'warn'}">${n.online ? 'آنلاین' : 'آفلاین'}</span>${n.conflicts.length ? `<br><span class="pill bad wrap" title="پورتی که برنامه‌ی دیگری گرفته؛ آن پروتکل روی این نود بالا نمی‌آید. پورت را در بخش پروتکل‌ها ← پورت‌ها عوض کنید.">تداخل پورت: ${esc(n.conflicts.join('، '))}</span>` : ''}</td>
+        <td><div class="chips"><button class="btn sm" data-install="${n.id}">دستور نصب</button> <button class="btn sm" data-reality="${n.id}">Reality</button> <button class="btn sm" data-cf="${n.id}">کلادفلر${n.cf_domain ? ' ✓' : ''}</button> <button class="btn sm" data-delnode="${n.id}">حذف</button></div></td></tr>`).join('')
         || '<tr><td colspan="6" class="muted">لوکیشنی وجود ندارد.</td></tr>'}</tbody></table></div>`;
   },
   protos() {
