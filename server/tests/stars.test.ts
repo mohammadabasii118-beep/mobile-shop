@@ -55,6 +55,8 @@ describe('telegram stars', () => {
     expect(r.j.url).toBe('https://t.me/$fake-invoice');
     expect(invoiceReq).toMatchObject({ currency: 'XTR', provider_token: '', payload: `order:${r.j.order.id}`, prices: [{ amount: pk.stars }] });
     const payload = `order:${r.j.order.id}`;
+    expect(srv.game.adminOrders().filter((o) => o.tgId === 500)).toHaveLength(0);   // فاکتور باز شد ولی پرداخت نشده: در پنل دیده نمی‌شود
+    expect((await call(500, '/api/shop/state')).j.shop.orders).toHaveLength(0);
     expect(srv.stars.preCheckout({ currency: 'XTR', total_amount: pk.stars, invoice_payload: payload, from: { id: 500 } })).toBeNull();
     expect(srv.stars.preCheckout({ currency: 'XTR', total_amount: pk.stars, invoice_payload: payload, from: { id: 501 } })).toBeTruthy();
     expect(srv.stars.preCheckout({ currency: 'USD', total_amount: pk.stars, invoice_payload: payload, from: { id: 500 } })).toBeTruthy();
@@ -62,6 +64,7 @@ describe('telegram stars', () => {
     expect(srv.stars.payment(pay)).toMatch(/الماس/);
     expect(srv.stars.payment(pay)).toBeNull();                              // تکراری: دوباره اضافه نمی‌شود
     expect((await call(500, '/api/me')).j.profile.gems).toBe(50 + pk.gems);
+    expect(srv.game.adminOrders().filter((o) => o.tgId === 500)).toMatchObject([{ status: 'delivered', method: 'stars' }]);   // بعد از پرداخت دیده می‌شود
   });
 
   it('a failing telegram call cancels the order and shows an error', async () => {

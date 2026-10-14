@@ -15,7 +15,7 @@ export function Shop({ ctx }: { ctx: Ctx }) {
   const [at, setAt] = useState(Date.now());
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState(false);
-  const [order, setOrder] = useState<{ id: number; gems: number; coins: number; toman: number; note: string; sent: boolean } | null>(null);
+  const [order, setOrder] = useState<{ packId: string; gems: number; coins: number; toman: number; note: string; sent: boolean } | null>(null);
 
   const load = useCallback(async () => {
     try { const j = await call('/api/shop/state'); setSt(j.shop); setAt(Date.now()); } catch (e) { toast((e as Error).message); }
@@ -40,15 +40,15 @@ export function Shop({ ctx }: { ctx: Ctx }) {
     setProfile(j.profile);
     toast(`${fa(j.got.coins)} سکه گرفتی`);
   });
-  /** کارت‌به‌کارت: سفارش ثبت می‌شود و مشخصات کارت نشان داده می‌شود */
-  const payCard = (id: string) => act(async () => {
-    const j = await call('/api/shop/order', { id });
-    setOrder({ ...j.order, note: '', sent: false });
-    await load();
-  });
+  /** کارت‌به‌کارت: فقط پنجره‌ی راهنما باز می‌شود؛ هیچ سفارشی ثبت نمی‌شود تا وقتی بازیکن «پرداخت کردم» را بزند */
+  const payCard = (id: string) => {
+    const gp = cfg.shop.gemPacks.find((x) => x.id === id), cp = cfg.shop.coinPacks.find((x) => x.id === id);
+    if (gp) setOrder({ packId: id, gems: gp.gems, coins: 0, toman: gp.toman, note: '', sent: false });
+    else if (cp) setOrder({ packId: id, gems: 0, coins: cp.coins, toman: cp.price, note: '', sent: false });
+  };
   const sendNote = () => act(async () => {
     if (!order) return;
-    await call('/api/shop/order-note', { id: order.id, note: order.note });
+    await call('/api/shop/order', { id: order.packId, note: order.note });
     setOrder({ ...order, sent: true });
     toast('ثبت شد؛ بعد از بررسی اضافه می‌شود');
     await load();
@@ -114,7 +114,7 @@ export function Shop({ ctx }: { ctx: Ctx }) {
               <b className="num">{fa(k.coins)}</b><small>سکه</small>
               {k.currency === 'gems'
                 ? <button className="pbtn gem" disabled={busy || p.gems < k.price} onClick={() => void buyCoins(k.id)}><Gem /> <b className="num">{fa(k.price)}</b></button>
-                : <button className="pbtn toman" disabled={busy} onClick={() => void payCard(k.id)} aria-label={`خرید کارت‌به‌کارت ${fa(k.price)} تومان`}><b className="num">{fa(k.price)}</b> <small>تومان</small></button>}
+                : <button className="pbtn toman" disabled={busy} onClick={() => payCard(k.id)} aria-label={`خرید کارت‌به‌کارت ${fa(k.price)} تومان`}><b className="num">{fa(k.price)}</b> <small>تومان</small></button>}
             </div>
           ))}
           {cfg.shop.coinPacks.filter((k) => k.currency === 'gems' || cfg.shop.card.enabled).length === 0 && <p className="shopempty">فعلاً بسته‌ای نیست.</p>}
@@ -129,7 +129,7 @@ export function Shop({ ctx }: { ctx: Ctx }) {
               <div className="pico"><Gem className="gemi big" /></div>
               <b className="num">{fa(k.gems)}</b><small>الماس</small>
               <div className="pays">
-                {cfg.shop.card.enabled && k.toman > 0 && <button className="pbtn toman" disabled={busy} onClick={() => void payCard(k.id)} aria-label={`خرید کارت‌به‌کارت ${fa(k.toman)} تومان`}><b className="num">{fa(k.toman)}</b> <small>تومان</small></button>}
+                {cfg.shop.card.enabled && k.toman > 0 && <button className="pbtn toman" disabled={busy} onClick={() => payCard(k.id)} aria-label={`خرید کارت‌به‌کارت ${fa(k.toman)} تومان`}><b className="num">{fa(k.toman)}</b> <small>تومان</small></button>}
                 {cfg.shop.starsEnabled && k.stars > 0 && <button className="pbtn stars" disabled={busy} onClick={() => void payStars(k.id)} aria-label={`خرید با ${fa(k.stars)} استار`}>⭐ <b className="num">{fa(k.stars)}</b> <small>استار</small></button>}
               </div>
             </div>
@@ -156,7 +156,7 @@ export function Shop({ ctx }: { ctx: Ctx }) {
               <button className="cnum num" dir="ltr" onClick={() => void copy(cfg.shop.card.number.replace(/\D/g, ''))}>{cardFmt(cfg.shop.card.number)}</button>
               <span>به نام <b>{cfg.shop.card.holder || '—'}</b>{cfg.shop.card.bank ? ` · ${cfg.shop.card.bank}` : ''}</span>
             </div>
-            <p className="hint">دقیقاً مبلغ بالا را واریز کن. بعد کد پیگیری (یا ۴ رقم آخر کارتِ خودت) را بنویس و «پرداخت کردم» را بزن. ادمین بررسی می‌کند و به حسابت اضافه می‌شود. کد سفارش: <b className="num">#{fa(order.id)}</b> · شناسه‌ی تو: <b className="num">{fa(p.id)}</b></p>
+            <p className="hint">دقیقاً مبلغ بالا را واریز کن. بعد کد پیگیری (یا ۴ رقم آخر کارتِ خودت) را بنویس و «پرداخت کردم» را بزن. ادمین بررسی می‌کند و به حسابت اضافه می‌شود. تا «پرداخت کردم» را نزنی هیچ سفارشی ثبت نمی‌شود. شناسه‌ی تو: <b className="num">{fa(p.id)}</b></p>
             {order.sent ? <p className="sent">✓ ثبت شد، منتظر بررسی ادمین باش.</p> : (
               <>
                 <input className="notein" value={order.note} maxLength={60} onChange={(e) => setOrder({ ...order, note: e.target.value })} placeholder="کد پیگیری یا ۴ رقم آخر کارت" />

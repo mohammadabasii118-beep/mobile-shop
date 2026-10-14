@@ -304,7 +304,7 @@ export class Game {
     cfg.shop.cards.forEach((o, slot) => {
       if (o.cardId && db.prepare('SELECT 1 FROM shop_buys WHERE user_id = ? AND slot = ? AND day = ? AND sig = ?').get(userId, slot, day, this.offerSig(o))) bought.push(slot);
     });
-    const orders = (db.prepare('SELECT id, gems, coins, toman, stars, method, status, created_at FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 5').all(userId) as any[])
+    const orders = (db.prepare("SELECT id, gems, coins, toman, stars, method, status, created_at FROM orders WHERE user_id = ? AND status NOT IN ('created', 'expired') ORDER BY id DESC LIMIT 5").all(userId) as any[])
       .map((r) => ({ id: r.id as number, gems: r.gems as number, coins: r.coins as number, toman: r.toman as number, stars: r.stars as number, method: r.method as string, status: r.status as string, createdAt: r.created_at as number }));
     return { bought, resetInMs: this.shopNextResetMs(), orders };
   }
@@ -338,10 +338,11 @@ export class Game {
   }
 
   /**
-   * ثبت سفارشِ خرید الماس. method='card': کارت‌به‌کارت (تحویل دستی از پنل)؛ method='stars': استار تلگرام (تحویل خودکار بعد از پرداخت).
-   * حداکثر ۵ سفارش در انتظار برای هر نفر؛ سفارش‌های استارِ پرداخت‌نشده بعد از یک ساعت خودکار لغو می‌شوند.
+   * ثبت سفارش. فقط وقتی بازیکن واقعاً پرداخت را تأیید می‌کند چیزی در پنل و «سفارش‌های اخیر» دیده می‌شود:
+   * - کارت‌به‌کارت: سفارش با زدنِ «پرداخت کردم» و کد پیگیری ساخته می‌شود (وضعیت pending)، نه موقع باز کردن پنجره‌ی خرید.
+   * - استار: برای فاکتور یک ردیف «created» (نامرئی) ساخته می‌شود؛ بعد از پرداخت واقعی delivered و دیده می‌شود. پرداخت‌نشده‌ها بعد از یک ساعت «expired» می‌شوند.
    */
-  createOrder(userId: number, packId: string, method: 'card' | 'stars' = 'card') {
+  createOrder(userId: number, packId: string, method: 'card' | 'stars' = 'card', note?: string) {
     const { db, cfg } = this.d;
     // بسته‌ی الماس (تومان یا استار) یا بسته‌ی سکه‌ای که با تومان فروخته می‌شود (فقط کارت‌به‌کارت)
     const gp = cfg.shop.gemPacks.find((x) => x.id === packId);
@@ -350,25 +351,27 @@ export class Game {
     const item = gp ? { id: gp.id, gems: gp.gems, coins: 0, toman: gp.toman, stars: gp.stars } : { id: cp!.id, gems: 0, coins: cp!.coins, toman: cp!.price, stars: 0 };
     if (method === 'card' && (!cfg.shop.card.enabled || !(item.toman > 0))) throw new GameError('پرداخت کارت‌به‌کارت برای این بسته فعال نیست');
     if (method === 'stars' && (!gp || !cfg.shop.starsEnabled || !(item.stars > 0))) throw new GameError('پرداخت با استار برای این بسته فعال نیست');
-    db.prepare("UPDATE orders SET status = 'canceled', done_at = ? WHERE user_id = ? AND status = 'pending' AND method = 'stars' AND created_at < ?").run(this.d.now(), userId, this.d.now() - 3_600_000);
-    const pending = Number((db.prepare("SELECT COUNT(*) n FROM orders WHERE user_id = ? AND status = 'pending'").get(userId) as any).n);
-    if (pending >= 5) throw new GameError('چند سفارش در انتظار داری؛ اول صبر کن تا بررسی شوند');
+    const now = this.d.now();
+    let clean: string | null = null;
+    if (method === 'card') {
+      clean = String(note ?? '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 60);
+      if (!clean) throw new GameError('کد پیگیری یا ۴ رقم آخر کارت را بنویس');
+      const pending = Number((db.prepare("SELECT COUNT(*) n FROM orders WHERE user_id = ? AND status = 'pending'").get(userId) as any).n);
+      if (pending >= 5) throw new GameError('چند سفارش در انتظار داری؛ اول صبر کن تا بررسی شوند');
+    } else {
+      db.prepare("UPDATE orders SET status = 'expired', done_at = ? WHERE user_id = ? AND status = 'created' AND created_at < ?").run(now, userId, now - 3_600_000);
+      const open = Number((db.prepare("SELECT COUNT(*) n FROM orders WHERE user_id = ? AND status = 'created'").get(userId) as any).n);
+      if (open >= 10) throw new GameError('چند پرداخت باز داری؛ کمی بعد دوباره امتحان کن');
+    }
     const toman = method === 'card' ? item.toman : 0, stars = method === 'stars' ? item.stars : 0;
-    const r = db.prepare('INSERT INTO orders (user_id, pack_id, gems, coins, toman, stars, method, created_at) VALUES (?,?,?,?,?,?,?,?)').run(userId, item.id, item.gems, item.coins, toman, stars, method, this.d.now());
+    const status = method === 'card' ? 'pending' : 'created';
+    const r = db.prepare('INSERT INTO orders (user_id, pack_id, gems, coins, toman, stars, method, status, note, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)').run(userId, item.id, item.gems, item.coins, toman, stars, method, status, clean, now);
     return { id: Number(r.lastInsertRowid), gems: item.gems, coins: item.coins, toman, stars };
   }
 
-  /** کد پیگیری/۴ رقم آخر کارتِ پرداخت‌کننده (برای تطبیق در پنل) */
-  setOrderNote(userId: number, orderId: number, note: string) {
-    const clean = String(note ?? '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 60);
-    if (!clean) throw new GameError('کد پیگیری را بنویس');
-    const r = this.d.db.prepare("UPDATE orders SET note = ? WHERE id = ? AND user_id = ? AND method = 'card' AND status = 'pending'").run(clean, orderId, userId);
-    if (Number(r.changes) !== 1) throw new GameError('سفارش پیدا نشد یا قبلاً بررسی شده');
-  }
-
-  /** لغو سفارشِ استارِ ساخته‌شده که فاکتورش نشد (خطای تلگرام) */
+  /** فاکتور استار ساخته نشد (خطای تلگرام): ردیف نامرئی را منقضی کن */
   cancelOrder(orderId: number) {
-    this.d.db.prepare("UPDATE orders SET status = 'canceled', done_at = ? WHERE id = ? AND status = 'pending'").run(this.d.now(), orderId);
+    this.d.db.prepare("UPDATE orders SET status = 'expired', done_at = ? WHERE id = ? AND status = 'created'").run(this.d.now(), orderId);
   }
 
   /** قبل از پرداخت استار: آیا این پرداخت معتبر است؟ (تلگرام فقط ۱۰ ثانیه فرصت می‌دهد) */
@@ -396,7 +399,8 @@ export class Game {
   }
 
   adminOrders(status?: string) {
-    const rows = this.d.db.prepare(`SELECT o.id, o.user_id, o.gems, o.coins, o.toman, o.stars, o.method, o.note, o.status, o.created_at, o.done_at, u.tg_id, u.name, u.avatar FROM orders o JOIN users u ON u.id = o.user_id ${status ? 'WHERE o.status = ?' : ''} ORDER BY o.id DESC LIMIT 200`).all(...(status ? [status] : [])) as any[];
+    // سفارش‌های «created/expired» (فاکتور باز شده ولی پرداخت نشده) هیچ‌وقت نمایش داده نمی‌شوند
+    const rows = this.d.db.prepare(`SELECT o.id, o.user_id, o.gems, o.coins, o.toman, o.stars, o.method, o.note, o.status, o.created_at, o.done_at, u.tg_id, u.name, u.avatar FROM orders o JOIN users u ON u.id = o.user_id WHERE o.status NOT IN ('created', 'expired') ${status ? 'AND o.status = ?' : ''} ORDER BY o.id DESC LIMIT 200`).all(...(status ? [status] : [])) as any[];
     return rows.map((r) => ({ id: r.id as number, userId: r.user_id as number, tgId: r.tg_id as number, name: r.name as string, avatar: (r.avatar ?? null) as string | null, gems: r.gems as number, coins: r.coins as number, toman: r.toman as number, stars: r.stars as number, method: r.method as string, note: (r.note ?? null) as string | null, status: r.status as string, createdAt: r.created_at as number, doneAt: (r.done_at ?? null) as number | null }));
   }
 

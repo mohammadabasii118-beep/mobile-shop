@@ -166,9 +166,9 @@ describe('shop admin', () => {
     expect((await call(42, '/api/admin/config', { config: bad3 })).status).toBe(400);
     // سفارش کارت‌به‌کارت: مشخصات کارت برمی‌گردد، یادداشت پیگیری، تحویل فقط یک‌بار
     const me = await (await call(45, '/api/me')).json() as any;
-    const ord = await (await call(45, '/api/shop/order', { id: pub.shop.gemPacks[0].id })).json() as any;
-    expect(ord.card).toMatchObject({ holder: 'علی رضایی' });
-    expect((await call(45, '/api/shop/order-note', { id: ord.order.id, note: 'پیگیری ۱۲۳۴' })).status).toBe(200);
+    expect((await call(45, '/api/shop/order', { id: pub.shop.gemPacks[0].id })).status).toBe(400);   // بدون کد پیگیری ثبت نمی‌شود
+    expect(((await (await call(42, '/api/admin/orders')).json()) as any).orders.filter((o: any) => o.tgId === 45)).toHaveLength(0);
+    const ord = await (await call(45, '/api/shop/order', { id: pub.shop.gemPacks[0].id, note: 'پیگیری ۱۲۳۴' })).json() as any;
     const list = await (await call(42, '/api/admin/orders?status=pending')).json() as any;
     expect(list.orders.find((o: any) => o.id === ord.order.id)).toMatchObject({ name: me.profile.name, status: 'pending', note: 'پیگیری ۱۲۳۴', method: 'card' });
     expect((await call(43, '/api/admin/order', { id: ord.order.id, action: 'deliver' })).status).toBe(403);

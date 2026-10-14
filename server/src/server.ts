@@ -412,12 +412,11 @@ export function createGameServer(opt: ServerOptions) {
         case '/api/shop/state': extra = { shop: game.shopState(userId) }; break;
         case '/api/shop/buy-card': extra = { bought: game.buyShopCard(userId, Number(body.slot)) }; break;
         case '/api/shop/buy-coins': extra = { got: game.buyCoinPack(userId, String(body.id)) }; break;
-        case '/api/shop/order': { // کارت‌به‌کارت: سفارش ثبت می‌شود و مشخصات کارت نمایش داده می‌شود؛ تحویل دستی از پنل
-          const o = game.createOrder(userId, String(body.id), 'card');
-          extra = { order: o, card: cfg.shop.card };
+        case '/api/shop/order': { // کارت‌به‌کارت: فقط وقتی بازیکن «پرداخت کردم» را می‌زند (با کد پیگیری) سفارش ثبت می‌شود؛ تحویل دستی از پنل
+          const o = game.createOrder(userId, String(body.id), 'card', String(body.note ?? ''));
+          extra = { order: o };
           break;
         }
-        case '/api/shop/order-note': game.setOrderNote(userId, Number(body.id), String(body.note ?? '')); break;
         case '/api/shop/stars': { // استار تلگرام: فاکتور ساخته می‌شود؛ بعد از پرداخت ربات الماس را خودکار اضافه می‌کند
           if (!opt.auth.botToken) throw new GameError('پرداخت با استار فقط در نسخه‌ی واقعی (با توکن ربات) کار می‌کند');
           const o = game.createOrder(userId, String(body.id), 'stars');
