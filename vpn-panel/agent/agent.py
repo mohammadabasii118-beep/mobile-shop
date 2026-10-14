@@ -412,6 +412,33 @@ def ensure_openvpn_limits(path=OPENVPN_DROPIN, conf="/etc/openvpn/server/server.
     return write_if_changed(path, OPENVPN_DROPIN_TEXT, 0o644)
 
 
+VPN_SUBNETS = ["10.99.0.0/16", "10.88.0.0/16", "10.77.0.0/24", "10.66.0.0/24", "10.55.0.0/24"]   # L2TP, WireGuard, IKEv2, AnyConnect, OpenVPN
+
+
+def forwarding_rules(subnets, chain, iface):
+    """[(table, chain, rule)] that let VPN clients reach the internet: forward both ways, and masquerade."""
+    rules = []
+    for n in subnets:
+        rules.append(("filter", chain, ["-s", n, "-j", "ACCEPT"]))
+        rules.append(("filter", chain, ["-d", n, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"]))
+        if iface:
+            rules.append(("nat", "POSTROUTING", ["-s", n, "-o", iface, "-j", "MASQUERADE"]))
+    return rules
+
+
+def ensure_forwarding(run=None):
+    """Idempotent. Docker (and some firewalls) set FORWARD to DROP and rewrite the chain, so this runs on every
+    pass instead of once at install time. DOCKER-USER, when present, is evaluated before Docker's own rules."""
+    run = run or sh
+    run("sysctl", "-w", "net.ipv4.ip_forward=1")
+    chain = "DOCKER-USER" if run("iptables", "-S", "DOCKER-USER").returncode == 0 else "FORWARD"
+    route = run("ip", "route", "show", "default").stdout.split()
+    iface = route[route.index("dev") + 1] if "dev" in route else ""
+    for table, ch, rule in forwarding_rules(VPN_SUBNETS, chain, iface):
+        if run("iptables", "-t", table, "-C", ch, *rule).returncode != 0:
+            run("iptables", "-t", table, "-I" if table == "filter" else "-A", ch, *(["1"] if table == "filter" else []), *rule)
+
+
 def restart(service):
     sh("systemctl", "reset-failed", service)  # after repeated crashes systemd refuses to start it again
     sh("systemctl", "restart", service)
@@ -449,6 +476,7 @@ def apply(cfg, reality, tls, wg):
             sh("wg", "syncconf", "wg0", tmp)  # live update, keeps existing sessions
         else:
             sh("systemctl", "restart", "wg-quick@wg0")
+    ensure_forwarding()
     if ensure_openvpn_limits():
         sh("systemctl", "daemon-reload")
         restart("openvpn-server@server")

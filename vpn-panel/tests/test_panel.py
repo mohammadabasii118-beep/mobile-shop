@@ -556,3 +556,40 @@ def test_openvpn_nproc_dropin_is_installed_once():
     assert agent.ensure_openvpn_limits(str(drop), str(conf)) is True
     assert "LimitNPROC=infinity" in drop.read_text()
     assert agent.ensure_openvpn_limits(str(drop), str(conf)) is False          # already there: no restart loop
+
+
+def test_forwarding_rules_are_added_once_and_use_docker_user_when_present():
+    class R:  # minimal subprocess result
+        def __init__(self, code=0, out=""):
+            self.returncode, self.stdout = code, out
+
+    def make(has_docker_user, existing=()):
+        calls = []
+
+        def run(*cmd):
+            calls.append(cmd)
+            if cmd[:3] == ("iptables", "-S", "DOCKER-USER"):
+                return R(0 if has_docker_user else 1)
+            if cmd[:3] == ("ip", "route", "show"):
+                return R(0, "default via 10.0.0.1 dev ens3 proto dhcp")
+            if "-C" in cmd:
+                return R(0 if cmd in existing else 1)
+            return R()
+        return run, calls
+
+    run, calls = make(False)
+    agent.ensure_forwarding(run)
+    inserted = [c for c in calls if "-I" in c or "-A" in c]
+    assert ("iptables", "-t", "filter", "-I", "FORWARD", "1", "-s", "10.55.0.0/24", "-j", "ACCEPT") in inserted
+    assert ("iptables", "-t", "nat", "-A", "POSTROUTING", "-s", "10.55.0.0/24", "-o", "ens3", "-j", "MASQUERADE") in inserted
+    assert len(inserted) == 3 * len(agent.VPN_SUBNETS)
+
+    run, calls = make(True)
+    agent.ensure_forwarding(run)
+    assert any(c[:5] == ("iptables", "-t", "filter", "-I", "DOCKER-USER") for c in calls)
+
+    # when every rule already exists nothing is inserted
+    have = tuple(("iptables", "-t", t, "-C", ch, *r) for t, ch, r in agent.forwarding_rules(agent.VPN_SUBNETS, "FORWARD", "ens3"))
+    run, calls = make(False, existing=have)
+    agent.ensure_forwarding(run)
+    assert not [c for c in calls if "-I" in c or "-A" in c]
