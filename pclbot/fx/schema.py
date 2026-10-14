@@ -63,15 +63,6 @@ CREATE TABLE IF NOT EXISTS fx_xi_drafts(admin_id INTEGER PRIMARY KEY, data TEXT 
 CREATE TABLE IF NOT EXISTS fx_xi_known(
     player_id TEXT PRIMARY KEY COLLATE NOCASE, team_name TEXT, photo_file TEXT, logo_file TEXT, updated_at INTEGER NOT NULL);
 
--- ---- multi-location VPN subscriptions sold through the panel API
-CREATE TABLE IF NOT EXISTS fx_vpn_plans(
-    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, quota_gb INTEGER NOT NULL DEFAULT 0, days INTEGER NOT NULL DEFAULT 30,
-    price INTEGER NOT NULL DEFAULT 0, protos TEXT NOT NULL DEFAULT '[]', active INTEGER NOT NULL DEFAULT 1, sort INTEGER NOT NULL DEFAULT 0);
-CREATE TABLE IF NOT EXISTS fx_vpn_services(
-    id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, panel_id INTEGER, name TEXT NOT NULL UNIQUE,
-    plan_id INTEGER, price INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);
-CREATE INDEX IF NOT EXISTS fx_vpn_services_user ON fx_vpn_services(user_id);
-
 -- ---- Here We Go (transfers from the PCL app API) -------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS fx_hwg_seen(id TEXT PRIMARY KEY, posted_at INTEGER NOT NULL);
 """

@@ -1,7 +1,6 @@
 """Extra features: USDT subscription, blacklist, draft, streamers, quiz contests, Here We Go, app graphics.   python -m tests.fx_test"""
 import asyncio
 import datetime as dt
-import datetime
 import os
 import sys
 import tempfile
@@ -18,10 +17,6 @@ U2, U3, STREAMER = 50001, 50002, 60000
 PLUS = -1009999999
 
 
-FUT = (datetime.date.today() + datetime.timedelta(days=2)).isoformat()            # scheduled matches are always in the future
-FUT2 = (datetime.date.today() + datetime.timedelta(days=9)).isoformat()
-
-
 def mock_api():
     from pclbot.fx import appapi
     tf = [{"id": f"t{i}", "player_id": f"p{i}", "player_gaming_id": f"Player_{i}", "from_team_id": "a", "from_team_name": "آریا", "from_team_logo": None,
@@ -31,12 +26,12 @@ def mock_api():
 
     def m(i, h, a, hs, as_, st, day, rnd, cid="c1", hp=None, ap=None, hh="17:30"):
         return {"id": f"m{i}", "competition_id": cid, "competition_name": "x", "home_team_name": h, "away_team_name": a, "home_score": hs, "away_score": as_,
-                "home_penalty": hp, "away_penalty": ap, "round": rnd, "group_name": None, "status": st, "match_date": (day if len(day) > 2 else f"2026-10-{day}") + f"T{hh}:00Z"}
+                "home_penalty": hp, "away_penalty": ap, "round": rnd, "group_name": None, "status": st, "match_date": f"2026-10-{day}T{hh}:00Z"}
     ms = [m(1, "تاج", "آزادی", 2, 1, "finished", "05", "1"), m(2, "لگسی", "آریا", 0, 0, "finished", "05", "1", hh="18:30"),
-          m(3, "تاج", "لگسی", None, None, "scheduled", FUT, "2"), m(4, "آریا", "آزادی", None, None, "scheduled", FUT, "2", hh="19:30"),
-          m(5, "تاج", "آریا", None, None, "scheduled", FUT2, "3")]
+          m(3, "تاج", "لگسی", None, None, "scheduled", "12", "2"), m(4, "آریا", "آزادی", None, None, "scheduled", "12", "2", hh="19:30"),
+          m(5, "تاج", "آریا", None, None, "scheduled", "19", "3")]
     cup = [m(10, "تاج", "آزادی", 1, 1, "finished", "05", "quarter_final", "c2", 4, 3), m(11, "لگسی", "آریا", 2, 0, "finished", "05", "quarter_final", "c2"),
-           m(12, "تاج", "لگسی", None, None, "scheduled", FUT, "semi_final", "c2")]
+           m(12, "تاج", "لگسی", None, None, "scheduled", "12", "semi_final", "c2")]
     st = [{"team_name": n, "position": i + 1, "played": 2, "won": 2 - i, "drawn": i % 2, "lost": i, "goals_for": 5 - i, "goals_against": i, "goal_difference": 5 - 2 * i, "points": 6 - 2 * i, "group_name": None}
           for i, n in enumerate(["تاج", "آریا", "آزادی", "لگسی"])]
     stats = {"scorers": [{"gamer_tag": "Ali_10", "team_name": "تاج", "value": 12}, {"gamer_tag": "Reza_7", "team_name": "آریا", "value": 9}, {"player_name": "Sina", "team_name": "لگسی", "value": 8}],
@@ -342,9 +337,9 @@ async def run():
     await d.press("fx:agm", A); await d.press("fx:agxi", A)                                             # ⭐ opens the Team of the Tournament manager
     assert [t for t, _ in d.buttons(A)][:2] == ["🤖 بر اساس آمار اپ — AUTO", "✍️ انتخاب دستی — MANUAL"], d.buttons(A)
     await d.press("fx:agm", A); await d.press("fx:agd", A)                                                  # daily schedule: days that have matches
-    assert FUT.replace("-", "/") in " ".join(t for t, _ in d.buttons(A)), d.buttons(A)
+    assert "2026/10/12" in " ".join(t for t, _ in d.buttons(A)), d.buttons(A)
     d.snap("Daily schedule — choose the day", A)
-    i12 = [cb for t, cb in d.buttons(A) if FUT.replace("-", "/") in t][0]
+    i12 = [cb for t, cb in d.buttons(A) if "2026/10/12" in t][0]
     await preview(i12, snap="App graphic — daily schedule")
     await d.press("fx:agm", A); await d.press("fx:agd", A); await d.say("2026-12-31", A)
     assert "بازی‌ای ثبت نشده" in d.text(A)

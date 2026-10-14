@@ -7,7 +7,7 @@ from aiogram.types import CallbackQuery
 
 from ..onc.ui import ob, okb
 from ..utils import is_admin, show
-from . import appgfx, blacklist, core, draft, hwg, quiz, streamers, subs, themes_ui, vpn, xi
+from . import appgfx, blacklist, core, draft, hwg, quiz, streamers, subs, themes_ui, xi
 from .states import DestSt
 
 PANEL = "fx:a"
@@ -25,7 +25,7 @@ async def panel(c: CallbackQuery, state: FSMContext):
                     [ob("🎥 Streamers", "fx:at"), ob("⚡ ترنسفر نیوز (HWG)", "fx:hw")],
                     [ob("🎨 گرافیک‌های اپ", "fx:ag"), ob("🎭 تم‌های گرافیکی", "fx:th")],
                     [ob("⭐ تیم منتخب تورنمنت", "fx:xi"), ob("📍 کانال «پلاس»", "fx:ap")],
-                    [ob("🌍 VPN مولتی‌لوکیشن", "fx:av"), ob("✨ گروه واسط ایموجی پریمیوم", "fx:ar")],
+                    [ob("✨ گروه واسط ایموجی پریمیوم", "fx:ar")],
                     [ob("🔙 بازگشت", "admhome")]]))
     await c.answer()
 
@@ -84,7 +84,7 @@ async def stale(c: CallbackQuery):
 
 def routers() -> list[Router]:
     return [subs.router, blacklist.router, draft.router, quiz.router, streamers.router, subs.admin_router, blacklist.admin_router, draft.admin_router,
-            quiz.admin_router, streamers.admin_router, vpn.admin_router, vpn.router, router, themes_ui.router, xi.router, hwg.router, appgfx.router]
+            quiz.admin_router, streamers.admin_router, router, themes_ui.router, xi.router, hwg.router, appgfx.router]
 
 
 def start_tasks(bot: Bot) -> list[asyncio.Task]:
