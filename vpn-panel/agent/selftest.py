@@ -152,6 +152,8 @@ def main():
         sys.exit(__doc__ + "\n\nPass the user's real subscription link (https://.../sub/...), not a placeholder.")
     DEFAULT_PIN = cert_sha256(os.environ.get("SELFTEST_CERT", "/etc/vpn-node/tls.crt"))
     xray = shutil.which("xray") or "/usr/local/bin/xray"
+    if not os.path.exists(xray):
+        sys.exit("xray is not installed on this machine. Run this on a node (the server where you ran node-install.sh), not on the panel server.")
     wanted = sys.argv[2].lower() if len(sys.argv) > 2 else ""
     entries = [e for e in (outbound_for(l) for l in fetch_links(sys.argv[1]) if "://" in l) if e]
     entries = [e for e in entries if wanted in e[0].lower()]
