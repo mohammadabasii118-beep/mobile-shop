@@ -489,7 +489,7 @@ def test_reality_camouflage_site_is_configurable_per_node():
     with TestClient(app) as c:
         h = admin(c)
         node = c.post("/api/nodes", headers=h, json={"name": "R", "cc": "fr", "address": "7.7.7.7"}).json()
-        assert node["reality_sni"] == "www.microsoft.com"
+        assert node["reality_sni"] == "www.apple.com"
         nh = {"Authorization": "Bearer " + node["install_command"].split("--token ")[1].split()[0]}
         user = c.post("/api/users", headers=h, json={"name": "realuser", "protos": ["vless"], "node_ids": [node["id"]]}).json()
         c.post("/api/node/report", headers=nh, json={"reality_pub": "PUB", "reality_sid": "ab"})

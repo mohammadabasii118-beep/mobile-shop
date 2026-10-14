@@ -1,7 +1,9 @@
 """Protocols the panel can manage. Adding one means: a row here, a renderer in
 agent/agent.py, a link builder in subscription.py, and install steps in agent/install.sh."""
 
-REALITY_SNI = "www.microsoft.com"
+# Reality camouflage default. www.microsoft.com sends a ~9 KB certificate chain and its handshake did not complete
+# on a real node; www.apple.com (2 certificates, ~5.5 KB) did. Every node can override it in the panel.
+REALITY_SNI = "www.apple.com"
 SS_METHOD = "2022-blake3-aes-128-gcm"
 WS_PATHS = {"vmess_ws": "/ws", "vless_ws": "/vless", "trojan_ws": "/trojan"}
 GRPC_SERVICE = "grpc"

@@ -32,7 +32,7 @@ class Node(Base):
     tls_self_signed: Mapped[bool] = mapped_column(default=True)
     tls_pin: Mapped[str] = mapped_column(default="")  # SHA-256 of the node certificate, for pinning
     conflicts: Mapped[list] = mapped_column(JSON, default=list)  # ports another program holds, from the agent
-    reality_sni: Mapped[str] = mapped_column(default="www.microsoft.com")  # camouflage site for Reality
+    reality_sni: Mapped[str] = mapped_column(default="www.apple.com")  # camouflage site for Reality
     cf_domain: Mapped[str] = mapped_column(default="")
     cf_address: Mapped[str] = mapped_column(default="")
     wg_pub: Mapped[str] = mapped_column(default="")

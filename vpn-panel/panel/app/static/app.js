@@ -113,7 +113,7 @@ function installDialog(n) {
     <pre>${esc(n.install_command)}</pre>
     <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-copy="${esc(n.install_command)}">کپی دستور</button><button class="btn pri" data-close>بستن</button></div>`);
 }
-const REALITY_SITES = ['www.microsoft.com', 'www.apple.com', 'addons.mozilla.org', 'dl.google.com', 'www.samsung.com', 'www.asus.com', 'www.lovelive-anime.jp'];
+const REALITY_SITES = ['www.apple.com', 'www.microsoft.com', 'addons.mozilla.org', 'dl.google.com', 'www.samsung.com', 'www.asus.com', 'www.lovelive-anime.jp'];
 function realityDialog(n) {
   openModal(`<h2>Reality برای ${esc(n.name)}</h2>
     <p class="muted" style="margin:0">سایتی که Reality ادای آن را درمی‌آورد. باید از روی سرور نود با TLS 1.3 و h2 جواب بدهد و پشت CDN نباشد؛ همه‌ی سایت‌ها از همه‌ی سرورها جواب نمی‌دهند.</p>
