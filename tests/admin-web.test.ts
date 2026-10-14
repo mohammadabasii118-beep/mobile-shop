@@ -289,3 +289,24 @@ describe('web panel: multi-panel management API', () => {
     } finally { await fake.stop(); }
   });
 });
+
+describe('button looks', () => {
+  it('colour + premium emoji overrides reach the keyboard; defaults and validation hold', async () => {
+    const { toKb } = await import('../src/bot/ui');
+    const { setButtonLook, resetButtonLook, listButtonLooks } = await import('../src/modules/ui/buttons');
+    const first = (data: string) => (toKb([[{ text: 'x', data }]]).inline_keyboard[0][0] as any);
+    expect(first('menu:buy').style).toBe('success'); // built-in default
+    expect(first('menu:orders').style).toBeUndefined();
+    await setButtonLook('admin:1', 'menu:orders', { style: 'danger', emoji: '5368324170671202286' });
+    expect(first('menu:orders')).toMatchObject({ style: 'danger', icon_custom_emoji_id: '5368324170671202286' });
+    expect(first('sv:renew:abc').style).toBe('success');
+    await setButtonLook('admin:1', 'menu:buy', { style: null, emoji: null }); // explicit "no colour"
+    expect(first('menu:buy').style).toBeUndefined();
+    await expect(setButtonLook('admin:1', 'menu:orders', { emoji: 'abc' })).rejects.toThrow();
+    await expect(setButtonLook('admin:1', 'nope', {})).rejects.toThrow();
+    expect((await listButtonLooks()).find((b) => b.key === 'menu:orders')?.style).toBe('danger');
+    await resetButtonLook('admin:1', 'menu:orders'); await resetButtonLook('admin:1', 'menu:buy');
+    expect(first('menu:orders').style).toBeUndefined();
+    expect(first('menu:buy').style).toBe('success');
+  });
+});

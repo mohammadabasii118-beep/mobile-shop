@@ -902,3 +902,26 @@ export function broadcast(ctx, root) {
   }
   load();
 }
+
+/* ============================== Button looks ================================= */
+const BTN_STYLES = [['', 'پیش‌فرض (طوسی)'], ['primary', '🔵 آبی'], ['success', '🟢 سبز'], ['danger', '🔴 قرمز']];
+export function buttons(ctx, root) {
+  root.append(pageHead('ظاهر دکمه‌ها', 'رنگ و ایموجی پرمیوم دکمه‌های ربات را تنظیم کنید'));
+  root.append(h('div', { class: 'callout' }, icon('info'), h('div', { text: 'شناسه‌ی ایموجی پرمیوم یک عدد است (custom emoji id). برای گرفتن آن، ایموجی را در ربات @RawDataBot یا مشابه بفرستید و مقدار custom_emoji_id را بردارید. نمایش ایموجی پرمیوم روی دکمه فقط وقتی کار می‌کند که حساب مالک ربات پریمیوم باشد؛ در غیر این‌صورت تلگرام آن را نادیده می‌گیرد یا خطا می‌دهد. رنگ دکمه‌ها فقط در نسخه‌های جدید تلگرام دیده می‌شود.' })));
+  const card = h('div', { class: 'card' }); root.append(card);
+  async function reload() {
+    clear(card); card.append(h('div', { class: 'card-b' }, skeletonBlock(200)));
+    try {
+      const { items } = await api('/ui/buttons'); clear(card);
+      card.append(table([
+        { label: 'دکمه', render: (b) => h('div', null, h('div', { class: 'cell-main', text: b.label }), h('div', { class: 'cell-sub' }, b.group, ' · ', ltr(b.key, 'mono'))) },
+        { label: 'رنگ', render: (b) => { const sel = h('select', { class: 'select', 'aria-label': 'رنگ ' + b.label }, BTN_STYLES.map(([v, l]) => h('option', { value: v, selected: (b.style || '') === v }, l))); b._sel = sel; return sel; } },
+        { label: 'ایموجی پرمیوم', render: (b) => { const inp = h('input', { class: 'input ltr', dir: 'ltr', placeholder: 'مثلاً 5368324170671202286', value: b.emoji || '', 'aria-label': 'ایموجی ' + b.label }); b._emoji = inp; return inp; } },
+        { label: '', render: (b) => h('div', { class: 'actions' },
+          button('ذخیره', { size: 'sm', kind: 'primary', onClick: async () => { try { await api('/ui/buttons', { method: 'PUT', body: { key: b.key, style: b._sel.value || null, emoji: b._emoji.value.trim() || null } }); toast('ذخیره شد'); } catch (e) { toast(errMsg(e), 'err'); } } }),
+          b.isDefault ? null : button('بازگشت به پیش‌فرض', { size: 'sm', onClick: async () => { try { await api(`/ui/buttons/${b.key}`, { method: 'DELETE' }); toast('بازگردانده شد'); reload(); } catch (e) { toast(errMsg(e), 'err'); } } })) },
+      ], items));
+    } catch (e) { clear(card); card.append(errorState(errMsg(e), reload)); }
+  }
+  reload();
+}

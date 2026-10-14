@@ -1,3 +1,4 @@
+import { loadButtonLooks } from '../modules/ui/buttons';
 import { Bot, session } from 'grammy';
 import { prisma } from '../db/client';
 import { RateLimiter } from '../utils/ratelimit';
@@ -37,6 +38,7 @@ export function createBot(token: string, opts: { fetchFile?: FileFetcher; botInf
 
   bot.use(async (ctx, next) => {
     if (ctx.chat && ctx.chat.type !== 'private') return; // bot works in private chats only
+    await loadButtonLooks();
     if (!ctx.from || ctx.from.is_bot) return;
     if (!limiter.allow(String(ctx.from.id))) {
       if (ctx.callbackQuery) await ctx.answerCallbackQuery({ text: 'لطفاً کمی آهسته‌تر.' }).catch(() => undefined);

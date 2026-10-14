@@ -19,6 +19,7 @@ import { PartnerFilter, validatePartnerSetting, approvePartner, getPartnerById, 
 import { PanelView, probePanel, createPanel, deletePanel, listPanelInbounds, listPanels, panelHealth, setPanelActive, testPanel, updatePanel } from '../modules/panels/service';
 import { categoryTree, createCategory, deleteCategory, moveCategory, updateCategory } from '../modules/categories/service';
 import { isTextKey, listTexts, previewText, resetText, setText } from '../modules/texts/service';
+import { listButtonLooks, resetButtonLook, setButtonLook } from '../modules/ui/buttons';
 import { addChannel, deleteChannel, listChannels, setChannelActive, testChannel } from '../modules/channels/service';
 import * as Q from './queries';
 
@@ -143,6 +144,9 @@ export const routes: Route[] = [
   },
   { method: 'DELETE', re: /^\/texts\/([\w.]+)$/, perm: 'texts.manage', run: async (c) => { if (!isTextKey(c.params[0])) throw new NotFoundError('text'); await resetText(actor(c), c.params[0]); return { ok: true }; } },
 
+  { method: 'GET', re: /^\/ui\/buttons$/, perm: 'settings.manage', run: async () => ({ items: await listButtonLooks() }) },
+  { method: 'PUT', re: /^\/ui\/buttons$/, perm: 'settings.manage', run: async (c) => { const b = z.object({ key: z.string(), style: z.string().nullish(), emoji: z.string().nullish() }).parse(c.body); await setButtonLook(actor(c), b.key, b); return { ok: true }; } },
+  { method: 'DELETE', re: /^\/ui\/buttons\/([\w:]+)$/, perm: 'settings.manage', run: async (c) => { await resetButtonLook(actor(c), c.params[0]); return { ok: true }; } },
   { method: 'GET', re: /^\/channels$/, perm: 'settings.manage', run: async () => ({ items: (await listChannels()).map((c) => ({ ...c, chatId: String(c.chatId) })) }) },
   {
     method: 'POST', re: /^\/channels$/, perm: 'settings.manage',

@@ -1,6 +1,7 @@
 import { Context, InlineKeyboard, SessionFlavor } from 'grammy';
 import { User } from '@prisma/client';
 import { Button } from '../modules/notifications/service';
+import { lookFor } from '../modules/ui/buttons';
 import type { Texts } from '../modules/texts/service';
 
 export interface Session {
@@ -15,7 +16,13 @@ export const BACK = '⬅️ بازگشت';
 export function toKb(rows: Button[][]): InlineKeyboard {
   const kb = new InlineKeyboard();
   rows.forEach((row, i) => {
-    row.forEach((b) => (b.url ? kb.url(b.text, b.url) : kb.text(b.text, b.data ?? 'noop')));
+    row.forEach((b) => {
+      if (b.url) kb.url(b.text, b.url); else kb.text(b.text, b.data ?? 'noop');
+      const look = lookFor(b.data);
+      const last = kb.inline_keyboard[kb.inline_keyboard.length - 1]?.at(-1) as any;
+      if (last && look.style) last.style = look.style;
+      if (last && look.emoji) last.icon_custom_emoji_id = look.emoji;
+    });
     if (i < rows.length - 1) kb.row();
   });
   return kb;
