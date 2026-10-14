@@ -9,6 +9,7 @@ import { loadTexts } from '../modules/texts/service';
 import { getBool } from '../modules/settings/service';
 import { notifyAdmins } from '../modules/notifications/service';
 import { setSender } from '../modules/notifications/service';
+import { setBroadcastSender } from '../modules/broadcast/service';
 import { Ctx, Session, toKb } from './ui';
 import type { Button } from '../modules/notifications/service';
 import { adminHandlers } from './admin';
@@ -62,6 +63,11 @@ export function createBot(token: string, opts: { fetchFile?: FileFetcher; botInf
       link_preview_options: { is_disabled: true },
       ...(m.html ? { parse_mode: 'HTML' as const } : {}),
     });
+  });
+  setBroadcastSender(async (m) => {
+    const reply_markup = m.button ? toKb([[{ text: m.button.text, url: m.button.url }]]) : undefined;
+    if (m.photoFileId) await bot.api.sendPhoto(Number(m.chatId), m.photoFileId, { caption: m.html, parse_mode: 'HTML', reply_markup });
+    else await bot.api.sendMessage(Number(m.chatId), m.html, { parse_mode: 'HTML', reply_markup, link_preview_options: { is_disabled: true } });
   });
   return bot;
 }

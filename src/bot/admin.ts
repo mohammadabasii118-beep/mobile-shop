@@ -13,6 +13,7 @@ import { adminReply, closeTicket, listOpenTickets } from '../modules/support/ser
 import { SETTING_DEFAULTS, SettingKey, allSettings, getSetting, setSetting } from '../modules/settings/service';
 import { audit } from '../modules/admin/audit';
 import { PARTNER_STATUS_FA, PartnerFilter, validatePartnerSetting, approvePartner, getPartnerById, listPartners, partnerCounts, partnerLabel, partnerStats, rejectPartner, setPartnerPercent, setPartnerSuspended } from '../modules/partners/service';
+import { AUDIENCES, AudienceKey, Draft, audienceCounts, cancelBroadcast, createBroadcast, getBroadcast, isAudience, listBroadcasts, sendTestBroadcast, validateDraft } from '../modules/broadcast/service';
 import { addChannel, deleteChannel, listChannels, setChannelActive, testChannel } from '../modules/channels/service';
 import { isTextKey, listTexts, previewText, resetText, setText, textDef } from '../modules/texts/service';
 import { categoryTree, createCategory, deleteCategory, getCategory, moveCategory, setProductCategory, splitIconName, updateCategory } from '../modules/categories/service';
@@ -64,6 +65,7 @@ export function adminHandlers() {
     if (await hasPermission(BigInt(ctx.from!.id), 'stats.view')) rows.push([{ text: '📊 داشبورد', data: 'adm:dash' }]);
     for (const g of GROUPS) if ((await visibleItems(ctx, g)).length) rows.push([{ text: g.title, data: `adm:g:${g.id}` }]);
     if (await hasPermission(BigInt(ctx.from!.id), 'support.reply')) rows.push([{ text: '🎫 پشتیبانی', data: 'adm:tickets' }]);
+    if (await hasPermission(BigInt(ctx.from!.id), 'broadcast.manage')) rows.push([{ text: '📣 پیام همگانی', data: 'bm:h' }]);
     if (panelEnabled()) rows.push([{ text: '🖥 ورود به پنل وب', data: 'adm:web' }]);
     rows.push([{ text: '🏠 منوی کاربر', data: 'menu:main' }]);
     await show(ctx, `🛠 پنل مدیریت (${a.role})\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\nیک بخش را انتخاب کنید:`, rows);
@@ -173,6 +175,51 @@ export function adminHandlers() {
     ]);
   }
 
+  /* ----------------------------- broadcast (پیام همگانی) ----------------------------- */
+  const BM_STATUS = { RUNNING: '🔄 در حال ارسال', DONE: '✅ تمام شد', CANCELLED: '⛔ متوقف شد' } as const;
+  const draftOf = (ctx: Ctx): Draft | undefined => ctx.session.data?.bmDraft;
+
+  async function bmHome(ctx: Ctx) {
+    ctx.session.step = undefined;
+    const list = await listBroadcasts(6);
+    await show(ctx, `📣 پیام همگانی\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\nیک پیام را برای همه یا بخشی از کاربران بفرستید. قبل از ارسال، پیش‌نمایش می‌بینید و تعداد مخاطبان را تأیید می‌کنید.${list.length ? '' : '\n\nهنوز پیامی نفرستاده‌اید.'}`, [
+      [{ text: '✍️ پیام جدید', data: 'bm:new' }],
+      ...list.map((b): Button[] => [{ text: `${b.status === 'RUNNING' ? '🔄' : b.status === 'DONE' ? '✅' : '⛔'} ${fmtDt(b.createdAt).slice(5, 16)} · ${b.sent}/${b.total}`, data: `bm:v:${b.id}` }]),
+      back('adm:home'),
+    ]);
+  }
+
+  async function bmDraftScreen(ctx: Ctx, preview = true) {
+    const d = draftOf(ctx);
+    if (!d) throw new AppError('VALIDATION', 'پیش‌نویسی وجود ندارد؛ از «پیام جدید» شروع کنید');
+    ctx.session.step = undefined;
+    if (preview) { await ctx.reply('👇 پیش‌نمایش (همان‌طور که کاربر می‌بیند):'); await sendTestBroadcast(BigInt(ctx.from!.id), d, ctx.from!.first_name); }
+    await show(ctx, `✅ پیام آماده است${d.buttonText ? `\n🔗 دکمه: «${d.buttonText}»` : ''}${d.photoFileId ? '\n🖼 همراه با عکس' : ''}\nمرحله‌ی بعد: مخاطبان را انتخاب کنید.`, [
+      [{ text: '🎯 انتخاب مخاطب و ارسال', data: 'bm:aud' }],
+      [{ text: d.buttonText ? '🔗 تغییر/حذف دکمه' : '🔗 افزودن دکمه‌ی لینک', data: 'bm:btn' }, { text: '✏️ ویرایش پیام', data: 'bm:new' }],
+      [{ text: '🧪 پیش‌نمایش دوباره', data: 'bm:pv' }],
+      back('bm:h'),
+    ]);
+  }
+
+  async function bmProgress(ctx: Ctx, id: string) {
+    const p = await getBroadcast(id);
+    const done = p.sent + p.blocked + p.failed;
+    const pct = p.total ? Math.round((done / p.total) * 100) : 100;
+    const barLen = 12, fill = Math.round((pct / 100) * barLen);
+    await show(ctx, [
+      `📣 ${BM_STATUS[p.status]}`, '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈',
+      `${'▰'.repeat(fill)}${'▱'.repeat(barLen - fill)} ${pct}٪`,
+      `مخاطب: ${p.total} (${AUDIENCES[p.audience as AudienceKey]?.label ?? p.audience})`,
+      `✅ ارسال‌شده: ${p.sent}`, `⏳ در صف: ${p.pending}`,
+      `🚫 بلاک‌کرده‌ها: ${p.blocked}`, `⚠️ ناموفق: ${p.failed}`,
+      `🕒 شروع: ${fmtDt(p.createdAt)}${p.finishedAt ? `\n🏁 پایان: ${fmtDt(p.finishedAt)}` : ''}`,
+    ].join('\n'), [
+      [{ text: '🔄 به‌روزرسانی', data: `bm:v:${id}` }, ...(p.status === 'RUNNING' ? [{ text: '⛔ توقف', data: `bm:x:${id}` }] : [])],
+      back('bm:h'),
+    ]);
+  }
+
   const FILTERS: [PaymentFilter, string][] = [['review', '🔎 نیازمند بررسی'], ['submitted', '📤 ارسال‌شده'], ['auto', '🤖 تأیید خودکار'], ['approved', '✅ تأییدشده'], ['rejected', '❌ ردشده'], ['pending', '⏳ در انتظار']];
 
   async function paymentList(ctx: Ctx, f: PaymentFilter, page: number) {
@@ -278,7 +325,7 @@ export function adminHandlers() {
   c.on('callback_query:data', async (ctx, next) => {
     const d = ctx.callbackQuery.data;
     const [ns, a, b] = d.split(':');
-    const adminNs = ['adm', 'pl', 'ap', 'av', 'vl', 'pr', 'cp', 'st', 'at', 'ao', 'ct', 'tx', 'ch', 'pn', 'pa'];
+    const adminNs = ['adm', 'pl', 'ap', 'av', 'vl', 'pr', 'cp', 'st', 'at', 'ao', 'ct', 'tx', 'ch', 'pn', 'pa', 'bm'];
     if (!adminNs.includes(ns)) return next();
     try {
       // every admin callback re-checks authorization server-side (callback data is untrusted)
@@ -552,6 +599,44 @@ export function adminHandlers() {
           return show(ctx, `${PCFG_EDIT[b]}\nمقدار فعلی: ${await getSetting(b as SettingKey)}\n\nعدد جدید را بفرستید:`, [back('pa:cfg')]);
         }
       }
+      if (ns === 'bm') {
+        await need(ctx, 'broadcast.manage');
+        if (a === 'h') return bmHome(ctx);
+        if (a === 'new') {
+          ctx.session.step = 'a_bm_text'; ctx.session.data = { bmDraft: undefined };
+          return show(ctx, ['✍️ متن پیام را بفرستید', '', 'برای پیام همراه با عکس، «عکس را با کپشن» بفرستید.', '', '• متن بین ستاره پررنگ می‌شود: *مهم*', '• به‌جای {name} اسم هر کاربر نوشته می‌شود', '• حداکثر ۳۵۰۰ حرف (با عکس: ۱۰۰۰ حرف)'].join('\n'), [back('bm:h')]);
+        }
+        if (a === 'v') return bmProgress(ctx, b);
+        if (a === 'x') return show(ctx, '⛔ ارسال متوقف شود؟\nبه کسانی که پیام را گرفته‌اند چیزی تغییر نمی‌کند؛ بقیه دیگر پیام نمی‌گیرند.', [[{ text: '⛔ بله، متوقف شود', data: `bm:x2:${b}` }, { text: '↩️ ادامه‌ی ارسال', data: `bm:v:${b}` }]]);
+        if (a === 'x2') { await cancelBroadcast(actor(ctx), b); return bmProgress(ctx, b); }
+        // everything below works on the current draft
+        if (a === 'pv') return bmDraftScreen(ctx);
+        if (a === 'btn') {
+          if (!draftOf(ctx)) throw new AppError('VALIDATION', 'پیش‌نویس منقضی شد؛ دوباره از «پیام جدید» شروع کنید');
+          ctx.session.step = 'a_bm_btn';
+          return show(ctx, 'دکمه‌ی لینک را در دو خط بفرستید:\n\nمتن دکمه\nhttps://example.com\n\nبرای حذف دکمه فقط - بفرستید.', [back('bm:pv')]);
+        }
+        if (a === 'aud') {
+          if (!draftOf(ctx)) throw new AppError('VALIDATION', 'پیش‌نویس منقضی شد؛ دوباره از «پیام جدید» شروع کنید');
+          const counts = await audienceCounts();
+          return show(ctx, '🎯 پیام برای چه کسانی ارسال شود؟\n(کاربرانی که ربات را بلاک کرده‌اند یا مسدودند حساب نمی‌شوند)', [
+            ...(Object.keys(AUDIENCES) as AudienceKey[]).map((k): Button[] => [{ text: `${AUDIENCES[k].label} (${counts[k]})`, data: `bm:a:${k}` }]),
+            back('bm:pv'),
+          ]);
+        }
+        if (a === 'a') {
+          if (!draftOf(ctx) || !isAudience(b)) throw new AppError('VALIDATION', 'پیش‌نویس منقضی شد؛ دوباره از «پیام جدید» شروع کنید');
+          const n = (await audienceCounts())[b];
+          return show(ctx, `⚠️ ارسال نهایی\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\nمخاطب: ${AUDIENCES[b].label}\nتعداد: ${n} نفر\n\nبعد از شروع، فقط می‌توانید ارسال را متوقف کنید. پیام‌های رسیده برگشت‌پذیر نیستند.`, n ? [[{ text: `✅ ارسال به ${n} نفر`, data: `bm:go:${b}` }], back('bm:aud')] : [back('bm:aud')]);
+        }
+        if (a === 'go') {
+          const d = draftOf(ctx);
+          if (!d || !isAudience(b)) throw new AppError('VALIDATION', 'پیش‌نویس منقضی شد؛ دوباره از «پیام جدید» شروع کنید');
+          const created = await createBroadcast(actor(ctx), d, b);
+          ctx.session.data = undefined;
+          return bmProgress(ctx, created.id);
+        }
+      }
       if (ns === 'ch') {
         await need(ctx, 'settings.manage');
         if (a === 'l') {
@@ -706,6 +791,18 @@ export function adminHandlers() {
     return next();
   });
 
+  // A broadcast with a photo: the admin sends the photo with its caption.
+  c.on('message:photo', async (ctx, next) => {
+    if (ctx.session.step !== 'a_bm_text') return next();
+    try {
+      if (!(await getAdmin(BigInt(ctx.from.id)))) throw new ForbiddenError();
+      await need(ctx, 'broadcast.manage');
+      const photo = ctx.message.photo.at(-1)!;
+      ctx.session.data = { bmDraft: validateDraft({ text: ctx.message.caption ?? '', photoFileId: photo.file_id }) };
+      return await bmDraftScreen(ctx);
+    } catch (e) { return handleError(ctx, e, 'bm:h'); }
+  });
+
   // Admin text-input steps (wizard). Step names are admin-only; each re-checks permission.
   c.on('message:text', async (ctx, next) => {
     const step = ctx.session.step;
@@ -774,6 +871,24 @@ export function adminHandlers() {
         ctx.session.step = undefined;
         await ctx.reply('✅ ذخیره شد.');
         return partnerCfg(ctx);
+      }
+      if (step === 'a_bm_text') {
+        await need(ctx, 'broadcast.manage');
+        const d = validateDraft({ text });
+        ctx.session.data = { bmDraft: d };
+        return bmDraftScreen(ctx);
+      }
+      if (step === 'a_bm_btn') {
+        await need(ctx, 'broadcast.manage');
+        const cur = draftOf(ctx);
+        if (!cur) throw new AppError('VALIDATION', 'پیش‌نویس منقضی شد؛ دوباره از «پیام جدید» شروع کنید');
+        if (text === '-') ctx.session.data = { bmDraft: validateDraft({ ...cur, buttonText: null, buttonUrl: null }) };
+        else {
+          const [label, url, ...rest] = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+          if (!label || !url || rest.length) throw new AppError('VALIDATION', 'دو خط بفرستید: متن دکمه، سپس لینک');
+          ctx.session.data = { bmDraft: validateDraft({ ...cur, buttonText: label, buttonUrl: url }) };
+        }
+        return bmDraftScreen(ctx);
       }
       if (step === 'a_chan_add') {
         await need(ctx, 'settings.manage');
@@ -855,7 +970,7 @@ export function adminHandlers() {
       }
     } catch (e) {
       // validation errors on multi-line / field edits keep the step, so the admin can just resend a corrected text
-      const retry = e instanceof AppError && (e.code === 'VALIDATION' || e.code === 'CONFLICT') && ['a_bulk', 'a_pfield', 'a_cat_new', 'a_cat_rename', 'a_text', 'a_chan_add', 'a_panel_add', 'a_panel_edit', 'a_partner_reject', 'a_partner_pct', 'a_partner_cfg'].includes(step ?? '');
+      const retry = e instanceof AppError && (e.code === 'VALIDATION' || e.code === 'CONFLICT') && ['a_bulk', 'a_pfield', 'a_cat_new', 'a_cat_rename', 'a_text', 'a_chan_add', 'a_panel_add', 'a_panel_edit', 'a_partner_reject', 'a_partner_pct', 'a_partner_cfg', 'a_bm_text', 'a_bm_btn'].includes(step ?? '');
       if (!retry) ctx.session.step = undefined;
       return handleError(ctx, e, step === 'a_bulk' ? 'adm:products' : 'adm:home');
     }

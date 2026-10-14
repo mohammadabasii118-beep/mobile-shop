@@ -80,6 +80,14 @@ async function main() {
   const { createOrder: mk } = await import('../src/modules/orders/service');
   await mk({ userId: users[4].id, productId: p2.id, paymentMethod: 'CARD_TO_CARD' });
 
+  // broadcasts: one finished, one half-way (rows are written directly: the worker is not running in this harness)
+  const Bc = await import('../src/modules/broadcast/service');
+  Bc.setBroadcastSender(async () => undefined);
+  const b1 = await Bc.createBroadcast('admin:9000', { text: 'سلام {name}! 🎁 تا آخر هفته روی تمدید ۲۰٪ تخفیف دارید.', buttonText: 'تمدید در ربات', buttonUrl: 'https://t.me/Speedvpnx_bot' }, 'EXPIRED');
+  while ((await Bc.getBroadcast(b1.id)).status === 'RUNNING') await Bc.runBroadcastTick({ gapMs: 0 });
+  const b2 = await Bc.createBroadcast('admin:9000', { text: 'اطلاعیه: امشب ساعت ۲ بامداد سرور آلمان چند دقیقه در دسترس نیست.' }, 'ALL');
+  await Bc.runBroadcastTick({ batch: 3, gapMs: 0 }); void b2;
+
   const server = createServer().listen(Number(process.env.PORT ?? 8110));
   for (let k = 0; k < 6; k++) console.log('LOGIN', loginUrl(createLoginToken(9000n)));
   console.log('READY');

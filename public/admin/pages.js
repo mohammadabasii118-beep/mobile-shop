@@ -814,3 +814,61 @@ function rejectDialog(p, onOk) {
   const ok = button('رد درخواست', { kind: 'danger', onClick: () => { if (!inp.value.trim()) { err.hidden = false; err.textContent = 'دلیل را بنویسید'; return; } m.close(); onOk(inp.value.trim()); } });
   const m = modal({ title: 'رد درخواست همکاری', small: true, body: h('div', { class: 'stack' }, h('div', { class: 'field' }, h('label', { text: 'دلیل' }), inp), err), footer: [ok, button('انصراف', { onClick: () => m.close() })] });
 }
+
+/* ============================== Broadcast (پیام همگانی) ============================== */
+const BC_ST = { RUNNING: ['در حال ارسال', 'warn'], DONE: ['تمام شد', 'ok'], CANCELLED: ['متوقف شد', ''] };
+export function broadcast(ctx, root) {
+  root.append(pageHead('پیام همگانی', 'یک پیام را برای همه یا بخشی از کاربران ربات بفرستید'));
+  const compose = h('div', { class: 'card' }); const hist = h('div', { class: 'card' });
+  root.append(compose, hist);
+  let audiences = [], timer = null;
+
+  const text = h('textarea', { class: 'textarea', id: 'bc-text', rows: 6, maxlength: 3500, placeholder: 'متن پیام…\n*پررنگ* و {name} برای اسم کاربر', 'aria-label': 'متن پیام' });
+  const count = h('div', { class: 'hint', text: '۰ / ۳٬۵۰۰' });
+  text.addEventListener('input', () => { count.textContent = `${num(text.value.length)} / ${num(3500)}`; });
+  const bt = h('input', { class: 'input', id: 'bc-bt', placeholder: 'متن دکمه (اختیاری)', maxlength: 40, 'aria-label': 'متن دکمه' });
+  const bu = h('input', { class: 'input ltr', dir: 'ltr', id: 'bc-bu', placeholder: 'https://… لینک دکمه', 'aria-label': 'لینک دکمه' });
+  const aud = h('select', { class: 'select', id: 'bc-aud', 'aria-label': 'مخاطبان' });
+  const err = h('div', { class: 'form-error', hidden: true });
+  const draft = () => ({ text: text.value, buttonText: bt.value.trim() || null, buttonUrl: bu.value.trim() || null });
+  const fail = (e) => { err.hidden = false; err.textContent = errMsg(e); };
+  const testBtn = button('ارسال آزمایشی به من', { onClick: async () => { err.hidden = true; try { await api('/broadcasts/test', { method: 'POST', body: draft() }); toast('پیش‌نمایش در تلگرام شما ارسال شد'); } catch (e) { fail(e); } } });
+  const sendBtn = button('ارسال', { kind: 'primary', ico: 'plus', onClick: async () => {
+    err.hidden = true;
+    const a = audiences.find((x) => x.key === aud.value);
+    if (!text.value.trim()) return fail({ message: 'متن پیام را بنویسید' });
+    if (!(await confirmDialog({ title: 'ارسال پیام همگانی', message: `پیام برای ${num(a.count)} نفر (${a.label}) ارسال می‌شود. بعد از شروع فقط می‌توانید ارسال را متوقف کنید.`, confirmLabel: `ارسال به ${num(a.count)} نفر` }))) return;
+    sendBtn.disabled = true;
+    try { await api('/broadcasts', { method: 'POST', body: { ...draft(), audience: aud.value } }); toast('ارسال شروع شد'); text.value = ''; count.textContent = '۰ / ۳٬۵۰۰'; await load(); }
+    catch (e) { fail(e); } finally { sendBtn.disabled = false; }
+  } });
+  compose.append(h('div', { class: 'card-b', style: 'display:grid;gap:14px' },
+    h('div', { class: 'field' }, h('label', { for: 'bc-text', text: 'متن پیام' }), text, count),
+    h('div', { class: 'form-grid' }, h('div', { class: 'field' }, h('label', { for: 'bc-bt', text: 'دکمه‌ی لینک' }), bt), h('div', { class: 'field' }, h('label', { for: 'bc-bu', text: 'لینک' }), bu)),
+    h('div', { class: 'field' }, h('label', { for: 'bc-aud', text: 'مخاطبان' }), aud, h('div', { class: 'hint', text: 'کاربرانی که ربات را بلاک کرده‌اند یا مسدودند حساب نمی‌شوند. برای ارسال عکس از ربات استفاده کنید.' })),
+    err, h('div', { class: 'row' }, sendBtn, testBtn)));
+
+  const row = (b) => {
+    const done = b.sent + b.blocked + b.failed, pct = b.total ? Math.round((done / b.total) * 100) : 100;
+    return h('tr', null,
+      h('td', { class: 'wrap' }, h('div', { class: 'cell-main', text: b.text.slice(0, 70) + (b.text.length > 70 ? '…' : '') || (b.hasPhoto ? '(عکس)' : '') }), h('div', { class: 'cell-sub', text: (audiences.find((x) => x.key === b.audience) || {}).label || b.audience })),
+      h('td', null, h('span', { class: `badge ${BC_ST[b.status][1]}`, text: BC_ST[b.status][0] })),
+      h('td', { style: 'min-width:140px' }, h('div', { class: 'bar', style: 'height:8px;background:var(--track,#e5e7eb);border-radius:99px;overflow:hidden' }, h('i', { style: `display:block;height:100%;width:${pct}%;background:var(--accent)` })), h('div', { class: 'cell-sub num', text: `${num(pct)}٪ · ${num(done)} از ${num(b.total)}` })),
+      h('td', { class: 'num', text: `${num(b.sent)}` }), h('td', { class: 'num', text: `${num(b.blocked)}` }), h('td', { class: 'num', text: `${num(b.failed)}` }),
+      h('td', { text: datetime(b.createdAt) }),
+      h('td', null, b.status === 'RUNNING' ? button('توقف', { size: 'sm', onClick: async () => { try { await api(`/broadcasts/${b.id}/cancel`, { method: 'POST' }); toast('متوقف شد'); load(); } catch (e) { toast(errMsg(e), 'err'); } } }) : null));
+  };
+  async function load() {
+    try {
+      const r = await api('/broadcasts'); audiences = r.audiences;
+      const cur = aud.value; clear(aud);
+      audiences.forEach((a) => aud.append(h('option', { value: a.key, selected: a.key === cur }, `${a.label} (${num(a.count)})`)));
+      clear(hist);
+      if (!r.items.length) hist.append(emptyState('هنوز پیامی نفرستاده‌اید', 'پیام‌های ارسال‌شده و میزان پیشرفتشان اینجا نمایش داده می‌شود.', 'bell'));
+      else hist.append(h('div', { class: 'table-wrap' }, h('table', { class: 'table' }, h('thead', null, h('tr', null, ['پیام', 'وضعیت', 'پیشرفت', 'ارسال', 'بلاک', 'ناموفق', 'زمان', ''].map((t) => h('th', { text: t })))), h('tbody', null, r.items.map(row)))));
+      clearTimeout(timer);
+      if (r.items.some((b) => b.status === 'RUNNING') && document.body.contains(root)) timer = setTimeout(load, 3000);
+    } catch (e) { clear(hist); hist.append(errorState(errMsg(e), load)); }
+  }
+  load();
+}

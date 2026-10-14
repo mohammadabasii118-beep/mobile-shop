@@ -6,7 +6,7 @@ export interface TgUser { id: number | bigint; username?: string; first_name?: s
 
 export async function registerUser(tg: TgUser): Promise<{ user: User; isNew: boolean }> {
   const telegramId = BigInt(tg.id);
-  const profile = { username: tg.username, firstName: tg.first_name, lastName: tg.last_name };
+  const profile = { username: tg.username, firstName: tg.first_name, lastName: tg.last_name, botBlockedAt: null }; // writing to the bot proves it is reachable again
   const existing = await prisma.user.findUnique({ where: { telegramId } });
   if (existing) return { user: await prisma.user.update({ where: { telegramId }, data: profile }), isNew: false };
   try {

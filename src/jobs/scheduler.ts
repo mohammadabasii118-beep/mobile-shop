@@ -6,6 +6,7 @@ import { flushPending } from '../modules/notifications/service';
 import { expireStaleOrders } from '../modules/orders/service';
 import { getNumber } from '../modules/settings/service';
 import { listPanels, testPanel } from '../modules/panels/service';
+import { runBroadcastTick } from '../modules/broadcast/service';
 import { notifyAdmins } from '../modules/notifications/service';
 
 interface Job { name: string; everyMs: number; run: () => Promise<unknown> }
@@ -41,6 +42,7 @@ export const jobs: Job[] = [
   { name: 'expirations', everyMs: 5 * 60_000, run: () => processExpirations() },
   { name: 'orders-expire', everyMs: 15 * 60_000, run: async () => expireStaleOrders(await getNumber('orders.expireMinutes')) },
   { name: 'xui-health', everyMs: 60_000, run: checkPanels },
+  { name: 'broadcast', everyMs: 2_000, run: () => runBroadcastTick() },
 ];
 
 /** Simple in-process scheduler; each job is serialised (no overlapping runs). */

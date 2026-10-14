@@ -14,6 +14,7 @@ import { adminRetry } from '../modules/vpn/provisioning';
 import { adminReply, closeTicket } from '../modules/support/service';
 import { SETTING_DEFAULTS, SettingKey, allSettings, setSetting } from '../modules/settings/service';
 import { flushPending } from '../modules/notifications/service';
+import { AUDIENCES, AudienceKey, audienceCounts, cancelBroadcast, createBroadcast, getBroadcast, listBroadcasts, sendTestBroadcast } from '../modules/broadcast/service';
 import { PartnerFilter, validatePartnerSetting, approvePartner, getPartnerById, listPartners, partnerCounts, partnerStats, rejectPartner, setPartnerPercent, setPartnerSuspended } from '../modules/partners/service';
 import { PanelView, createPanel, deletePanel, listPanelInbounds, listPanels, panelHealth, setPanelActive, testPanel, updatePanel } from '../modules/panels/service';
 import { categoryTree, createCategory, deleteCategory, moveCategory, updateCategory } from '../modules/categories/service';
@@ -90,6 +91,7 @@ const panelBody = z.object({
   subBaseUrl: z.string().max(300).optional(), publicHost: z.string().max(200).optional(), tlsInsecure: z.boolean().optional(),
 });
 
+const broadcastBody = z.object({ text: z.string().max(4000), buttonText: z.string().max(60).nullable().optional(), buttonUrl: z.string().max(500).nullable().optional() });
 const PARTNER_KEYS = ['partner.enabled', 'partner.autoApprove', 'partner.stackCoupons', 'partner.defaultDiscount', 'partner.maxDiscount', 'partner.reapplyDays', 'partner.autoApproveOrders', 'partner.autoApproveMinOrders', 'partner.autoApproveDailyMax', 'partner.autoApproveMaxAmount'] as SettingKey[];
 
 const confirmFor = (externalId: string) => `DELETE ${externalId.slice(-6)}`;
@@ -210,6 +212,19 @@ export const routes: Route[] = [
     },
   },
   { method: 'PUT', re: /^\/settings$/, perm: 'settings.manage', run: putSetting },
+  // Broadcast (پیام همگانی)
+  {
+    method: 'GET', re: /^\/broadcasts$/, perm: 'broadcast.manage',
+    run: async () => {
+      const counts = await audienceCounts();
+      return { items: await listBroadcasts(30), audiences: (Object.keys(AUDIENCES) as AudienceKey[]).map((key) => ({ key, ...AUDIENCES[key], count: counts[key] })) };
+    },
+  },
+  { method: 'POST', re: /^\/broadcasts$/, perm: 'broadcast.manage', run: async (c) => { const b = broadcastBody.extend({ audience: z.string() }).parse(c.body); const r = await createBroadcast(actor(c), b, b.audience); return { id: r.id, total: r.total }; } },
+  { method: 'POST', re: /^\/broadcasts\/test$/, perm: 'broadcast.manage', run: async (c) => { await sendTestBroadcast(c.admin.telegramId, broadcastBody.parse(c.body), 'ادمین'); return { ok: true }; } },
+  { method: 'GET', re: /^\/broadcasts\/([\w-]+)$/, perm: 'broadcast.manage', run: (c) => getBroadcast(c.params[0]) },
+  { method: 'POST', re: /^\/broadcasts\/([\w-]+)\/cancel$/, perm: 'broadcast.manage', run: async (c) => { await cancelBroadcast(actor(c), c.params[0]); return { ok: true }; } },
+
   // Partner (reseller) programme
   {
     method: 'GET', re: /^\/partners$/, perm: 'partners.manage',

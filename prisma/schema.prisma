@@ -26,6 +26,19 @@ enum OrderStatus {
   REFUNDED
 }
 
+enum BroadcastStatus {
+  RUNNING
+  DONE
+  CANCELLED
+}
+
+enum RecipientStatus {
+  PENDING
+  SENT
+  FAILED
+  BLOCKED
+}
+
 enum PartnerStatus {
   PENDING
   APPROVED
@@ -124,6 +137,7 @@ model User {
   lastName    String?
   language    String   @default("fa")
   isBlocked   Boolean  @default(false)
+  botBlockedAt DateTime? // Telegram told us the user blocked the bot / deleted the account; cleared when they write again
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -509,4 +523,39 @@ model Partner {
   user User @relation(fields: [userId], references: [id])
 
   @@index([status, requestedAt])
+}
+
+/// A mass message (پیام همگانی). Recipients are snapshotted when it is created, so a restart never double-sends.
+model Broadcast {
+  id          String          @id @default(cuid())
+  createdBy   String
+  audience    String
+  text        String
+  photoFileId String?
+  buttonText  String?
+  buttonUrl   String?
+  status      BroadcastStatus @default(RUNNING)
+  total       Int
+  createdAt   DateTime        @default(now())
+  finishedAt  DateTime?
+
+  recipients BroadcastRecipient[]
+
+  @@index([status, createdAt])
+}
+
+model BroadcastRecipient {
+  id          String          @id @default(cuid())
+  broadcastId String
+  userId      String?
+  chatId      BigInt
+  status      RecipientStatus @default(PENDING)
+  attempts    Int             @default(0)
+  error       String?
+  sentAt      DateTime?
+
+  broadcast Broadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+
+  @@unique([broadcastId, chatId])
+  @@index([broadcastId, status])
 }
