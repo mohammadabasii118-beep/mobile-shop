@@ -1,6 +1,6 @@
 declare global {
   interface Window {
-    Telegram?: { WebApp?: { initData: string; ready(): void; expand(): void; setHeaderColor?(c: string): void; setBackgroundColor?(c: string): void; HapticFeedback?: { impactOccurred(s: string): void }; openTelegramLink?(url: string): void; openLink?(url: string): void; disableVerticalSwipes?(): void; enableClosingConfirmation?(): void; disableClosingConfirmation?(): void } };
+    Telegram?: { WebApp?: { initData: string; ready(): void; expand(): void; setHeaderColor?(c: string): void; setBackgroundColor?(c: string): void; openInvoice?(url: string, cb?: (status: string) => void): void; HapticFeedback?: { impactOccurred(s: string): void }; openTelegramLink?(url: string): void; openLink?(url: string): void; disableVerticalSwipes?(): void; enableClosingConfirmation?(): void; disableClosingConfirmation?(): void } };
   }
 }
 
@@ -52,6 +52,14 @@ export function openLink(url: string) {
     else if (tg?.openLink) tg.openLink(url);
     else window.open(url, '_blank', 'noopener');
   } catch { window.open(url, '_blank', 'noopener'); }
+}
+
+/** پرداخت با استار تلگرام: پنجره‌ی فاکتور داخل تلگرام باز می‌شود؛ نتیجه: paid / cancelled / failed / pending (یا external اگر بیرون از تلگرام باز شد) */
+export function openInvoice(url: string): Promise<string> {
+  return new Promise((resolve) => {
+    try { if (tg?.openInvoice) { tg.openInvoice(url, (st) => resolve(st)); return; } } catch { /* ادامه با لینک */ }
+    openLink(url); resolve('external');
+  });
 }
 
 /** وسط نبرد: اگر کاربر خواست بازی را ببندد، اول تلگرام تأیید می‌گیرد (جلوی بستن اتفاقی و باخت ناخواسته) */

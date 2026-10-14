@@ -273,19 +273,18 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
   );
 }
 
-interface AdminOrder { id: number; userId: number; tgId: number; name: string; avatar: string | null; gems: number; toman: number; status: string; createdAt: number; doneAt: number | null }
+interface AdminOrder { id: number; userId: number; tgId: number; name: string; avatar: string | null; gems: number; toman: number; stars: number; method: string; note: string | null; status: string; createdAt: number; doneAt: number | null }
 const ORDER_FA: Record<string, string> = { pending: 'در انتظار', delivered: 'تحویل شد', canceled: 'لغو شد' };
 
 /** فروشگاه: ۶ پیشنهاد کارت روزانه، بسته‌های سکه (با الماس) و الماس (با تومان)، آدرس درگاه، و سفارش‌ها */
 function ShopTab({ cfg, refresh, run }: TabProps) {
   const [d, setD] = useState<GameConfig>(() => JSON.parse(JSON.stringify(cfg)));
-  const [gw, setGw] = useState('');
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [only, setOnly] = useState<'pending' | 'all'>('pending');
   const n = (v: string) => (v === '' ? 0 : Math.max(0, Math.floor(Number(v))));
   const upd = (fn: (c: GameConfig) => void) => { const c = JSON.parse(JSON.stringify(d)) as GameConfig; fn(c); setD(c); };
   const loadOrders = () => run(async () => { setOrders((await call('/api/admin/orders')).orders); });
-  useEffect(() => { void loadOrders(); void run(async () => { setGw((await call('/api/admin/shop')).gatewayUrl); }); /* eslint-disable-next-line */ }, []);
+  useEffect(() => { void loadOrders(); /* eslint-disable-next-line */ }, []);
   const saveShop = () => run(async () => refresh((await call('/api/admin/config', { config: d })) as GameConfig), 'فروشگاه ذخیره شد');
   const when = (t: number) => new Date(t).toLocaleString('fa-IR', { dateStyle: 'medium', timeStyle: 'short' });
   const act = (id: number, action: 'deliver' | 'cancel') => run(async () => { setOrders((await call('/api/admin/order', { id, action })).orders); }, action === 'deliver' ? 'الماس به حساب بازیکن اضافه شد' : 'سفارش لغو شد');
@@ -329,25 +328,34 @@ function ShopTab({ cfg, refresh, run }: TabProps) {
         ))}
         <button className="btn ghost" disabled={d.shop.coinPacks.length >= 12} onClick={() => upd((c) => { c.shop.coinPacks.push({ id: `c${Date.now().toString(36)}`, coins: 1000, gems: 20 }); })}>+ بسته‌ی سکه</button>
 
-        <h3>خرید الماس (با تومان)</h3>
+        <h3>خرید الماس (تومان / استار)</h3>
+        <small className="hint" style={{ textAlign: 'start' }}>برای هر بسته می‌توانی هر دو قیمت را بگذاری یا یکی را ۰ کنی (۰ = با آن روش نمی‌شود خرید). هر بسته حداقل یک قیمت لازم دارد.</small>
         {d.shop.gemPacks.map((k, i) => (
           <div key={k.id} className="giftbox">
             <div className="fgrid">
               {num('مقدار الماس', k.gems, (x) => upd((c) => { c.shop.gemPacks[i].gems = Math.max(1, x); }))}
-              {num('قیمت (تومان)', k.toman, (x) => upd((c) => { c.shop.gemPacks[i].toman = Math.max(1, x); }))}
+              {num('قیمت (تومان) — کارت‌به‌کارت', k.toman, (x) => upd((c) => { c.shop.gemPacks[i].toman = x; }))}
+              {num('قیمت (استار تلگرام)', k.stars, (x) => upd((c) => { c.shop.gemPacks[i].stars = Math.min(10000, x); }))}
             </div>
             <button className="btn ghost neg" onClick={() => upd((c) => { c.shop.gemPacks.splice(i, 1); })}>حذف</button>
           </div>
         ))}
-        <button className="btn ghost" disabled={d.shop.gemPacks.length >= 12} onClick={() => upd((c) => { c.shop.gemPacks.push({ id: `g${Date.now().toString(36)}`, gems: 100, toman: 90000 }); })}>+ بسته‌ی الماس</button>
+        <button className="btn ghost" disabled={d.shop.gemPacks.length >= 12} onClick={() => upd((c) => { c.shop.gemPacks.push({ id: `g${Date.now().toString(36)}`, gems: 100, toman: 90000, stars: 250 }); })}>+ بسته‌ی الماس</button>
         <button className="btn" onClick={() => void saveShop()}>ذخیره و اعمال</button>
       </div>
 
       <div className="box">
-        <h3>درگاه پرداخت</h3>
-        <small className="hint" style={{ textAlign: 'start' }}>آدرس صفحه‌ی پرداخت (https://…). موقع خرید الماس، بازیکن به این آدرس می‌رود. می‌توانی این جای‌نگهدارها را در آدرس بگذاری: <code dir="ltr">{'{order}'}</code> شماره‌ی سفارش، <code dir="ltr">{'{amount}'}</code> مبلغ تومان، <code dir="ltr">{'{gems}'}</code> تعداد الماس، <code dir="ltr">{'{user}'}</code> شناسه‌ی تلگرام. تا وقتی خالی باشد، خرید الماس فعال نیست. تأیید پرداخت دستی است: سفارش را پایین می‌بینی و بعد از دیدن پرداخت «تحویل» را می‌زنی.</small>
-        <label className="field">آدرس درگاه<input dir="ltr" value={gw} onChange={(e) => setGw(e.target.value)} placeholder="https://pay.example.com/pay?order={order}&amount={amount}" /></label>
-        <button className="btn" onClick={() => run(async () => { setGw((await call('/api/admin/shop', { gatewayUrl: gw })).gatewayUrl); }, 'آدرس درگاه ذخیره شد')}>ذخیره‌ی درگاه</button>
+        <h3>روش‌های پرداخت</h3>
+        <label className="check"><input type="checkbox" checked={d.shop.card.enabled} onChange={(e) => upd((c) => { c.shop.card.enabled = e.target.checked; })} /> کارت‌به‌کارت (تحویل دستی)</label>
+        <div className="fgrid">
+          <label className="field">شماره‌ی کارت<input dir="ltr" inputMode="numeric" value={d.shop.card.number} onChange={(e) => upd((c) => { c.shop.card.number = e.target.value; })} placeholder="6037 9912 3456 7890" /></label>
+          <label className="field">به نام<input value={d.shop.card.holder} maxLength={60} onChange={(e) => upd((c) => { c.shop.card.holder = e.target.value; })} /></label>
+          <label className="field">بانک<input value={d.shop.card.bank} maxLength={40} onChange={(e) => upd((c) => { c.shop.card.bank = e.target.value; })} /></label>
+        </div>
+        <small className="hint" style={{ textAlign: 'start' }}>بازیکن مشخصات کارت را می‌بیند، واریز می‌کند، کد پیگیری را می‌نویسد و سفارش پایین می‌آید. تو پرداخت را در اپ بانکت چک می‌کنی و «تحویل» را می‌زنی.</small>
+        <label className="check"><input type="checkbox" checked={d.shop.starsEnabled} onChange={(e) => upd((c) => { c.shop.starsEnabled = e.target.checked; })} /> استار تلگرام (خودکار)</label>
+        <small className="hint" style={{ textAlign: 'start' }}>با استار، پرداخت داخل خود تلگرام انجام می‌شود و الماس همان لحظه خودکار اضافه می‌شود (نیازی به تحویل دستی نیست). فقط وقتی کار می‌کند که ربات روشن و توکن درست باشد. استارهای دریافتی در حساب ربات جمع می‌شوند.</small>
+        <button className="btn" onClick={() => void saveShop()}>ذخیره و اعمال</button>
       </div>
 
       <div className="box">
@@ -361,11 +369,12 @@ function ShopTab({ cfg, refresh, run }: TabProps) {
           <div key={o.id} className="giftbox">
             <div className="who"><Av url={o.avatar} name={o.name} /> <b>{o.name}</b> <span className={`tag ${o.status === 'pending' ? '' : o.status === 'delivered' ? 'ok' : 'bad'}`}>{ORDER_FA[o.status] ?? o.status}</span></div>
             <small>شناسه‌ی تلگرام: <b className="num">{o.tgId}</b> · شناسه‌ی بازی: <b className="num">{fa(o.userId)}</b></small>
-            <small>خرید: <b className="num">{fa(o.gems)}</b> الماس — {fa(o.toman)} تومان · سفارش #{fa(o.id)}</small>
+            <small>خرید: <b className="num">{fa(o.gems)}</b> الماس — {o.method === 'stars' ? `${fa(o.stars)} استار (تلگرام، خودکار)` : `${fa(o.toman)} تومان (کارت‌به‌کارت)`} · سفارش #{fa(o.id)}</small>
+            {o.note && <small>کد پیگیری بازیکن: <b className="num">{o.note}</b></small>}
             <small>تاریخ ثبت: {when(o.createdAt)}{o.doneAt ? ` · بررسی: ${when(o.doneAt)}` : ''}</small>
             {o.status === 'pending' && (
               <div className="row">
-                <button className="btn ghost pos" onClick={() => void act(o.id, 'deliver')}>تحویل (+{fa(o.gems)} الماس)</button>
+                {o.method === 'card' && <button className="btn ghost pos" onClick={() => void act(o.id, 'deliver')}>تحویل (+{fa(o.gems)} الماس)</button>}
                 <button className="btn ghost neg" onClick={() => void act(o.id, 'cancel')}>لغو</button>
               </div>
             )}

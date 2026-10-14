@@ -66,6 +66,32 @@ export function createGameServer(opt: ServerOptions) {
 
   const send = (c: Conn, m: ServerMsg) => { if (c.ws.readyState === 1) c.ws.send(JSON.stringify(m)); };
 
+  // ---------- استار تلگرام ----------
+  async function createStarsInvoice(o: { id: number; gems: number; stars: number }): Promise<string> {
+    const r = await fetch(`${opt.telegramApi ?? 'https://api.telegram.org'}/bot${opt.auth.botToken}/createInvoiceLink`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(10_000),
+      body: JSON.stringify({ title: `${o.gems} الماس سرخ`, description: `بسته‌ی ${o.gems} الماس برای بازی میراث`, payload: `order:${o.id}`, provider_token: '', currency: 'XTR', prices: [{ label: `${o.gems} الماس`, amount: o.stars }] }),
+    });
+    const j: any = await r.json().catch(() => ({}));
+    if (!j.ok || typeof j.result !== 'string') throw new Error(j.description ?? `HTTP ${r.status}`);
+    return j.result;
+  }
+  const orderOf = (payload: unknown) => { const m = /^order:(\d+)$/.exec(String(payload ?? '')); return m ? Number(m[1]) : 0; };
+  /** تلگرام قبل از گرفتن استار می‌پرسد (۱۰ ثانیه فرصت): null = اشکالی نیست، رشته = دلیل رد */
+  const starsPreCheckout = (q: any): string | null => {
+    if (q?.currency !== 'XTR') return 'ارز نامعتبر است';
+    return game.starsPreCheck(orderOf(q.invoice_payload), Number(q.from?.id), Number(q.total_amount));
+  };
+  /** پرداخت تمام شد (successful_payment): الماس اضافه می‌شود. متن پیام برای بازیکن را برمی‌گرداند (یا null). */
+  const starsPayment = (m: any): string | null => {
+    const p = m?.successful_payment;
+    if (!p || p.currency !== 'XTR') return null;
+    const id = orderOf(p.invoice_payload);
+    const res = game.completeStarsPayment(id, Number(m.from?.id), Number(p.total_amount), String(p.telegram_payment_charge_id));
+    if (res === 'invalid') console.error(`[stars] پرداخت نامعتبر: سفارش ${id} کاربر ${m.from?.id} مبلغ ${p.total_amount} شناسه ${p.telegram_payment_charge_id}`);
+    return res === 'delivered' ? '✅ پرداخت انجام شد و الماس به حسابت اضافه شد. موفق باشی!' : null;
+  };
+
   // ---------- مبارزه ----------
   function startBattle(mode: 'solo' | 'pvp', a: Participant, b: Participant, humans: Conn[], soloStage?: number) {
     const id = randomUUID();
@@ -217,8 +243,6 @@ export function createGameServer(opt: ServerOptions) {
 
   /** کانفیگ جدید را اعتبارسنجی می‌کند، در حافظه جایگزین و روی دیسک ذخیره می‌کند (بدون ری‌استارت سرور). */
   function commitConfig(next: GameConfig) {
-    // آدرس درگاه فقط از بخش مخصوص خودش عوض می‌شود؛ ذخیره‌ی بقیه‌ی تنظیمات آن را پاک نکند
-    if (next.shop && next.shop.gatewayUrl === undefined) next.shop.gatewayUrl = cfg.shop?.gatewayUrl ?? '';
     validateConfig(next);
     for (const old of cfg.cards) {
       if (!next.cards.some((c) => c.id === old.id) && game.cardOwned(old.id)) throw new GameError(`کارت «${old.name}» را بازیکن‌ها دارند و قابل حذف نیست`);
@@ -318,13 +342,6 @@ export function createGameServer(opt: ServerOptions) {
         return json(res, 200, { users: game.adminUsers(url.searchParams.get('q') ?? '') });
       case '/api/admin/user':
         return json(res, 200, { user: game.adminUser(Number(url.searchParams.get('id'))) });
-      case '/api/admin/shop': {
-        if (req.method !== 'POST') return json(res, 200, { gatewayUrl: cfg.shop.gatewayUrl ?? '' });
-        const b = await readBody(req);
-        const next = clone(); next.shop.gatewayUrl = String(b.gatewayUrl ?? '').trim();
-        commitConfig(next);
-        return json(res, 200, { gatewayUrl: cfg.shop.gatewayUrl ?? '' });
-      }
       case '/api/admin/orders': return json(res, 200, { orders: game.adminOrders(url.searchParams.get('status') || undefined) });
       case '/api/admin/order': {
         const b = await readBody(req);
@@ -357,8 +374,7 @@ export function createGameServer(opt: ServerOptions) {
   }
 
   async function api(req: IncomingMessage, res: ServerResponse, path: string) {
-    // به بازیکن‌ها آدرس درگاه داده نمی‌شود (فقط موقع ثبت سفارش)
-    if (path === '/api/config') return json(res, 200, { ...cfg, shop: { ...cfg.shop, gatewayUrl: undefined } });
+    if (path === '/api/config') return json(res, 200, cfg);
     if (path === '/api/version') { res.setHeader('cache-control', 'no-store'); return json(res, 200, { bundle: currentBundle(opt.staticDir) }); }
     const hdr = req.headers['x-init-data'];
     const u = authenticate(Array.isArray(hdr) ? hdr[0] : hdr, opt.auth);
@@ -396,10 +412,16 @@ export function createGameServer(opt: ServerOptions) {
         case '/api/shop/state': extra = { shop: game.shopState(userId) }; break;
         case '/api/shop/buy-card': extra = { bought: game.buyShopCard(userId, Number(body.slot), body.currency) }; break;
         case '/api/shop/buy-coins': extra = { got: game.buyCoinPack(userId, String(body.id)) }; break;
-        case '/api/shop/order': {
-          if (!cfg.shop.gatewayUrl) throw new GameError('درگاه پرداخت هنوز فعال نشده؛ به پشتیبانی پیام بده');
-          const o = game.createOrder(userId, String(body.id));
-          extra = { order: o, url: game.gatewayLink(o, u.tgId) };
+        case '/api/shop/order': { // کارت‌به‌کارت: سفارش ثبت می‌شود و مشخصات کارت نمایش داده می‌شود؛ تحویل دستی از پنل
+          const o = game.createOrder(userId, String(body.id), 'card');
+          extra = { order: o, card: cfg.shop.card };
+          break;
+        }
+        case '/api/shop/order-note': game.setOrderNote(userId, Number(body.id), String(body.note ?? '')); break;
+        case '/api/shop/stars': { // استار تلگرام: فاکتور ساخته می‌شود؛ بعد از پرداخت ربات الماس را خودکار اضافه می‌کند
+          if (!opt.auth.botToken) throw new GameError('پرداخت با استار فقط در نسخه‌ی واقعی (با توکن ربات) کار می‌کند');
+          const o = game.createOrder(userId, String(body.id), 'stars');
+          try { extra = { order: o, url: await createStarsInvoice(o) }; } catch (e) { game.cancelOrder(o.id); console.error('[stars]', (e as Error).message); throw new GameError('ساخت فاکتور استار ممکن نشد؛ کمی بعد دوباره امتحان کن'); }
           break;
         }
         case '/api/leaderboard': extra = { leaders: game.leaderboard(userId), myRank: game.trophyRank(userId) }; break;
@@ -467,5 +489,5 @@ export function createGameServer(opt: ServerOptions) {
     wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
   });
 
-  return { http, game, close: () => { clearInterval(heartbeat); wss.clients.forEach((c) => c.close()); http.close(); } };
+  return { http, game, stars: { preCheckout: starsPreCheckout, payment: starsPayment }, close: () => { clearInterval(heartbeat); wss.clients.forEach((c) => c.close()); http.close(); } };
 }

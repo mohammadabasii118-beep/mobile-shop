@@ -59,6 +59,11 @@ export function openDb(path = ':memory:'): Db {
       done_at INTEGER
     );
   `);
+  try { db.exec("ALTER TABLE orders ADD COLUMN method TEXT NOT NULL DEFAULT 'card'"); } catch { /* ستون از قبل هست */ }
+  try { db.exec('ALTER TABLE orders ADD COLUMN note TEXT'); } catch { /* ستون از قبل هست */ }
+  try { db.exec('ALTER TABLE orders ADD COLUMN stars INTEGER NOT NULL DEFAULT 0'); } catch { /* ستون از قبل هست */ }
+  try { db.exec('ALTER TABLE orders ADD COLUMN charge_id TEXT'); } catch { /* ستون از قبل هست */ }
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS orders_charge ON orders(charge_id) WHERE charge_id IS NOT NULL');
   // کاپ‌ها: فقط از نبردهای آنلاین کم و زیاد می‌شود
   try { db.exec('ALTER TABLE users ADD COLUMN trophies INTEGER NOT NULL DEFAULT 0'); } catch { /* ستون از قبل هست */ }
   // الماس سرخ: همه (قدیمی و جدید) با ۵۰ شروع می‌کنند

@@ -288,8 +288,8 @@ export class Game {
     cfg.shop.cards.forEach((o, slot) => {
       if (o.cardId && db.prepare('SELECT 1 FROM shop_buys WHERE user_id = ? AND slot = ? AND day = ? AND sig = ?').get(userId, slot, day, this.offerSig(o))) bought.push(slot);
     });
-    const orders = (db.prepare('SELECT id, gems, toman, status, created_at FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 5').all(userId) as any[])
-      .map((r) => ({ id: r.id as number, gems: r.gems as number, toman: r.toman as number, status: r.status as string, createdAt: r.created_at as number }));
+    const orders = (db.prepare('SELECT id, gems, toman, stars, method, status, created_at FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 5').all(userId) as any[])
+      .map((r) => ({ id: r.id as number, gems: r.gems as number, toman: r.toman as number, stars: r.stars as number, method: r.method as string, status: r.status as string, createdAt: r.created_at as number }));
     return { bought, resetInMs: this.shopNextResetMs(), orders };
   }
 
@@ -323,37 +323,74 @@ export class Game {
     return { coins: pk.coins };
   }
 
-  /** ثبت سفارشِ خرید الماس با تومان (پرداخت بیرونی؛ تحویل دستی از پنل). حداکثر ۵ سفارش در انتظار برای هر نفر. */
-  createOrder(userId: number, packId: string) {
+  /**
+   * ثبت سفارشِ خرید الماس. method='card': کارت‌به‌کارت (تحویل دستی از پنل)؛ method='stars': استار تلگرام (تحویل خودکار بعد از پرداخت).
+   * حداکثر ۵ سفارش در انتظار برای هر نفر؛ سفارش‌های استارِ پرداخت‌نشده بعد از یک ساعت خودکار لغو می‌شوند.
+   */
+  createOrder(userId: number, packId: string, method: 'card' | 'stars' = 'card') {
     const { db, cfg } = this.d;
     const pk = cfg.shop.gemPacks.find((x) => x.id === packId);
     if (!pk) throw new GameError('این بسته وجود ندارد');
+    if (method === 'card' && (!cfg.shop.card.enabled || !(pk.toman > 0))) throw new GameError('پرداخت کارت‌به‌کارت برای این بسته فعال نیست');
+    if (method === 'stars' && (!cfg.shop.starsEnabled || !(pk.stars > 0))) throw new GameError('پرداخت با استار برای این بسته فعال نیست');
+    db.prepare("UPDATE orders SET status = 'canceled', done_at = ? WHERE user_id = ? AND status = 'pending' AND method = 'stars' AND created_at < ?").run(this.d.now(), userId, this.d.now() - 3_600_000);
     const pending = Number((db.prepare("SELECT COUNT(*) n FROM orders WHERE user_id = ? AND status = 'pending'").get(userId) as any).n);
-    if (pending >= 5) throw new GameError('چند سفارش در انتظار تأیید داری؛ اول صبر کن تا بررسی شوند');
-    const r = db.prepare('INSERT INTO orders (user_id, pack_id, gems, toman, created_at) VALUES (?,?,?,?,?)').run(userId, pk.id, pk.gems, pk.toman, this.d.now());
-    return { id: Number(r.lastInsertRowid), gems: pk.gems, toman: pk.toman };
+    if (pending >= 5) throw new GameError('چند سفارش در انتظار داری؛ اول صبر کن تا بررسی شوند');
+    const r = db.prepare('INSERT INTO orders (user_id, pack_id, gems, toman, stars, method, created_at) VALUES (?,?,?,?,?,?,?)')
+      .run(userId, pk.id, pk.gems, method === 'card' ? pk.toman : 0, method === 'stars' ? pk.stars : 0, method, this.d.now());
+    return { id: Number(r.lastInsertRowid), gems: pk.gems, toman: method === 'card' ? pk.toman : 0, stars: method === 'stars' ? pk.stars : 0 };
   }
 
-  /** لینک درگاه برای یک سفارش (جای‌نگهدارها جایگزین می‌شوند)؛ null اگر درگاه تنظیم نشده */
-  gatewayLink(order: { id: number; gems: number; toman: number }, tgId: number): string | null {
-    const g = this.d.cfg.shop.gatewayUrl;
-    if (!g) return null;
-    const m: Record<string, string> = { order: String(order.id), amount: String(order.toman), gems: String(order.gems), user: String(tgId) };
-    return g.replace(/\{(order|amount|gems|user)\}/g, (_, k) => encodeURIComponent(m[k]));
+  /** کد پیگیری/۴ رقم آخر کارتِ پرداخت‌کننده (برای تطبیق در پنل) */
+  setOrderNote(userId: number, orderId: number, note: string) {
+    const clean = String(note ?? '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 60);
+    if (!clean) throw new GameError('کد پیگیری را بنویس');
+    const r = this.d.db.prepare("UPDATE orders SET note = ? WHERE id = ? AND user_id = ? AND method = 'card' AND status = 'pending'").run(clean, orderId, userId);
+    if (Number(r.changes) !== 1) throw new GameError('سفارش پیدا نشد یا قبلاً بررسی شده');
+  }
+
+  /** لغو سفارشِ استارِ ساخته‌شده که فاکتورش نشد (خطای تلگرام) */
+  cancelOrder(orderId: number) {
+    this.d.db.prepare("UPDATE orders SET status = 'canceled', done_at = ? WHERE id = ? AND status = 'pending'").run(this.d.now(), orderId);
+  }
+
+  /** قبل از پرداخت استار: آیا این پرداخت معتبر است؟ (تلگرام فقط ۱۰ ثانیه فرصت می‌دهد) */
+  starsPreCheck(orderId: number, tgId: number, stars: number): string | null {
+    const o = this.d.db.prepare('SELECT o.status, o.method, o.stars, u.tg_id FROM orders o JOIN users u ON u.id = o.user_id WHERE o.id = ?').get(orderId) as any;
+    if (!o || o.method !== 'stars') return 'سفارش پیدا نشد';
+    if (o.tg_id !== tgId) return 'این سفارش برای حساب دیگری است';
+    if (o.status === 'delivered') return 'این سفارش قبلاً پرداخت شده';
+    if (o.stars !== stars) return 'مبلغ سفارش تغییر کرده؛ دوباره امتحان کن';
+    return null;
+  }
+
+  /**
+   * پرداخت استار انجام شد (successful_payment): الماس فوراً و فقط یک‌بار (با شناسه‌ی تراکنش تلگرام) اضافه می‌شود.
+   * اگر سفارش به‌خاطر گذشت زمان لغو شده بود هم تحویل می‌شود، چون پول پرداخت شده.
+   */
+  completeStarsPayment(orderId: number, tgId: number, stars: number, chargeId: string): 'delivered' | 'duplicate' | 'invalid' {
+    const { db } = this.d;
+    if (db.prepare('SELECT 1 FROM orders WHERE charge_id = ?').get(chargeId)) return 'duplicate';
+    const o = db.prepare('SELECT o.user_id, o.gems, o.status, o.method, o.stars, u.tg_id FROM orders o JOIN users u ON u.id = o.user_id WHERE o.id = ?').get(orderId) as any;
+    if (!o || o.method !== 'stars' || o.tg_id !== tgId || o.stars !== stars || o.status === 'delivered') return 'invalid';
+    db.prepare("UPDATE orders SET status = 'delivered', done_at = ?, charge_id = ? WHERE id = ?").run(this.d.now(), chargeId, orderId);
+    db.prepare('UPDATE users SET gems = gems + ? WHERE id = ?').run(o.gems, o.user_id);
+    return 'delivered';
   }
 
   adminOrders(status?: string) {
-    const rows = this.d.db.prepare(`SELECT o.id, o.user_id, o.gems, o.toman, o.status, o.created_at, o.done_at, u.tg_id, u.name, u.avatar FROM orders o JOIN users u ON u.id = o.user_id ${status ? 'WHERE o.status = ?' : ''} ORDER BY o.id DESC LIMIT 200`).all(...(status ? [status] : [])) as any[];
-    return rows.map((r) => ({ id: r.id as number, userId: r.user_id as number, tgId: r.tg_id as number, name: r.name as string, avatar: (r.avatar ?? null) as string | null, gems: r.gems as number, toman: r.toman as number, status: r.status as string, createdAt: r.created_at as number, doneAt: (r.done_at ?? null) as number | null }));
+    const rows = this.d.db.prepare(`SELECT o.id, o.user_id, o.gems, o.toman, o.stars, o.method, o.note, o.status, o.created_at, o.done_at, u.tg_id, u.name, u.avatar FROM orders o JOIN users u ON u.id = o.user_id ${status ? 'WHERE o.status = ?' : ''} ORDER BY o.id DESC LIMIT 200`).all(...(status ? [status] : [])) as any[];
+    return rows.map((r) => ({ id: r.id as number, userId: r.user_id as number, tgId: r.tg_id as number, name: r.name as string, avatar: (r.avatar ?? null) as string | null, gems: r.gems as number, toman: r.toman as number, stars: r.stars as number, method: r.method as string, note: (r.note ?? null) as string | null, status: r.status as string, createdAt: r.created_at as number, doneAt: (r.done_at ?? null) as number | null }));
   }
 
-  /** تحویل (الماس به حساب بازیکن اضافه می‌شود) یا لغو یک سفارش؛ هر سفارش فقط یک‌بار قابل تصمیم است */
+  /** تحویل دستی (فقط کارت‌به‌کارت) یا لغو یک سفارش در انتظار؛ هر سفارش فقط یک‌بار قابل تصمیم است */
   adminOrderAction(id: number, action: 'deliver' | 'cancel') {
     const { db } = this.d;
-    const o = db.prepare('SELECT user_id, gems, status FROM orders WHERE id = ?').get(id) as any;
+    const o = db.prepare('SELECT user_id, gems, status, method FROM orders WHERE id = ?').get(id) as any;
     if (!o) throw new GameError('سفارش پیدا نشد');
     if (o.status !== 'pending') throw new GameError('این سفارش قبلاً بررسی شده');
     if (action === 'deliver') {
+      if (o.method !== 'card') throw new GameError('سفارش‌های استار خودکار بعد از پرداخت تحویل می‌شوند');
       db.prepare("UPDATE orders SET status = 'delivered', done_at = ? WHERE id = ? AND status = 'pending'").run(this.d.now(), id);
       db.prepare('UPDATE users SET gems = gems + ? WHERE id = ?').run(o.gems, o.user_id);
     } else if (action === 'cancel') {

@@ -42,7 +42,9 @@ export function validateConfig(cfg: GameConfig): GameConfig {
   if (!Array.isArray(cfg.xpPerLevel) || cfg.xpPerLevel.length < 1 || cfg.xpPerLevel.some((x) => !isNum(x, 1))) bad('جدول XP نامعتبر است');
   const sh = cfg.shop;
   if (!sh || !Array.isArray(sh.cards) || sh.cards.length !== 6 || !Array.isArray(sh.coinPacks) || !Array.isArray(sh.gemPacks)) bad('تنظیمات فروشگاه نامعتبر است (باید دقیقاً ۶ اسلات کارت داشته باشد)');
-  if (sh.gatewayUrl !== undefined && sh.gatewayUrl !== '' && (typeof sh.gatewayUrl !== 'string' || sh.gatewayUrl.length > 600 || !/^https?:\/\//i.test(sh.gatewayUrl))) bad('آدرس درگاه باید با http:// یا https:// شروع شود');
+  if (!sh.card || typeof sh.card.enabled !== 'boolean' || typeof sh.card.number !== 'string' || typeof sh.card.holder !== 'string' || typeof sh.card.bank !== 'string' || typeof sh.starsEnabled !== 'boolean') bad('تنظیمات پرداخت فروشگاه نامعتبر است');
+  if (sh.card.holder.length > 60 || sh.card.bank.length > 40) bad('نام صاحب کارت یا بانک خیلی طولانی است');
+  if (sh.card.enabled && !/^[0-9۰-۹\s-]{12,30}$/.test(sh.card.number.trim())) bad('شماره‌ی کارت نامعتبر است (۱۶ رقم)');
   const isInt = (v: unknown, min: number, max = 10_000_000) => Number.isInteger(v) && (v as number) >= min && (v as number) <= max;
   sh.cards.forEach((o, i) => {
     if (!o || typeof o.cardId !== 'string') bad(`فروشگاه: اسلات ${i + 1} نامعتبر است`);
@@ -58,7 +60,10 @@ export function validateConfig(cfg: GameConfig): GameConfig {
   }
   if (sh.coinPacks.length > 12 || sh.gemPacks.length > 12) bad('فروشگاه: حداکثر ۱۲ بسته');
   for (const pk of sh.coinPacks) if (!isInt(pk.coins, 1) || !isInt(pk.gems, 1)) bad('فروشگاه: بسته‌ی سکه نامعتبر است');
-  for (const pk of sh.gemPacks) if (!isInt(pk.gems, 1) || !isInt(pk.toman, 1, 1_000_000_000)) bad('فروشگاه: بسته‌ی الماس نامعتبر است');
+  for (const pk of sh.gemPacks) {
+    if (!isInt(pk.gems, 1) || !isInt(pk.toman, 0, 1_000_000_000) || !isInt(pk.stars, 0, 10_000)) bad('فروشگاه: بسته‌ی الماس نامعتبر است');
+    if (pk.toman === 0 && pk.stars === 0) bad('فروشگاه: هر بسته‌ی الماس حداقل یک قیمت (تومان یا استار) لازم دارد');
+  }
   const on = cfg.online;
   if (!on || !isNum(on.winCoins) || !isNum(on.winXp) || !isNum(on.trophiesWin) || !isNum(on.trophiesLoss)) bad('جایزه‌ی نبرد آنلاین نامعتبر است');
   const b = cfg.box;
@@ -127,7 +132,14 @@ export function loadConfigWithOverride(overridePath: string, basePath = CONFIG_P
     const lv = merged.upgrade?.levels;
     merged.upgrade = Array.isArray(lv) ? { maxLevel: merged.upgrade.maxLevel, byRarity: { common: lv, rare: lv, epic: lv } } : base.upgrade;
   }
+  // فروشگاه: نسخه‌ی قدیمی (درگاه آدرسی) → روش‌های پرداخت جدید؛ بسته‌های الماس بدون قیمت استار از پایه (هم‌شناسه) یا ۰
   if (!merged.shop) merged.shop = base.shop;
+  else {
+    delete merged.shop.gatewayUrl;
+    merged.shop.card = merged.shop.card ?? base.shop.card;
+    merged.shop.starsEnabled = merged.shop.starsEnabled ?? base.shop.starsEnabled;
+    merged.shop.gemPacks = (merged.shop.gemPacks ?? base.shop.gemPacks).map((g: any) => (typeof g?.stars === 'number' ? g : { ...g, stars: base.shop.gemPacks.find((x) => x.id === g.id)?.stars ?? 0 }));
+  }
   // جایزه‌ی آنلاین (جدید): اگر نبود از پایه
   if (!merged.online) merged.online = base.online;
   // XP دیگر از جعبه نمی‌آید (حذف از نوع‌ها) و هر ردیف ارتقا مقدار XP دارد (اگر نبود از پایه‌ی همان نوع و ردیف)

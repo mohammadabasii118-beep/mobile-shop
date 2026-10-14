@@ -1514,7 +1514,6 @@
     "trophiesLoss": 6
   },
   "shop": {
-    "gatewayUrl": "",
     "cards": [
       {
         "cardId": "giv",
@@ -1574,18 +1573,28 @@
       {
         "id": "g1",
         "gems": 50,
-        "toman": 49000
+        "toman": 49000,
+        "stars": 60
       },
       {
         "id": "g2",
         "gems": 120,
-        "toman": 99000
+        "toman": 99000,
+        "stars": 140
       },
       {
         "id": "g3",
         "gems": 300,
-        "toman": 199000
+        "toman": 199000,
+        "stars": 340
       }
-    ]
+    ],
+    "card": {
+      "enabled": false,
+      "number": "",
+      "holder": "",
+      "bank": ""
+    },
+    "starsEnabled": true
   }
 }

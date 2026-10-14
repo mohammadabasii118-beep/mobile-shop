@@ -242,24 +242,55 @@ describe('game economy', () => {
       expect(() => game.buyCoinPack(uid, pk.id)).toThrow(/الماس/);
     });
 
-    it('gem orders: pending until the admin delivers (once), cap of 5 pending, gateway link placeholders', () => {
+    it('card-to-card orders: pending with a note until the admin delivers (once), cap of 5 pending', () => {
+      const g = new Game({ db: openDb(), cfg: { ...cfg, shop: { ...cfg.shop, card: { enabled: true, number: '6037991234567890', holder: 'علی', bank: 'ملی' } } }, now: () => t, rng: () => rngVal });
+      const u = g.upsertUser({ tgId: 9, name: 'U', avatar: null });
       const pk = cfg.shop.gemPacks[0];
-      const o = game.createOrder(uid, pk.id);
-      expect(o).toMatchObject({ gems: pk.gems, toman: pk.toman });
-      expect(game.profile(uid).gems).toBe(50);                       // هنوز چیزی اضافه نشده
-      expect(game.adminOrders()[0]).toMatchObject({ id: o.id, status: 'pending', tgId: 1 });
-      game.adminOrderAction(o.id, 'deliver');
+      const o = g.createOrder(u, pk.id, 'card');
+      expect(o).toMatchObject({ gems: pk.gems, toman: pk.toman, stars: 0 });
+      expect(g.profile(u).gems).toBe(50);                                  // هنوز چیزی اضافه نشده
+      expect(() => g.setOrderNote(u, o.id, '   ')).toThrow(GameError);
+      g.setOrderNote(u, o.id, '۱۲۳۴۵۶ <b>');
+      expect(g.adminOrders()[0]).toMatchObject({ id: o.id, status: 'pending', tgId: 9, method: 'card', note: '۱۲۳۴۵۶ b' });
+      g.adminOrderAction(o.id, 'deliver');
+      expect(g.profile(u).gems).toBe(50 + pk.gems);
+      expect(() => g.adminOrderAction(o.id, 'deliver')).toThrow(/قبلاً/);        // دوبار تحویل نمی‌شود
+      expect(g.profile(u).gems).toBe(50 + pk.gems);
+      const o2 = g.createOrder(u, pk.id, 'card');
+      g.adminOrderAction(o2.id, 'cancel');
+      expect(g.profile(u).gems).toBe(50 + pk.gems);
+      for (let i = 0; i < 5; i++) g.createOrder(u, pk.id, 'card');
+      expect(() => g.createOrder(u, pk.id, 'card')).toThrow(/سفارش/);
+      expect(() => game.createOrder(uid, pk.id, 'card')).toThrow(/فعال نیست/);   // کارت در تنظیمات پیش‌فرض خاموش است
+    });
+
+    it('telegram stars: invoice order is paid automatically exactly once, with checks', () => {
+      const pk = cfg.shop.gemPacks[0];
+      const o = game.createOrder(uid, pk.id, 'stars');
+      expect(o).toMatchObject({ gems: pk.gems, stars: pk.stars, toman: 0 });
+      // قبل از پرداخت: مبلغ و صاحب سفارش چک می‌شود
+      expect(game.starsPreCheck(o.id, 1, pk.stars)).toBeNull();
+      expect(game.starsPreCheck(o.id, 999, pk.stars)).toMatch(/حساب دیگری/);
+      expect(game.starsPreCheck(o.id, 1, pk.stars + 1)).toMatch(/مبلغ/);
+      expect(game.starsPreCheck(12345, 1, pk.stars)).toMatch(/پیدا نشد/);
+      // پرداخت اشتباه: چیزی تحویل نمی‌شود
+      expect(game.completeStarsPayment(o.id, 999, pk.stars, 'chg-bad')).toBe('invalid');
+      expect(game.completeStarsPayment(o.id, 1, 1, 'chg-bad2')).toBe('invalid');
+      expect(game.profile(uid).gems).toBe(50);
+      // پرداخت درست: یک‌بار
+      expect(game.completeStarsPayment(o.id, 1, pk.stars, 'chg-1')).toBe('delivered');
       expect(game.profile(uid).gems).toBe(50 + pk.gems);
-      expect(() => game.adminOrderAction(o.id, 'deliver')).toThrow(/قبلاً/);   // دوبار تحویل نمی‌شود
+      expect(game.completeStarsPayment(o.id, 1, pk.stars, 'chg-1')).toBe('duplicate');   // تلگرام دوباره بفرستد
+      expect(game.completeStarsPayment(o.id, 1, pk.stars, 'chg-2')).toBe('invalid');     // سفارش تحویل‌شده
       expect(game.profile(uid).gems).toBe(50 + pk.gems);
-      const o2 = game.createOrder(uid, pk.id);
-      game.adminOrderAction(o2.id, 'cancel');
-      expect(game.profile(uid).gems).toBe(50 + pk.gems);
-      for (let i = 0; i < 5; i++) game.createOrder(uid, pk.id);
-      expect(() => game.createOrder(uid, pk.id)).toThrow(/سفارش/);
-      const g2 = new Game({ db: openDb(), cfg: { ...cfg, shop: { ...cfg.shop, gatewayUrl: 'https://pay.example/go?o={order}&a={amount}&u={user}' } }, now: () => t, rng: () => rngVal });
-      expect(g2.gatewayLink({ id: 7, gems: 50, toman: 49000 }, 123)).toBe('https://pay.example/go?o=7&a=49000&u=123');
-      expect(game.gatewayLink({ id: 7, gems: 50, toman: 49000 }, 123)).toBeNull();
+      expect(game.starsPreCheck(o.id, 1, pk.stars)).toMatch(/قبلاً/);
+      // سفارش استارِ پرداخت‌نشده بعد از یک ساعت لغو می‌شود، ولی اگر بعدش پرداخت شد باز تحویل می‌شود
+      const o2 = game.createOrder(uid, pk.id, 'stars');
+      t += 3_700_000;
+      game.createOrder(uid, pk.id, 'stars');
+      expect(game.adminOrders().find((x) => x.id === o2.id)!.status).toBe('canceled');
+      expect(game.completeStarsPayment(o2.id, 1, pk.stars, 'chg-3')).toBe('delivered');
+      expect(() => game.adminOrderAction(game.createOrder(uid, pk.id, 'stars').id, 'deliver')).toThrow(/خودکار/); // استار دستی تحویل نمی‌شود
     });
   });
 });

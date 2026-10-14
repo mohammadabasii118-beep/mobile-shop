@@ -22,7 +22,7 @@ const configPath = join(dataDir, 'game.json'); // تنظیمات ویرایش‌
 const db = openDb(process.env.DB_PATH ?? join(dataDir, 'game.db'));
 const staticDir = fileURLToPath(new URL('../../client/dist', import.meta.url));
 const cfg = loadConfigWithOverride(configPath);
-const { http } = createGameServer({
+const { http, stars } = createGameServer({
   db, cfg, auth: { botToken, devAuth }, dataDir, adminIds, telegramApi: process.env.TELEGRAM_API, saveCfg: (c) => saveConfig(c, configPath),
   staticDir,
 });
@@ -30,7 +30,7 @@ const { http } = createGameServer({
 const backupOpts = { db, dataDir, codeDir: fileURLToPath(new URL('../../', import.meta.url)) };
 if (botToken && isProd && adminIds.length && process.env.BACKUP !== 'off') scheduleDailyBackup({ ...backupOpts, token: botToken, adminIds, apiBase: process.env.TELEGRAM_API, hourUtc: Number(process.env.BACKUP_HOUR_UTC ?? 3) });
 if (botToken && process.env.WEBAPP_URL) startBot({
-  token: botToken, webAppUrl: `${process.env.WEBAPP_URL}${process.env.WEBAPP_URL.includes('?') ? '&' : '?'}v=${versionTag(staticDir)}`, welcomeText: () => cfg.ui?.welcome,
+  token: botToken, webAppUrl: `${process.env.WEBAPP_URL}${process.env.WEBAPP_URL.includes('?') ? '&' : '?'}v=${versionTag(staticDir)}`, welcomeText: () => cfg.ui?.welcome, onPreCheckout: stars.preCheckout, onPayment: stars.payment,
   onBackup: async (fromId, chatId) => {
     if (!adminIds.includes(fromId)) return 'این دستور فقط برای ادمین‌هاست.';
     const ok = await backupToAdmins({ ...backupOpts, token: botToken, adminIds, apiBase: process.env.TELEGRAM_API, chatIds: [chatId] });

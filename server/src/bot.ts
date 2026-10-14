@@ -25,6 +25,10 @@ export interface BotOptions {
   welcomeText?: () => string | undefined;
   /** دستور /backup؛ تشخیص ادمین‌بودن با خود تابع است و متن جواب را برمی‌گرداند */
   onBackup?: (fromId: number, chatId: number) => Promise<string>;
+  /** استار تلگرام: قبل از گرفتن پول (null = تأیید، رشته = رد با این پیام) */
+  onPreCheckout?: (q: any) => string | null;
+  /** استار تلگرام: بعد از پرداخت موفق؛ متنی که برای بازیکن فرستاده شود (یا null) */
+  onPayment?: (m: any) => string | null;
   log?: (s: string) => void;
 }
 
@@ -72,7 +76,7 @@ export function startBot(o: BotOptions) {
     let offset = 0;
     while (!stopped) {
       try {
-        const j = await api('getUpdates', { offset, timeout: 25, allowed_updates: ['message'] }, ac.signal);
+        const j = await api('getUpdates', { offset, timeout: 25, allowed_updates: ['message', 'pre_checkout_query'] }, ac.signal);
         if (!j.ok) {
           if (j.error_code === 409) { log('این توکن را برنامه‌ی دیگری هم استفاده می‌کند (۴۰۹). برای اینکه مزاحمش نشوم متوقف شدم. برای این بازی یک ربات جدا بساز.'); return; }
           if (j.error_code === 401) { log('توکن نامعتبر است.'); return; }
@@ -80,7 +84,17 @@ export function startBot(o: BotOptions) {
         }
         for (const u of j.result as any[]) {
           offset = u.update_id + 1;
+          if (u.pre_checkout_query && o.onPreCheckout) {
+            const q = u.pre_checkout_query; let err: string | null = 'خطای داخلی';
+            try { err = o.onPreCheckout(q); } catch (e) { log(`pre_checkout: ${(e as Error).message}`); }
+            await api('answerPreCheckoutQuery', err ? { pre_checkout_query_id: q.id, ok: false, error_message: err } : { pre_checkout_query_id: q.id, ok: true });
+            continue;
+          }
           const m = u.message;
+          if (m?.successful_payment && o.onPayment) {
+            try { const t = o.onPayment(m); if (t) await api('sendMessage', { chat_id: m.chat.id, text: t }); } catch (e) { log(`payment: ${(e as Error).message}`); }
+            continue;
+          }
           if (m?.chat?.type === 'private' && typeof m.text === 'string' && m.text.startsWith('/start')) await welcome(m.chat.id);
           else if (m?.chat?.type === 'private' && typeof m.text === 'string' && m.text.startsWith('/backup') && o.onBackup) {
             try { await api('sendMessage', { chat_id: m.chat.id, text: await o.onBackup(m.from?.id, m.chat.id) }); } catch (e) { log(`backup: ${(e as Error).message}`); }
