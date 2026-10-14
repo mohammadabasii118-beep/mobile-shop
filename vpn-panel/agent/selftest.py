@@ -111,7 +111,9 @@ def test_one(xray, outbound):
             return True, "ok"
         proc.terminate()
         out = (proc.communicate(timeout=3)[0] or "").strip().splitlines()
-        hint = next((l for l in reversed(out) if "Warning" not in l), "")[-160:]
+        # Xray reports connection errors as [Warning]; only the "deprecated feature" notices are noise
+        useful = [l.split("] ", 1)[-1] for l in out if "deprecated" not in l and "Xray " not in l and "unified platform" not in l]
+        hint = " | ".join(useful[-3:])[-420:]
         return False, f"no answer (http {r.stdout.strip() or '000'}, curl exit {r.returncode}) {hint}".strip()
     finally:
         if proc.poll() is None:
