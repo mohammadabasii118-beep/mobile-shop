@@ -45,6 +45,13 @@ class XiSt(StatesGroup):
     logo = State()
 
 
+class VpnSt(StatesGroup):
+    name = State()
+    quota = State()
+    days = State()
+    price = State()
+
+
 class DestSt(StatesGroup):
     pick = State()
 

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ONC Live Demo</title>
+<style>
+:root{--bg:#0b1118;--panel:#121a24;--bub:#1b2836;--line:#243344;--tx:#e8eef5;--mut:#8aa0b5;--ac:#4aa3ff;--btn:#27415c;--red:#ff4d5e}
+@media (prefers-color-scheme: light){:root:not([data-theme=dark]){--bg:#eef2f6;--panel:#fff;--bub:#fff;--line:#d5dde6;--tx:#14202b;--mut:#5b6e80;--btn:#dbe8f5}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.55 system-ui,"Segoe UI",Tahoma,sans-serif}
+.wrap{display:grid;grid-template-columns:330px 1fr;gap:18px;max-width:1180px;margin:0 auto;padding:16px}
+@media(max-width:820px){.wrap{grid-template-columns:1fr}.side{max-height:240px}}
+h1{font-size:19px;margin:0 0 4px}.sub{color:var(--mut);font-size:13px;margin:0 0 12px}
+.side{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px;overflow:auto;max-height:calc(100vh - 32px);position:sticky;top:16px}
+.item{display:flex;gap:8px;padding:8px 9px;border-radius:9px;cursor:pointer;font-size:13.5px;align-items:flex-start}
+.item:hover{background:var(--btn)}.item.on{background:var(--ac);color:#fff}.item .n{opacity:.7;min-width:22px}
+.item.ch .n:after{content:"📢"}
+.stage{display:flex;flex-direction:column;align-items:center}
+.cap{width:100%;max-width:440px;margin-bottom:10px}.cap b{display:block;font-size:16px}.cap span{color:var(--mut);font-size:12.5px;direction:ltr;display:block;text-align:left}
+.phone{width:100%;max-width:440px;background:var(--panel);border:1px solid var(--line);border-radius:22px;overflow:hidden}
+.top{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);direction:rtl}
+.av{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#ff4d5e,#7a1030);display:grid;place-items:center;font-weight:700;color:#fff}
+.nm{font-weight:600}.st{font-size:12px;color:var(--mut)}
+.chat{padding:14px;display:flex;flex-direction:column;gap:6px;direction:rtl;min-height:240px}
+.bub{background:var(--bub);border:1px solid var(--line);border-radius:14px;padding:9px 12px;max-width:100%;white-space:pre-wrap;word-wrap:break-word;text-align:right;direction:rtl}
+.bub img{display:block;width:100%;border-radius:10px;margin-bottom:8px}
+.bub pre{direction:ltr;text-align:left;unicode-bidi:isolate;margin:6px 0;font:12.5px/1.45 ui-monospace,Menlo,Consolas,monospace;white-space:pre;overflow:auto;background:rgba(0,0,0,.18);padding:7px 8px;border-radius:8px}
+.bub code{font:13px ui-monospace,Menlo,monospace;background:rgba(127,127,127,.2);padding:0 4px;border-radius:4px}
+.kb{display:grid;gap:4px;margin-top:2px}.kb .r{display:flex;gap:4px}
+.kb .b{flex:1;background:var(--btn);border-radius:9px;padding:8px 6px;text-align:center;font-size:13px;min-width:0;overflow-wrap:anywhere}
+.nav{display:flex;gap:8px;margin:12px 0}
+button{background:var(--btn);color:var(--tx);border:0;border-radius:9px;padding:8px 14px;font:inherit;cursor:pointer}
+button:disabled{opacity:.4}
+.feed .bub{background:var(--bub)}
+.pill{display:inline-block;background:var(--red);color:#fff;border-radius:999px;padding:1px 9px;font-size:11px;margin-inline-start:6px}
+body.shot .side,body.shot .nav,body.shot h1,body.shot .sub{display:none}body.shot .wrap{grid-template-columns:1fr;padding:8px}
+</style></head><body>
+<div class="wrap">
+  <div>
+    <h1>🌍 مولتی‌لوکیشن — اجرای واقعی ربات</h1>
+    <p class="sub">این صفحه با اجرای <b>کد واقعی ربات</b> (هندلرها، دیتابیس و رندر گرافیک) ساخته شده؛ نه یک ماکت.</p>
+    <div class="side" id="side"></div>
+  </div>
+  <div class="stage">
+    <div class="cap"><b id="ft"></b><span id="fe"></span></div>
+    <div class="phone"><div class="top"><div class="av" id="av">PCL</div><div><div class="nm" id="nm"></div><div class="st" id="st"></div></div></div>
+      <div class="chat" id="chat"></div></div>
+    <div class="nav"><button id="prev">⬅ قبلی</button><button id="next">بعدی ➡</button></div>
+  </div>
+</div>
+<script>
+const F=[{"i": 0, "title": "VPN admin panel", "fa": "پنل ادمین: وضعیت پنل، لوکیشن‌های آنلاین، پلن‌ها", "kind": "chat", "messages": [{"text": "🌍 <b>VPN مولتی‌لوکیشن</b>\n\nپنل: 🟢 متصل — 1 از 2 لوکیشن آنلاین\nسرویس‌های فروخته‌شده: 0\n\nپلن‌ها (برای ویرایش بزن):", "rows": [["🟢 ۳۰ روزه ۵۰ گیگ · 50 گیگ · 30 روز · 80,000 تومان"], ["➕ پلن جدید", "🔄 تست اتصال"], ["🔙 بازگشت"]], "img": null}]}, {"i": 1, "title": "Main menu with the multi-location button", "fa": "منوی اصلی با دکمه‌ی «🌍 مولتی‌لوکیشن»", "kind": "chat", "messages": [{"text": "🏠 <b>منوی اصلی</b>\n\nیک بخش را انتخاب کن:", "rows": [["🔄 ترنسفر"], ["🏆 وان نایت چمپیون"], ["🌍 مولتی‌لوکیشن"], ["⚽ مسابقه فوتبالی", "🌍 اشتراک بین‌المللی"], ["🚫 بلک‌لیست"]], "img": null}]}, {"i": 2, "title": "VPN plans", "fa": "پلن‌ها و موجودی کیف پول", "kind": "chat", "messages": [{"text": "🌍 <b>مولتی‌لوکیشن</b>\n\nیک اشتراک VPN با چند لوکیشن و چند پروتکل؛ حجم و زمان بین همه‌ی لوکیشن‌ها مشترک است.\n💰 موجودی کیف پول: <b>0 تومان</b>", "rows": [["۳۰ روزه ۵۰ گیگ · 50 گیگ · 30 روز · 80,000 تومان"], ["📋 سرویس‌های من", "📍 لوکیشن‌ها"], ["🔙 منوی اصلی"]], "img": null}]}, {"i": 3, "title": "Buy confirmation", "fa": "تأیید خرید از کیف پول", "kind": "chat", "messages": [{"text": "🛒 <b>۳۰ روزه ۵۰ گیگ</b>\n\n📊 حجم: 50 گیگ\n⏳ مدت: 30 روز\n💵 قیمت: <b>80,000 تومان</b>\n💰 موجودی: 200,000 تومان", "rows": [["✅ خرید از کیف پول"], ["🔙 بازگشت"]], "img": null}]}, {"i": 4, "title": "Service created", "fa": "سرویس ساخته شد: لینک اشتراک + راهنمای اتصال", "kind": "chat", "messages": [{"text": "✅ <b>سرویس ساخته شد</b>\n\n🌍 <b>۳۰ روزه ۵۰ گیگ</b>\n\nوضعیت: 🟢 فعال\n📊 مصرف: <b>1.5</b> از 50 گیگ\n⏳ زمان مانده: <b>30</b> روز\n\n🔗 لینک اشتراک:\n<code>https://panel.test/sub/tok1</code>\n\n📱 <b>اتصال:</b> لینک اشتراک را کپی کن، در برنامه‌ی v2rayNG (اندروید) / Streisand یا Hiddify (آیفون) / Hiddify (ویندوز) گزینه‌ی «افزودن اشتراک / Import from clipboard» را بزن. همین لینک در مرورگر هم مصرف و کانفیگ‌ها را نشان می‌دهد.", "rows": [["📋 سرویس‌های من"], ["🔙 منوی اصلی"]], "img": null}]}, {"i": 5, "title": "My service", "fa": "سرویس من: وضعیت، مصرف، زمان مانده، تمدید", "kind": "chat", "messages": [{"text": "🌍 <b>u500</b>\n\nوضعیت: 🟢 فعال\n📊 مصرف: <b>1.5</b> از 50 گیگ\n⏳ زمان مانده: <b>30</b> روز", "rows": [["🔗 لینک اشتراک"], ["🔁 تمدید (80,000 تومان)"], ["🔙 بازگشت"]], "img": null}]}];let cur=0;
+const $=id=>document.getElementById(id);
+function render(){const f=F[cur];$('ft').textContent=f.fa;
+ const ch=f.kind==='channel';$('nm').textContent=ch?'ONE NIGHT CHAMPION | News':'PCL BOT';$('st').textContent=ch?'کانال — فقط اخبار تورنمنت':'ربات';
+ $('chat').className='chat'+(ch?' feed':'');
+ $('chat').innerHTML=f.messages.map(m=>`<div class="bub" ${(!m.img&&ch)?'style="direction:ltr;text-align:left"':''}>${m.img?`<img src="${m.img}">`:''}${m.text}</div>`+
+  (m.rows.length?`<div class="kb">${m.rows.map(r=>`<div class="r">${r.map(t=>`<div class="b">${t.replace(/</g,'&lt;')}</div>`).join('')}</div>`).join('')}</div>`:'')).join('');
+ document.querySelectorAll('.item').forEach((e,i)=>e.classList.toggle('on',i===cur));
+ $('prev').disabled=cur===0;$('next').disabled=cur===F.length-1;
+ const on=document.querySelector('.item.on');if(on&&!document.body.classList.contains('shot'))on.scrollIntoView({block:'nearest'});}
+$('side').innerHTML=F.map((f,i)=>`<div class="item ${f.kind==='channel'?'ch':''}" data-i="${i}"><span class="n">${i+1}</span><span>${f.fa}</span></div>`).join('');
+$('side').onclick=e=>{const t=e.target.closest('.item');if(t){cur=+t.dataset.i;render();location.hash=cur+1}};
+$('prev').onclick=()=>{cur=Math.max(0,cur-1);render()};$('next').onclick=()=>{cur=Math.min(F.length-1,cur+1);render()};
+document.onkeydown=e=>{if(e.key==='ArrowRight')$('prev').click();if(e.key==='ArrowLeft')$('next').click()};
+const q=new URLSearchParams(location.search);if(q.get('shot')){document.body.classList.add('shot');cur=+q.get('shot')}
+else if(+location.hash.slice(1))cur=+location.hash.slice(1)-1;
+render();
+</script></body></html>

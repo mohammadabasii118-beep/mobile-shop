@@ -25,10 +25,12 @@ HOME_TEXT = "🏠 <b>منوی اصلی</b>\n\nیک بخش را انتخاب کن
 ADMIN_TEXT = "🛠 <b>پنل مدیریت</b>\n\nکدام پنل را می‌خواهی؟"
 
 
-def home_markup(uid: int, extra: tuple[bool, bool] = (False, False)):
+def home_markup(uid: int, extra: tuple[bool, ...] = (False, False, False)):
     rows = [[btn("🔄 ترنسفر", "menu")], [btn("🏆 وان نایت چمپیون", "onc:u")],
             [btn("⚽ مسابقه فوتبالی", "fx:qz"), btn("🌍 اشتراک بین‌المللی", "fx:sb")], [btn("🚫 بلک‌لیست", "fx:bl")]]
-    draft_on, streamer = extra
+    draft_on, streamer, vpn_on = (tuple(extra) + (False, False, False))[:3]
+    if vpn_on:
+        rows.insert(2, [btn("🌍 مولتی‌لوکیشن", "fx:vp")])
     if draft_on:
         rows[-1].append(btn("📝 درفت", "fx:dr"))
     if streamer:
@@ -42,9 +44,10 @@ def admin_markup():
     return kb([[btn("🔄 پنل ترنسفر", "adm")], [btn("🏆 پنل وان نایت چمپیون", "onc:a")], [btn("⚙️ پنل ویژگی‌های جدید", "fx:a")], [btn("🔙 منوی اصلی", "home")]])
 
 
-async def extras(uid: int) -> tuple[bool, bool]:
-    from ..fx import draft as fx_draft, streamers as fx_streamers
-    return await fx_draft.is_on(), await fx_streamers.is_streamer(uid)
+async def extras(uid: int) -> tuple[bool, bool, bool]:
+    from ..fx import draft as fx_draft, streamers as fx_streamers, vpn as fx_vpn
+    vpn_on = fx_vpn.enabled() and bool(await fx_vpn.plans())          # shown only when the panel is connected and a plan exists
+    return await fx_draft.is_on(), await fx_streamers.is_streamer(uid), vpn_on
 
 
 @router.message(CommandStart())
