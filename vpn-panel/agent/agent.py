@@ -439,6 +439,21 @@ def ensure_forwarding(run=None):
             run("iptables", "-t", table, "-I" if table == "filter" else "-A", ch, *(["1"] if table == "filter" else []), *rule)
 
 
+# pppd 2.4.9 as built for Ubuntu rejects these serial-port options ("unrecognized option 'lock'") and exits at once,
+# which ends every L2TP session right after IPsec came up. Older installers wrote them to options.xl2tpd.
+PPP_BAD_OPTIONS = ("lock", "connect-delay")
+
+
+def fix_ppp_options(path="/etc/ppp/options.xl2tpd"):
+    """Drop options pppd cannot parse. True when the file changed (xl2tpd is then restarted by the hash check)."""
+    text = read_text(path)
+    if not text:
+        return False
+    keep = [l for l in text.splitlines() if (l.split() or [""])[0] not in PPP_BAD_OPTIONS]
+    new = "\n".join(keep) + "\n"
+    return new != text and write_if_changed(path, new, 0o644)
+
+
 def restart_on_config_change(service, paths, state_dir="/var/lib/vpn-node", do_restart=None):
     """Restart `service` once whenever its config files differ from what it was last restarted with.
     Covers services that apt started with default settings before our files existed. True if restarted."""
@@ -494,6 +509,7 @@ def apply(cfg, reality, tls, wg):
         else:
             sh("systemctl", "restart", "wg-quick@wg0")
     ensure_forwarding()
+    fix_ppp_options()
     restart_on_config_change("strongswan-starter", ["/etc/ipsec.conf"])
     restart_on_config_change("xl2tpd", ["/etc/xl2tpd/xl2tpd.conf", "/etc/ppp/options.xl2tpd"])
     restart_on_config_change("ocserv", ["/etc/ocserv/ocserv.conf"])

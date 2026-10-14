@@ -230,15 +230,19 @@ length bit = yes
 EOF2
 cat > /etc/ppp/options.xl2tpd <<'EOF2'
 require-mschap-v2
+refuse-pap
+refuse-chap
+refuse-mschap
 ms-dns 1.1.1.1
 ms-dns 8.8.8.8
 asyncmap 0
 auth
 mtu 1280
 mru 1280
-lock
 proxyarp
-connect-delay 5000
+noccp
+lcp-echo-failure 4
+lcp-echo-interval 30
 name l2tpd
 EOF2
 

@@ -606,3 +606,16 @@ def test_service_restarts_once_per_config_change():
     assert call() is False and len(restarted) == 1             # unchanged: not restarted again
     conf.write_text("conn l2tp-psk\nconn ikev2-eap\n")
     assert call() is True and len(restarted) == 2              # changed: restarted once more
+
+
+def test_pppd_options_that_break_l2tp_are_removed():
+    path = Path(tempfile.mkdtemp()) / "options.xl2tpd"
+    path.write_text("require-mschap-v2\nms-dns 1.1.1.1\nlock\nproxyarp\nconnect-delay 5000\nname l2tpd\n")
+    assert agent.fix_ppp_options(str(path)) is True
+    assert path.read_text() == "require-mschap-v2\nms-dns 1.1.1.1\nproxyarp\nname l2tpd\n"
+    assert agent.fix_ppp_options(str(path)) is False               # idempotent
+    assert agent.fix_ppp_options(str(path.parent / "missing")) is False
+    # the installer no longer writes them
+    installer = (ROOT / "agent" / "install.sh").read_text()
+    section = installer.split("options.xl2tpd <<'EOF2'")[1].split("EOF2")[0]
+    assert "lock" not in section.split() and "connect-delay" not in section
