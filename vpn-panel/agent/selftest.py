@@ -30,7 +30,7 @@ DEFAULT_PIN = ""   # set by main() from the node's own certificate
 def _stream(net, security, q, host):
     s = {"network": net, "security": security}
     if security == "reality":
-        s["realitySettings"] = {"serverName": q.get("sni", ""), "fingerprint": q.get("fp", "chrome"),
+        s["realitySettings"] = {"serverName": q.get("sni", ""), "fingerprint": os.environ.get("SELFTEST_FP") or q.get("fp", "chrome"),
                                 "publicKey": q.get("pbk", ""), "shortId": q.get("sid", "")}
     elif security == "tls":
         s["tlsSettings"] = {"serverName": q.get("sni") or host}
