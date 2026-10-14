@@ -3,11 +3,12 @@
 # Usage: bash <(curl -sL https://panel/node-install.sh) --token TOKEN --address node.example.com
 set -euo pipefail
 PANEL_URL="__PANEL_URL__"
-TOKEN=""; ADDRESS=""
+TOKEN=""; ADDRESS=""; LETSENCRYPT=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --token) TOKEN="$2"; shift 2 ;;
     --address) ADDRESS="$2"; shift 2 ;;
+    --letsencrypt) LETSENCRYPT=1; shift ;;
     *) echo "unknown option $1"; exit 1 ;;
   esac
 done
@@ -52,6 +53,38 @@ if [ ! -f "$CONF_DIR/tls.crt" ]; then
   openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 3650 \
     -subj "/CN=$ADDRESS" -addext "subjectAltName=$SAN" -keyout "$CONF_DIR/tls.key" -out "$CONF_DIR/tls.crt"
   chmod 644 "$CONF_DIR/tls.crt" "$CONF_DIR/tls.key"
+fi
+
+# Real certificate (domain only, needs DNS pointing here and port 80 free). Falls back to the self-signed one.
+if [ "$LETSENCRYPT" = 1 ] && [ ! -f "$CONF_DIR/.letsencrypt" ]; then
+  if [[ "$ADDRESS" =~ ^[0-9.]+$ ]]; then
+    echo "Let's Encrypt needs a domain, not an IP: keeping the self-signed certificate."
+  else
+    apt-get install -y certbot
+    LE="/etc/letsencrypt/live/$ADDRESS"
+    if certbot certonly --standalone -d "$ADDRESS" --non-interactive --agree-tos --register-unsafely-without-email; then
+      mkdir -p /etc/letsencrypt/renewal-hooks/deploy
+      cat > /etc/letsencrypt/renewal-hooks/deploy/vpn-node.sh <<HOOK
+#!/bin/sh
+cp $LE/fullchain.pem $CONF_DIR/tls.crt
+cp $LE/privkey.pem $CONF_DIR/tls.key
+chmod 644 $CONF_DIR/tls.crt $CONF_DIR/tls.key
+cp $CONF_DIR/tls.crt /etc/ipsec.d/certs/server.crt
+cp $CONF_DIR/tls.key /etc/ipsec.d/private/server.key
+systemctl restart xray sing-box ocserv 2>/dev/null
+ipsec restart 2>/dev/null
+exit 0
+HOOK
+      chmod 755 /etc/letsencrypt/renewal-hooks/deploy/vpn-node.sh
+      mkdir -p /etc/ipsec.d/certs /etc/ipsec.d/private
+      RENEWED_LINEAGE=$LE /etc/letsencrypt/renewal-hooks/deploy/vpn-node.sh
+      sed -i 's/"tls_self_signed": true/"tls_self_signed": false/' "$CONF_DIR/agent.json"
+      touch "$CONF_DIR/.letsencrypt"
+      echo "Let's Encrypt certificate installed for $ADDRESS."
+    else
+      echo "certbot failed (check DNS and that port 80 is open). Keeping the self-signed certificate."
+    fi
+  fi
 fi
 
 # WireGuard server key

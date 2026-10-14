@@ -1,5 +1,7 @@
 import base64
 import hashlib
+import sqlite3
+import tempfile
 import hmac
 import os
 import re
@@ -12,6 +14,7 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse, Response
+from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -90,12 +93,46 @@ class Login(BaseModel):
     password: str
 
 
+LOGIN_MAX_FAILS, LOGIN_WINDOW = 5, 900
+_login_fails: dict[str, list[float]] = {}
+
+
+def client_ip(request: Request) -> str:
+    # Caddy (the only thing exposed) sets X-Forwarded-For to the real client address
+    fwd = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+    return fwd or (request.client.host if request.client else "?")
+
+
 @app.post("/api/login")
-def login(body: Login):
+def login(body: Login, request: Request):
+    ip, now = client_ip(request), time.time()
+    recent = [t for t in _login_fails.get(ip, []) if now - t < LOGIN_WINDOW]
+    if len(recent) >= LOGIN_MAX_FAILS:
+        raise HTTPException(429, "تلاش‌های اشتباه زیاد بود؛ ۱۵ دقیقه بعد دوباره امتحان کنید")
     if not hmac.compare_digest(body.password, admin_password()):
+        if len(_login_fails) > 10000:  # bound memory
+            _login_fails.clear()
+        _login_fails[ip] = recent + [now]
         time.sleep(1)  # slow down guessing
         raise HTTPException(401, "رمز اشتباه است")
+    _login_fails.pop(ip, None)
     return {"token": make_token()}
+
+
+@app.get("/api/backup", dependencies=[Depends(require_admin)])
+def backup():
+    """Consistent copy of the SQLite database (safe while the panel is running)."""
+    if engine.url.get_backend_name() != "sqlite":
+        raise HTTPException(501, "پشتیبان‌گیری فقط برای SQLite پشتیبانی می‌شود")
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    src, dst = sqlite3.connect(engine.url.database), sqlite3.connect(path)
+    with dst:
+        src.backup(dst)
+    src.close(); dst.close()
+    name = f"panel-backup-{utcnow():%Y%m%d-%H%M}.db"
+    return FileResponse(path, filename=name, media_type="application/octet-stream",
+                        background=BackgroundTask(os.unlink, path))
 
 
 # ---------- helpers ----------
@@ -121,7 +158,8 @@ def node_out(node: Node, request: Request) -> dict:
         "last_seen": node.last_seen.isoformat() + "Z" if node.last_seen else None,
         "protocols": [{"proto": p.proto, "enabled": p.enabled, "port": p.port,
                        "fixed": PROTOCOLS[p.proto]["fixed_port"]} for p in node.protocols],
-        "install_command": f"bash <(curl -sL {url}/node-install.sh) --token {node.token} --address {node.address}",
+        "install_command": f"bash <(curl -sL {url}/node-install.sh) --token {node.token} --address {node.address}"
+                           + ("" if node.address.replace(".", "").isdigit() else " --letsencrypt"),
     }
 
 
@@ -333,7 +371,9 @@ def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db
             users.append({"name": u.name, "uuid": u.uuid, "password": u.password,
                           "ss_key": user_ss_key(u.uuid), "wg_pub": u.wg_public,
                           "wg_ip": wg_ip(u.id), "protos": protos})
-    return {"node": {"name": node.name, "reality_sni": REALITY_SNI, "ss_method": SS_METHOD,
+    agent_sha = hashlib.sha256((ROOT / "agent" / "agent.py").read_bytes()).hexdigest()
+    return {"agent_sha256": agent_sha,
+            "node": {"name": node.name, "reality_sni": REALITY_SNI, "ss_method": SS_METHOD,
                      "ss_key": node.ss_key, "l2tp_psk": node.l2tp_psk},
             "protocols": enabled, "users": users}
 

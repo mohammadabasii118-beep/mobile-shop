@@ -166,6 +166,13 @@ document.addEventListener('click', async e => {
   try {
     if (d.tab) { S.tab = d.tab; render(); }
     else if (t.id === 'themeBtn') { const r = document.documentElement; r.dataset.theme = getComputedStyle(r).colorScheme.includes('dark') ? 'light' : 'dark'; }
+    else if (t.id === 'backupBtn') {
+      const r = await fetch('/api/backup', {headers: {Authorization: 'Bearer ' + token}});
+      if (!r.ok) throw new Error('پشتیبان‌گیری ناموفق بود');
+      const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob());
+      a.download = (r.headers.get('content-disposition') || '').split('filename=')[1]?.replace(/"/g, '') || 'panel-backup.db';
+      a.click(); URL.revokeObjectURL(a.href); toast('پشتیبان دانلود شد');
+    }
     else if (t.id === 'logoutBtn') { token = ''; try { localStorage.removeItem('tok'); } catch (_) {} showLogin(); }
     else if (t.id === 'doLogin') {
       const r = await api('POST', '/login', {password: $('#pw').value}); token = r.token;

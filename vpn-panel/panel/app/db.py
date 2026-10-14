@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, ForeignKey, create_engine
+from sqlalchemy import JSON, ForeignKey, create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship
 
 engine = create_engine(os.environ.get("PANEL_DB", "sqlite:///./panel.db"),
@@ -73,8 +73,39 @@ class User(Base):
         return "active"
 
 
+def _server_default(col) -> str:
+    """DEFAULT clause so ALTER TABLE ADD COLUMN works on rows that already exist."""
+    if isinstance(col.type, JSON):
+        return " DEFAULT '[]'"
+    default = col.default.arg if col.default is not None and col.default.is_scalar else None
+    if isinstance(default, bool):
+        return f" DEFAULT {int(default)}"
+    if isinstance(default, (int, float)):
+        return f" DEFAULT {default}"
+    if isinstance(default, str):
+        return " DEFAULT '" + default.replace("'", "''") + "'"
+    if col.nullable:
+        return ""
+    return " DEFAULT ''" if col.type.python_type is str else " DEFAULT 0"
+
+
+def migrate() -> None:
+    """Add columns that newer code expects but an older database lacks (no drops or type changes)."""
+    insp = inspect(engine)
+    with engine.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            if not insp.has_table(table.name):
+                continue
+            have = {c["name"] for c in insp.get_columns(table.name)}
+            for col in table.columns:
+                if col.name not in have:
+                    ddl = col.type.compile(engine.dialect)
+                    conn.execute(text(f'ALTER TABLE "{table.name}" ADD COLUMN "{col.name}" {ddl}{_server_default(col)}'))
+
+
 def init_db() -> None:
     Base.metadata.create_all(engine)
+    migrate()
 
 
 def get_db():

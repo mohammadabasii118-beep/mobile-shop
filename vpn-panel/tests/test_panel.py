@@ -276,3 +276,71 @@ def test_edit_and_renew_user():
         patch({"days": 0})
         assert patch({"extend_days": 5}).status_code == 422
         assert patch({"days": 3, "extend_days": 5}).json()["days_left"] in (7, 8)
+
+
+def test_login_lockout():
+    with TestClient(app) as c:
+        h = {"x-forwarded-for": "203.0.113.9"}
+        for _ in range(5):
+            assert c.post("/api/login", headers=h, json={"password": "bad"}).status_code == 401
+        # locked, even with the right password
+        assert c.post("/api/login", headers=h, json={"password": "secret-pw"}).status_code == 429
+        # another address is unaffected
+        assert c.post("/api/login", headers={"x-forwarded-for": "198.51.100.1"}, json={"password": "secret-pw"}).status_code == 200
+
+
+def test_backup_is_a_valid_sqlite_copy():
+    with TestClient(app) as c:
+        h = admin(c)
+        c.post("/api/users", headers=h, json={"name": "backed_up", "protos": ["vless"]})
+        assert c.get("/api/backup").status_code == 401
+        r = c.get("/api/backup", headers=h)
+        assert r.status_code == 200 and r.content.startswith(b"SQLite format 3")
+        import sqlite3
+        path = Path(tempfile.mkdtemp()) / "copy.db"
+        path.write_bytes(r.content)
+        assert ("backed_up",) in sqlite3.connect(path).execute("select name from users").fetchall()
+
+
+def test_migration_adds_missing_columns():
+    import sqlite3
+    from sqlalchemy import create_engine
+    import app.db as dbm
+    path = Path(tempfile.mkdtemp()) / "old.db"
+    old = sqlite3.connect(path)  # a database from before WireGuard/Cloudflare/OpenVPN columns existed
+    old.execute("CREATE TABLE nodes (id INTEGER PRIMARY KEY, name VARCHAR NOT NULL, cc VARCHAR NOT NULL, address VARCHAR NOT NULL,"
+                " token VARCHAR NOT NULL, ss_key VARCHAR NOT NULL, l2tp_psk VARCHAR NOT NULL, last_seen DATETIME, load INTEGER,"
+                " reality_pub VARCHAR, reality_sid VARCHAR, tls_self_signed BOOLEAN)")
+    old.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, name VARCHAR NOT NULL, sub_token VARCHAR NOT NULL, uuid VARCHAR NOT NULL,"
+                " password VARCHAR NOT NULL, quota_bytes INTEGER, used_bytes INTEGER, expire_at DATETIME, enabled BOOLEAN,"
+                " protos JSON, node_ids JSON)")
+    old.execute("INSERT INTO users (name, sub_token, uuid, password, protos, node_ids) VALUES ('old','t','u','p','[\"vless\"]','[]')")
+    old.commit(); old.close()
+    saved = dbm.engine
+    dbm.engine = create_engine(f"sqlite:///{path}")
+    try:
+        dbm.init_db()
+        cols = {r[1] for r in sqlite3.connect(path).execute("pragma table_info(users)")}
+        ncols = {r[1] for r in sqlite3.connect(path).execute("pragma table_info(nodes)")}
+        assert {"wg_private", "wg_public"} <= cols and {"cf_domain", "cf_address", "wg_pub", "ovpn_ca"} <= ncols
+        from sqlalchemy.orm import Session
+        with Session(dbm.engine) as s:
+            u = s.query(dbm.User).one()
+            assert u.name == "old" and u.wg_private == "" and u.protos == ["vless"]
+        dbm.init_db()  # running it again changes nothing
+    finally:
+        dbm.engine = saved
+
+
+def test_node_config_advertises_agent_hash():
+    import hashlib
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "H", "cc": "de", "address": "h.example.com"}).json()
+        assert node["install_command"].endswith(" --letsencrypt")   # domain -> real certificate
+        ip_node = c.post("/api/nodes", headers=h, json={"name": "I", "cc": "de", "address": "5.6.7.8"}).json()
+        assert "--letsencrypt" not in ip_node["install_command"]
+        nh = {"Authorization": "Bearer " + node["install_command"].split("--token ")[1].split()[0]}
+        sha = c.get("/api/node/config", headers=nh).json()["agent_sha256"]
+        assert sha == hashlib.sha256((ROOT / "agent" / "agent.py").read_bytes()).hexdigest()
+        assert hashlib.sha256(c.get("/node/agent.py").content).hexdigest() == sha

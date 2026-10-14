@@ -2,6 +2,7 @@
 """Node agent. Pulls the desired state from the panel, renders configs for
 Xray, sing-box and strongSwan/xl2tpd, reloads the services that changed, and
 reports load and per-user traffic back. Standard library only."""
+import hashlib
 import json
 import os
 import subprocess
@@ -180,6 +181,25 @@ def xray_usage():
     return usage
 
 
+def self_update(conf, expected_sha):
+    """Replace this file with the panel's agent.py when its hash differs, then restart in place."""
+    me = os.path.abspath(__file__)
+    with open(me, "rb") as f:
+        if not expected_sha or hashlib.sha256(f.read()).hexdigest() == expected_sha:
+            return
+    req = urllib.request.Request(conf["panel_url"].rstrip("/") + "/node/agent.py")
+    with urllib.request.urlopen(req, timeout=30) as r:
+        data = r.read()
+    if hashlib.sha256(data).hexdigest() != expected_sha:
+        return  # panel served something other than it advertised; keep the working agent
+    compile(data, me, "exec")  # never install a file that does not parse
+    with open(me + ".new", "wb") as f:
+        f.write(data)
+    os.replace(me + ".new", me)
+    print("agent updated, restarting", flush=True)
+    os.execv(sys.executable, [sys.executable, me])
+
+
 def cpu_load_percent():
     return min(100, int(os.getloadavg()[0] / (os.cpu_count() or 1) * 100))
 
@@ -274,6 +294,7 @@ def main():
     while True:
         try:
             cfg = api(conf, "GET", "/api/node/config")
+            self_update(conf, cfg.get("agent_sha256"))
             apply(cfg, reality, tls, wg)
             for src in (xray_usage(), wg_usage(cfg) if wg else {}):
                 for k, v in src.items():
