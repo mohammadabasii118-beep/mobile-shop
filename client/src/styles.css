@@ -614,8 +614,10 @@ html, body, #root, .app, .screen, .battle, .admin { overscroll-behavior: none; }
 /* دوستان */
 /* مولتی‌پلیر دو تکه: سمت راست «دوستانه»، سمت چپ «آنلاین» */
 .modes2 { display: flex; gap: 10px; }
-.modes2 .mode { flex: 1; min-width: 0; padding: 10px 12px; gap: 8px; flex-direction: column; justify-content: center; min-height: 96px; }
+.modes2 .mode { flex: 1; min-width: 0; padding: 10px 12px; gap: 8px; min-height: 76px; }
 .modes2 .mtitle { font-size: 22px; }
+.modes2 .medal8 { transform: scale(.8); margin: -4px; }
+.modes2 .mode .fee { transform: scale(.8); margin-inline: -6px; }
 .mode.friend { --m1: #2fb59a; --m2: #17705f; --m3: #08362e; --edge: #052018; }
 .frbtn { top: 46px; }
 .reflink { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; padding: 10px; border-radius: 12px; background: rgba(255,255,255,.07); }
