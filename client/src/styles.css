@@ -532,7 +532,7 @@ html, body, #root, .app, .screen, .battle, .admin { overscroll-behavior: none; }
 .coinp .pico .i { width: 26px; height: 26px; stroke-width: 2.2; }
 .gemp .pico { background: radial-gradient(circle at 50% 40%, rgba(255,120,140,.35), rgba(255,255,255,0) 70%); }
 .gemi.big { width: 34px; height: 34px; }
-.empty { grid-column: 1 / -1; text-align: center; color: var(--muted); margin: 6px 0; }
+.shopempty { grid-column: 1 / -1; text-align: center; color: var(--muted); margin: 6px 0; }
 .myorders { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
 .myorders small { color: var(--muted); }
 .ord { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; padding: 6px 10px; border-radius: 10px; background: rgba(255,255,255,.06); }

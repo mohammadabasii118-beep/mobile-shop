@@ -108,7 +108,7 @@ export function Shop({ ctx }: { ctx: Ctx }) {
               </div>
             );
           })}
-          {offers.length === 0 && <p className="empty">امروز پیشنهادی نیست.</p>}
+          {offers.length === 0 && <p className="shopempty">امروز پیشنهادی نیست.</p>}
         </div>
       </section>
 
@@ -122,7 +122,7 @@ export function Shop({ ctx }: { ctx: Ctx }) {
               <button className="pbtn gem" disabled={busy || p.gems < k.gems} onClick={() => void buyCoins(k.id)}><Gem /> <b className="num">{fa(k.gems)}</b></button>
             </div>
           ))}
-          {cfg.shop.coinPacks.length === 0 && <p className="empty">فعلاً بسته‌ای نیست.</p>}
+          {cfg.shop.coinPacks.length === 0 && <p className="shopempty">فعلاً بسته‌ای نیست.</p>}
         </div>
       </section>
 
@@ -139,7 +139,7 @@ export function Shop({ ctx }: { ctx: Ctx }) {
               </div>
             </div>
           ))}
-          {cfg.shop.gemPacks.length === 0 && <p className="empty">فعلاً بسته‌ای نیست.</p>}
+          {cfg.shop.gemPacks.length === 0 && <p className="shopempty">فعلاً بسته‌ای نیست.</p>}
         </div>
         {st && st.orders.length > 0 && (
           <div className="myorders">
