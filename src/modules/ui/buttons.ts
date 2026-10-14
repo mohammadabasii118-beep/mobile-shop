@@ -17,7 +17,7 @@ export const UI_BUTTONS: { key: string; label: string; group: string; style?: Bt
   { key: 'menu:rules', label: 'قوانین', group: 'منوی اصلی' },
   { key: 'menu:partner', label: 'همکاری', group: 'منوی اصلی' },
   { key: 'buy', label: 'دکمه‌ی هر محصول (لیست خرید)', group: 'خرید', style: 'success' },
-  { key: 'bc', label: 'دکمه‌ی دسته‌بندی‌ها (لیست خرید)', group: 'خرید' },
+  { key: 'bc', label: 'دکمه‌ی دسته‌بندی‌ها (لیست خرید)', group: 'خرید', style: 'primary' },
   { key: 'bo', label: 'پرداخت کارت‌به‌کارت', group: 'خرید', style: 'success' },
   { key: 'adm:dash', label: 'داشبورد', group: 'پنل مدیریت (ربات)', style: 'primary' },
   { key: 'adm:g:fin', label: 'فروش و مالی', group: 'پنل مدیریت (ربات)' },
