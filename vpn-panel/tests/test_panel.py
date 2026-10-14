@@ -452,3 +452,16 @@ def test_panel_stores_and_shows_port_conflicts():
         assert got["conflicts"] == ["tcp/443 xray-linux-amd6 (vless)"]
         c.post("/api/node/report", headers=nh, json={"conflicts": []})   # resolved -> cleared
         assert next(n for n in c.get("/api/nodes", headers=h).json() if n["id"] == node["id"])["conflicts"] == []
+
+
+def test_self_signed_tls_links_carry_insecure_flags():
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "SS", "cc": "de", "address": "9.9.9.9"}).json()
+        user = c.post("/api/users", headers=h, json={"name": "insec", "protos": ["vmess_ws", "vless_ws", "trojan", "vless"],
+                                                      "node_ids": [node["id"]]}).json()
+        rows = {e["proto"]: e for e in c.get(f"/api/users/{user['id']}/configs", headers=h).json()}
+        vm = json.loads(base64.b64decode(rows["vmess_ws"]["link"][8:]))
+        assert vm["allowInsecure"] == 1 and vm["insecure"] == "1"
+        for proto in ("vless_ws", "trojan"):
+            assert "allowInsecure=1&insecure=1" in rows[proto]["link"]

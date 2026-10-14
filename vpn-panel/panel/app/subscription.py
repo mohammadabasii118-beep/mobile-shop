@@ -34,7 +34,7 @@ def _b64url(s: str) -> str:
 
 
 def _tls_q(host: str, insecure: bool) -> str:
-    return f"security=tls&sni={host}" + ("&allowInsecure=1" if insecure else "")
+    return f"security=tls&sni={host}" + ("&allowInsecure=1&insecure=1" if insecure else "")
 
 
 def _manual(entry: dict, fields: dict, text: str | None = None) -> dict:
@@ -76,7 +76,7 @@ def build_entry(user: User, node: Node, proto: str, port: int, cdn: bool = False
         cfg = {"v": "2", "ps": f"{node.name}-{label}", "add": conn, "port": str(port), "id": user.uuid,
                "aid": "0", "scy": "auto", "net": "ws" if ws else "tcp", "type": "none", "host": host if ws else "",
                "path": WS_PATHS[proto] if ws else "", "tls": "tls", "sni": host,
-               "allowInsecure": 1 if insecure else 0}
+               "allowInsecure": 1 if insecure else 0, "insecure": "1" if insecure else "0"}
         e["link"] = "vmess://" + base64.b64encode(json.dumps(cfg).encode()).decode()
     elif proto == "trojan":
         e["link"] = f"trojan://{quote(user.password)}@{conn}:{port}?{tls}#{tag}"
