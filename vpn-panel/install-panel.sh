@@ -20,6 +20,17 @@ while [ $# -gt 0 ]; do
 done
 [ "$(id -u)" = 0 ] || { echo "run as root"; exit 1; }
 
+# A fresh server often runs automatic updates for a few minutes and holds the apt lock
+wait_for_apt() {
+  local i=0
+  while pgrep -x apt-get >/dev/null || pgrep -x apt >/dev/null || pgrep -x dpkg >/dev/null || pgrep -f unattended-upgr >/dev/null; do
+    [ $i -eq 0 ] && echo "Waiting for another apt process to finish (automatic updates)..."
+    i=$((i+1)); [ $i -gt 120 ] && { echo "apt is still busy after 10 minutes; try again later"; exit 1; }
+    sleep 5
+  done
+}
+
+wait_for_apt
 command -v git >/dev/null || { apt-get update -y && apt-get install -y git curl openssl; }
 if [ -z "${SKIP_DOCKER:-}" ] && ! command -v docker >/dev/null; then
   curl -fsSL https://get.docker.com | sh
