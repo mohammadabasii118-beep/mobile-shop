@@ -404,7 +404,6 @@ section.sec.tight-top { padding-top: 0; }
 .empty { display: grid; justify-items: center; text-align: center; gap: 10px; padding: 56px 16px; color: var(--mute); }
 .empty svg.big { width: 64px; height: 64px; stroke-width: 1.2; color: var(--stone); }
 .empty h2, .empty h3 { font-size: 18px; color: var(--ink); }
-.my-phone { background: var(--action-soft); border-radius: var(--r-md); padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: var(--ink); display: flex; gap: 10px; align-items: center; }
 
 /* ───────── صفحه‌ی محصول ───────── */
 .pdp { display: grid; gap: 24px; padding-bottom: 48px; }

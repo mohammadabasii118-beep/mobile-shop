@@ -6,7 +6,6 @@ import { fa, normText, toInt } from '@/lib/format';
 import ProductGrid from './ProductGrid';
 import Filters from './Filters';
 import SortSelect from './SortSelect';
-import MyPhone from './MyPhone';
 
 export type SP = Record<string, string | string[] | undefined>;
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? '';
@@ -78,7 +77,6 @@ export default function Listing({
         }}
       />
       <div>
-        {!f.model && phoneModels.length > 0 && <MyPhone models={phoneModels} basePath={basePath} />}
         <div className="toolbar">
           <span className="total num">{fa(total)} کالا</span>
           <SortSelect value={f.sort} />
