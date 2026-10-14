@@ -308,7 +308,7 @@ export function adminHandlers() {
   }
 
   const toggleKeys: SettingKey[] = ['card.enabled', 'verification.mode', 'verification.allowReceiptOnlyAutoApprove', 'risk.highAction'];
-  const editKeys: SettingKey[] = ['card.holder', 'card.number', 'card.bank', 'card.instructions', 'risk.mediumAt', 'risk.highAt', 'provisioning.maxRetries', 'notify.expiryDays', 'verification.provider'];
+  const editKeys: SettingKey[] = ['card.holder', 'card.number', 'card.bank', 'card.instructions', 'risk.mediumAt', 'risk.highAt', 'provisioning.maxRetries', 'notify.expiryDays', 'notify.trafficPercent', 'verification.provider'];
   const TOGGLE: Record<string, [string, string]> = { 'verification.mode': ['AUTO_VERIFICATION', 'MANUAL_REVIEW'], 'risk.highAction': ['MANUAL_REVIEW', 'REJECT'] };
 
   async function settingsView(ctx: Ctx) {

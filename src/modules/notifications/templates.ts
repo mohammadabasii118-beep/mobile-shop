@@ -34,6 +34,11 @@ export async function delivery(s: VpnService, p: Product, kind: 'created' | 'ren
 export const expiring = async (name: string, days: number, expiresAt: Date) =>
   (await loadTexts()).html('msg.expiring', { service: name, days: fa(days), date: jdatetime(expiresAt) });
 
+export const trafficLow = async (name: string, usedPct: number, left: bigint) =>
+  (await loadTexts()).html('msg.traffic_low', { service: name, used: fa(usedPct), left: gb(left) });
+
+export const trafficOver = async (name: string) => (await loadTexts()).html('msg.traffic_over', { service: name });
+
 export const expired = async (name: string) => (await loadTexts()).html('msg.expired', { service: name });
 
 export const ticketAnswer = (id: string, text: string) =>

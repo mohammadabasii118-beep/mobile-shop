@@ -44,10 +44,35 @@ export async function syncService(id: string): Promise<VpnService | null> {
   if (expiresAt.getTime() <= Date.now() || exhausted) status = 'EXPIRED';
   else if (!st.enabled && s.status !== 'SUSPENDED') status = 'EXPIRED'; // panel disabled it
   else if (st.enabled && s.status === 'EXPIRED') status = 'ACTIVE';
-  return prisma.vpnService.update({
+  const updated = await prisma.vpnService.update({
     where: { id },
     data: { trafficUsed: st.used, trafficLimit: st.trafficLimit > 0n ? st.trafficLimit : s.trafficLimit, expiresAt, status, lastSyncAt: new Date() },
   });
+  try { await notifyTraffic(updated.id); } catch (e: any) { logger.warn({ id, err: String(e?.message) }, 'traffic notice failed'); }
+  return updated;
+}
+
+/** Warn once per threshold (and once when the data is finished). Flags live next to the expiry ones and are reset on renewal. */
+export async function notifyTraffic(id: string): Promise<boolean> {
+  const s = await prisma.vpnService.findUnique({ where: { id }, include: { product: true } });
+  if (!s || s.provisioningStatus !== 'SUCCESS' || (s.status !== 'ACTIVE' && s.status !== 'EXPIRED') || s.trafficLimit <= 0n) return false;
+  if (s.expiresAt.getTime() <= Date.now()) return false; // the expiry notice covers it
+  const flags = ((s.expiryNotified as Record<string, boolean> | null) ?? {});
+  const pct = Number((s.trafficUsed * 10000n) / s.trafficLimit) / 100;
+  const buttons = [[{ text: '🔄 تمدید', data: `sv:renew:${s.id}` }]];
+  if (pct >= 100) {
+    if (flags.t100) return false;
+    await prisma.vpnService.update({ where: { id }, data: { expiryNotified: { ...flags, t100: true } } });
+    await notifyUser(s.userId, 'vpn_traffic_over', await T.trafficOver(s.product.name), { html: true, buttons, dedupeKey: `traffic:${s.id}:100:${s.trafficLimit}` });
+    return true;
+  }
+  const thresholds = (await getNumberList('notify.trafficPercent')).filter((p) => p > 0 && p < 100).sort((a, b) => b - a);
+  const due = thresholds.filter((p) => pct >= p && !flags[`t${p}`]);
+  if (!due.length) return false;
+  const p = Math.max(...due); // only the highest crossed threshold is sent
+  await prisma.vpnService.update({ where: { id }, data: { expiryNotified: { ...flags, ...Object.fromEntries(due.map((x) => [`t${x}`, true])) } } });
+  await notifyUser(s.userId, 'vpn_traffic_low', await T.trafficLow(s.product.name, Math.floor(pct), s.trafficLimit - s.trafficUsed), { html: true, buttons, dedupeKey: `traffic:${s.id}:${p}:${s.trafficLimit}` });
+  return true;
 }
 
 export async function syncAllServices(): Promise<{ ok: number; failed: number }> {

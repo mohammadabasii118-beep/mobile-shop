@@ -202,6 +202,23 @@ describe('lifecycle: sync / expiry / suspend / delete', () => {
     expect(acts).toEqual(expect.arrayContaining(['vpn.suspend', 'vpn.resume', 'vpn.delete']));
   });
 
+  it('traffic warnings: once per threshold, then a finished notice', async () => {
+    const { svc } = await active(); // 50 GB plan
+    const count = (needle: string) => ctx.sent.filter((m) => m.text.includes(needle)).length;
+    ctx.vpn.clients.get(svc.externalId)!.down = 30n * GB;
+    await syncService(svc.id);
+    expect(count('رو به پایان')).toBe(0);
+    ctx.vpn.clients.get(svc.externalId)!.down = 41n * GB; // 82%
+    await syncService(svc.id); await syncService(svc.id);
+    expect(count('حجم سرویس شما رو به پایان')).toBe(1);
+    ctx.vpn.clients.get(svc.externalId)!.down = 48n * GB; // 96%
+    await syncService(svc.id); await syncService(svc.id);
+    expect(count('حجم سرویس شما رو به پایان')).toBe(2);
+    ctx.vpn.clients.get(svc.externalId)!.down = 51n * GB;
+    await syncService(svc.id); await syncService(svc.id);
+    expect(count('حجم سرویس شما تمام شد')).toBe(1);
+  });
+
   it('expiry notifications fire once per threshold; expiry marks EXPIRED', async () => {
     const { svc } = await active();
     await prisma.vpnService.update({ where: { id: svc.id }, data: { expiresAt: new Date(Date.now() + 2.5 * 86_400_000) } });

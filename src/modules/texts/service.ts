@@ -19,6 +19,8 @@ const V = {
   days: { label: 'روز باقی‌مانده', sample: '۳' },
   date: { label: 'تاریخ انقضا', sample: '۹ آبان ۱۴۰۵' },
   percent: { label: 'درصد تخفیف', sample: '۲۰' },
+  used: { label: 'درصد مصرف‌شده', sample: '۸۰' },
+  left: { label: 'حجم باقی‌مانده', sample: '۱۰ GB' },
 } satisfies Record<string, VarSpec>;
 
 export const TEXT_DEFS = {
@@ -53,6 +55,10 @@ export const TEXT_DEFS = {
     default: `❌ *پرداخت شما تأیید نشد*\n${RULE}\nسفارش {order}\nدلیل: {reason}\n\nاگر پرداخت انجام داده‌اید، رسید درست را دوباره ارسال کنید یا با پشتیبانی در ارتباط باشید.` },
   'msg.expiring': { label: 'پیام: نزدیک انقضا', group: 'اعلان‌ها', max: 700, vars: { service: V.service, days: V.days, date: V.date },
     default: `⏳ *سرویس شما رو به پایان است*\n${RULE}\n📦 {service}\nحدود {days} روز دیگر ({date}) منقضی می‌شود.\nبرای جلوگیری از قطعی، همین حالا تمدید کنید.` },
+  'msg.traffic_low': { label: 'پیام: حجم رو به پایان', group: 'اعلان‌ها', max: 700, vars: { service: V.service, used: V.used, left: V.left },
+    default: `📊 *حجم سرویس شما رو به پایان است*\n${RULE}\n📦 {service}\n{used}٪ حجم مصرف شده و حدود {left} باقی مانده است.\nبرای جلوگیری از قطع شدن، حجم را تمدید کنید.` },
+  'msg.traffic_over': { label: 'پیام: حجم تمام شد', group: 'اعلان‌ها', max: 700, vars: { service: V.service },
+    default: `⛔ *حجم سرویس شما تمام شد*\n${RULE}\n📦 {service}\nبا تمدید، سرویس دوباره فعال می‌شود.` },
   'msg.expired': { label: 'پیام: سرویس منقضی شد', group: 'اعلان‌ها', max: 700, vars: { service: V.service },
     default: `⛔ *سرویس شما منقضی شد*\n${RULE}\n📦 {service} منقضی شده است.\nبا تمدید، همان لینک قبلی دوباره فعال می‌شود.` },
 

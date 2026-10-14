@@ -22,6 +22,7 @@ export const SETTING_DEFAULTS = {
   'provisioning.backoffSeconds': () => '60,300,900,1800,3600',
   'provisioning.processingTimeoutSeconds': () => '300',
   'notify.expiryDays': () => '3,1',
+  'notify.trafficPercent': () => '80,95', // warn when this % of the data is used (the "finished" notice is always sent)
   'xui.defaultInboundId': () => '',
   'orders.expireMinutes': () => '1440',
   'notify.newUser': () => 'true', // tell admins when someone starts the bot for the first time
