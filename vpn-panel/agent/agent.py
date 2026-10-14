@@ -347,6 +347,11 @@ def wg_usage(cfg):
     return usage
 
 
+def restart(service):
+    sh("systemctl", "reset-failed", service)  # after repeated crashes systemd refuses to start it again
+    sh("systemctl", "restart", service)
+
+
 def apply_port(path, values, service):
     """Rewrite listen ports in a service's config and restart it when they changed."""
     text = read_text(path)
@@ -356,15 +361,15 @@ def apply_port(path, values, service):
             new = set_conf_value(new, key, port)
     if text and new != text:
         write_if_changed(path, new, 0o644)
-        sh("systemctl", "restart", service)
+        restart(service)
 
 
 def apply(cfg, reality, tls, wg):
     xray_cfg = json.dumps(render_xray(cfg, reality, tls), indent=1)
     if write_if_changed("/usr/local/etc/xray/config.json", xray_cfg, 0o644):
-        sh("systemctl", "restart", "xray")
+        restart("xray")
     if write_if_changed("/etc/sing-box/config.json", json.dumps(render_singbox(cfg, tls), indent=1), 0o644):
-        sh("systemctl", "restart", "sing-box")
+        restart("sing-box")
     l2 = render_l2tp(cfg)
     write_if_changed("/etc/ppp/chap-secrets", l2["chap_secrets"])  # read by pppd per login, no reload
     if write_if_changed("/etc/ipsec.secrets", l2["ipsec_secrets"]):

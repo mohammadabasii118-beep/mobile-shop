@@ -286,6 +286,21 @@ systemctl daemon-reload
 systemctl disable --now ocserv.socket 2>/dev/null || true
 systemctl enable --now strongswan-starter xl2tpd xray sing-box wg-quick@wg0 openvpn-server@server ocserv vpn-node-nat vpn-node-agent || true
 echo
+# Ports that another program (for example x-ui) already holds: the matching protocol cannot start there
+find_busy() {   # reads `ss -H -ltnup`; prints "proto/port program" for ports we need that a foreign program holds
+  awk '
+    BEGIN { n = split("tcp:443 tcp:2053 tcp:2083 tcp:2087 tcp:2096 tcp:2097 tcp:2098 tcp:8443 tcp:8388 tcp:4443 udp:36712 udp:8444 udp:51820 udp:1194", w, " "); for (i = 1; i <= n; i++) want[w[i]] = 1 }
+    { split($5, a, ":"); port = a[length(a)]; name = $7; sub(/^[^"]*"/, "", name); sub(/".*/, "", name)
+      if ((($1 ":" port) in want) && name !~ /^(xray|sing-box|openvpn|ocserv|ocserv-main|ocserv-worker)$/ && name != "") print $1 "/" port " " name }'
+}
+BUSY=$(ss -H -ltnup 2>/dev/null | find_busy | sort -u || true)
+if [ -n "$BUSY" ]; then
+  echo
+  echo "WARNING: these ports are already used by another program, so the matching protocol will not start:"
+  echo "$BUSY" | sed 's/^/  /'
+  echo "Change the port in the panel (Protocols -> Ports) or stop the other program (for example x-ui)."
+fi
+echo
 echo "Done. Open these ports in the provider firewall:"
 echo "  TCP 443, 2053, 2083, 2087, 2096, 2097, 2098, 8443, 8388, 4443"
 echo "  UDP 8388, 36712, 8444, 51820, 1194, 4443, 500, 4500, 1701"
