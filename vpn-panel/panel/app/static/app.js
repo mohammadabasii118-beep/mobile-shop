@@ -72,7 +72,7 @@ const views = {
         <td><div style="display:flex;gap:8px;align-items:center"><div class="bar"><i class="${loadCls(pc)}" style="width:${pc}%"></i></div><span class="muted">${fmtGB(u.used_gb)}/${u.quota_gb ? fmtGB(u.quota_gb) : '∞'} GB</span></div></td>
         <td>${u.days_left === null ? 'نامحدود' : u.days_left + ' روز'}</td><td>${u.protos.map(p => `<span class="cc">${esc(protoLabel(p))}</span>`).join('')}</td>
         <td><span class="pill ${st[0]}">${st[1]}</span></td>
-        <td><button class="btn sm" data-cfg="${u.id}">کانفیگ‌ها</button> <button class="btn sm" data-edit="${u.id}">ویرایش</button> <button class="btn sm" data-toggle="${u.id}">${u.enabled ? 'غیرفعال' : 'فعال'}</button> <button class="btn sm" data-deluser="${u.id}">حذف</button></td></tr>`; }).join('')
+        <td><button class="btn sm" data-copy="${esc(u.sub_url)}">کپی لینک اشتراک</button> <button class="btn sm" data-cfg="${u.id}">کانفیگ‌ها</button> <button class="btn sm" data-edit="${u.id}">ویرایش</button> <button class="btn sm" data-toggle="${u.id}">${u.enabled ? 'غیرفعال' : 'فعال'}</button> <button class="btn sm" data-deluser="${u.id}">حذف</button></td></tr>`; }).join('')
         || '<tr><td colspan="6" class="muted">کاربری وجود ندارد.</td></tr>'}</tbody></table></div>`;
   },
 };
@@ -135,7 +135,7 @@ function editDialog(u) {
     <div><div class="muted" style="margin-bottom:6px">لوکیشن‌ها (هیچ‌کدام = همه)</div><div class="chips" id="eNodes">
       ${S.nodes.map(n => `<label><input type="checkbox" value="${n.id}" ${u.node_ids.includes(n.id) ? 'checked' : ''}>${esc(n.cc)} ${esc(n.name)}</label>`).join('')}</div></div>
     <div><div class="muted" style="margin-bottom:6px">پروتکل‌ها</div><div class="chips" id="eProtos">
-      ${S.protos.map(p => `<label><input type="checkbox" value="${p.id}" ${u.protos.includes(p.id) ? 'checked' : ''}>${esc(p.label)}</label>`).join('')}</div></div>
+      ${S.protos.map(p => `<label><input type="checkbox" value="${p.id}" ${u.protos.includes(p.id) ? 'checked' : ''}>${esc(p.label)}${p.counted ? '' : ' <span class="muted">(حجم شمرده نمی‌شود)</span>'}</label>`).join('')}</div></div>
     <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap"><button class="btn sm" data-resetusage="${u.id}">ریست مصرف</button>
       <span><button class="btn" data-close>انصراف</button> <button class="btn pri" id="eSave" data-id="${u.id}">ذخیره</button></span></div>`);
 }
@@ -147,7 +147,8 @@ function userForm() {
     <div><div class="muted" style="margin-bottom:6px">لوکیشن‌ها (هیچ‌کدام = همه)</div><div class="chips" id="fNodes">
       ${S.nodes.map(n => `<label><input type="checkbox" value="${n.id}">${esc(n.cc)} ${esc(n.name)}</label>`).join('')}</div></div>
     <div><div class="muted" style="margin-bottom:6px">پروتکل‌ها</div><div class="chips" id="fProtos">
-      ${S.protos.map(p => `<label><input type="checkbox" value="${p.id}" ${['vless', 'l2tp'].includes(p.id) ? 'checked' : ''}>${esc(p.label)}</label>`).join('')}</div></div>
+      ${S.protos.map(p => `<label><input type="checkbox" value="${p.id}" ${['vless', 'l2tp'].includes(p.id) ? 'checked' : ''}>${esc(p.label)}${p.counted ? '' : ' <span class="muted">(حجم شمرده نمی‌شود)</span>'}</label>`).join('')}</div></div>
+    <div class="note">حجم و زمان بین همه‌ی کانفیگ‌ها و لوکیشن‌های این کاربر مشترک است و با یک لینک اشتراک داده می‌شود.</div>
     <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="fSave">ساخت کاربر</button></div>`);
 }
 async function configsDialog(id) {

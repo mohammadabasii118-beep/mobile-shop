@@ -13,7 +13,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
-from fastapi.responses import FileResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -22,7 +22,8 @@ from sqlalchemy.orm import Session
 
 from .catalog import PROTOCOLS, REALITY_SNI, SS_METHOD
 from .db import Node, NodeProtocol, User, engine, get_db, init_db, utcnow
-from .subscription import new_wg_keypair, subscription_body, user_entries, user_ss_key, wg_ip
+from .subpage import render_sub_page
+from .subscription import info_entries, new_wg_keypair, subscription_body, user_entries, user_ss_key, wg_ip
 
 BASE = Path(__file__).resolve().parent
 ROOT = BASE.parent.parent  # vpn-panel/
@@ -349,13 +350,21 @@ def user_configs(user_id: int, db: Session = Depends(get_db)):
 
 # ---------- subscription (public, token in URL) ----------
 @app.get("/sub/{token}")
-def subscription(token: str, db: Session = Depends(get_db)):
+def subscription(token: str, request: Request, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.sub_token == token)) or _404()
     entries = user_entries(user, list(db.scalars(select(Node)))) if user.status() == "active" else []
+    days_left = max(0, (user.expire_at - utcnow()).days) if user.expire_at else None
+    if "text/html" in request.headers.get("accept", ""):  # a person in a browser, not a client app
+        return HTMLResponse(render_sub_page(user, entries, days_left, f"{public_url(request)}/sub/{token}"))
+    info = info_entries(user, days_left) if os.environ.get("PANEL_SUB_INFO", "1") != "0" else []
     headers = {"subscription-userinfo": f"upload=0; download={user.used_bytes}; total={user.quota_bytes}; "
                f"expire={int(user.expire_at.timestamp()) if user.expire_at else 0}",
+               "profile-title": "base64:" + base64.b64encode(user.name.encode()).decode(),
                "profile-update-interval": "6"}
-    return PlainTextResponse(subscription_body(entries), headers=headers)
+    if url := os.environ.get("PANEL_SUPPORT_URL"):
+        headers["support-url"] = url
+    links = info + [e["link"] for e in entries if e["link"]]
+    return PlainTextResponse(base64.b64encode("\n".join(links).encode()).decode(), headers=headers)
 
 
 # ---------- node agent API ----------

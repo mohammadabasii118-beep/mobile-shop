@@ -67,7 +67,9 @@ def test_full_flow():
         # quota exhausted -> removed from node config and subscription is empty
         c.post("/api/node/report", headers=nh, json={"usage": {"ali_t": 1024 ** 3}})
         assert c.get("/api/node/config", headers=nh).json()["users"] == []
-        assert c.get(user["sub_url"].replace("https://panel.test", "")).text == ""
+        body = base64.b64decode(c.get(user["sub_url"].replace("https://panel.test", "")).text).decode().splitlines()
+        assert body and all("@127.0.0.1:1?" in line for line in body)   # no real config, only the usage remarks
+        assert any("%E2%9B%94" in line for line in body)               # the ⛔ status line
 
         # protocol toggle
         c.patch(f"/api/users/{user['id']}", headers=h, json={"reset_usage": True})
@@ -344,3 +346,65 @@ def test_node_config_advertises_agent_hash():
         sha = c.get("/api/node/config", headers=nh).json()["agent_sha256"]
         assert sha == hashlib.sha256((ROOT / "agent" / "agent.py").read_bytes()).hexdigest()
         assert hashlib.sha256(c.get("/node/agent.py").content).hexdigest() == sha
+
+
+def test_subscription_shows_usage_and_shares_one_quota():
+    from urllib.parse import unquote
+    with TestClient(app) as c:
+        h = admin(c)
+        n1 = c.post("/api/nodes", headers=h, json={"name": "A", "cc": "de", "address": "a.example.com"}).json()
+        n2 = c.post("/api/nodes", headers=h, json={"name": "B", "cc": "nl", "address": "b.example.com"}).json()
+        tok = lambda n: {"Authorization": "Bearer " + n["install_command"].split("--token ")[1].split()[0]}
+        user = c.post("/api/users", headers=h, json={"name": "shared", "quota_gb": 10, "days": 30,
+                                                      "protos": ["trojan", "l2tp"], "node_ids": [n1["id"], n2["id"]]}).json()
+        # traffic reported by two different nodes adds up in the same user's quota
+        gb = 1024 ** 3
+        c.post("/api/node/report", headers=tok(n1), json={"usage": {"shared": 3 * gb}})
+        c.post("/api/node/report", headers=tok(n2), json={"usage": {"shared": 2 * gb}})
+        info = next(u for u in c.get("/api/users", headers=h).json() if u["name"] == "shared")
+        assert info["used_gb"] == 5.0 and info["quota_gb"] == 10.0
+
+        sub = user["sub_url"].replace("https://panel.test", "")
+        r = c.get(sub)  # a client app
+        assert r.headers["subscription-userinfo"].startswith(f"upload=0; download={5 * gb}; total={10 * gb}; expire=")
+        assert r.headers["profile-title"].startswith("base64:")
+        lines = base64.b64decode(r.text).decode().splitlines()
+        remarks = [unquote(l.split("#", 1)[1]) for l in lines if "@127.0.0.1:1?" in l]
+        assert any("5.00" in x and "10.00" in x for x in remarks) and any("30 روز" in x or "29 روز" in x for x in remarks)
+        assert sum("trojan://" in l for l in lines) == 2           # one real link per node, same user
+
+        page = c.get(sub, headers={"accept": "text/html,application/xhtml+xml"})  # a person in a browser
+        assert page.status_code == 200 and "text/html" in page.headers["content-type"]
+        assert "shared" in page.text and "5.00 GB" in page.text and "10.00 GB" in page.text and "trojan://" in page.text
+        assert c.get("/api/protocols", headers=h).json()[0]["counted"] is True
+        assert next(p for p in c.get("/api/protocols", headers=h).json() if p["id"] == "hy2")["counted"] is False
+
+
+def test_agent_usage_parsers_and_counters():
+    ovpn = ("OpenVPN CLIENT LIST\nUpdated,Tue Oct 14 10:00:00 2026\n"
+            "Common Name,Real Address,Bytes Received,Bytes Sent,Connected Since\n"
+            "ali_t,1.2.3.4:5555,1000,2000,Tue Oct 14 09:00:00 2026\nROUTING TABLE\nVirtual Address,Common Name,Real Address,Last Ref\n"
+            "10.55.0.2,ali_t,1.2.3.4:5555,Tue\nGLOBAL STATS\nMax bcast/mcast queue length,0\nEND\n")
+    assert agent.parse_openvpn_status(ovpn) == [("ali_t", "1.2.3.4:5555", 3000)]
+    occ = '[{"id": 7, "username": "sara", "raw_rx": 10, "raw_tx": 5, "rx": "10 B"}, {"username": "bad", "rx": "1 KB", "tx": "2 KB"}]'
+    assert agent.parse_occtl_users(occ) == [("7", "sara", 15)]
+    assert agent.parse_occtl_users("not json") == []
+
+    cn = agent.Counters()
+    assert cn.delta("k", 100) == 0 and cn.delta("k", 160) == 60 and cn.delta("k", 10) == 10  # restart -> counts from zero
+
+    # L2TP: live interface counters, then the final total logged by pppd on hang-up (no double counting)
+    root = Path(tempfile.mkdtemp())
+    run, sysd, closed = root / "run", root / "sys", root / "ppp-closed"
+    (run).mkdir(); (sysd / "ppp0" / "statistics").mkdir(parents=True)
+    (run / "ppp-ppp0").write_text("ali_t\n")
+    def set_bytes(rx, tx):
+        (sysd / "ppp0" / "statistics" / "rx_bytes").write_text(str(rx)); (sysd / "ppp0" / "statistics" / "tx_bytes").write_text(str(tx))
+    cn = agent.Counters()
+    call = lambda: agent.ppp_usage(cn, str(run), str(sysd), str(closed))
+    set_bytes(100, 100); assert call() == {}                    # first sight
+    set_bytes(500, 300); assert call() == {"ali_t": 600}        # 800 - 200
+    closed.write_text("ppp0 ali_t 1000\n"); (run / "ppp-ppp0").unlink()
+    assert call() == {"ali_t": 200} and not closed.exists()     # 1000 - 800 already counted
+    closed.write_text("ppp1 sara 700\n")                         # a session shorter than one poll
+    assert call() == {"sara": 700}

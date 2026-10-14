@@ -8,9 +8,10 @@ GRPC_SERVICE = "grpc"
 OVPN_PORT_PROTO = "udp"
 
 
-def _p(label, engine, port, desc, uri=True, fixed=False):
+def _p(label, engine, port, desc, uri=True, fixed=False, counted=True):
     # fixed: the protocol standard dictates the port (IPsec), clients cannot use another
-    return {"label": label, "engine": engine, "port": port, "desc": desc, "uri": uri, "fixed_port": fixed}
+    return {"label": label, "engine": engine, "port": port, "desc": desc, "uri": uri, "fixed_port": fixed,
+            "counted": counted}  # counted: traffic is added to the user's shared quota
 
 
 PROTOCOLS = {
@@ -23,12 +24,12 @@ PROTOCOLS = {
     "trojan": _p("Trojan", "xray", 8443, "TLS؛ با گواهی خودامضا یا واقعی"),
     "trojan_ws": _p("Trojan + WebSocket (TLS)", "xray", 2087, "WS روی TLS"),
     "ss": _p("Shadowsocks 2022", "xray", 8388, "سبک و سریع"),
-    "hy2": _p("Hysteria2", "sing-box", 36712, "مبتنی بر QUIC برای خطوط ضعیف"),
-    "tuic": _p("TUIC v5", "sing-box", 8444, "QUIC با تأخیر کم"),
+    "hy2": _p("Hysteria2", "sing-box", 36712, "مبتنی بر QUIC برای خطوط ضعیف", counted=False),
+    "tuic": _p("TUIC v5", "sing-box", 8444, "QUIC با تأخیر کم", counted=False),
     "wg": _p("WireGuard", "wireguard", 51820, "VPN سطح سیستم؛ کانفیگ فایل", uri=False),
     "ovpn": _p("OpenVPN", "openvpn", 1194, "UDP؛ فایل ovpn با نام کاربری و رمز", uri=False),
     "l2tp": _p("L2TP/IPsec", "strongSwan + xl2tpd", 1701, "داخلی در iOS، اندروید و ویندوز", uri=False, fixed=True),
-    "ikev2": _p("IKEv2/IPsec", "strongSwan", 500, "پایدار روی موبایل؛ نیاز به گواهی معتبر", uri=False, fixed=True),
+    "ikev2": _p("IKEv2/IPsec", "strongSwan", 500, "پایدار روی موبایل؛ نیاز به گواهی معتبر", uri=False, fixed=True, counted=False),
     "anyc": _p("Cisco AnyConnect", "ocserv", 4443, "سازگار با کلاینت‌های AnyConnect/OpenConnect", uri=False),
 }
 

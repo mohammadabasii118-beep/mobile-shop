@@ -140,3 +140,22 @@ def user_entries(user: User, nodes: list[Node]) -> list[dict]:
 def subscription_body(entries: list[dict]) -> str:
     links = [e["link"] for e in entries if e["link"]]
     return base64.b64encode("\n".join(links).encode()).decode()
+
+
+GB = 1024 ** 3
+_INFO_URI = "vless://00000000-0000-0000-0000-000000000000@127.0.0.1:1?encryption=none&security=none&type=tcp#"
+
+
+def usage_lines(user: User, days_left: int | None) -> list[str]:
+    """Human readable usage and time, shown as remarks in clients that ignore the usage header."""
+    quota = f"{user.quota_bytes / GB:.2f}" if user.quota_bytes else "∞"
+    used = f"{user.used_bytes / GB:.2f}"
+    left = ("∞" if not user.quota_bytes else f"{max(0, user.quota_bytes - user.used_bytes) / GB:.2f}")
+    time_line = "بدون انقضا" if days_left is None else (f"{days_left} روز مانده" if days_left > 0 else "منقضی شده")
+    status = {"active": None, "disabled": "غیرفعال", "expired": "منقضی شده", "quota": "حجم تمام شده"}[user.status()]
+    lines = [f"📊 مصرف {used} از {quota} GB", f"📦 باقی‌مانده {left} GB", f"⏳ {time_line}"]
+    return ([f"⛔ {status}"] if status else []) + lines
+
+
+def info_entries(user: User, days_left: int | None) -> list[str]:
+    return [_INFO_URI + quote(line) for line in usage_lines(user, days_left)]

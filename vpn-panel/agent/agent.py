@@ -181,6 +181,115 @@ def xray_usage():
     return usage
 
 
+# ---------- usage for protocols Xray does not meter ----------
+class Counters:
+    """Turns cumulative per-session byte counters into increments."""
+
+    def __init__(self):
+        self.last = {}
+
+    def delta(self, key, total):
+        prev = self.last.get(key, total)  # first sight: no increment yet
+        self.last[key] = total
+        return total - prev if total >= prev else total  # a lower value means the counter restarted
+
+    def forget(self, key):
+        return self.last.pop(key, 0)
+
+    def drop_missing(self, seen):
+        for k in [k for k in self.last if k not in seen]:
+            del self.last[k]
+
+
+def parse_openvpn_status(text):
+    """`status-version 1` file -> [(common_name, real_address, bytes_received + bytes_sent)]."""
+    rows, active = [], False
+    for line in text.splitlines():
+        if line.startswith("Common Name,"):
+            active = True
+        elif line.startswith(("ROUTING TABLE", "GLOBAL STATS", "END")):
+            active = False
+        elif active:
+            p = line.split(",")
+            if len(p) >= 4 and p[2].isdigit() and p[3].isdigit():
+                rows.append((p[0], p[1], int(p[2]) + int(p[3])))
+    return rows
+
+
+def parse_occtl_users(text):
+    """`occtl -j show users` -> [(session_id, username, rx + tx)]."""
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return []
+    out = []
+    for u in data if isinstance(data, list) else []:
+        rx, tx = u.get("raw_rx", u.get("rx")), u.get("raw_tx", u.get("tx"))
+        if u.get("username") and isinstance(rx, int) and isinstance(tx, int):
+            out.append((str(u.get("id", u.get("ID", u["username"]))), u["username"], rx + tx))
+    return out
+
+
+def ppp_usage(counters, run_dir="/run/vpn-node", sys_dir="/sys/class/net",
+              closed_path="/var/lib/vpn-node/ppp-closed"):
+    """L2TP sessions: live counters from the ppp interfaces plus the final totals pppd logs on hang-up."""
+    usage, seen = {}, set()
+    if os.path.isdir(run_dir):
+        for name in os.listdir(run_dir):
+            if not name.startswith("ppp-"):
+                continue
+            ifname = name[4:]
+            try:
+                user = open(os.path.join(run_dir, name)).read().strip()
+                stats = os.path.join(sys_dir, ifname, "statistics")
+                total = int(open(os.path.join(stats, "rx_bytes")).read()) + int(open(os.path.join(stats, "tx_bytes")).read())
+            except (OSError, ValueError):
+                continue
+            key = "ppp:" + ifname
+            seen.add(key)
+            d = counters.delta(key, total)
+            if user and d > 0:
+                usage[user] = usage.get(user, 0) + d
+    if os.path.exists(closed_path):
+        tmp = closed_path + ".processing"
+        os.replace(closed_path, tmp)
+        for line in open(tmp).read().splitlines():
+            parts = line.split()
+            if len(parts) == 3 and parts[2].isdigit():
+                d = int(parts[2]) - counters.forget("ppp:" + parts[0])
+                if d > 0:
+                    usage[parts[1]] = usage.get(parts[1], 0) + d
+        os.remove(tmp)
+    return usage
+
+
+_net_counters = Counters()
+
+
+def session_usage():
+    usage = {}
+
+    def add(name, n):
+        if n > 0:
+            usage[name] = usage.get(name, 0) + n
+
+    seen = set()
+    for name, addr, total in parse_openvpn_status(read_text("/var/lib/vpn-node/ovpn/status.log")):
+        key = f"ovpn:{name}:{addr}"
+        seen.add(key)
+        add(name, _net_counters.delta(key, total))
+    r = sh("occtl", "-j", "show", "users")
+    if r.returncode == 0:
+        for sid, name, total in parse_occtl_users(r.stdout):
+            key = f"anyc:{sid}"
+            seen.add(key)
+            add(name, _net_counters.delta(key, total))
+    _net_counters.drop_missing({k for k in _net_counters.last if k.startswith("ppp:")} | seen)
+    for name, n in ppp_usage(_net_counters).items():
+        add(name, n)
+    return usage
+
+
 def self_update(conf, expected_sha):
     """Replace this file with the panel's agent.py when its hash differs, then restart in place."""
     me = os.path.abspath(__file__)
@@ -296,7 +405,7 @@ def main():
             cfg = api(conf, "GET", "/api/node/config")
             self_update(conf, cfg.get("agent_sha256"))
             apply(cfg, reality, tls, wg)
-            for src in (xray_usage(), wg_usage(cfg) if wg else {}):
+            for src in (xray_usage(), wg_usage(cfg) if wg else {}, session_usage()):
                 for k, v in src.items():
                     pending[k] = pending.get(k, 0) + v
             api(conf, "POST", "/api/node/report", {

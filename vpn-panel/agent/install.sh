@@ -149,7 +149,9 @@ user nobody
 group nogroup
 persist-key
 persist-tun
+status /var/lib/vpn-node/ovpn/status.log 10
 EOF2
+mkdir -p /var/lib/vpn-node/ovpn; chown nobody:nogroup /var/lib/vpn-node/ovpn
 
 # IKEv2 and AnyConnect reuse the TLS certificate
 mkdir -p /etc/ipsec.d/certs /etc/ipsec.d/private
@@ -235,6 +237,22 @@ proxyarp
 connect-delay 5000
 name l2tpd
 EOF2
+
+# L2TP traffic accounting: remember which user owns each ppp interface and log the final total
+mkdir -p /etc/ppp/ip-up.d /etc/ppp/ip-down.d /var/lib/vpn-node
+cat > /etc/ppp/ip-up.d/vpn-node <<'SH'
+#!/bin/sh
+[ -n "$PEERNAME" ] || exit 0
+mkdir -p /run/vpn-node
+echo "$PEERNAME" > "/run/vpn-node/ppp-$IFNAME"
+SH
+cat > /etc/ppp/ip-down.d/vpn-node <<'SH'
+#!/bin/sh
+[ -n "$PEERNAME" ] || exit 0
+echo "$IFNAME $PEERNAME $(( ${BYTES_SENT:-0} + ${BYTES_RCVD:-0} ))" >> /var/lib/vpn-node/ppp-closed
+rm -f "/run/vpn-node/ppp-$IFNAME"
+SH
+chmod 755 /etc/ppp/ip-up.d/vpn-node /etc/ppp/ip-down.d/vpn-node
 
 # Forwarding + NAT for L2TP clients
 echo 'net.ipv4.ip_forward=1' > /etc/sysctl.d/99-vpn-node.conf
