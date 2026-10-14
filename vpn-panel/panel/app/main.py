@@ -380,6 +380,21 @@ def subscription(token: str, request: Request, db: Session = Depends(get_db)):
     return PlainTextResponse(base64.b64encode("\n".join(links).encode()).decode(), headers=headers)
 
 
+@app.get("/sub/{token}/file/{node_id}/{proto}")
+def subscription_file(token: str, node_id: int, proto: str, db: Session = Depends(get_db)):
+    """The WireGuard .conf / OpenVPN .ovpn file for one location, for clients that import a file."""
+    user = db.scalar(select(User).where(User.sub_token == token)) or _404()
+    if user.status() == "active":
+        for e in user_entries(user, list(db.scalars(select(Node)))):
+            text = (e["details"] or {}).get("config")
+            if e["node_id"] == node_id and e["proto"] == proto and text and e["file_ext"]:
+                slug = re.sub(r"[^A-Za-z0-9]+", "-", e["node"]).strip("-") or f"node{node_id}"
+                headers = {"Content-Disposition": f'attachment; filename="{slug}-{proto}.{e["file_ext"]}"',
+                           "Cache-Control": "no-store"}
+                return PlainTextResponse(text, headers=headers, media_type="application/octet-stream")
+    _404()
+
+
 # ---------- node agent API ----------
 @app.get("/api/node/config")
 def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db)):

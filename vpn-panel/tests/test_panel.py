@@ -520,3 +520,29 @@ def test_openvpn_status_v2_and_ocserv_socket_line():
     assert path.read_text().endswith("occtl-socket-file = /run/occtl.socket\n")
     assert agent.ensure_conf_line(str(path), "occtl-socket-file", "/run/occtl.socket") is False   # idempotent
     assert agent.ensure_conf_line(str(path.parent / "missing.conf"), "x", "y") is False
+
+
+def test_wireguard_and_openvpn_files_download():
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "فرانسه france", "cc": "fr", "address": "4.3.2.1"}).json()
+        nh = {"Authorization": "Bearer " + node["install_command"].split("--token ")[1].split()[0]}
+        c.post("/api/node/report", headers=nh, json={"wg_pub": "WGPUB", "ovpn_ca": "-----BEGIN CERTIFICATE-----\nX\n-----END CERTIFICATE-----"})
+        user = c.post("/api/users", headers=h, json={"name": "filer", "protos": ["wg", "ovpn", "l2tp"], "node_ids": [node["id"]]}).json()
+        base = user["sub_url"].replace("https://panel.test", "")
+        wg = c.get(f"{base}/file/{node['id']}/wg")
+        assert wg.status_code == 200 and wg.text.startswith("[Interface]") and "PublicKey = WGPUB" in wg.text
+        assert wg.headers["content-disposition"] == 'attachment; filename="france-wg.conf"'
+        ov = c.get(f"{base}/file/{node['id']}/ovpn")
+        assert ov.text.startswith("client\n") and "<ca>" in ov.text and ov.headers["content-disposition"].endswith('france-ovpn.ovpn"')
+        assert not ov.text.startswith("#")   # the file itself has no credential comments
+        assert c.get(f"{base}/file/{node['id']}/l2tp").status_code == 404      # not a file protocol
+        assert c.get(f"/sub/wrong-token/file/{node['id']}/wg").status_code == 404
+        # the browser subscription page offers the download, and the admin API tells the UI which entries are files
+        page = c.get(base, headers={"accept": "text/html"}).text
+        assert f"/file/{node['id']}/wg" in page and "دانلود فایل" in page
+        rows = {e["proto"]: e for e in c.get(f"/api/users/{user['id']}/configs", headers=h).json()}
+        assert rows["wg"]["file_ext"] == "conf" and rows["ovpn"]["file_ext"] == "ovpn" and rows["l2tp"]["file_ext"] is None
+        # a disabled user gets nothing
+        c.patch(f"/api/users/{user['id']}", headers=h, json={"enabled": False})
+        assert c.get(f"{base}/file/{node['id']}/wg").status_code == 404

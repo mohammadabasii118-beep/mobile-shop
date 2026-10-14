@@ -58,8 +58,9 @@ def build_entry(user: User, node: Node, proto: str, port: int, cdn: bool = False
     else:
         conn = host = node.address
         insecure = node.tls_self_signed
-    e = {"node": node.name, "cc": node.cc, "proto": proto, "label": label,
-         "link": None, "details": None, "summary": None, "copy": None}
+    e = {"node": node.name, "node_id": node.id, "cc": node.cc, "proto": proto, "label": label,
+         "link": None, "details": None, "summary": None, "copy": None,
+         "file_ext": {"wg": "conf", "ovpn": "ovpn"}.get(proto)}   # protocols that clients import as a file
     tls = _tls_q(host, insecure, node.tls_pin)
     if proto == "vless":
         if not node.reality_pub:
