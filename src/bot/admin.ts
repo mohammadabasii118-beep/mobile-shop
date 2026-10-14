@@ -83,7 +83,7 @@ export function adminHandlers() {
   }
 
   const PROTO_ENUM: Record<string, string> = { vless: 'VLESS', vmess: 'VMESS', trojan: 'TROJAN', shadowsocks: 'SHADOWSOCKS' };
-  const ibLabel = (i: { id: number; remark?: string; protocol: string; port: number; enable: boolean }) => `${i.enable ? '' : '⛔ '}#${i.id} ${i.remark || '—'} · ${i.protocol}:${i.port}`;
+  const ibLabel = (i: { id: number; remark?: string; protocol: string; port: number; enable: boolean }) => (i.protocol === 'profile' ? `🧩 پروفایل ${i.id} · ${i.remark || '—'}` : `${i.enable ? '' : '⛔ '}#${i.id} ${i.remark || '—'} · ${i.protocol}:${i.port}`);
 
   async function panelsList(ctx: Ctx) {
     const ps = await listPanels();
@@ -99,9 +99,11 @@ export function adminHandlers() {
     return [
       `🖥 ${p.name}  (${p.code})`, '┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈',
       `🌐 ${p.baseUrl}`,
+      `🧱 نوع: ${p.kind === 'vpnpanel' ? 'پنل اختصاصی (چندلوکیشن)' : '3x-ui'}`,
       `🔐 ورود: ${p.auth === 'token' ? 'توکن API' : p.auth === 'password' ? 'کاربر و رمز' : 'تنظیم نشده'}${p.tlsInsecure ? ' · گواهی خودامضا مجاز' : ''}`,
-      p.subBaseUrl ? `📡 ساب: ${p.subBaseUrl}` : '📡 ساب: —  (مشتری کانفیگ مستقیم می‌گیرد)',
-      p.publicHost ? `🏷 هاست لینک‌ها: ${p.publicHost}` : '',
+      ...(p.kind === 'vpnpanel'
+        ? ['🧩 پروفایل‌ها:', ...p.profiles.map((x) => `   ${x.id}. ${x.name} — ${x.protos.join('+')} — ${x.nodeIds.length ? 'لوکیشن ' + x.nodeIds.join(',') : 'همه‌ی لوکیشن‌ها'}`)]
+        : [p.subBaseUrl ? `📡 ساب: ${p.subBaseUrl}` : '📡 ساب: —  (مشتری کانفیگ مستقیم می‌گیرد)', p.publicHost ? `🏷 هاست لینک‌ها: ${p.publicHost}` : '']),
       `وضعیت: ${!p.isActive ? '⚪ غیرفعال' : h ? (h.ok ? `🟢 متصل (${h.ms}ms)` : `🔴 ${h.detail}`) : '— (تست نشده)'}`,
       `📦 محصول: ${p.products} · 🛰 سرویس: ${p.services}`,
       p.source === 'env' ? '\nℹ️ این پنل از تنظیمات سرور (.env) خوانده می‌شود و از اینجا قابل ویرایش/حذف نیست.' : '',
@@ -110,7 +112,7 @@ export function adminHandlers() {
 
   async function panelView(ctx: Ctx, code: string) {
     const p = await getPanel(code);
-    const rows: Button[][] = [[{ text: '🔌 تست اتصال', data: `pn:t:${code}` }, { text: '📋 inboundها', data: `pn:i:${code}` }]];
+    const rows: Button[][] = [[{ text: '🔌 تست اتصال', data: `pn:t:${code}` }, { text: p.kind === 'vpnpanel' ? '🧩 پروفایل‌ها' : '📋 inboundها', data: `pn:i:${code}` }]];
     if (p.source === 'db') rows.push([{ text: '✏️ ویرایش', data: `pn:e:${code}` }, { text: p.isActive ? '⏸ غیرفعال' : '▶️ فعال', data: `pn:tg:${code}` }], [{ text: '🗑 حذف', data: `pn:d:${code}` }]);
     rows.push(back('pn:l'));
     await show(ctx, panelText(p), rows);
@@ -523,6 +525,7 @@ export function adminHandlers() {
             '🖥 افزودن پنل X-UI', '',
             'یک پیام با این قالب بفرستید (هر خط یک مورد):', '',
             'نام: آلمان',
+            'نوع: xui   (پیش‌فرض؛ برای پنل اختصاصی بنویسید: نوع: panel)',
             'آدرس: https://1.2.3.4:2053/مسیر-پنل',
             'کاربر: admin',
             'رمز: ********',
@@ -530,6 +533,9 @@ export function adminHandlers() {
             'هاست: example.com   (اختیاری؛ دامنه‌ی داخل لینک مشتری)',
             'tls: نامعتبر   (اختیاری؛ اگر گواهی پنل خودامضاست)', '',
             '• به‌جای کاربر/رمز می‌توانید «توکن: ...» بدهید.',
+            '• پنل اختصاصی: فقط «توکن» (PANEL_API_KEY) لازم است و پروفایل‌ها را خط‌به‌خط بدهید:',
+            '   پروفایل: 1 | اصلی | vless | همه',
+            '   پروفایل: 2 | آلمان | vless,trojan | 1',
             '• قبل از ذخیره، اتصال تست می‌شود؛ اگر وصل نشد ذخیره نمی‌شود و می‌توانید اصلاح‌شده دوباره بفرستید.',
             '• پیام شما (که رمز دارد) بعد از خواندن از چت پاک می‌شود.',
           ].join('\n'), [back('pn:l')]);
@@ -543,7 +549,7 @@ export function adminHandlers() {
           const p = await getPanel(b);
           let ibs;
           try { ibs = await listPanelInbounds(b); } catch (e: any) { throw new AppError('VALIDATION', `ارتباط با پنل «${p.name}» برقرار نشد:\n${String(e?.message ?? e)}`); }
-          return show(ctx, `📋 inboundهای «${p.name}» (${ibs.length})\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\nروی هر کدام بزنید تا برایش محصول بسازید.\n⛔ = غیرفعال${ibs.some((i) => !isSupportedProtocol(i.protocol)) ? '\n(پروتکل‌های mixed/http/socks پشتیبانی نمی‌شوند)' : ''}`, [...ibs.slice(0, 40).map((i): Button[] => [{ text: ibLabel(i), data: `pn:ib:${b}:${i.id}` }]), back(`pn:v:${b}`)]);
+          return show(ctx, `${p.kind === 'vpnpanel' ? '🧩 پروفایل‌های' : '📋 inboundهای'} «${p.name}» (${ibs.length})\n┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\nروی هر کدام بزنید تا برایش محصول بسازید.\n⛔ = غیرفعال${ibs.some((i) => !isSupportedProtocol(i.protocol)) ? '\n(پروتکل‌های mixed/http/socks پشتیبانی نمی‌شوند)' : ''}`, [...ibs.slice(0, 40).map((i): Button[] => [{ text: ibLabel(i), data: `pn:ib:${b}:${i.id}` }]), back(`pn:v:${b}`)]);
         }
         if (a === 'ib') {
           const id = Number(d.split(':')[3]);
@@ -551,7 +557,7 @@ export function adminHandlers() {
           if (!i) throw new AppError('VALIDATION', 'این inbound دیگر در پنل نیست');
           const prods = (await listAllProducts()).filter((x) => x.xuiProviderId === b && x.xuiInboundId === id);
           const okProto = isSupportedProtocol(i.protocol) && i.enable;
-          return show(ctx, `🔌 inbound #${i.id}\nنام: ${i.remark || '—'}\nپروتکل: ${i.protocol} · پورت ${i.port}\nوضعیت: ${i.enable ? '🟢 فعال' : '⛔ غیرفعال'}\n📦 محصولات روی آن: ${prods.length}${prods.length ? '\n' + prods.slice(0, 8).map((x) => `• ${x.name}`).join('\n') : ''}${okProto ? '' : '\n\n⚠️ برای فروش باید inbound فعال و از نوع vless/vmess/trojan/shadowsocks باشد.'}`, [...(okProto ? [[{ text: '➕ افزودن محصول روی این inbound', data: `pn:np:${b}:${id}` }]] : []), back(`pn:i:${b}`)]);
+          return show(ctx, `${i.protocol === 'profile' ? '🧩 پروفایل' : '🔌 inbound'} #${i.id}\nنام: ${i.remark || '—'}\n${i.protocol === 'profile' ? '' : `پروتکل: ${i.protocol} · پورت ${i.port}\n`}وضعیت: ${i.enable ? '🟢 فعال' : '⛔ غیرفعال'}\n📦 محصولات روی آن: ${prods.length}${prods.length ? '\n' + prods.slice(0, 8).map((x) => `• ${x.name}`).join('\n') : ''}${okProto ? '' : '\n\n⚠️ برای فروش باید inbound فعال و از نوع vless/vmess/trojan/shadowsocks باشد.'}`, [...(okProto ? [[{ text: i.protocol === 'profile' ? '➕ افزودن محصول روی این پروفایل' : '➕ افزودن محصول روی این inbound', data: `pn:np:${b}:${id}` }]] : []), back(`pn:i:${b}`)]);
         }
         if (a === 'np') {
           const id = Number(d.split(':')[3]);

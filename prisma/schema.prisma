@@ -502,6 +502,10 @@ model Panel {
   tlsInsecure    Boolean  @default(false)
   isActive       Boolean  @default(true)
   sortOrder      Int      @default(0)
+  /// "xui" (3x-ui) or "vpnpanel" (the multi-location panel in vpn-panel/)
+  kind           String   @default("xui")
+  /// vpnpanel: { profiles: [{ id, name, protos, nodeIds }] } — a product's "inbound id" is the profile id
+  options        Json?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }

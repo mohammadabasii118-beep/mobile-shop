@@ -6,6 +6,9 @@ import { XuiClient } from './xui/client';
 import { XuiVpnProvider } from './xui/provider';
 import { MockVpnProvider } from './mock';
 import { xuiFetch } from './xui/net';
+import { VpnPanelClient } from './vpnpanel/client';
+import { DEFAULT_PROFILES, PanelProfile, VpnPanelProvider } from './vpnpanel/provider';
+export type { PanelProfile } from './vpnpanel/provider';
 
 /** Everything needed to talk to one 3x-ui panel. */
 export interface PanelConfig {
@@ -16,11 +19,18 @@ export interface PanelConfig {
   subBaseUrl?: string | null;
   publicHost?: string | null;
   tlsInsecure?: boolean;
+  /** "xui" (default) or "vpnpanel" (apiToken = the panel's PANEL_API_KEY) */
+  kind?: string;
+  profiles?: PanelProfile[];
 }
 
 export const DEFAULT_PANEL = 'default';
 
 export function providerFromConfig(c: PanelConfig): VpnProvider {
+  if (c.kind === 'vpnpanel') {
+    if (!c.apiToken) throw new ProviderError('panel API key is missing', false);
+    return new VpnPanelProvider({ client: new VpnPanelClient({ baseUrl: c.baseUrl, apiKey: c.apiToken, fetchImpl: xuiFetch(!!c.tlsInsecure) }), profiles: c.profiles?.length ? c.profiles : DEFAULT_PROFILES });
+  }
   const publicHost = c.publicHost || new URL(c.baseUrl).hostname;
   return new XuiVpnProvider({
     client: new XuiClient({ baseUrl: c.baseUrl, username: c.username ?? undefined, password: c.password ?? undefined, apiToken: c.apiToken ?? undefined, fetchImpl: xuiFetch(!!c.tlsInsecure) }),
@@ -60,7 +70,7 @@ export async function vpnFor(code: string = DEFAULT_PANEL): Promise<VpnProvider>
       password = row.passwordEnc ? decryptSecret(row.passwordEnc) : undefined;
       apiToken = row.apiTokenEnc ? decryptSecret(row.apiTokenEnc) : undefined;
     } catch (err: any) { throw new ProviderError(`panel "${code}": ${err.message}`, false); }
-    const provider = providerFromConfig({ ...row, password, apiToken });
+    const provider = providerFromConfig({ ...row, password, apiToken, profiles: ((row.options as { profiles?: PanelProfile[] } | null)?.profiles) });
     cache.set(code, { version, provider });
     return provider;
   }

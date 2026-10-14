@@ -16,7 +16,7 @@ import { SETTING_DEFAULTS, SettingKey, allSettings, setSetting } from '../module
 import { flushPending } from '../modules/notifications/service';
 import { AUDIENCES, AudienceKey, audienceCounts, cancelBroadcast, createBroadcast, getBroadcast, listBroadcasts, sendTestBroadcast } from '../modules/broadcast/service';
 import { PartnerFilter, validatePartnerSetting, approvePartner, getPartnerById, listPartners, partnerCounts, partnerStats, rejectPartner, setPartnerPercent, setPartnerSuspended } from '../modules/partners/service';
-import { PanelView, createPanel, deletePanel, listPanelInbounds, listPanels, panelHealth, setPanelActive, testPanel, updatePanel } from '../modules/panels/service';
+import { PanelView, probePanel, createPanel, deletePanel, listPanelInbounds, listPanels, panelHealth, setPanelActive, testPanel, updatePanel } from '../modules/panels/service';
 import { categoryTree, createCategory, deleteCategory, moveCategory, updateCategory } from '../modules/categories/service';
 import { isTextKey, listTexts, previewText, resetText, setText } from '../modules/texts/service';
 import { addChannel, deleteChannel, listChannels, setChannelActive, testChannel } from '../modules/channels/service';
@@ -89,6 +89,8 @@ const panelBody = z.object({
   code: z.string().max(40).optional(), name: z.string().min(1).max(60), baseUrl: z.string().min(1).max(300),
   username: z.string().max(120).optional(), password: z.string().max(200).optional(), apiToken: z.string().max(400).optional(),
   subBaseUrl: z.string().max(300).optional(), publicHost: z.string().max(200).optional(), tlsInsecure: z.boolean().optional(),
+  kind: z.enum(['xui', 'vpnpanel']).optional(),
+  profiles: z.array(z.object({ id: z.number().int(), name: z.string().max(60), protos: z.array(z.string().max(20)).max(20), nodeIds: z.array(z.number().int()).max(200) })).max(30).optional(),
 });
 
 const broadcastBody = z.object({ text: z.string().max(4000), buttonText: z.string().max(60).nullable().optional(), buttonUrl: z.string().max(500).nullable().optional() });
@@ -264,6 +266,7 @@ export const routes: Route[] = [
   { method: 'GET', re: /^\/panels\/options$/, perm: 'products.manage', run: async () => ({ items: (await listPanels()).filter((p) => p.isActive).map((p: PanelView) => ({ code: p.code, name: p.name })) }) },
   { method: 'POST', re: /^\/panels$/, perm: 'panels.manage', run: async (c) => { const r = await createPanel(actor(c), panelBody.parse(c.body) as any); return { id: r.id, code: r.code }; } },
   { method: 'PATCH', re: /^\/panels\/([\w-]+)$/, perm: 'panels.manage', run: async (c) => { await updatePanel(actor(c), c.params[0], panelBody.partial().parse(c.body) as any); return { ok: true }; } },
+  { method: 'POST', re: /^\/panels\/probe$/, perm: 'panels.manage', run: async (c) => probePanel(z.object({ baseUrl: z.string().max(300), apiToken: z.string().max(400), tlsInsecure: z.boolean().optional() }).parse(c.body)) },
   { method: 'POST', re: /^\/panels\/([\w-]+)\/active$/, perm: 'panels.manage', run: async (c) => { await setPanelActive(actor(c), c.params[0], z.object({ isActive: z.boolean() }).parse(c.body).isActive); return { ok: true }; } },
   { method: 'DELETE', re: /^\/panels\/([\w-]+)$/, perm: 'panels.manage', run: async (c) => { await deletePanel(actor(c), c.params[0]); return { ok: true }; } },
   { method: 'POST', re: /^\/panels\/([\w-]+)\/test$/, perm: 'panels.manage', run: (c) => testPanel(c.params[0]) },

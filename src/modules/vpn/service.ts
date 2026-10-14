@@ -8,6 +8,7 @@ import { getNumberList } from '../settings/service';
 import { notifyUser } from '../notifications/service';
 import * as T from '../notifications/templates';
 import { vpnFor } from '../../providers/vpn';
+import { ProviderError } from '../../providers/vpn/types';
 import { credentialFor, refOf, subIdGen } from './provisioning';
 import { linkRemark, validateServiceName } from '../../utils/names';
 
@@ -194,7 +195,8 @@ export async function rotateServiceLink(userId: string, id: string) {
     const credential = credentialFor(s.protocol);
     const subId = subIdGen();
     const provider = await vpnFor(s.provider);
-    await provider.rotateLink(refOf(s), { credential, subId });
+    try { await provider.rotateLink(refOf(s), { credential, subId }); }
+    catch (e) { if (e instanceof ProviderError && !e.retryable) throw new ConflictError(e.message); throw e; } // e.g. a panel without the rotate endpoint: say so plainly
     await prisma.vpnService.update({ where: { id: s.id }, data: { uuid: credential, clientId: credential, subId, config: null, subscriptionUrl: null } });
     await audit({ actor: `user:${userId}`, action: 'vpn.rotate_link', target: 'VpnService', targetId: s.id, metadata: { externalId: s.externalId } });
     return await refreshConfig(s.id); // if this fails the user can press "get link" again: it re-reads from the panel

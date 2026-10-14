@@ -664,13 +664,13 @@ export function panels(ctx, root) {
       const { items } = await api('/panels'); clear(card);
       if (!items.length) return void card.append(emptyState('هنوز پنلی ثبت نشده', 'اولین پنل X-UI را اضافه کنید.', 'server', button('افزودن پنل', { kind: 'primary', ico: 'plus', onClick: () => panelForm(null, reload) })));
       card.append(table([
-        { label: 'پنل', cls: 'wrap', render: (p) => h('div', null, h('div', { class: 'cell-main', text: p.name }), h('div', { class: 'cell-sub' }, ltr(p.code, 'mono'), ' · ', ltr(p.baseUrl.replace(/^https?:\/\//, '')))) },
+        { label: 'پنل', cls: 'wrap', render: (p) => h('div', null, h('div', { class: 'cell-main' }, p.name, p.kind === 'vpnpanel' ? h('span', { class: 'badge plain brand', style: 'margin-inline-start:6px', text: 'پنل اختصاصی' }) : null), h('div', { class: 'cell-sub' }, ltr(p.code, 'mono'), ' · ', ltr(p.baseUrl.replace(/^https?:\/\//, '')))) },
         { label: 'ورود', render: (p) => h('span', { class: 'badge plain', text: p.auth === 'token' ? 'توکن API' : p.auth === 'password' ? 'کاربر/رمز' : '—' }) },
         { label: 'وضعیت', render: (p) => !p.isActive ? h('span', { class: 'badge', text: 'غیرفعال' }) : p.health ? h('span', { class: `badge ${p.health.ok ? 'ok' : 'err'}`, title: p.health.detail, text: p.health.ok ? `متصل · ${num(p.health.ms)}ms` : 'خطا' }) : h('span', { class: 'muted', text: 'تست نشده' }) },
         { label: 'محصول', cls: 'num', render: (p) => num(p.products) }, { label: 'سرویس', cls: 'num', render: (p) => num(p.services) },
         { label: '', render: (p) => h('div', { class: 'actions' },
           button('تست', { size: 'sm', onClick: async () => { try { const r = await api(`/panels/${p.code}/test`, { method: 'POST' }); toast(r.ok ? `متصل (${r.ms}ms) — ${r.detail}` : `خطا: ${r.detail}`, r.ok ? 'ok' : 'err'); reload(); } catch (e) { toast(errMsg(e), 'err'); } } }),
-          button('inboundها', { size: 'sm', onClick: () => inboundsDrawer(p) }),
+          button(p.kind === 'vpnpanel' ? 'پروفایل‌ها' : 'inboundها', { size: 'sm', onClick: () => inboundsDrawer(p) }),
           p.source === 'db' ? button('', { size: 'sm', kind: 'ghost', ico: 'edit', title: 'ویرایش', onClick: () => panelForm(p, reload) }) : null,
           p.source === 'db' ? button('', { size: 'sm', kind: 'ghost', ico: p.isActive ? 'pause' : 'play', title: p.isActive ? 'غیرفعال‌سازی' : 'فعال‌سازی', onClick: async () => { try { await api(`/panels/${p.id}/active`, { method: 'POST', body: { isActive: !p.isActive } }); reload(); } catch (e) { toast(errMsg(e), 'err'); } } }) : null,
           p.source === 'db' ? button('', { size: 'sm', kind: 'ghost', ico: 'trash', title: 'حذف', onClick: async () => { if (!(await confirmDialog({ title: 'حذف پنل', message: `«${p.name}» حذف شود؟ فقط وقتی هیچ محصول و سرویسی روی آن نباشد حذف می‌شود.`, confirmLabel: 'حذف', kind: 'danger' }))) return; try { await api(`/panels/${p.id}`, { method: 'DELETE' }); toast('پنل حذف شد'); reload(); } catch (e) { toast(errMsg(e), 'err'); } } }) : null) },
@@ -690,39 +690,69 @@ function inboundsDrawer(p) {
       if (!items.length) return void body.append(emptyState('inbound ای در این پنل نیست', 'ابتدا در خود پنل X-UI یک inbound بسازید.', 'server'));
       body.append(table([
         { label: '#', cls: 'num', render: (i) => ltr(String(i.id), 'mono') }, { label: 'نام', render: (i) => i.remark || '—' },
-        { label: 'پروتکل', render: (i) => h('span', { class: 'badge plain brand', text: i.protocol }) }, { label: 'پورت', cls: 'num', render: (i) => num(i.port) },
+        { label: 'پروتکل', render: (i) => h('span', { class: 'badge plain brand', text: i.protocol }) }, { label: 'پورت', cls: 'num', render: (i) => i.protocol === 'profile' ? '—' : num(i.port) },
         { label: 'وضعیت', render: (i) => h('span', { class: `badge ${i.enable ? 'ok' : ''}`, text: i.enable ? 'فعال' : 'غیرفعال' }) },
-        { label: '', render: (i) => ['vless', 'vmess', 'trojan', 'shadowsocks'].includes(i.protocol) && i.enable ? button('ساخت محصول', { size: 'sm', ico: 'plus', onClick: () => bulkProductsForm(() => toast('ثبت شد'), { panel: p.code, inbound: i.id, protocol: i.protocol.toUpperCase() }) }) : h('span', { class: 'muted', text: 'قابل فروش نیست' }) },
+        { label: '', render: (i) => (i.protocol === 'profile' || ['vless', 'vmess', 'trojan', 'shadowsocks'].includes(i.protocol)) && i.enable ? button('ساخت محصول', { size: 'sm', ico: 'plus', onClick: () => bulkProductsForm(() => toast('ثبت شد'), { panel: p.code, inbound: i.id, protocol: i.protocol.toUpperCase() }) }) : h('span', { class: 'muted', text: 'قابل فروش نیست' }) },
       ], items));
     } catch (e) { clear(body); body.append(errorState(errMsg(e))); }
   })();
 }
 
 function panelForm(p, done) {
-  const f = (label, name, o = {}) => h('div', { class: `field ${o.full ? 'full' : ''}` }, h('label', { for: `pn-${name}`, text: label }), h('input', { class: `input ${o.ltr === false ? '' : 'ltr'}`, dir: o.ltr === false ? false : 'ltr', id: `pn-${name}`, name, type: o.type || 'text', value: o.val ?? '', placeholder: o.ph || '', autocomplete: 'off' }), o.hint ? h('div', { class: 'hint', text: o.hint }) : null);
+  const f = (label, name, o = {}) => h('div', { class: `field ${o.full ? 'full' : ''}`, 'data-for': o.only || '' }, h('label', { for: `pn-${name}`, text: label }), h('input', { class: `input ${o.ltr === false ? '' : 'ltr'}`, dir: o.ltr === false ? false : 'ltr', id: `pn-${name}`, name, type: o.type || 'text', value: o.val ?? '', placeholder: o.ph || '', autocomplete: 'off' }), o.hint ? h('div', { class: 'hint', text: o.hint }) : null);
   const tls = h('button', { type: 'button', class: 'switch', role: 'switch', 'aria-checked': String(!!p?.tlsInsecure), 'aria-label': 'گواهی خودامضا' });
   tls.addEventListener('click', () => tls.setAttribute('aria-checked', String(tls.getAttribute('aria-checked') !== 'true')));
+  const kindSel = h('select', { class: 'input', name: 'kind', id: 'pn-kind', disabled: !!p }, h('option', { value: 'xui', text: 'X-UI / 3x-ui' }), h('option', { value: 'vpnpanel', text: 'پنل اختصاصی (vpn-panel)' }));
+  kindSel.value = p?.kind || 'xui';
+  const profLine = (x) => `${x.id} | ${x.name} | ${x.protos.join(',')} | ${x.nodeIds.length ? x.nodeIds.join(',') : 'همه'}`;
+  const profiles = h('textarea', { class: 'input ltr', dir: 'ltr', rows: 4, name: 'profiles', placeholder: '1 | اصلی | vless | همه' });
+  profiles.value = (p?.profiles || []).map(profLine).join('\n');
+  const probeOut = h('div', { class: 'hint' });
+  const probeBtn = button('نمایش پروتکل‌ها و لوکیشن‌های پنل', { size: 'sm', onClick: async () => {
+    const v = (n) => form.querySelector(`[name=${n}]`).value.trim();
+    probeOut.textContent = 'در حال اتصال…';
+    try {
+      const r = await api('/panels/probe', { method: 'POST', body: { baseUrl: v('baseUrl'), apiToken: v('apiToken'), tlsInsecure: tls.getAttribute('aria-checked') === 'true' } });
+      probeOut.textContent = `پروتکل‌های قابل فروش حجمی: ${r.protocols.filter((x) => x.counted).map((x) => x.id).join(', ') || '—'}`
+        + (r.protocols.some((x) => !x.counted) ? ` | بدون شمارش حجم (غیرقابل فروش): ${r.protocols.filter((x) => !x.counted).map((x) => x.id).join(', ')}` : '')
+        + ` | لوکیشن‌ها: ${r.nodes.map((n) => `${n.id}=${n.name}${n.online ? '' : ' (آفلاین)'}`).join(', ') || '—'}`;
+    } catch (e) { probeOut.textContent = errMsg(e); }
+  } });
   const form = h('form', { class: 'form-grid', novalidate: true },
+    h('div', { class: 'field full' }, h('label', { for: 'pn-kind', text: 'نوع پنل' }), kindSel),
     f('نام پنل', 'name', { full: true, ltr: false, val: p?.name, ph: 'مثلاً: آلمان ۱' }),
     f('آدرس پنل (با مسیر)', 'baseUrl', { full: true, val: p?.baseUrl, ph: 'https://1.2.3.4:2053/مسیر-پنل' }),
-    f('نام کاربری', 'username', { ph: p ? 'بدون تغییر' : 'admin' }), f('رمز عبور', 'password', { type: 'password', ph: p ? 'بدون تغییر' : '', hint: p ? 'خالی = بدون تغییر' : '' }),
-    f('یا توکن API', 'apiToken', { full: true, type: 'password', ph: p?.auth === 'token' ? 'بدون تغییر' : 'اختیاری؛ جایگزین کاربر/رمز' }),
-    f('آدرس Subscription', 'subBaseUrl', { full: true, val: p?.subBaseUrl || '', ph: 'https://sub.example.com:2096/sub  (اختیاری)' }),
-    f('هاست داخل لینک‌ها', 'publicHost', { full: true, val: p?.publicHost || '', ph: 'example.com  (اختیاری)' }),
+    f('نام کاربری', 'username', { only: 'xui', ph: p ? 'بدون تغییر' : 'admin' }), f('رمز عبور', 'password', { only: 'xui', type: 'password', ph: p ? 'بدون تغییر' : '', hint: p ? 'خالی = بدون تغییر' : '' }),
+    f('توکن API', 'apiToken', { full: true, type: 'password', ph: p?.auth === 'token' ? 'بدون تغییر' : 'X-UI: اختیاری · پنل اختصاصی: PANEL_API_KEY', hint: 'برای پنل اختصاصی همان PANEL_API_KEY داخل .env پنل است' }),
+    h('div', { class: 'field full', 'data-for': 'vpnpanel' }, h('label', { text: 'پروفایل‌ها (هر خط یک پروفایل)' }), profiles, h('div', { class: 'hint', text: 'قالب: شماره | نام | پروتکل‌ها با کاما | شماره لوکیشن‌ها یا «همه». هر محصول به یک پروفایل بسته می‌شود.' }), probeBtn, probeOut),
+    f('آدرس Subscription', 'subBaseUrl', { full: true, only: 'xui', val: p?.subBaseUrl || '', ph: 'https://sub.example.com:2096/sub  (اختیاری)' }),
+    f('هاست داخل لینک‌ها', 'publicHost', { full: true, only: 'xui', val: p?.publicHost || '', ph: 'example.com  (اختیاری)' }),
     h('div', { class: 'field full' }, h('div', { class: 'row' }, tls, h('span', { text: 'گواهی TLS خودامضا را بپذیر' })), h('div', { class: 'hint', text: 'فقط وقتی پنل با https و گواهی خودامضا کار می‌کند.' })),
     h('div', { class: 'full form-error', hidden: true, id: 'pn-err' }));
+  const sync = () => form.querySelectorAll('[data-for]').forEach((el) => { const w = el.getAttribute('data-for'); el.hidden = !!w && w !== kindSel.value; });
+  kindSel.addEventListener('change', sync); sync();
+  const parseProfiles = () => profiles.value.split('\n').map((l) => l.trim()).filter(Boolean).map((l) => {
+    const [id, name, pr, nd] = l.split('|').map((x) => x.trim());
+    if (!/^\d+$/.test(id || '') || !name || !pr) throw new Error(`خط نامعتبر: ${l}`);
+    const nodeIds = !nd || nd === 'همه' ? [] : nd.split(',').map((x) => Number(x.trim()));
+    if (nodeIds.some((n) => !Number.isInteger(n))) throw new Error(`شماره‌ی لوکیشن نامعتبر: ${l}`);
+    return { id: Number(id), name, protos: pr.split(',').map((x) => x.trim()).filter(Boolean), nodeIds };
+  });
   const save = button(p ? 'ذخیره و تست اتصال' : 'تست اتصال و افزودن', { kind: 'primary', onClick: async () => {
     const err = form.querySelector('#pn-err'); err.hidden = true;
     const v = (n) => form.querySelector(`[name=${n}]`).value.trim();
-    const body = { name: v('name'), baseUrl: v('baseUrl'), tlsInsecure: tls.getAttribute('aria-checked') === 'true', subBaseUrl: v('subBaseUrl'), publicHost: v('publicHost') };
-    if (v('username')) body.username = v('username');
-    if (form.querySelector('[name=password]').value) body.password = form.querySelector('[name=password]').value;
+    const kind = kindSel.value;
+    const body = { name: v('name'), baseUrl: v('baseUrl'), tlsInsecure: tls.getAttribute('aria-checked') === 'true' };
+    if (!p) body.kind = kind;
+    if (kind === 'xui') { body.subBaseUrl = v('subBaseUrl'); body.publicHost = v('publicHost'); if (v('username')) body.username = v('username'); if (form.querySelector('[name=password]').value) body.password = form.querySelector('[name=password]').value; }
     if (v('apiToken')) body.apiToken = v('apiToken');
     save.disabled = true;
-    try { await api(p ? `/panels/${p.id}` : '/panels', { method: p ? 'PATCH' : 'POST', body }); toast(p ? 'ذخیره شد' : 'پنل اضافه شد'); m.close(); done(); }
-    catch (e) { err.hidden = false; err.textContent = errMsg(e); } finally { save.disabled = false; }
+    try {
+      if (kind === 'vpnpanel') { const pr = parseProfiles(); if (pr.length) body.profiles = pr; }
+      await api(p ? `/panels/${p.id}` : '/panels', { method: p ? 'PATCH' : 'POST', body }); toast(p ? 'ذخیره شد' : 'پنل اضافه شد'); m.close(); done();
+    } catch (e) { err.hidden = false; err.textContent = errMsg(e); } finally { save.disabled = false; }
   } });
-  const m = modal({ title: p ? `ویرایش ${p.name}` : 'افزودن پنل X-UI', body: form, footer: [save, button('انصراف', { onClick: () => m.close() })] });
+  const m = modal({ title: p ? `ویرایش ${p.name}` : 'افزودن پنل', body: form, footer: [save, button('انصراف', { onClick: () => m.close() })] });
   form.addEventListener('submit', (e) => e.preventDefault());
 }
 
