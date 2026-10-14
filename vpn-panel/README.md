@@ -14,19 +14,18 @@
 - `agent/install.sh` نصب‌کننده نود (پنل آن را با آدرس خودش سرو می‌کند)
 - `deploy/` داکر و Caddy برای HTTPS
 
-## راه‌اندازی پنل
-سرور پنل یک دامنه لازم دارد که به آی‌پی آن اشاره کند.
+## راه‌اندازی پنل (یک دستور)
+روی یک سرور اوبونتو/دبیان با root، که یک دامنه به آی‌پی آن اشاره می‌کند و پورت‌های 80 و 443 باز است:
 
 ```bash
-cd vpn-panel
-cat > .env <<ENV
-PANEL_DOMAIN=panel.example.com
-PANEL_ADMIN_PASSWORD=یک-رمز-قوی
-PANEL_SECRET=$(openssl rand -hex 32)
-ENV
-docker compose --env-file .env -f deploy/docker-compose.yml up -d
+bash <(curl -fsSL https://raw.githubusercontent.com/mohammadabasii118-beep/mobile-shop/claude/vpn-panel/vpn-panel/install-panel.sh) --domain panel.example.com
 ```
-بدون داکر (برای تست): `cd panel && pip install -r requirements.txt && PANEL_ADMIN_PASSWORD=demo uvicorn app.main:app`
+این دستور Docker را نصب می‌کند، کد را در `/opt/vpn-panel` می‌گیرد، رمز ادمین و کلید را می‌سازد (در `/opt/vpn-panel/vpn-panel/.env`)، پنل را با HTTPS خودکار (Caddy) بالا می‌آورد و آخر کار آدرس و رمز را چاپ می‌کند. اجرای دوباره‌اش پنل را به‌روز می‌کند و تنظیمات و داده‌ها را نگه می‌دارد.
+
+- گزینه‌ها: `--password رمز` برای رمز دلخواه، `--branch نام` برای شاخه‌ی دیگر. بدون `--domain` از آی‌پی سرور با HTTP ساده استفاده می‌شود که توصیه نمی‌شود.
+- دستور بالا از GitHub می‌خواند؛ اگر ریپو خصوصی است باید public شود، یا کد را با `git clone` به سرور ببرید و `bash vpn-panel/install-panel.sh --domain ... --repo آدرس` را اجرا کنید.
+- پس از merge به `main`، در آدرس بالا `claude/vpn-panel` را با `main` عوض کنید.
+- بدون داکر (برای تست): `cd panel && pip install -r requirements.txt && PANEL_ADMIN_PASSWORD=demo uvicorn app.main:app`
 
 ## وصل‌کردن نود
 1. یک سرور لینوکس تازه (اوبونتو ۲۲.۰۴/۲۴.۰۴) در کشور مورد نظر بگیرید. آدرس نود می‌تواند خود آی‌پی باشد، ولی با دامنه (مثلاً `de.example.com`) می‌توانید بعداً گواهی واقعی بگذارید.
