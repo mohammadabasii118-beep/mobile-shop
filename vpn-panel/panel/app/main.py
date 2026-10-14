@@ -154,7 +154,7 @@ def node_out(node: Node, request: Request) -> dict:
     url = public_url(request)
     return {
         "id": node.id, "name": node.name, "cc": node.cc, "address": node.address,
-        "cf_domain": node.cf_domain, "cf_address": node.cf_address, "port_range": list(PORT_RANGE),
+        "cf_domain": node.cf_domain, "cf_address": node.cf_address, "conflicts": node.conflicts or [], "port_range": list(PORT_RANGE),
         "online": is_online(node), "load": node.load, "reality_ready": bool(node.reality_pub),
         "last_seen": node.last_seen.isoformat() + "Z" if node.last_seen else None,
         "protocols": [{"proto": p.proto, "enabled": p.enabled, "port": p.port,
@@ -395,11 +395,13 @@ class Report(BaseModel):
     tls_self_signed: bool = True
     wg_pub: str = ""
     ovpn_ca: str = ""
+    conflicts: list[str] = Field(default=[], max_length=50)
 
 
 @app.post("/api/node/report")
 def node_report(body: Report, node: Node = Depends(require_node), db: Session = Depends(get_db)):
     node.last_seen, node.load = utcnow(), body.load
+    node.conflicts = [c[:120] for c in body.conflicts]
     node.tls_self_signed = body.tls_self_signed
     if body.reality_pub:
         node.reality_pub, node.reality_sid = body.reality_pub, body.reality_sid

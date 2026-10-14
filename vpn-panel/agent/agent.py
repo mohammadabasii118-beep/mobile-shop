@@ -25,8 +25,9 @@ def users_for(cfg, proto):
     return [u for u in cfg["users"] if proto in u["protos"]]
 
 
-def render_xray(cfg, reality, tls):
-    ports = cfg["protocols"]
+def render_xray(cfg, reality, tls, busy=frozenset()):
+    """`busy`: TCP ports held by another program; those inbounds are left out so the rest still start."""
+    ports = {k: v for k, v in cfg["protocols"].items() if v not in busy}
     certs = [{"certificateFile": tls["cert"], "keyFile": tls["key"]}]
     inbounds = [{"tag": "api", "listen": "127.0.0.1", "port": 10085, "protocol": "dokodemo-door",
                  "settings": {"address": "127.0.0.1"}}]
@@ -79,8 +80,8 @@ def render_xray(cfg, reality, tls):
     }
 
 
-def render_singbox(cfg, tls):
-    ports, inbounds = cfg["protocols"], []
+def render_singbox(cfg, tls, busy=frozenset()):
+    ports, inbounds = {k: v for k, v in cfg["protocols"].items() if v not in busy}, []
     tls_block = {"enabled": True, "certificate_path": tls["cert"], "key_path": tls["key"], "alpn": ["h3"]}
     if "hy2" in ports and users_for(cfg, "hy2"):
         inbounds.append({"type": "hysteria2", "tag": "hy2", "listen": "::", "listen_port": ports["hy2"],
@@ -99,6 +100,36 @@ def set_conf_value(text, key, value):
     import re
     return re.sub(rf"^({re.escape(key)})(\s*=\s*|\s+)\S+", lambda m: f"{m.group(1)}{m.group(2)}{value}",
                   text, flags=re.M)
+
+
+OURS = {"xray", "sing-box", "openvpn", "ocserv", "ocserv-main", "ocserv-worker", "charon", "xl2tpd"}
+TCP_PROTOS = {"vless", "vless_tcp", "vless_ws", "vless_grpc", "vmess_ws", "vmess_tcp", "trojan", "trojan_ws", "ss", "anyc"}
+UDP_PROTOS = {"hy2", "tuic", "wg", "ovpn", "anyc"}
+
+
+def foreign_listeners(ss_text):
+    """`ss -H -ltnup` output -> {("tcp", 443): "xray-linux-amd6"} for ports held by programs that are not ours."""
+    import re
+    out = {}
+    for line in ss_text.splitlines():
+        f = line.split()
+        m = re.search(r'\(\("([^"]+)"', line)
+        if len(f) >= 5 and m and m.group(1) not in OURS and f[0] in ("tcp", "udp"):
+            port = f[4].rsplit(":", 1)[-1]
+            if port.isdigit():
+                out[(f[0], int(port))] = m.group(1)
+    return out
+
+
+def port_conflicts(cfg, foreign):
+    """-> ([tcp ports to skip], [udp ports to skip], ["tcp/8443 nginx", ...]) for the enabled protocols."""
+    tcp, udp, notes = set(), set(), []
+    for proto, port in cfg["protocols"].items():
+        for kind, group, bag in (("tcp", TCP_PROTOS, tcp), ("udp", UDP_PROTOS, udp)):
+            if proto in group and (kind, port) in foreign:
+                bag.add(port)
+                notes.append(f"{kind}/{port} {foreign[(kind, port)]} ({proto})")
+    return tcp, udp, sorted(set(notes))
 
 
 def render_l2tp(cfg):
@@ -365,10 +396,12 @@ def apply_port(path, values, service):
 
 
 def apply(cfg, reality, tls, wg):
-    xray_cfg = json.dumps(render_xray(cfg, reality, tls), indent=1)
+    """Write configs and restart what changed. Returns the port conflicts found."""
+    tcp_busy, udp_busy, conflicts = port_conflicts(cfg, foreign_listeners(sh("ss", "-H", "-ltnup").stdout))
+    xray_cfg = json.dumps(render_xray(cfg, reality, tls, tcp_busy), indent=1)
     if write_if_changed("/usr/local/etc/xray/config.json", xray_cfg, 0o644):
         restart("xray")
-    if write_if_changed("/etc/sing-box/config.json", json.dumps(render_singbox(cfg, tls), indent=1), 0o644):
+    if write_if_changed("/etc/sing-box/config.json", json.dumps(render_singbox(cfg, tls, udp_busy), indent=1), 0o644):
         restart("sing-box")
     l2 = render_l2tp(cfg)
     write_if_changed("/etc/ppp/chap-secrets", l2["chap_secrets"])  # read by pppd per login, no reload
@@ -387,6 +420,7 @@ def apply(cfg, reality, tls, wg):
                                            "udp-port": cfg["protocols"].get("anyc")}, "ocserv")
     write_if_changed("/etc/vpn-node/ovpn-users", render_ovpn_users(cfg), 0o644)  # checked per login
     write_if_changed("/etc/ocserv/ocpasswd", render_ocpasswd(cfg, crypt_hash), 0o600)  # checked per login
+    return conflicts
 
 
 def read_text(path):
@@ -409,14 +443,14 @@ def main():
         try:
             cfg = api(conf, "GET", "/api/node/config")
             self_update(conf, cfg.get("agent_sha256"))
-            apply(cfg, reality, tls, wg)
+            conflicts = apply(cfg, reality, tls, wg)
             for src in (xray_usage(), wg_usage(cfg) if wg else {}, session_usage()):
                 for k, v in src.items():
                     pending[k] = pending.get(k, 0) + v
             api(conf, "POST", "/api/node/report", {
                 "load": cpu_load_percent(), "usage": pending, "reality_pub": reality["public"],
                 "reality_sid": reality["short_id"], "tls_self_signed": conf.get("tls_self_signed", True),
-                "wg_pub": wg["public"] if wg else "", "ovpn_ca": read_text(f"{STATE_DIR}/ovpn/ca.crt")})
+                "conflicts": conflicts, "wg_pub": wg["public"] if wg else "", "ovpn_ca": read_text(f"{STATE_DIR}/ovpn/ca.crt")})
             pending = {}  # kept in memory until the panel accepted the report
         except Exception as e:  # keep running; the panel may be briefly unreachable
             print("agent error:", e, file=sys.stderr, flush=True)

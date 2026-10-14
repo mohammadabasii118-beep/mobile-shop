@@ -408,3 +408,47 @@ def test_agent_usage_parsers_and_counters():
     assert call() == {"ali_t": 200} and not closed.exists()     # 1000 - 800 already counted
     closed.write_text("ppp1 sara 700\n")                         # a session shorter than one poll
     assert call() == {"sara": 700}
+
+
+SS_SAMPLE = """udp   UNCONN 0      0            0.0.0.0:1194       0.0.0.0:*    users:(("openvpn",pid=3279693,fd=5))
+udp   UNCONN 0      0                  *:36247            *:*    users:(("xray-linux-amd6",pid=1475374,fd=268))
+tcp   LISTEN 0      4096       127.0.0.1:62789      0.0.0.0:*    users:(("xray-linux-amd6",pid=1475374,fd=4))
+tcp   LISTEN 0      4096               *:443              *:*    users:(("xray-linux-amd6",pid=1475374,fd=7))
+tcp   LISTEN 0      4096         0.0.0.0:4443       0.0.0.0:*    users:(("ocserv-main",pid=3279698,fd=3))
+tcp   LISTEN 0      4096         0.0.0.0:8443       0.0.0.0:*    users:(("nginx",pid=77,fd=6))
+tcp   LISTEN 0      4096         0.0.0.0:2083       0.0.0.0:*    users:(("xray",pid=99,fd=3))
+tcp   LISTEN 0      511             [::]:2087          [::]:*    users:(("nginx",pid=5,fd=6))
+udp   UNCONN 0      0            0.0.0.0:51820            *:*
+"""
+
+
+def test_busy_ports_skip_only_the_conflicting_inbounds():
+    foreign = agent.foreign_listeners(SS_SAMPLE)
+    assert foreign[("tcp", 443)] == "xray-linux-amd6" and foreign[("tcp", 8443)] == "nginx"
+    assert ("tcp", 2083) not in foreign and ("tcp", 4443) not in foreign and ("udp", 1194) not in foreign  # our own services
+
+    cfg = sample_cfg()
+    cfg["protocols"].update({"vless_ws": 2083, "trojan_ws": 2087})
+    cfg["users"][0]["protos"] += ["vless_ws", "trojan_ws"]
+    tcp, udp, notes = agent.port_conflicts(cfg, foreign)
+    assert tcp == {443, 8443, 2087} and not udp
+    assert "tcp/443 xray-linux-amd6 (vless)" in notes and "tcp/8443 nginx (trojan)" in notes
+
+    x = {i["tag"] for i in agent.render_xray(cfg, {"private": "P", "short_id": "ab"}, {"cert": "/c", "key": "/k"}, tcp)["inbounds"]}
+    assert x == {"api", "ss", "vless_ws"}   # VLESS, Trojan and Trojan+WS skipped, the rest still starts
+    # a port can be "busy" for UDP only: Hysteria2 is skipped, Xray's TCP inbounds are not
+    s = agent.render_singbox(cfg, {"cert": "/c", "key": "/k"}, {36712})
+    assert s["inbounds"] == []
+
+
+def test_panel_stores_and_shows_port_conflicts():
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "X", "cc": "de", "address": "x.example.com"}).json()
+        nh = {"Authorization": "Bearer " + node["install_command"].split("--token ")[1].split()[0]}
+        assert node["conflicts"] == []
+        c.post("/api/node/report", headers=nh, json={"conflicts": ["tcp/443 xray-linux-amd6 (vless)"]})
+        got = next(n for n in c.get("/api/nodes", headers=h).json() if n["id"] == node["id"])
+        assert got["conflicts"] == ["tcp/443 xray-linux-amd6 (vless)"]
+        c.post("/api/node/report", headers=nh, json={"conflicts": []})   # resolved -> cleared
+        assert next(n for n in c.get("/api/nodes", headers=h).json() if n["id"] == node["id"])["conflicts"] == []
