@@ -1,6 +1,6 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const S = {tab: 'dash', nodes: [], users: [], protos: []};
+const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null};
 const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', users: 'کاربران'};
 const STATUS = {active: ['good', 'فعال'], disabled: ['bad', 'غیرفعال'], expired: ['bad', 'منقضی'], quota: ['bad', 'حجم تمام شده']};
 
@@ -62,7 +62,8 @@ const views = {
       ${S.protos.map(p => `<tr><td><b>${esc(p.label)}</b><br><small class="muted">${esc(p.engine)} · ${esc(p.desc)}</small></td>
         ${S.nodes.map(n => { const np = n.protocols.find(x => x.proto === p.id);
           return `<td><input type="checkbox" data-node="${n.id}" data-proto="${p.id}" aria-label="${esc(p.label)} در ${esc(n.cc)}" ${np && np.enabled ? 'checked' : ''}></td>`; }).join('')}</tr>`).join('')}
-      </tbody></table></div>`;
+      </tbody></table></div>
+      ${portPanel()}`;
   },
   users() {
     return `<div class="panel scroll"><table><thead><tr><th>کاربر</th><th>مصرف</th><th>انقضا</th><th>پروتکل‌ها</th><th>وضعیت</th><th></th></tr></thead><tbody>
@@ -75,6 +76,20 @@ const views = {
         || '<tr><td colspan="6" class="muted">کاربری وجود ندارد.</td></tr>'}</tbody></table></div>`;
   },
 };
+
+function portPanel() {
+  if (!S.nodes.length) return '';
+  const n = nodeBy(S.portNode) || S.nodes[0], [lo, hi] = n.port_range;
+  return `<div class="panel"><h2>پورت‌ها</h2>
+    <div class="form" style="margin-bottom:10px"><label class="f">لوکیشن<select id="portNode">${S.nodes.map(x => `<option value="${x.id}" ${x.id === n.id ? 'selected' : ''}>${esc(x.cc)} ${esc(x.name)}</option>`).join('')}</select></label></div>
+    <div class="scroll"><table><thead><tr><th>پروتکل</th><th>پورت</th><th></th></tr></thead><tbody>
+    ${n.protocols.map(np => { const p = S.protos.find(x => x.id === np.proto);
+      return `<tr><td>${esc(p.label)}</td><td>${np.fixed ? `<span class="mono">${np.port}</span> <span class="pill">ثابت</span>`
+        : `<input type="number" min="1" max="65535" value="${np.port}" id="port-${np.proto}" style="width:110px" dir="ltr">`}</td>
+        <td>${np.fixed ? '' : `<button class="btn sm" data-setport="${np.proto}" data-nid="${n.id}">ذخیره</button> <button class="btn sm" data-randport="${np.proto}" data-nid="${n.id}">رندوم</button>`}</td></tr>`; }).join('')}
+    </tbody></table></div>
+    <div class="note" style="margin-top:10px">رندوم از بازه‌ی ${lo} تا ${hi} انتخاب می‌شود. پورت جدید را در فایروال سرویس‌دهنده باز کنید (بهتر است کل این بازه را از قبل باز بگذارید). لینک‌های قبلی کاربران با پورت قدیمی کار نمی‌کنند؛ کاربران باید اشتراک را به‌روز کنند.</div></div>`;
+}
 
 function render() {
   $('#title').textContent = TITLES[S.tab];
@@ -145,6 +160,11 @@ document.addEventListener('click', async e => {
       const n = await api('POST', '/nodes', {name: $('#nName').value.trim(), cc: $('#nCc').value.trim(), address: $('#nAddr').value.trim()});
       await refresh(); installDialog(n);
     }
+    else if (d.setport || d.randport) {
+      const proto = d.setport || d.randport;
+      const port = d.setport ? +$('#port-' + proto).value : null;
+      await api('PUT', `/nodes/${d.nid}/protocols/${proto}/port`, {port}); await refresh(); toast(port ? 'پورت ذخیره شد' : 'پورت رندوم ساخته شد');
+    }
     else if (d.install) installDialog(nodeBy(+d.install));
     else if (d.cf) cfDialog(nodeBy(+d.cf));
     else if (t.id === 'cfSave') { await api('PUT', `/nodes/${d.id}/cloudflare`, {cf_domain: $('#cfDomain').value.trim(), cf_address: $('#cfAddr').value.trim()}); closeModal(); await refresh(); toast('ذخیره شد'); }
@@ -164,6 +184,7 @@ document.addEventListener('click', async e => {
   } catch (err) { if (err.message !== 'login') toast(err.message); }
 });
 document.addEventListener('change', async e => {
+  if (e.target.id === 'portNode') { S.portNode = +e.target.value; render(); return; }
   const d = e.target.dataset; if (!d.proto) return;
   try { await api('PUT', `/nodes/${d.node}/protocols/${d.proto}`, {enabled: e.target.checked}); await refresh(); }
   catch (err) { toast(err.message); }

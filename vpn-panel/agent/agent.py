@@ -93,6 +93,13 @@ def render_singbox(cfg, tls):
     return {"log": {"level": "warn"}, "inbounds": inbounds, "outbounds": [{"type": "direct"}]}
 
 
+def set_conf_value(text, key, value):
+    """Set `key value` / `key = value` in a config file, keeping the file's own style."""
+    import re
+    return re.sub(rf"^({re.escape(key)})(\s*=\s*|\s+)\S+", lambda m: f"{m.group(1)}{m.group(2)}{value}",
+                  text, flags=re.M)
+
+
 def render_l2tp(cfg):
     lines = [f'"{u["name"]}" l2tpd "{u["password"]}" *' for u in users_for(cfg, "l2tp")]
     return {"chap_secrets": "\n".join(lines) + ("\n" if lines else ""),
@@ -211,6 +218,18 @@ def wg_usage(cfg):
     return usage
 
 
+def apply_port(path, values, service):
+    """Rewrite listen ports in a service's config and restart it when they changed."""
+    text = read_text(path)
+    new = text
+    for key, port in values.items():
+        if port:
+            new = set_conf_value(new, key, port)
+    if text and new != text:
+        write_if_changed(path, new, 0o644)
+        sh("systemctl", "restart", service)
+
+
 def apply(cfg, reality, tls, wg):
     xray_cfg = json.dumps(render_xray(cfg, reality, tls), indent=1)
     if write_if_changed("/usr/local/etc/xray/config.json", xray_cfg, 0o644):
@@ -229,6 +248,9 @@ def apply(cfg, reality, tls, wg):
             sh("wg", "syncconf", "wg0", tmp)  # live update, keeps existing sessions
         else:
             sh("systemctl", "restart", "wg-quick@wg0")
+    apply_port("/etc/openvpn/server/server.conf", {"port": cfg["protocols"].get("ovpn")}, "openvpn-server@server")
+    apply_port("/etc/ocserv/ocserv.conf", {"tcp-port": cfg["protocols"].get("anyc"),
+                                           "udp-port": cfg["protocols"].get("anyc")}, "ocserv")
     write_if_changed("/etc/vpn-node/ovpn-users", render_ovpn_users(cfg), 0o644)  # checked per login
     write_if_changed("/etc/ocserv/ocpasswd", render_ocpasswd(cfg, crypt_hash), 0o600)  # checked per login
 

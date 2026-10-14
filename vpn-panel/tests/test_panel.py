@@ -201,3 +201,36 @@ def test_cloudflare_entries():
         # the direct entries still point at the node itself
         direct = next(r for r in rows if r["proto"] == "vless_ws" and "Cloudflare" not in r["label"])
         assert "@1.2.3.4:2083" in direct["link"]
+
+
+def test_manual_and_random_ports():
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "P", "cc": "fi", "address": "fi.example.com"}).json()
+        url = lambda proto: f"/api/nodes/{node['id']}/protocols/{proto}/port"
+        r = c.put(url("hy2"), headers=h, json={"port": 40123})
+        assert next(p for p in r.json()["protocols"] if p["proto"] == "hy2")["port"] == 40123
+        assert c.put(url("tuic"), headers=h, json={"port": 40123}).status_code == 409   # already used
+        assert c.put(url("tuic"), headers=h, json={"port": 22}).status_code == 422      # reserved
+        assert c.put(url("l2tp"), headers=h, json={"port": 1800}).status_code == 422    # fixed by IPsec
+        assert c.put(url("tuic"), headers=h, json={"port": 70000}).status_code == 422
+        seen = set()
+        for _ in range(5):
+            p = next(x for x in c.put(url("tuic"), headers=h, json={}).json()["protocols"] if x["proto"] == "tuic")["port"]
+            assert 10000 <= p <= 60000 and p != 40123
+            seen.add(p)
+        assert len(seen) > 1
+
+        # the new port reaches the node config and the user's link
+        nh = {"Authorization": "Bearer " + node["install_command"].split("--token ")[1].split()[0]}
+        user = c.post("/api/users", headers=h, json={"name": "portuser", "protos": ["hy2"], "node_ids": [node["id"]]}).json()
+        assert c.get("/api/node/config", headers=nh).json()["protocols"]["hy2"] == 40123
+        link = c.get(f"/api/users/{user['id']}/configs", headers=h).json()[0]["link"]
+        assert "@fi.example.com:40123" in link
+
+
+def test_agent_port_rewrite():
+    assert agent.set_conf_value("port 1194\nproto udp\n", "port", 2222) == "port 2222\nproto udp\n"
+    text = "tcp-port = 4443\nudp-port = 4443\nrun-as-user = nobody\n"
+    out = agent.set_conf_value(agent.set_conf_value(text, "tcp-port", 5555), "udp-port", 5555)
+    assert out == "tcp-port = 5555\nudp-port = 5555\nrun-as-user = nobody\n"

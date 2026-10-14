@@ -24,6 +24,18 @@ from .subscription import new_wg_keypair, subscription_body, user_entries, user_
 BASE = Path(__file__).resolve().parent
 ROOT = BASE.parent.parent  # vpn-panel/
 GB = 1024 ** 3
+RESERVED_PORTS = {22, 53, 80, 500, 1701, 4500, 10085}  # SSH, DNS, HTTP, IPsec/L2TP, Xray stats API
+
+
+def _port_range() -> tuple[int, int]:
+    lo, _, hi = os.environ.get("PANEL_RANDOM_PORT_RANGE", "10000-60000").partition("-")
+    lo, hi = int(lo), int(hi or lo)
+    if not 1024 <= lo <= hi <= 65535:
+        raise RuntimeError("PANEL_RANDOM_PORT_RANGE must look like 10000-60000")
+    return lo, hi
+
+
+PORT_RANGE = _port_range()
 ONLINE_WINDOW = 90  # seconds without a report before a node shows as offline
 SECRET = (os.environ.get("PANEL_SECRET") or secrets.token_hex(32)).encode()
 
@@ -104,10 +116,11 @@ def node_out(node: Node, request: Request) -> dict:
     url = public_url(request)
     return {
         "id": node.id, "name": node.name, "cc": node.cc, "address": node.address,
-        "cf_domain": node.cf_domain, "cf_address": node.cf_address,
+        "cf_domain": node.cf_domain, "cf_address": node.cf_address, "port_range": list(PORT_RANGE),
         "online": is_online(node), "load": node.load, "reality_ready": bool(node.reality_pub),
         "last_seen": node.last_seen.isoformat() + "Z" if node.last_seen else None,
-        "protocols": [{"proto": p.proto, "enabled": p.enabled, "port": p.port} for p in node.protocols],
+        "protocols": [{"proto": p.proto, "enabled": p.enabled, "port": p.port,
+                       "fixed": PROTOCOLS[p.proto]["fixed_port"]} for p in node.protocols],
         "install_command": f"bash <(curl -sL {url}/node-install.sh) --token {node.token} --address {node.address}",
     }
 
@@ -188,6 +201,33 @@ def toggle_protocol(node_id: int, proto: str, body: ProtoToggle, db: Session = D
     np.enabled = body.enabled
     db.commit()
     return {"ok": True}
+
+
+class PortIn(BaseModel):
+    port: int | None = Field(default=None, ge=1, le=65535)  # None = pick a random free port
+
+
+@app.put("/api/nodes/{node_id}/protocols/{proto}/port", dependencies=[Depends(require_admin)])
+def set_port(node_id: int, proto: str, body: PortIn, request: Request, db: Session = Depends(get_db)):
+    node = db.get(Node, node_id) or _404()
+    np = next((p for p in node.protocols if p.proto == proto), None) or _404()
+    if PROTOCOLS[proto]["fixed_port"]:
+        raise HTTPException(422, "پورت این پروتکل طبق استاندارد ثابت است")
+    used = {p.port for p in node.protocols if p is not np}
+    if body.port is None:
+        free = [x for x in range(PORT_RANGE[0], PORT_RANGE[1] + 1) if x not in used and x not in RESERVED_PORTS]
+        if not free:
+            raise HTTPException(409, "پورت آزادی در بازه نمانده است")
+        port = secrets.choice(free)
+    else:
+        port = body.port
+        if port in RESERVED_PORTS:
+            raise HTTPException(422, f"پورت {port} رزرو است")
+        if port in used:
+            raise HTTPException(409, f"پورت {port} را پروتکل دیگری در این نود استفاده می‌کند")
+    np.port = port
+    db.commit()
+    return node_out(node, request)
 
 
 class UserIn(BaseModel):
