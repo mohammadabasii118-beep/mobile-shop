@@ -133,8 +133,8 @@ def cert_sha256(path):
 
 def main():
     global DEFAULT_PIN
-    if len(sys.argv) < 2:
-        sys.exit(__doc__)
+    if len(sys.argv) < 2 or not sys.argv[1].startswith(("http://", "https://")):
+        sys.exit(__doc__ + "\n\nPass the user's real subscription link (https://.../sub/...), not a placeholder.")
     DEFAULT_PIN = cert_sha256(os.environ.get("SELFTEST_CERT", "/etc/vpn-node/tls.crt"))
     xray = shutil.which("xray") or "/usr/local/bin/xray"
     wanted = sys.argv[2].lower() if len(sys.argv) > 2 else ""
