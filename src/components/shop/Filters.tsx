@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { SlidersHorizontal, X, Smartphone } from 'lucide-react';
-import { clearPhone, savePhone } from '@/lib/phone';
 
 export type FilterData = {
   basePath: string;
@@ -38,7 +37,7 @@ export default function Filters({ d }: { d: FilterData }) {
       <form
         className={`filters${open ? ' open' : ''}`} method="get" action={d.basePath} aria-label="فیلتر محصولات"
         onSubmit={() => {
-          if (pm) savePhone(pb, pm); else clearPhone();
+          try { if (pm) localStorage.setItem('vt_phone', JSON.stringify({ brand: pb, model: pm })); } catch { /* noop */ }
         }}
       >
         <div className="f-head"><b style={{ fontSize: 18 }}>فیلترها</b><button type="button" className="icon-btn" onClick={() => setOpen(false)} aria-label="بستن فیلترها"><X className="i" /></button></div>

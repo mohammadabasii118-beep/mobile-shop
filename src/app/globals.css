@@ -404,7 +404,7 @@ section.sec.tight-top { padding-top: 0; }
 .empty { display: grid; justify-items: center; text-align: center; gap: 10px; padding: 56px 16px; color: var(--mute); }
 .empty svg.big { width: 64px; height: 64px; stroke-width: 1.2; color: var(--stone); }
 .empty h2, .empty h3 { font-size: 18px; color: var(--ink); }
-.my-phone { flex-wrap: wrap; background: var(--action-soft); border-radius: var(--r-md); padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: var(--ink); display: flex; gap: 10px; align-items: center; }
+.my-phone { background: var(--action-soft); border-radius: var(--r-md); padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: var(--ink); display: flex; gap: 10px; align-items: center; }
 
 /* ───────── صفحه‌ی محصول ───────── */
 .pdp { display: grid; gap: 24px; padding-bottom: 48px; }
@@ -606,6 +606,3 @@ section.sec.tight-top { padding-top: 0; }
 .receipt-prev img { width: 96px; height: 96px; object-fit: cover; border-radius: var(--r-md); box-shadow: inset 0 0 0 1px var(--hairline); }
 
 .p-brands { display: flex; flex-wrap: wrap; gap: 4px 14px; }
-
-.my-phone .mp-acts { margin-inline-start: auto; display: flex; gap: 14px; align-items: center; }
-.my-phone button.link { background: none; border: 0; padding: 0; font: inherit; cursor: pointer; color: var(--action); }
