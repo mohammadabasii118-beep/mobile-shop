@@ -1,5 +1,6 @@
 import base64
 import importlib.util
+import json
 import os
 import sys
 import tempfile
@@ -102,8 +103,73 @@ def test_agent_renderers():
     assert s["inbounds"][0]["users"] == [{"name": "ali_t", "password": "pw1"}]
     l = agent.render_l2tp(cfg)
     assert l["chap_secrets"] == '"ali_t" l2tpd "pw1" *\n"sara" l2tpd "pw2" *\n'
-    assert l["ipsec_secrets"] == ': PSK "psk123"\n'
+    assert l["ipsec_secrets"] == ': PSK "psk123"\n: RSA /etc/ipsec.d/private/server.key\n'
     # an inbound with no users is omitted instead of rendered empty
     cfg["users"] = [u for u in cfg["users"] if u["name"] == "sara"]
     assert {i["tag"] for i in agent.render_xray(cfg, reality, tls)["inbounds"]} == {"api"}
     assert agent.render_singbox(cfg, tls)["inbounds"] == []
+
+
+ALL = ["vless", "vless_ws", "vless_grpc", "vmess_ws", "trojan", "trojan_ws", "ss", "hy2", "tuic",
+       "wg", "ovpn", "l2tp", "ikev2", "anyc"]
+
+
+def test_all_protocols_have_entries_and_node_config():
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "NL", "cc": "nl", "address": "nl.example.com"}).json()
+        assert {p["proto"] for p in node["protocols"]} == set(ALL)
+        nh = {"Authorization": "Bearer " + node["install_command"].split("--token ")[1].split()[0]}
+        user = c.post("/api/users", headers=h, json={"name": "full", "protos": ALL,
+                                                      "node_ids": [node["id"]]}).json()
+
+        cfg = c.get("/api/node/config", headers=nh).json()
+        u = next(x for x in cfg["users"] if x["name"] == "full")
+        assert u["wg_pub"] and u["wg_ip"].startswith("10.88.")
+
+        # WireGuard and OpenVPN need data the node reports first
+        before = {e["proto"] for e in c.get(f"/api/users/{user['id']}/configs", headers=h).json()}
+        assert not {"vless", "wg", "ovpn"} & before
+        c.post("/api/node/report", headers=nh, json={"reality_pub": "PUB", "reality_sid": "ab", "wg_pub": "WGPUB",
+                                                      "ovpn_ca": "-----BEGIN CERTIFICATE-----\nX\n-----END CERTIFICATE-----"})
+        rows = {e["proto"]: e for e in c.get(f"/api/users/{user['id']}/configs", headers=h).json()}
+        assert set(rows) == set(ALL)
+        assert "type=ws" in rows["vless_ws"]["link"] and "path=%2Fvless" in rows["vless_ws"]["link"]
+        assert "type=grpc" in rows["vless_grpc"]["link"] and "serviceName=grpc" in rows["vless_grpc"]["link"]
+        vm = rows["vmess_ws"]["link"]
+        assert json.loads(base64.b64decode(vm[len("vmess://"):]))["net"] == "ws"
+        assert rows["tuic"]["link"].startswith(f"tuic://{u['uuid']}:")
+        wgc = rows["wg"]["copy"]
+        assert "PublicKey = WGPUB" in wgc and f"Address = {u['wg_ip']}/32" in wgc and "PrivateKey = " in wgc
+        assert "<ca>" in rows["ovpn"]["copy"] and "remote nl.example.com 1194" in rows["ovpn"]["copy"]
+        assert "full" in rows["ikev2"]["summary"] and "4443" in rows["anyc"]["summary"]
+
+
+def test_wireguard_keypair_is_valid():
+    from app.subscription import new_wg_keypair, wg_ip
+    priv, pub = new_wg_keypair()
+    assert len(base64.b64decode(priv)) == 32 and len(base64.b64decode(pub)) == 32 and priv != pub
+    assert wg_ip(1) != wg_ip(2) and wg_ip(1).startswith("10.88.")
+
+
+def test_agent_renderers_new_protocols():
+    cfg = sample_cfg()
+    allp = ["vless_ws", "vless_grpc", "vmess_ws", "trojan_ws", "tuic", "wg", "ovpn", "ikev2", "anyc"]
+    cfg["protocols"].update({"vless_ws": 2083, "vless_grpc": 2096, "vmess_ws": 2053, "trojan_ws": 2087,
+                             "tuic": 8444, "wg": 51820, "ovpn": 1194, "ikev2": 500, "anyc": 4443})
+    cfg["users"][0]["protos"] += allp
+    cfg["users"][0].update({"wg_pub": "WGPUBU", "wg_ip": "10.88.0.2"})
+    tls = {"cert": "/c", "key": "/k"}
+    x = {i["tag"]: i for i in agent.render_xray(cfg, {"private": "P", "short_id": "ab"}, tls)["inbounds"]}
+    assert x["vless_ws"]["streamSettings"]["network"] == "ws"
+    assert x["vless_ws"]["streamSettings"]["wsSettings"]["path"] == "/vless"
+    assert x["vless_grpc"]["streamSettings"]["grpcSettings"]["serviceName"] == "grpc"
+    assert x["vmess_ws"]["settings"]["clients"][0]["alterId"] == 0
+    assert x["trojan_ws"]["streamSettings"]["wsSettings"]["path"] == "/trojan"
+    assert [i["type"] for i in agent.render_singbox(cfg, tls)["inbounds"]] == ["hysteria2", "tuic"]
+    wg = agent.render_wg(cfg, "SRVPRIV")
+    assert "PrivateKey = SRVPRIV" in wg and "AllowedIPs = 10.88.0.2/32" in wg and wg.count("[Peer]") == 1
+    assert agent.render_ovpn_users(cfg).startswith("ali_t:") and len(agent.render_ovpn_users(cfg).split(":")[1].strip()) == 64
+    assert agent.render_ocpasswd(cfg, lambda p: "H(" + p + ")") == "ali_t:*:H(pw1)\n"
+    sec = agent.render_ipsec_secrets(cfg)
+    assert ': PSK "psk123"' in sec and 'ali_t : EAP "pw1"' in sec and "RSA" in sec

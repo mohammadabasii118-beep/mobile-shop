@@ -18,8 +18,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .catalog import PROTOCOLS, REALITY_SNI, SS_METHOD
-from .db import Node, NodeProtocol, User, get_db, init_db, utcnow
-from .subscription import subscription_body, user_entries, user_ss_key
+from .db import Node, NodeProtocol, User, engine, get_db, init_db, utcnow
+from .subscription import new_wg_keypair, subscription_body, user_entries, user_ss_key, wg_ip
 
 BASE = Path(__file__).resolve().parent
 ROOT = BASE.parent.parent  # vpn-panel/
@@ -39,6 +39,10 @@ def admin_password() -> str:
 async def lifespan(_: FastAPI):
     admin_password()
     init_db()
+    with Session(engine) as db:  # nodes created before a protocol existed get a (default-on) row for it
+        for node in db.scalars(select(Node)):
+            ensure_protocols(node)
+        db.commit()
     yield
 
 
@@ -83,6 +87,11 @@ def login(body: Login):
 
 
 # ---------- helpers ----------
+def ensure_protocols(node: Node) -> None:
+    have = {p.proto for p in node.protocols}
+    node.protocols += [NodeProtocol(proto=k, port=v["port"]) for k, v in PROTOCOLS.items() if k not in have]
+
+
 def public_url(request: Request) -> str:
     return (os.environ.get("PANEL_PUBLIC_URL") or str(request.base_url)).rstrip("/")
 
@@ -137,7 +146,7 @@ def create_node(body: NodeIn, request: Request, db: Session = Depends(get_db)):
                 token=secrets.token_urlsafe(24),
                 ss_key=base64.b64encode(secrets.token_bytes(16)).decode(),
                 l2tp_psk=secrets.token_urlsafe(12))
-    node.protocols = [NodeProtocol(proto=k, port=v["port"]) for k, v in PROTOCOLS.items()]
+    ensure_protocols(node)
     db.add(node)
     db.commit()
     return node_out(node, request)
@@ -197,6 +206,7 @@ def create_user(body: UserIn, request: Request, db: Session = Depends(get_db)):
                 password=secrets.token_urlsafe(12), quota_bytes=int(body.quota_gb * GB),
                 expire_at=utcnow() + timedelta(days=body.days) if body.days else None,
                 protos=body.protos, node_ids=body.node_ids)
+    user.wg_private, user.wg_public = new_wg_keypair()
     db.add(user)
     db.commit()
     return user_out(user, request)
@@ -252,7 +262,8 @@ def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db
         protos = [p for p in u.protos if p in enabled]
         if protos:
             users.append({"name": u.name, "uuid": u.uuid, "password": u.password,
-                          "ss_key": user_ss_key(u.uuid), "protos": protos})
+                          "ss_key": user_ss_key(u.uuid), "wg_pub": u.wg_public,
+                          "wg_ip": wg_ip(u.id), "protos": protos})
     return {"node": {"name": node.name, "reality_sni": REALITY_SNI, "ss_method": SS_METHOD,
                      "ss_key": node.ss_key, "l2tp_psk": node.l2tp_psk},
             "protocols": enabled, "users": users}
@@ -264,6 +275,8 @@ class Report(BaseModel):
     reality_pub: str = ""
     reality_sid: str = ""
     tls_self_signed: bool = True
+    wg_pub: str = ""
+    ovpn_ca: str = ""
 
 
 @app.post("/api/node/report")
@@ -272,6 +285,7 @@ def node_report(body: Report, node: Node = Depends(require_node), db: Session = 
     node.tls_self_signed = body.tls_self_signed
     if body.reality_pub:
         node.reality_pub, node.reality_sid = body.reality_pub, body.reality_sid
+    node.wg_pub, node.ovpn_ca = body.wg_pub or node.wg_pub, body.ovpn_ca or node.ovpn_ca
     if body.usage:
         for u in db.scalars(select(User).where(User.name.in_(body.usage))):
             u.used_bytes += max(0, body.usage[u.name])

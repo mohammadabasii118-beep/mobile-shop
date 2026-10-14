@@ -30,6 +30,8 @@ class Node(Base):
     reality_pub: Mapped[str] = mapped_column(default="")
     reality_sid: Mapped[str] = mapped_column(default="")
     tls_self_signed: Mapped[bool] = mapped_column(default=True)
+    wg_pub: Mapped[str] = mapped_column(default="")
+    ovpn_ca: Mapped[str] = mapped_column(default="")
     protocols: Mapped[list["NodeProtocol"]] = relationship(
         cascade="all, delete-orphan", order_by="NodeProtocol.id")
 
@@ -50,6 +52,8 @@ class User(Base):
     sub_token: Mapped[str] = mapped_column(unique=True)
     uuid: Mapped[str]
     password: Mapped[str]
+    wg_private: Mapped[str] = mapped_column(default="")
+    wg_public: Mapped[str] = mapped_column(default="")
     quota_bytes: Mapped[int] = mapped_column(default=0)  # 0 = unlimited
     used_bytes: Mapped[int] = mapped_column(default=0)
     expire_at: Mapped[datetime | None] = mapped_column(default=None)

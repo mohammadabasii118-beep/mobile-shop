@@ -115,8 +115,7 @@ async function configsDialog(id) {
     <div class="link"><span style="min-width:90px">لینک اشتراک</span><code>${esc(u.sub_url)}</code><button class="btn sm" data-copy="${esc(u.sub_url)}">کپی</button></div>
     <div class="links">${rows.length ? rows.map(r => r.link
       ? `<div class="link"><span class="cc">${esc(r.cc)}</span><span style="min-width:110px">${esc(r.label)}</span><code>${esc(r.link)}</code><button class="btn sm" data-copy="${esc(r.link)}">کپی</button></div>`
-      : `<div class="link"><span class="cc">${esc(r.cc)}</span><span style="min-width:110px">${esc(r.label)}</span><code>${esc(`${r.details.server} | ${r.details.username} | ${r.details.password} | PSK: ${r.details.psk}`)}</code>
-         <button class="btn sm" data-copy="${esc(`Server: ${r.details.server}\nUsername: ${r.details.username}\nPassword: ${r.details.password}\nPSK: ${r.details.psk}`)}">کپی</button></div>`).join('')
+      : `<div class="link"><span class="cc">${esc(r.cc)}</span><span style="min-width:110px">${esc(r.label)}</span><code>${esc(r.summary)}</code><button class="btn sm" data-copy="${esc(r.copy)}">کپی</button></div>`).join('')
       : '<p class="muted">هنوز کانفیگی نیست. نود باید آنلاین باشد و پروتکل مورد نظر روی آن روشن باشد (برای VLESS اولین گزارش نود لازم است).</p>'}</div>
     <div style="text-align:left"><button class="btn" data-close>بستن</button></div>`);
 }

@@ -16,66 +16,108 @@ XRAY_API = "127.0.0.1:10085"
 
 
 # ---------- renderers (pure functions, covered by tests) ----------
+WS_PATHS = {"vmess_ws": "/ws", "vless_ws": "/vless", "trojan_ws": "/trojan"}
+GRPC_SERVICE = "grpc"
+
+
 def users_for(cfg, proto):
     return [u for u in cfg["users"] if proto in u["protos"]]
 
 
 def render_xray(cfg, reality, tls):
     ports = cfg["protocols"]
+    certs = [{"certificateFile": tls["cert"], "keyFile": tls["key"]}]
     inbounds = [{"tag": "api", "listen": "127.0.0.1", "port": 10085, "protocol": "dokodemo-door",
                  "settings": {"address": "127.0.0.1"}}]
-    certs = [{"certificateFile": tls["cert"], "keyFile": tls["key"]}]
-    if "vless" in ports and users_for(cfg, "vless"):
-        inbounds.append({
-            "tag": "vless", "port": ports["vless"], "protocol": "vless",
-            "settings": {"decryption": "none", "clients": [
-                {"id": u["uuid"], "email": u["name"], "flow": "xtls-rprx-vision"}
-                for u in users_for(cfg, "vless")]},
-            "streamSettings": {"network": "tcp", "security": "reality", "realitySettings": {
-                "dest": cfg["node"]["reality_sni"] + ":443",
-                "serverNames": [cfg["node"]["reality_sni"]],
-                "privateKey": reality["private"], "shortIds": [reality["short_id"]]}}})
-    if "trojan" in ports and users_for(cfg, "trojan"):
-        inbounds.append({
-            "tag": "trojan", "port": ports["trojan"], "protocol": "trojan",
-            "settings": {"clients": [{"password": u["password"], "email": u["name"]}
-                                     for u in users_for(cfg, "trojan")]},
-            "streamSettings": {"network": "tcp", "security": "tls",
-                               "tlsSettings": {"certificates": certs}}})
+
+    def tls_stream(network, **extra):
+        return {"network": network, "security": "tls", "tlsSettings": {"certificates": certs}, **extra}
+
+    def add(proto, protocol, clients, stream, **settings):
+        if proto in ports and clients:
+            inbounds.append({"tag": proto, "port": ports[proto], "protocol": protocol,
+                             "settings": {"clients": clients, **settings}, "streamSettings": stream})
+
+    sni = cfg["node"]["reality_sni"]
+    add("vless", "vless",
+        [{"id": u["uuid"], "email": u["name"], "flow": "xtls-rprx-vision"} for u in users_for(cfg, "vless")],
+        {"network": "tcp", "security": "reality", "realitySettings": {
+            "dest": sni + ":443", "serverNames": [sni],
+            "privateKey": reality["private"], "shortIds": [reality["short_id"]]}},
+        decryption="none")
+    vless_plain = lambda p: [{"id": u["uuid"], "email": u["name"]} for u in users_for(cfg, p)]
+    add("vless_ws", "vless", vless_plain("vless_ws"),
+        tls_stream("ws", wsSettings={"path": WS_PATHS["vless_ws"]}), decryption="none")
+    add("vless_grpc", "vless", vless_plain("vless_grpc"),
+        tls_stream("grpc", grpcSettings={"serviceName": GRPC_SERVICE}), decryption="none")
+    add("vmess_ws", "vmess",
+        [{"id": u["uuid"], "email": u["name"], "alterId": 0} for u in users_for(cfg, "vmess_ws")],
+        tls_stream("ws", wsSettings={"path": WS_PATHS["vmess_ws"]}))
+    trojan = lambda p: [{"password": u["password"], "email": u["name"]} for u in users_for(cfg, p)]
+    add("trojan", "trojan", trojan("trojan"), tls_stream("tcp"))
+    add("trojan_ws", "trojan", trojan("trojan_ws"),
+        tls_stream("ws", wsSettings={"path": WS_PATHS["trojan_ws"]}))
     if "ss" in ports and users_for(cfg, "ss"):
         inbounds.append({
             "tag": "ss", "port": ports["ss"], "protocol": "shadowsocks",
             "settings": {"method": cfg["node"]["ss_method"], "password": cfg["node"]["ss_key"],
                          "network": "tcp,udp",
-                         "clients": [{"password": u["ss_key"], "email": u["name"]}
-                                     for u in users_for(cfg, "ss")]}})
+                         "clients": [{"password": u["ss_key"], "email": u["name"]} for u in users_for(cfg, "ss")]}})
     return {
         "log": {"loglevel": "warning"},
         "stats": {},
         "api": {"tag": "api", "services": ["StatsService"]},
         "policy": {"levels": {"0": {"statsUserUplink": True, "statsUserDownlink": True}}},
         "inbounds": inbounds,
-        "outbounds": [{"protocol": "freedom", "tag": "direct"},
-                      {"protocol": "blackhole", "tag": "block"}],
+        "outbounds": [{"protocol": "freedom", "tag": "direct"}, {"protocol": "blackhole", "tag": "block"}],
         "routing": {"rules": [{"type": "field", "inboundTag": ["api"], "outboundTag": "api"}]},
     }
 
 
 def render_singbox(cfg, tls):
-    inbounds = []
-    if "hy2" in cfg["protocols"] and users_for(cfg, "hy2"):
-        inbounds.append({
-            "type": "hysteria2", "tag": "hy2", "listen": "::", "listen_port": cfg["protocols"]["hy2"],
-            "users": [{"name": u["name"], "password": u["password"]} for u in users_for(cfg, "hy2")],
-            "tls": {"enabled": True, "certificate_path": tls["cert"], "key_path": tls["key"],
-                    "alpn": ["h3"]}})
+    ports, inbounds = cfg["protocols"], []
+    tls_block = {"enabled": True, "certificate_path": tls["cert"], "key_path": tls["key"], "alpn": ["h3"]}
+    if "hy2" in ports and users_for(cfg, "hy2"):
+        inbounds.append({"type": "hysteria2", "tag": "hy2", "listen": "::", "listen_port": ports["hy2"],
+                         "users": [{"name": u["name"], "password": u["password"]} for u in users_for(cfg, "hy2")],
+                         "tls": tls_block})
+    if "tuic" in ports and users_for(cfg, "tuic"):
+        inbounds.append({"type": "tuic", "tag": "tuic", "listen": "::", "listen_port": ports["tuic"],
+                         "users": [{"name": u["name"], "uuid": u["uuid"], "password": u["password"]}
+                                   for u in users_for(cfg, "tuic")],
+                         "congestion_control": "bbr", "tls": tls_block})
     return {"log": {"level": "warn"}, "inbounds": inbounds, "outbounds": [{"type": "direct"}]}
 
 
 def render_l2tp(cfg):
     lines = [f'"{u["name"]}" l2tpd "{u["password"]}" *' for u in users_for(cfg, "l2tp")]
     return {"chap_secrets": "\n".join(lines) + ("\n" if lines else ""),
-            "ipsec_secrets": f': PSK "{cfg["node"]["l2tp_psk"]}"\n'}
+            "ipsec_secrets": render_ipsec_secrets(cfg)}
+
+
+def render_ipsec_secrets(cfg):
+    """L2TP pre-shared key, the IKEv2 server key and one EAP line per IKEv2 user."""
+    out = [f': PSK "{cfg["node"]["l2tp_psk"]}"', ": RSA /etc/ipsec.d/private/server.key"]
+    out += [f'{u["name"]} : EAP "{u["password"]}"' for u in users_for(cfg, "ikev2")]
+    return "\n".join(out) + "\n"
+
+
+def render_wg(cfg, server_private):
+    port = cfg["protocols"].get("wg", 51820)
+    out = [f"[Interface]\nAddress = 10.88.0.1/16\nListenPort = {port}\nPrivateKey = {server_private}\n"]
+    out += [f"[Peer]\nPublicKey = {u['wg_pub']}\nAllowedIPs = {u['wg_ip']}/32\n" for u in users_for(cfg, "wg") if u.get("wg_pub")]
+    return "\n".join(out)
+
+
+def render_ovpn_users(cfg):
+    import hashlib
+    return "".join(f'{u["name"]}:{hashlib.sha256(u["password"].encode()).hexdigest()}\n'
+                   for u in users_for(cfg, "ovpn"))
+
+
+def render_ocpasswd(cfg, hasher):
+    """ocserv password file; `hasher(password)` returns a crypt(3) hash."""
+    return "".join(f'{u["name"]}:*:{hasher(u["password"])}\n' for u in users_for(cfg, "anyc"))
 
 
 # ---------- system glue ----------
@@ -131,7 +173,41 @@ def cpu_load_percent():
     return min(100, int(os.getloadavg()[0] / (os.cpu_count() or 1) * 100))
 
 
-def apply(cfg, reality, tls):
+_hash_cache = {}
+
+
+def crypt_hash(password):
+    if password not in _hash_cache:  # salted hash differs per call; cache so the file stays stable
+        _hash_cache[password] = subprocess.run(["openssl", "passwd", "-6", "-stdin"], input=password,
+                                               capture_output=True, text=True, check=True).stdout.strip()
+    return _hash_cache[password]
+
+
+_wg_last = {}
+
+
+def wg_usage(cfg):
+    """Bytes per user since the previous call, from cumulative `wg show` counters."""
+    r = sh("wg", "show", "wg0", "transfer")
+    if r.returncode != 0:
+        return {}
+    names = {u["wg_pub"]: u["name"] for u in users_for(cfg, "wg")}
+    usage = {}
+    for line in r.stdout.splitlines():
+        try:
+            pub, rx, tx = line.split("\t")
+        except ValueError:
+            continue
+        total = int(rx) + int(tx)
+        prev = _wg_last.get(pub, total)  # first sight: no delta yet
+        delta = total - prev if total >= prev else total  # a lower counter means wg restarted
+        _wg_last[pub] = total
+        if pub in names and delta > 0:
+            usage[names[pub]] = usage.get(names[pub], 0) + delta
+    return usage
+
+
+def apply(cfg, reality, tls, wg):
     xray_cfg = json.dumps(render_xray(cfg, reality, tls), indent=1)
     if write_if_changed("/usr/local/etc/xray/config.json", xray_cfg, 0o644):
         sh("systemctl", "restart", "xray")
@@ -141,6 +217,24 @@ def apply(cfg, reality, tls):
     write_if_changed("/etc/ppp/chap-secrets", l2["chap_secrets"])  # read by pppd per login, no reload
     if write_if_changed("/etc/ipsec.secrets", l2["ipsec_secrets"]):
         sh("ipsec", "rereadsecrets")
+    if wg and write_if_changed("/etc/wireguard/wg0.conf", render_wg(cfg, wg["private"])):
+        if sh("wg", "show", "wg0").returncode == 0:
+            stripped = sh("wg-quick", "strip", "wg0").stdout
+            tmp = f"{STATE_DIR}/wg0.stripped"
+            write_if_changed(tmp, stripped)
+            sh("wg", "syncconf", "wg0", tmp)  # live update, keeps existing sessions
+        else:
+            sh("systemctl", "restart", "wg-quick@wg0")
+    write_if_changed("/etc/vpn-node/ovpn-users", render_ovpn_users(cfg), 0o644)  # checked per login
+    write_if_changed("/etc/ocserv/ocpasswd", render_ocpasswd(cfg, crypt_hash), 0o600)  # checked per login
+
+
+def read_text(path):
+    try:
+        with open(path) as f:
+            return f.read()
+    except FileNotFoundError:
+        return ""
 
 
 def main():
@@ -148,17 +242,20 @@ def main():
     if not conf:
         sys.exit(f"missing {CONF}")
     reality = load_json(f"{STATE_DIR}/reality.json", {"private": "", "public": "", "short_id": ""})
+    wg = load_json(f"{STATE_DIR}/wg.json")
     tls = {"cert": f"{STATE_DIR}/tls.crt", "key": f"{STATE_DIR}/tls.key"}
     pending = {}
     while True:
         try:
             cfg = api(conf, "GET", "/api/node/config")
-            apply(cfg, reality, tls)
-            for k, v in xray_usage().items():
-                pending[k] = pending.get(k, 0) + v
+            apply(cfg, reality, tls, wg)
+            for src in (xray_usage(), wg_usage(cfg) if wg else {}):
+                for k, v in src.items():
+                    pending[k] = pending.get(k, 0) + v
             api(conf, "POST", "/api/node/report", {
                 "load": cpu_load_percent(), "usage": pending, "reality_pub": reality["public"],
-                "reality_sid": reality["short_id"], "tls_self_signed": conf.get("tls_self_signed", True)})
+                "reality_sid": reality["short_id"], "tls_self_signed": conf.get("tls_self_signed", True),
+                "wg_pub": wg["public"] if wg else "", "ovpn_ca": read_text(f"{STATE_DIR}/ovpn/ca.crt")})
             pending = {}  # kept in memory until the panel accepted the report
         except Exception as e:  # keep running; the panel may be briefly unreachable
             print("agent error:", e, file=sys.stderr, flush=True)
