@@ -5,6 +5,7 @@ import { BellRing, Check, Minus, Plus, ShieldCheck, Smartphone, Truck, RotateCcw
 import { fa, pct, toman } from '@/lib/format';
 import { ATTR, effectivePrice, findVariation, optionState } from '@/lib/variations';
 import Pic from './Pic';
+import { savePhone } from '@/lib/phone';
 import { useShop } from './CartProvider';
 
 export type PVAttr = {
@@ -78,7 +79,7 @@ export default function ProductView({ header, ...p }: PVProps & { header: React.
     setQty(1);
     if (attr.slug === ATTR.model) {
       const t = attr.terms.find((x) => x.slug === term);
-      try { if (t) localStorage.setItem('vt_phone', JSON.stringify({ brand: t.parent ?? '', model: term })); } catch { /* noop */ }
+      if (t) savePhone(t.parent ?? '', term);
       setPhone({ brand: t?.parent ?? '', model: term });
     }
   };

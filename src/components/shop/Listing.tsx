@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 import { ChevronLeft, SearchX } from 'lucide-react';
 import { getAttributes, getBrands, getCategories, getSettings, listProducts, type ListOpts } from '@/lib/catalog';
 import { ATTR } from '@/lib/variations';
@@ -17,6 +18,7 @@ export function paramsOf(sp: SP) {
     q: normText(one(sp.q)).slice(0, 80),
     brand: one(sp.brand),
     model: one(sp.model),
+    all: one(sp.all) === '1',
     cat: one(sp.cat),
     min: toInt(one(sp.min), 0),
     max: toInt(one(sp.max), 0),
@@ -38,7 +40,7 @@ function link(basePath: string, sp: SP, patch: Record<string, string | null>) {
   return s ? `${basePath}?${s}` : basePath;
 }
 
-export default function Listing({
+export default async function Listing({
   basePath, sp, categoryId, showCategories = false, forceQ, emptyHint,
 }: { basePath: string; sp: SP; categoryId?: number; showCategories?: boolean; forceQ?: string; emptyHint?: React.ReactNode }) {
   const f = paramsOf(sp);
@@ -52,8 +54,13 @@ export default function Listing({
   const phoneBrands = brandAttr?.terms.map((t) => ({ slug: t.slug, name: t.name })) ?? [];
   const phoneModels = modelAttr?.terms.map((t) => ({ slug: t.slug, name: t.name, parent: brandAttr?.terms.find((b) => b.id === t.parent_term_id)?.slug ?? '' })) ?? [];
 
+  // فیلتر خودکار «سازگار با گوشی من» (کوکی vt_model)؛ در جستجو و با ?model= یا ?all=1 اعمال نمی‌شود
+  const cookieModel = (await cookies()).get('vt_model')?.value ?? '';
+  const autoModel = !forceQ && !f.q && !f.model && !f.all && phoneModels.some((m) => m.slug === cookieModel) ? cookieModel : '';
+  const effModel = f.model || autoModel;
+
   const { items, total } = listProducts({
-    q: forceQ ?? f.q, categoryId: categoryId ?? catRow?.id, brandSlug: f.brand || undefined, model: f.model || undefined,
+    q: forceQ ?? f.q, categoryId: categoryId ?? catRow?.id, brandSlug: f.brand || undefined, model: effModel || undefined,
     minPrice: f.min || undefined, maxPrice: f.max || undefined, inStock: f.stock, onSale: f.sale, sort: f.sort, page: f.page, limit: PER_PAGE,
   });
   const pages = Math.max(1, Math.ceil(total / PER_PAGE));
@@ -73,12 +80,14 @@ export default function Listing({
         d={{
           basePath, q: forceQ ?? f.q, categories: showCategories ? cats.filter((c) => !c.parent_id).map((c) => ({ slug: c.slug, name: c.name })) : undefined,
           currentCategory: f.cat, brands: brands.map((b) => ({ slug: b.slug, name: b.name })),
-          current: { brand: f.brand, model: f.model, min: f.min ? String(f.min) : '', max: f.max ? String(f.max) : '', stock: f.stock, sale: f.sale, sort: f.sort },
+          current: { brand: f.brand, model: effModel, min: f.min ? String(f.min) : '', max: f.max ? String(f.max) : '', stock: f.stock, sale: f.sale, sort: f.sort },
           phoneBrands, phoneModels, activeCount: active.length,
         }}
       />
       <div>
-        {!f.model && phoneModels.length > 0 && <MyPhone models={phoneModels} basePath={basePath} />}
+        {phoneModels.length > 0 && !f.model && !forceQ && (autoModel
+          ? <MyPhone models={phoneModels} basePath={basePath} auto={autoModel} allHref={link(basePath, sp, { all: '1', page: null })} />
+          : <MyPhone models={phoneModels} basePath={basePath} compatHref={f.all ? link(basePath, sp, { all: null, page: null }) : undefined} />)}
         <div className="toolbar">
           <span className="total num">{fa(total)} کالا</span>
           <SortSelect value={f.sort} />
