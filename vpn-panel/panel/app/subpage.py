@@ -18,7 +18,8 @@ def render_sub_page(user: User, entries: list[dict], days_left: int | None, sub_
         shown = e["link"] or e["summary"] or ""
         download = (f'<a class="btn" href="{escape(sub_url, quote=True)}/file/{e["node_id"]}/{e["proto"]}">دانلود فایل</a>'
                     if e.get("file_ext") else "")
-        rows.append(f'<div class="row"><span class="cc">{escape(e["cc"])}</span><b>{escape(e["label"])}</b>'
+        rows.append(f'<div class="row"><span class="cc">{escape(e["cc"])}</span><b class="loc">{escape(e["node"])}</b>'
+                    f'<span class="muted proto">{escape(e["label"])}</span>'
                     f'<code>{escape(shown)}</code>{download}<button data-copy="{escape(text, quote=True)}">کپی</button></div>')
     body = "".join(rows) or '<p class="muted">فعلاً کانفیگی برای نمایش نیست.</p>'
     return f"""<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8">
@@ -36,6 +37,7 @@ h1{{margin:0;font-size:19px}}.muted{{color:var(--muted)}}
 .stats b{{display:block;font-size:17px}}.pill{{padding:1px 10px;border-radius:99px;background:var(--soft)}}.good{{color:var(--good)}}.bad{{color:var(--bad)}}
 .row{{display:flex;gap:8px;align-items:center;background:var(--soft);border-radius:8px;padding:6px 10px;margin-top:8px;min-width:0}}
 .row code{{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:ltr;text-align:left;font-size:12px}}
+.loc{{white-space:nowrap}}.proto{{white-space:nowrap;font-size:12px}}
 .cc{{font:11px monospace;background:var(--card);padding:1px 6px;border-radius:4px}}
 a.btn{{text-decoration:none;color:var(--fg);border:1px solid var(--line);background:var(--card);border-radius:8px;padding:3px 12px;white-space:nowrap}}
 button{{cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--fg);border-radius:8px;padding:3px 12px;font:inherit}}
