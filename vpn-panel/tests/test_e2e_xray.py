@@ -59,9 +59,13 @@ def test_every_xray_protocol_connects_end_to_end():
         def log_message(self, *a):
             pass
 
+    import ssl
     web = http.server.ThreadingHTTPServer(("127.0.0.1", _free_port()), H)
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(d / "c.pem", d / "k.pem")
+    web.socket = ctx.wrap_socket(web.socket, server_side=True)
     threading.Thread(target=web.serve_forever, daemon=True).start()
-    selftest.TEST_URL = f"http://127.0.0.1:{web.server_address[1]}/generate_204"
+    selftest.TEST_URL = f"https://localhost:{web.server_address[1]}/generate_204"   # TLS inside the tunnel, like a browser
     selftest.DEFAULT_PIN = agent.cert_sha256(str(d / "c.pem"))
     assert len(selftest.DEFAULT_PIN) == 64
 

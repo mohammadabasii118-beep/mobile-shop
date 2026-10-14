@@ -105,7 +105,8 @@ def test_one(xray, outbound):
         time.sleep(1.5)
         if proc.poll() is not None:
             return False, "client config rejected: " + proc.stdout.read().strip().splitlines()[-1][:160]
-        r = subprocess.run(["curl", "-s", "-o", "/dev/null", "-m", "12", "-w", "%{http_code}",
+        r = subprocess.run(["curl", "-s", "-o", "/dev/null", "-m", "12", "-w", "%{http_code}"]
+                           + (["-k"] if os.environ.get("SELFTEST_INSECURE") else []) + [
                             "--socks5-hostname", f"127.0.0.1:{port}", TEST_URL], capture_output=True, text=True)
         if r.stdout.strip() == "204":
             return True, "ok"
