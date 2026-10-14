@@ -427,6 +427,7 @@ export function createGameServer(opt: ServerOptions) {
         case '/api/leaderboard': extra = { leaders: game.leaderboard(userId), myRank: game.trophyRank(userId) }; break;
         case '/api/box/start': game.startBox(userId, Number(body.slot)); break;
         case '/api/box/open': extra = { reward: game.openBox(userId, Number(body.slot)) }; break;
+        case '/api/box/speedup': extra = { speedup: game.speedupBox(userId, Number(body.slot)) }; break;
         case '/api/box/skip':
           if (!opt.auth.devAuth) return json(res, 404, { error: 'not found' });
           game.skipBoxTimer(userId, Number(body.slot)); break;

@@ -409,52 +409,109 @@
       "bronze": {
         "name": "برنزی",
         "durationSeconds": 10800,
-        "coins": [
-          40,
-          90
-        ],
-        "cardCountRange": [
-          1,
-          1
-        ],
-        "cardChance": {
-          "epic": 0.01,
-          "rare": 0.14,
-          "common": 0.55
+        "contents": {
+          "solo": {
+            "coins": [
+              40,
+              90
+            ],
+            "cardCountRange": [
+              1,
+              1
+            ],
+            "cardChance": {
+              "epic": 0.01,
+              "rare": 0.14,
+              "common": 0.55
+            }
+          },
+          "multi": {
+            "coins": [
+              40,
+              90
+            ],
+            "cardCountRange": [
+              1,
+              1
+            ],
+            "cardChance": {
+              "epic": 0.01,
+              "rare": 0.14,
+              "common": 0.55
+            }
+          }
         }
       },
       "silver": {
         "name": "نقره‌ای",
         "durationSeconds": 28800,
-        "coins": [
-          120,
-          260
-        ],
-        "cardCountRange": [
-          1,
-          2
-        ],
-        "cardChance": {
-          "epic": 0.05,
-          "rare": 0.3,
-          "common": 0.55
+        "contents": {
+          "solo": {
+            "coins": [
+              120,
+              260
+            ],
+            "cardCountRange": [
+              1,
+              2
+            ],
+            "cardChance": {
+              "epic": 0.05,
+              "rare": 0.3,
+              "common": 0.55
+            }
+          },
+          "multi": {
+            "coins": [
+              120,
+              260
+            ],
+            "cardCountRange": [
+              1,
+              2
+            ],
+            "cardChance": {
+              "epic": 0.05,
+              "rare": 0.3,
+              "common": 0.55
+            }
+          }
         }
       },
       "gold": {
         "name": "طلایی",
         "durationSeconds": 43200,
-        "coins": [
-          400,
-          800
-        ],
-        "cardCountRange": [
-          2,
-          3
-        ],
-        "cardChance": {
-          "epic": 0.15,
-          "rare": 0.4,
-          "common": 0.45
+        "contents": {
+          "solo": {
+            "coins": [
+              400,
+              800
+            ],
+            "cardCountRange": [
+              2,
+              3
+            ],
+            "cardChance": {
+              "epic": 0.15,
+              "rare": 0.4,
+              "common": 0.45
+            }
+          },
+          "multi": {
+            "coins": [
+              400,
+              800
+            ],
+            "cardCountRange": [
+              2,
+              3
+            ],
+            "cardChance": {
+              "epic": 0.15,
+              "rare": 0.4,
+              "common": 0.45
+            }
+          }
         }
       }
     },
@@ -469,6 +526,10 @@
         "silver": 25,
         "gold": 5
       }
+    },
+    "speedup": {
+      "gemsPerStep": 2,
+      "stepMinutes": 10
     }
   },
   "solo": {

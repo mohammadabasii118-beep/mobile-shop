@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { loadConfig } from '../src/config';
 import { openDb } from '../src/db';
-import { resolveCard } from '@game/shared';
+import { boxSpeedupCost, resolveCard } from '@game/shared';
 import { Game, GameError } from '../src/game';
 
 const cfg = loadConfig();
@@ -41,7 +41,7 @@ describe('game economy', () => {
     expect(() => game.openBox(uid, 0)).toThrow(GameError);
     t += 1;
     const r = game.openBox(uid, 0);
-    expect(r.coins).toBeGreaterThanOrEqual(cfg.box.types.bronze.coins[0]);
+    expect(r.coins).toBeGreaterThanOrEqual(cfg.box.types.bronze.contents.multi.coins[0]);
     expect(game.profile(uid).boxes).toHaveLength(3);
     game.startBox(uid, 1); // حالا می‌شه یکی دیگه شروع کرد
   });
@@ -55,9 +55,43 @@ describe('game economy', () => {
     expect(r.cards).toHaveLength(1);
     expect(cfg.cards.find((c) => c.id === r.cards[0].id)!.rarity).toBe('epic');
     const p = game.profile(uid);
-    expect(p.coins).toBe(100 + cfg.box.types.bronze.coins[0]);
+    expect(p.coins).toBe(100 + cfg.box.types.bronze.contents.multi.coins[0]);
     expect(p.xp).toBe(0); // جعبه دیگر XP نمی‌دهد
     expect(game.addXp(uid, 100000)).toBeGreaterThan(1);
+  });
+
+  it('box contents differ by source: a box won in solo (dungeon) uses the solo table, online uses the online table', () => {
+    const custom = JSON.parse(JSON.stringify(cfg));
+    custom.box.types.bronze.contents.solo.coins = [11, 11];
+    custom.box.types.bronze.contents.multi.coins = [77, 77];
+    const g2 = new Game({ db: openDb(), cfg: custom, now: () => t, rng: () => rngVal });
+    const u = g2.upsertUser({ tgId: 31, name: 'S', avatar: null });
+    g2.grantBox(u, 'bronze', 'solo'); g2.grantBox(u, 'bronze', 'multi');
+    expect(g2.profile(u).boxes.map((b) => b.source)).toEqual(['solo', 'multi']);
+    g2.startBox(u, 0); t += custom.box.types.bronze.durationSeconds * 1000;
+    expect(g2.openBox(u, 0).coins).toBe(11);
+    g2.startBox(u, 1); t += custom.box.types.bronze.durationSeconds * 1000;
+    expect(g2.openBox(u, 1).coins).toBe(77);
+  });
+
+  it('gems open a box instantly: 2 gems per started 10 minutes remaining (12 min = 4, 25 min = 6, 60 min = 12)', () => {
+    expect([boxSpeedupCost(1, cfg.box.speedup), boxSpeedupCost(10 * 60_000, cfg.box.speedup), boxSpeedupCost(12 * 60_000, cfg.box.speedup),
+      boxSpeedupCost(20 * 60_000, cfg.box.speedup), boxSpeedupCost(25 * 60_000, cfg.box.speedup), boxSpeedupCost(60 * 60_000, cfg.box.speedup), boxSpeedupCost(0, cfg.box.speedup)]).toEqual([2, 2, 4, 4, 6, 12, 0]);
+    game.grantBox(uid, 'bronze');
+    expect(() => game.speedupBox(uid, 0)).toThrow(/در حال باز شدن نیست/);       // هنوز شروع نشده
+    game.startBox(uid, 0);
+    const total = cfg.box.types.bronze.durationSeconds * 1000;
+    t += total - 25 * 60_000;                                                    // ۲۵ دقیقه مانده
+    const db = (game as any).d.db;
+    db.prepare('UPDATE users SET gems = 5').run();
+    expect(() => game.speedupBox(uid, 0)).toThrow(/الماس کافی/);                 // ۶ لازم، ۵ دارد
+    expect(game.profile(uid).gems).toBe(5);
+    db.prepare('UPDATE users SET gems = 10').run();
+    expect(game.speedupBox(uid, 0)).toEqual({ cost: 6 });
+    expect(game.profile(uid).gems).toBe(4);
+    expect(game.profile(uid).boxes[0].state).toBe('ready');
+    expect(() => game.speedupBox(uid, 0)).toThrow(/آماده/);
+    expect(game.openBox(uid, 0).type).toBe('bronze');
   });
 
   it('three box types: own timer and own contents; winners get the box type of the pit / by chance', () => {
@@ -72,9 +106,9 @@ describe('game economy', () => {
     rngVal = 0.5;
     const r = game.openBox(uid, 0);
     expect(r.type).toBe('gold');
-    expect(r.coins).toBeGreaterThanOrEqual(gold.coins[0]);
-    expect(r.coins).toBeLessThanOrEqual(gold.coins[1]);
-    expect(r.cards.length).toBeGreaterThanOrEqual(gold.cardCountRange[0]);
+    expect(r.coins).toBeGreaterThanOrEqual(gold.contents.multi.coins[0]);
+    expect(r.coins).toBeLessThanOrEqual(gold.contents.multi.coins[1]);
+    expect(r.cards.length).toBeGreaterThanOrEqual(gold.contents.multi.cardCountRange[0]);
     // شانس جعبه‌ی جایزه با هر برد (سولو/آنلاین جدا): پیش‌فرض ۷۰ برنزی، ۲۵ نقره‌ای، ۵ طلایی
     rngVal = 0.0; expect(game.rewardBoxType('solo')).toBe('bronze');
     rngVal = 0.8; expect(game.rewardBoxType('solo')).toBe('silver');

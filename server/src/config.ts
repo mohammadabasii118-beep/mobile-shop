@@ -67,13 +67,19 @@ export function validateConfig(cfg: GameConfig): GameConfig {
   if (!on || !isNum(on.winCoins) || !isNum(on.winXp) || !isNum(on.trophiesWin) || !isNum(on.trophiesLoss)) bad('جایزه‌ی نبرد آنلاین نامعتبر است');
   const b = cfg.box;
   if (!b || !isNum(b.slots, 1) || !b.types || !b.drops) bad('تنظیمات جعبه نامعتبر است');
+  if (!b.speedup || !isNum(b.speedup.gemsPerStep) || !isNum(b.speedup.stepMinutes, 1)) bad('تنظیم باز کردن فوری جعبه نامعتبر است');
   for (const t of ['bronze', 'silver', 'gold'] as const) {
     const bt = b.types[t];
-    if (!bt || typeof bt.name !== 'string' || !bt.name.trim() || !isNum(bt.durationSeconds, 0) || !isRange(bt.coins) || !isRange(bt.cardCountRange)) bad(`تنظیمات جعبه‌ی ${t} نامعتبر است`);
-    const cc = bt.cardChance;
-    if (!cc || !isNum(cc.common) || !isNum(cc.rare) || !isNum(cc.epic) || cc.common + cc.rare + cc.epic > 1.0001) bad(`مجموع شانس کارت جعبه‌ی ${bt.name} نباید بیشتر از ۱۰۰٪ باشد`);
-    for (const r of ['common', 'rare', 'epic'] as const) {
-      if (cc[r] > 0 && !cfg.cards.some((c) => c.rarity === r)) bad(`جعبه‌ی ${bt.name}: برای نادری ${r} شانس گذاشته‌ای ولی کارتی از آن نیست`);
+    if (!bt || typeof bt.name !== 'string' || !bt.name.trim() || !isNum(bt.durationSeconds, 0) || !bt.contents) bad(`تنظیمات جعبه‌ی ${t} نامعتبر است`);
+    for (const src of ['solo', 'multi'] as const) {
+      const ct = bt.contents[src];
+      const where = `جعبه‌ی ${bt.name} (${src === 'solo' ? 'تک‌نفره' : 'آنلاین'})`;
+      if (!ct || !isRange(ct.coins) || !isRange(ct.cardCountRange)) bad(`تنظیمات ${where} نامعتبر است`);
+      const cc = ct.cardChance;
+      if (!cc || !isNum(cc.common) || !isNum(cc.rare) || !isNum(cc.epic) || cc.common + cc.rare + cc.epic > 1.0001) bad(`مجموع شانس کارت ${where} نباید بیشتر از ۱۰۰٪ باشد`);
+      for (const r of ['common', 'rare', 'epic'] as const) {
+        if (cc[r] > 0 && !cfg.cards.some((c) => c.rarity === r)) bad(`${where}: برای نادری ${r} شانس گذاشته‌ای ولی کارتی از آن نیست`);
+      }
     }
   }
   for (const mode of ['solo', 'multi'] as const) {
@@ -145,7 +151,16 @@ export function loadConfigWithOverride(overridePath: string, basePath = CONFIG_P
   // جایزه‌ی آنلاین (جدید): اگر نبود از پایه
   if (!merged.online) merged.online = base.online;
   // XP دیگر از جعبه نمی‌آید (حذف از نوع‌ها) و هر ردیف ارتقا مقدار XP دارد (اگر نبود از پایه‌ی همان نوع و ردیف)
-  for (const t of Object.values(merged.box?.types ?? {}) as any[]) delete t.xp;
+  for (const t of Object.values(merged.box?.types ?? {}) as any[]) {
+    delete t.xp;
+    // محتوای جعبه قبلاً یکی بود → حالا برای تک‌نفره و آنلاین جدا؛ مقدار قدیمی برای هر دو
+    if (!t.contents && t.coins) {
+      const cont = { coins: t.coins, cardCountRange: t.cardCountRange, cardChance: t.cardChance };
+      t.contents = { solo: JSON.parse(JSON.stringify(cont)), multi: JSON.parse(JSON.stringify(cont)) };
+      delete t.coins; delete t.cardCountRange; delete t.cardChance;
+    }
+  }
+  if (merged.box && !merged.box.speedup) merged.box.speedup = base.box.speedup;
   for (const r of ['common', 'rare', 'epic'] as const) {
     const rows = merged.upgrade?.byRarity?.[r];
     if (Array.isArray(rows)) merged.upgrade.byRarity[r] = rows.map((row: any, i: number) => (typeof row?.xp === 'number' ? row : { ...row, xp: base.upgrade.byRarity[r][i]?.xp ?? 0 }));

@@ -1,4 +1,4 @@
-import { resolveCard, type BattleReward, type BoxType, type BoxTypeCfg, type BoxView, type CardView, type GameConfig, type Profile, type Rarity, type UnitInit } from '@game/shared';
+import { boxSpeedupCost, resolveCard, type BattleReward, type BoxContents, type BoxSource, type BoxType, type BoxView, type CardView, type GameConfig, type Profile, type Rarity, type UnitInit } from '@game/shared';
 import type { Db } from './db';
 import type { TgUser } from './auth';
 
@@ -63,15 +63,16 @@ export class Game {
       .map((r): CardView => ({ id: r.card_id, level: r.level, copies: r.copies }));
     const deck = (db.prepare('SELECT card_id FROM deck WHERE user_id = ? ORDER BY slot').all(userId) as any[]).map((r) => r.card_id as string);
     const now = this.d.now();
-    const rows = db.prepare('SELECT slot, state, ready_at, type FROM boxes WHERE user_id = ? ORDER BY slot').all(userId) as any[];
+    const rows = db.prepare('SELECT slot, state, ready_at, type, source FROM boxes WHERE user_id = ? ORDER BY slot').all(userId) as any[];
     const boxes = rows.map((r): BoxView => {
       const type = this.boxType(r.type);
+      const source: BoxSource = r.source === 'solo' ? 'solo' : 'multi';
       const totalMs = cfg.box.types[type].durationSeconds * 1000;
       if (r.state === 'opening') {
         const remainingMs = Math.max(0, r.ready_at - now);
-        return { slot: r.slot, type, state: remainingMs === 0 ? 'ready' : 'opening', remainingMs, totalMs };
+        return { slot: r.slot, type, source, state: remainingMs === 0 ? 'ready' : 'opening', remainingMs, totalMs };
       }
-      return { slot: r.slot, type, state: 'locked', remainingMs: totalMs, totalMs };
+      return { slot: r.slot, type, source, state: 'locked', remainingMs: totalMs, totalMs };
     });
     return {
       id: u.id, name: u.name, avatar: u.avatar, level: u.level, xp: u.xp,
@@ -156,12 +157,12 @@ export class Game {
   }
 
   /** بعد از برد: اگه اسلات خالی بود جعبه می‌ده */
-  grantBox(userId: number, type: BoxType = 'bronze'): BattleReward {
+  grantBox(userId: number, type: BoxType = 'bronze', source: BoxSource = 'multi'): BattleReward {
     const { db, cfg } = this.d;
     const used = new Set((db.prepare('SELECT slot FROM boxes WHERE user_id = ?').all(userId) as any[]).map((r) => r.slot));
     for (let s = 0; s < cfg.box.slots; s++) {
       if (!used.has(s)) {
-        db.prepare("INSERT INTO boxes (user_id, slot, state, type) VALUES (?,?,'locked',?)").run(userId, s, type);
+        db.prepare("INSERT INTO boxes (user_id, slot, state, type, source) VALUES (?,?,'locked',?,?)").run(userId, s, type, source);
         return { box: s, type, noSlot: false };
       }
     }
@@ -185,15 +186,30 @@ export class Game {
     this.d.db.prepare("UPDATE boxes SET ready_at = ? WHERE user_id = ? AND slot = ? AND state = 'opening'").run(this.d.now(), userId, slot);
   }
 
+  /** باز کردن فوری یک جعبه‌ی در حال باز شدن با الماس (هزینه: boxSpeedupCost)؛ بعدش جعبه آماده‌ی باز کردن است */
+  speedupBox(userId: number, slot: number) {
+    const { db, cfg } = this.d;
+    const box = db.prepare('SELECT state, ready_at FROM boxes WHERE user_id = ? AND slot = ?').get(userId, slot) as any;
+    if (!box) throw new GameError('جعبه‌ای در این اسلات نیست');
+    if (box.state !== 'opening') throw new GameError('این جعبه در حال باز شدن نیست');
+    const remaining = box.ready_at - this.d.now();
+    if (remaining <= 0) throw new GameError('جعبه آماده است');
+    const cost = boxSpeedupCost(remaining, cfg.box.speedup);
+    const paid = Number(db.prepare('UPDATE users SET gems = gems - ? WHERE id = ? AND gems >= ?').run(cost, userId, cost).changes);
+    if (paid !== 1) throw new GameError(`الماس کافی نداری (${cost} الماس لازم است)`);
+    db.prepare("UPDATE boxes SET ready_at = ? WHERE user_id = ? AND slot = ? AND state = 'opening'").run(this.d.now(), userId, slot);
+    return { cost };
+  }
+
   openBox(userId: number, slot: number) {
     const { db, cfg, rng } = this.d;
-    const box = db.prepare('SELECT state, ready_at, type FROM boxes WHERE user_id = ? AND slot = ?').get(userId, slot) as any;
+    const box = db.prepare('SELECT state, ready_at, type, source FROM boxes WHERE user_id = ? AND slot = ?').get(userId, slot) as any;
     if (!box) throw new GameError('جعبه‌ای در این اسلات نیست');
     if (box.state !== 'opening') throw new GameError('اول باید جعبه را شروع کنی');
     if (this.d.now() < box.ready_at) throw new GameError('هنوز زمانش نرسیده');
 
     const type = this.boxType(box.type);
-    const bc: BoxTypeCfg = cfg.box.types[type];
+    const bc: BoxContents = cfg.box.types[type].contents[box.source === 'solo' ? 'solo' : 'multi']; // محتوا بر اساس اینکه جعبه از تک‌نفره آمده یا آنلاین
     const coins = randInt(rng, bc.coins);
     const gotCards: { id: string; isNew: boolean }[] = [];
     const n = randInt(rng, bc.cardCountRange);
@@ -212,7 +228,7 @@ export class Game {
     return { type, coins, cards: gotCards };
   }
 
-  private rollRarity(bc: BoxTypeCfg): Rarity | null {
+  private rollRarity(bc: BoxContents): Rarity | null {
     const { epic, rare, common } = bc.cardChance;
     const r = this.d.rng();
     if (r < epic) return 'epic';
@@ -253,7 +269,7 @@ export class Game {
       db.prepare('UPDATE users SET solo_stage = MAX(solo_stage, ?) WHERE id = ?').run(soloStage + 1, userId);
     }
     const type = this.rewardBoxType(mode);
-    const box = type ? this.grantBox(userId, type) : { box: null, type: null, noSlot: false };
+    const box = type ? this.grantBox(userId, type, mode) : { box: null, type: null, noSlot: false };
     if (mode === 'solo') return box;
     db.prepare('UPDATE users SET coins = coins + ?, trophies = trophies + ? WHERE id = ?').run(on.winCoins, on.trophiesWin, userId);
     const levelsGained = on.winXp > 0 ? this.addXp(userId, on.winXp) : 0;

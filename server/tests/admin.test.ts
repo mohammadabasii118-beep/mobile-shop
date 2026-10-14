@@ -122,7 +122,7 @@ describe('player management', () => {
 describe('validateConfig', () => {
   it('rejects chances above 100% and wrong upgrade table length', () => {
     const c = loadConfig();
-    expect(() => validateConfig({ ...c, box: { ...c.box, types: { ...c.box.types, gold: { ...c.box.types.gold, cardChance: { common: 0.6, rare: 0.3, epic: 0.2 } } } } })).toThrow(/۱۰۰/);
+    expect(() => validateConfig({ ...c, box: { ...c.box, types: { ...c.box.types, gold: { ...c.box.types.gold, contents: { ...c.box.types.gold.contents, solo: { ...c.box.types.gold.contents.solo, cardChance: { common: 0.6, rare: 0.3, epic: 0.2 } } } } } } })).toThrow(/۱۰۰/);
     expect(() => validateConfig({ ...c, box: { ...c.box, drops: { ...c.box.drops, solo: { bronze: 60, silver: 30, gold: 20 } } } })).toThrow(/۱۰۰/);
     expect(() => validateConfig({ ...c, upgrade: { ...c.upgrade, maxLevel: 9 } })).toThrow(/جدول ارتقا/);
   });
@@ -180,6 +180,21 @@ describe('shop admin', () => {
 });
 
 describe('config override (survives code updates)', () => {
+  it('migrates single-table box contents into solo and online tables and adds the speedup setting', async () => {
+    const { writeFileSync } = await import('node:fs');
+    const { loadConfigWithOverride } = await import('../src/config');
+    const base = loadConfig();
+    const file = join(dataDir, 'override-box.json');
+    const old: any = JSON.parse(JSON.stringify(base));
+    for (const t of Object.values(old.box.types) as any[]) { t.coins = [5, 6]; t.cardCountRange = [1, 2]; t.cardChance = { common: 0.5, rare: 0.1, epic: 0.01 }; delete t.contents; }
+    delete old.box.speedup;
+    writeFileSync(file, JSON.stringify(old));
+    const m = loadConfigWithOverride(file);
+    expect(m.box.types.bronze.contents.solo).toEqual({ coins: [5, 6], cardCountRange: [1, 2], cardChance: { common: 0.5, rare: 0.1, epic: 0.01 } });
+    expect(m.box.types.gold.contents.multi.coins).toEqual([5, 6]);
+    expect(m.box.speedup).toEqual(base.box.speedup);
+  });
+
   it('migrates the old two-price shop shape to one currency and one price', async () => {
     const { writeFileSync } = await import('node:fs');
     const { loadConfigWithOverride } = await import('../src/config');

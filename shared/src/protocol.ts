@@ -6,7 +6,7 @@ export interface UnitView {
 }
 export interface Snap { uid: string; hp: number; shield: number; alive: boolean }
 
-export interface BoxView { slot: number; type: BoxType; state: 'locked' | 'opening' | 'ready'; remainingMs: number; totalMs: number }
+export interface BoxView { slot: number; type: BoxType; /** از کجا آمده: تک‌نفره (دانجن) یا آنلاین */ source: 'solo' | 'multi'; state: 'locked' | 'opening' | 'ready'; remainingMs: number; totalMs: number }
 export interface CardView { id: string; level: number; copies: number }
 export interface Profile {
   id: number; name: string; avatar: string | null;

@@ -175,3 +175,7 @@ export function pickTarget(s: BattleState, side: Side, mode: 'random' | 'smart',
 
 export const snapshot = (s: BattleState) =>
   s.units.map((u) => ({ uid: u.uid, hp: u.hp, shield: u.shield, alive: u.alive }));
+
+/** هزینه‌ی الماس برای باز کردن فوری جعبه: برای هر stepMinutes دقیقه‌ی باقی‌مانده (رو به بالا) gemsPerStep. مثلاً ۱۲ دقیقه → ۲ پله → ۴ الماس */
+export const boxSpeedupCost = (remainingMs: number, sp: { gemsPerStep: number; stepMinutes: number }) =>
+  remainingMs <= 0 ? 0 : Math.ceil(remainingMs / (sp.stepMinutes * 60_000)) * sp.gemsPerStep;

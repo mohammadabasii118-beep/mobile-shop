@@ -9,13 +9,18 @@ export interface CardStats { hp: number; atk: number; shield: number; /** عدد
 export type BoxType = 'bronze' | 'silver' | 'gold';
 export const BOX_TYPES: BoxType[] = ['bronze', 'silver', 'gold'];
 
-/** محتوای یک نوع جعبه */
-export interface BoxTypeCfg {
-  name: string;
-  durationSeconds: number;
+/** محتوای جعبه (سکه، تعداد و شانس کارت)؛ برای هر حالت جدا: جعبه‌ی تک‌نفره (دانجن) و جعبه‌ی آنلاین */
+export interface BoxContents {
   coins: [number, number];
   cardCountRange: [number, number];
   cardChance: Record<Rarity, number>;
+}
+export type BoxSource = 'solo' | 'multi';
+/** یک نوع جعبه: نام و زمان باز شدن مشترک، محتوا برای هر حالت جدا */
+export interface BoxTypeCfg {
+  name: string;
+  durationSeconds: number;
+  contents: Record<BoxSource, BoxContents>;
 }
 
 export interface CardDef {
@@ -82,6 +87,8 @@ export interface GameConfig {
   online: { winCoins: number; winXp: number; trophiesWin: number; trophiesLoss: number };
   box: {
     slots: number;
+    /** باز کردن فوری جعبه با الماس: برای هر stepMinutes دقیقه‌ی باقی‌مانده (رو به بالا گرد می‌شود) gemsPerStep الماس */
+    speedup: { gemsPerStep: number; stepMinutes: number };
     types: Record<BoxType, BoxTypeCfg>;
     /** شانس (٪) دریافت هر نوع جعبه با هر برد، برای سولو و آنلاین. مجموع حداکثر ۱۰۰؛ باقی‌مانده = این بار جعبه‌ای نمی‌آید. */
     drops: { solo: Record<BoxType, number>; multi: Record<BoxType, number> };

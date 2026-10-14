@@ -3,6 +3,7 @@ import type { Ctx } from './App';
 import { call } from './net';
 import { isDev, openLink } from './telegram';
 import { setMuted, setVolume, useMusic, type Channel } from './music';
+import { boxSpeedupCost } from '@game/shared';
 import { Bar, Modal, fa, fmtTime, CardTile, RARITY_FA, Icon, Gem } from './ui';
 import type { LeaderRow } from '@game/shared';
 
@@ -254,11 +255,10 @@ function ProfileModal({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) {
 }
 
 function Boxes({ ctx }: { ctx: Ctx }) {
-  const { profile: p, cfg, setProfile, toast } = ctx;
+  const { profile: p, profileAt, cfg, setProfile, toast } = ctx;
   const [, tick] = useState(0);
-  const [fetchedAt, setFetchedAt] = useState(Date.now());
   const [reward, setReward] = useState<any>(null);
-  useEffect(() => { setFetchedAt(Date.now()); }, [p]);
+  const [speed, setSpeed] = useState<number | null>(null); // اسلاتی که منتظر تأیید باز کردن فوری است
   useEffect(() => { const t = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(t); }, []);
   const act = async (path: string, slot: number) => {
     try {
@@ -276,23 +276,47 @@ function Boxes({ ctx }: { ctx: Ctx }) {
         {Array.from({ length: cfg.box.slots }, (_, i) => {
           const b = bySlot.get(i);
           if (!b) return <div key={i} className="slot empty"><span>خالی</span></div>;
-          const left = b.state === 'opening' ? Math.max(0, b.remainingMs - (Date.now() - fetchedAt)) : 0;
+          const left = b.state === 'opening' ? Math.max(0, b.remainingMs - (Date.now() - profileAt)) : 0;
           const label = <b className={`btype ${b.type}`}>{cfg.box.types[b.type]?.name ?? b.type}</b>;
+          const dg = b.source === 'solo' ? ' dungeon' : '';
+          const vines = b.source === 'solo' ? <i className="vines" aria-hidden /> : null;
           if (b.state === 'locked') return (
-            <button key={i} className={`slot bx ${b.type}`} disabled={anyOpening} onClick={() => act('/api/box/start', i)}>
-              {label}<Chest /><small>{anyOpening ? 'در صف' : 'شروع باز شدن'}</small><small>{fmtTime(b.remainingMs)}</small>
+            <button key={i} className={`slot bx ${b.type}${dg}`} disabled={anyOpening} onClick={() => act('/api/box/start', i)}>
+              {vines}{label}<Chest /><small>{anyOpening ? 'در صف' : 'شروع باز شدن'}</small><small>{fmtTime(b.remainingMs)}</small>
             </button>);
           if (b.state === 'ready' || left === 0) return (
-            <button key={i} className={`slot bx ready ${b.type}`} onClick={() => act('/api/box/open', i)}>
-              {label}<Chest /><small>باز کن!</small>
+            <button key={i} className={`slot bx ready ${b.type}${dg}`} onClick={() => act('/api/box/open', i)}>
+              {vines}{label}<Chest /><small>باز کن!</small>
             </button>);
           return (
-            <div key={i} className={`slot bx opening ${b.type}`}>
-              {label}<Chest /><small>{fmtTime(left)}</small>
+            <div key={i} className={`slot bx opening ${b.type}${dg}`}>
+              {vines}{label}<Chest /><small>{fmtTime(left)}</small>
+              <button className="speedbtn" onClick={() => setSpeed(i)} aria-label={`باز کردن فوری با ${fa(boxSpeedupCost(left, cfg.box.speedup))} الماس`}><Gem /> <b className="num">{fa(boxSpeedupCost(left, cfg.box.speedup))}</b></button>
               {isDev && <button className="mini" onClick={() => act('/api/box/skip', i)}>⏩ دمو</button>}
             </div>);
         })}
       </div>
+      {speed !== null && (() => {
+        const b = bySlot.get(speed);
+        const left = b && b.state === 'opening' ? Math.max(0, b.remainingMs - (Date.now() - profileAt)) : 0;
+        const cost = boxSpeedupCost(left, cfg.box.speedup);
+        return (
+          <Modal onClose={() => setSpeed(null)}>
+            <div className="center-in">
+              <h3>باز کردن فوری</h3>
+              {left <= 0 ? <p>جعبه آماده است.</p> : (
+                <>
+                  <p>زمان باقی‌مانده: <b className="num">{fmtTime(left)}</b></p>
+                  <p>هزینه: <span className="gemv"><Gem /> <b className="num">{fa(cost)}</b> الماس</span> <small>({fa(cfg.box.speedup.gemsPerStep)} الماس برای هر {fa(cfg.box.speedup.stepMinutes)} دقیقه)</small></p>
+                  {p.gems < cost && <p className="hint">الماس کافی نداری؛ از فروشگاه بخر.</p>}
+                  <button className="btn" disabled={p.gems < cost} onClick={async () => { await act('/api/box/speedup', speed); setSpeed(null); }}>باز کن</button>
+                </>
+              )}
+              <button className="btn ghost" onClick={() => setSpeed(null)}>بیخیال</button>
+            </div>
+          </Modal>
+        );
+      })()}
       {reward && (
         <Modal onClose={() => setReward(null)}>
           <div className="center-in">

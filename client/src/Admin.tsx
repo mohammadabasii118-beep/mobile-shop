@@ -168,9 +168,11 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
   const total = urows.reduce((s, l) => ({ c: s.c + l.copies, k: s.k + l.coins, x: s.x + (l.xp ?? 0) }), { c: 0, k: 0, x: 0 });
   const [bt, setBt] = useState<BoxType>('bronze');
   const [dm, setDm] = useState<'solo' | 'multi'>('solo');
+  const [cm, setCm] = useState<'solo' | 'multi'>('solo');
   const dropSum = BOX_TYPES.reduce((t, k) => t + (Number(d.box.drops[dm][k]) || 0), 0);
   const box = d.box.types[bt];
-  const cc = box.cardChance;
+  const ct = box.contents[cm];
+  const cc = ct.cardChance;
   const upd = (fn: (c: GameConfig) => void) => { const c = JSON.parse(JSON.stringify(d)) as GameConfig; fn(c); setD(c); };
   /** حداکثر لول برای هر سه نوع کارت با هم عوض می‌شود؛ ردیف‌های جدید از آخرین ردیف دو برابر می‌شوند */
   const setMax = (m: number) => upd((c) => {
@@ -190,22 +192,37 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
             <button key={t} role="tab" aria-selected={bt === t} className={`pit boxtab ${t}`} onClick={() => setBt(t)}>{d.box.types[t].name}</button>
           ))}
         </div>
-        <small className="hint" style={{ textAlign: 'start' }}>نوع جعبه را انتخاب کن؛ محتوا و شانس کارتِ همین نوع در زیر ویرایش می‌شود.</small>
+        <small className="hint" style={{ textAlign: 'start' }}>نوع جعبه را انتخاب کن؛ نام و زمان باز شدن برای هر دو حالت یکی است، ولی محتوا (سکه، تعداد و شانس کارت) برای جعبه‌ی تک‌نفره (دانجن) و آنلاین جدا تنظیم می‌شود.</small>
         <label className="field">نام نمایشی<input value={box.name} onChange={(e) => upd((c) => { c.box.types[bt].name = e.target.value; })} /></label>
         <div className="fgrid">
           {f('زمان باز شدن (ساعت)', box.durationSeconds / 3600, (x) => upd((c) => { c.box.types[bt].durationSeconds = Math.round(x * 3600); }), 0.25)}
-          {f('سکه — حداقل', box.coins[0], (x) => upd((c) => { c.box.types[bt].coins[0] = x; }))}
-          {f('سکه — حداکثر', box.coins[1], (x) => upd((c) => { c.box.types[bt].coins[1] = x; }))}
-          {f('تعداد کارت — حداقل', box.cardCountRange[0], (x) => upd((c) => { c.box.types[bt].cardCountRange[0] = x; }))}
-          {f('تعداد کارت — حداکثر', box.cardCountRange[1], (x) => upd((c) => { c.box.types[bt].cardCountRange[1] = x; }))}
         </div>
-        <h3>شانس کارت — جعبه‌ی {box.name} (٪)</h3>
+        <h3>محتوای جعبه‌ی {box.name}</h3>
+        <div className="pits" role="tablist" aria-label="محتوای جعبه برای کدام حالت">
+          {(['solo', 'multi'] as const).map((m) => (
+            <button key={m} role="tab" aria-selected={cm === m} className="pit" onClick={() => setCm(m)}>{m === 'solo' ? 'تک‌نفره (دانجن)' : 'آنلاین'}</button>
+          ))}
+        </div>
+        <small className="hint" style={{ textAlign: 'start' }}>این محتوا برای جعبه‌ای است که از {cm === 'solo' ? 'تک‌نفره (دانجن)' : 'بازی آنلاین'} به بازیکن می‌رسد.</small>
         <div className="fgrid">
-          {f('کمیاب (طلایی)', Math.round(cc.epic * 100), (x) => upd((c) => { c.box.types[bt].cardChance.epic = x / 100; }))}
-          {f('معمولی (نقره‌ای)', Math.round(cc.rare * 100), (x) => upd((c) => { c.box.types[bt].cardChance.rare = x / 100; }))}
-          {f('ساده (برنزی)', Math.round(cc.common * 100), (x) => upd((c) => { c.box.types[bt].cardChance.common = x / 100; }))}
+          {f('سکه — حداقل', ct.coins[0], (x) => upd((c) => { c.box.types[bt].contents[cm].coins[0] = x; }))}
+          {f('سکه — حداکثر', ct.coins[1], (x) => upd((c) => { c.box.types[bt].contents[cm].coins[1] = x; }))}
+          {f('تعداد کارت — حداقل', ct.cardCountRange[0], (x) => upd((c) => { c.box.types[bt].contents[cm].cardCountRange[0] = x; }))}
+          {f('تعداد کارت — حداکثر', ct.cardCountRange[1], (x) => upd((c) => { c.box.types[bt].contents[cm].cardCountRange[1] = x; }))}
+        </div>
+        <h3>شانس کارت — جعبه‌ی {box.name} ({cm === 'solo' ? 'تک‌نفره' : 'آنلاین'}) (٪)</h3>
+        <div className="fgrid">
+          {f('کمیاب (طلایی)', Math.round(cc.epic * 100), (x) => upd((c) => { c.box.types[bt].contents[cm].cardChance.epic = x / 100; }))}
+          {f('معمولی (نقره‌ای)', Math.round(cc.rare * 100), (x) => upd((c) => { c.box.types[bt].contents[cm].cardChance.rare = x / 100; }))}
+          {f('ساده (برنزی)', Math.round(cc.common * 100), (x) => upd((c) => { c.box.types[bt].contents[cm].cardChance.common = x / 100; }))}
         </div>
         <small className="hint">شانس بدون کارت: {fa(Math.round((1 - cc.epic - cc.rare - cc.common) * 100))}٪ (برای هر کارتِ جعبه جدا انداخته می‌شود)</small>
+        <h3>باز کردن فوری با الماس</h3>
+        <small className="hint" style={{ textAlign: 'start' }}>برای هر چند دقیقه‌ی باقی‌مانده (رو به بالا گرد می‌شود) چند الماس؟ مثلاً با ۲ الماس برای هر ۱۰ دقیقه: ۱۲ دقیقه مانده = ۲ پله = ۴ الماس، ۲۵ دقیقه = ۶ الماس، جعبه‌ی ۱ ساعته = ۱۲ الماس.</small>
+        <div className="fgrid">
+          {f('الماس برای هر پله', d.box.speedup.gemsPerStep, (x) => upd((c) => { c.box.speedup.gemsPerStep = x; }))}
+          {f('طول هر پله (دقیقه)', d.box.speedup.stepMinutes, (x) => upd((c) => { c.box.speedup.stepMinutes = Math.max(1, x); }))}
+        </div>
         <h3>تعداد اسلات جعبه</h3>
         <div className="fgrid">{f('اسلات', d.box.slots, (x) => upd((c) => { c.box.slots = x; }))}</div>
         <h3>هزینه‌ی ورود به نبرد (سکه)</h3>

@@ -16,6 +16,8 @@ export interface Ctx {
   cfg: GameConfig;
   setCfg: (c: GameConfig) => void;
   profile: Profile;
+  /** لحظه‌ی دریافت این پروفایل (برای محاسبه‌ی درست شمارنده‌ی جعبه‌ها، حتی بعد از جابه‌جایی بین صفحه‌ها) */
+  profileAt: number;
   setProfile: (p: Profile) => void;
   sock: Socket;
   toast: (s: string) => void;
@@ -23,7 +25,9 @@ export interface Ctx {
 
 export function App() {
   const [cfg, setCfg] = useState<GameConfig | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfileRaw] = useState<Profile | null>(null);
+  const [profileAt, setProfileAt] = useState(Date.now());
+  const setProfile = useCallback((p: Profile) => { setProfileAt(Date.now()); setProfileRaw(p); }, []);
   const [err, setErr] = useState<string | null>(null);
   const [tab, setTab] = useState<'home' | 'cards' | 'shop' | 'admin'>('home');
   const [battle, setBattle] = useState<BattleInit | null>(null);
@@ -72,7 +76,7 @@ export function App() {
   if (err) return <div className="center"><h2>😕</h2><p>{err}</p><small className="dbg" dir="rtl">{initDebug()}</small><button className="btn" onClick={() => location.reload()}>تلاش دوباره</button></div>;
   if (!cfg || !profile) return <div className="center"><div className="spinner" /><p>در حال بارگذاری…</p></div>;
 
-  const ctx: Ctx = { cfg, setCfg, profile, setProfile, sock, toast };
+  const ctx: Ctx = { cfg, setCfg, profile, profileAt, setProfile, sock, toast };
   const onBattleDone = (end: Extract<ServerMsg, { t: 'battleEnd' }>) => { setProfile(end.profile); setResult(end); };
 
   return (
