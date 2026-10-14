@@ -64,7 +64,7 @@ def build_entry(user: User, node: Node, proto: str, port: int, cdn: bool = False
     if proto == "vless":
         if not node.reality_pub:
             return None
-        e["link"] = (f"vless://{user.uuid}@{conn}:{port}?encryption=none&security=reality&sni={REALITY_SNI}"
+        e["link"] = (f"vless://{user.uuid}@{conn}:{port}?encryption=none&security=reality&sni={node.reality_sni or REALITY_SNI}"
                      f"&fp=chrome&pbk={node.reality_pub}&sid={node.reality_sid}&type=tcp&flow=xtls-rprx-vision#{tag}")
     elif proto == "vless_tcp":
         e["link"] = f"vless://{user.uuid}@{conn}:{port}?encryption=none&{tls}&type=tcp#{tag}"

@@ -53,7 +53,7 @@ const views = {
       ${S.nodes.map(n => `<tr><td><span class="cc">${esc(n.cc)}</span>${esc(n.name)}</td><td class="mono">${esc(n.address)}</td>
         <td>${n.online ? n.load + '%' : '—'}</td><td>${n.last_seen ? new Date(n.last_seen).toLocaleString('fa-IR') : 'هنوز وصل نشده'}</td>
         <td><span class="pill ${n.online ? 'good' : 'warn'}">${n.online ? 'آنلاین' : 'آفلاین'}</span>${n.conflicts.length ? `<br><span class="pill bad" title="پورتی که برنامه‌ی دیگری گرفته؛ آن پروتکل روی این نود بالا نمی‌آید. پورت را در بخش پروتکل‌ها ← پورت‌ها عوض کنید.">تداخل پورت: ${esc(n.conflicts.join('، '))}</span>` : ''}</td>
-        <td><button class="btn sm" data-install="${n.id}">دستور نصب</button> <button class="btn sm" data-cf="${n.id}">کلادفلر${n.cf_domain ? ' ✓' : ''}</button> <button class="btn sm" data-delnode="${n.id}">حذف</button></td></tr>`).join('')
+        <td><button class="btn sm" data-install="${n.id}">دستور نصب</button> <button class="btn sm" data-reality="${n.id}">Reality</button> <button class="btn sm" data-cf="${n.id}">کلادفلر${n.cf_domain ? ' ✓' : ''}</button> <button class="btn sm" data-delnode="${n.id}">حذف</button></td></tr>`).join('')
         || '<tr><td colspan="6" class="muted">لوکیشنی وجود ندارد.</td></tr>'}</tbody></table></div>`;
   },
   protos() {
@@ -112,6 +112,15 @@ function installDialog(n) {
     <p class="muted" style="margin:0">روی سرور تازه (اوبونتو ۲۲.۰۴ یا ۲۴.۰۴، دسترسی root) این دستور را اجرا کنید:</p>
     <pre>${esc(n.install_command)}</pre>
     <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-copy="${esc(n.install_command)}">کپی دستور</button><button class="btn pri" data-close>بستن</button></div>`);
+}
+const REALITY_SITES = ['www.microsoft.com', 'www.apple.com', 'addons.mozilla.org', 'dl.google.com', 'www.samsung.com', 'www.asus.com', 'www.lovelive-anime.jp'];
+function realityDialog(n) {
+  openModal(`<h2>Reality برای ${esc(n.name)}</h2>
+    <p class="muted" style="margin:0">سایتی که Reality ادای آن را درمی‌آورد. باید از روی سرور نود با TLS 1.3 و h2 جواب بدهد و پشت CDN نباشد؛ همه‌ی سایت‌ها از همه‌ی سرورها جواب نمی‌دهند.</p>
+    <label class="f">دامنه‌ی سایت پوشش<input type="text" id="rSni" value="${esc(n.reality_sni)}" dir="ltr"></label>
+    <div class="chips">${REALITY_SITES.map(s => `<button class="btn sm" data-pick="${s}">${s}</button>`).join('')}</div>
+    <div class="note">بعد از ذخیره، اشتراک را در برنامه به‌روز کنید. برای بررسی روی نود: <span class="mono">python3 /tmp/selftest.py لینک_اشتراک Reality</span></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="rSave" data-id="${n.id}">ذخیره</button></div>`);
 }
 function cfDialog(n) {
   openModal(`<h2>کلادفلر برای ${esc(n.name)}</h2>
@@ -192,6 +201,9 @@ document.addEventListener('click', async e => {
     }
     else if (d.install) installDialog(nodeBy(+d.install));
     else if (d.cf) cfDialog(nodeBy(+d.cf));
+    else if (d.reality) realityDialog(nodeBy(+d.reality));
+    else if (d.pick) $('#rSni').value = d.pick;
+    else if (t.id === 'rSave') { await api('PUT', `/nodes/${d.id}/reality`, {sni: $('#rSni').value.trim()}); closeModal(); await refresh(); toast('ذخیره شد؛ ظرف ۳۰ ثانیه روی نود اعمال می‌شود'); }
     else if (t.id === 'cfSave') { await api('PUT', `/nodes/${d.id}/cloudflare`, {cf_domain: $('#cfDomain').value.trim(), cf_address: $('#cfAddr').value.trim()}); closeModal(); await refresh(); toast('ذخیره شد'); }
     else if (d.delnode) { await api('DELETE', '/nodes/' + d.delnode); closeModal(); await refresh(); toast('لوکیشن حذف شد'); }
     else if (t.id === 'addUser') userForm();

@@ -483,3 +483,19 @@ def test_links_pin_the_self_signed_certificate():
         rows = {e["proto"]: e for e in c.get(f"/api/users/{user['id']}/configs", headers=h).json()}
         assert "pcs=" not in rows["trojan"]["link"] and "insecure" not in rows["trojan"]["link"]
         assert c.post("/api/node/report", headers=nh, json={"tls_pin": "not hex!"}).status_code == 422
+
+
+def test_reality_camouflage_site_is_configurable_per_node():
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "R", "cc": "fr", "address": "7.7.7.7"}).json()
+        assert node["reality_sni"] == "www.microsoft.com"
+        nh = {"Authorization": "Bearer " + node["install_command"].split("--token ")[1].split()[0]}
+        user = c.post("/api/users", headers=h, json={"name": "realuser", "protos": ["vless"], "node_ids": [node["id"]]}).json()
+        c.post("/api/node/report", headers=nh, json={"reality_pub": "PUB", "reality_sid": "ab"})
+        assert c.put(f"/api/nodes/{node['id']}/reality", headers=h, json={"sni": "not a host"}).status_code == 422
+        r = c.put(f"/api/nodes/{node['id']}/reality", headers=h, json={"sni": "Addons.Mozilla.org"})
+        assert r.json()["reality_sni"] == "addons.mozilla.org"
+        assert c.get("/api/node/config", headers=nh).json()["node"]["reality_sni"] == "addons.mozilla.org"
+        link = c.get(f"/api/users/{user['id']}/configs", headers=h).json()[0]["link"]
+        assert "sni=addons.mozilla.org" in link

@@ -134,6 +134,18 @@ def cert_sha256(path):
         return ""
 
 
+def check_dest(sni):
+    """Reality copies the real handshake of `sni`: it must answer TLS 1.3 with h2 from this machine."""
+    try:
+        r = subprocess.run(["openssl", "s_client", "-connect", f"{sni}:443", "-servername", sni, "-tls1_3", "-alpn", "h2"],
+                           input="", capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return False, f"could not probe {sni}: {e}"
+    out = r.stdout + r.stderr
+    tls13, h2 = "TLSv1.3" in out, "ALPN protocol: h2" in out
+    return tls13 and h2, f"{sni}: TLS 1.3 {'yes' if tls13 else 'NO'}, h2 {'yes' if h2 else 'NO'}"
+
+
 def main():
     global DEFAULT_PIN
     if len(sys.argv) < 2 or not sys.argv[1].startswith(("http://", "https://")):
@@ -150,6 +162,10 @@ def main():
         good, note = test_one(xray, ob)
         ok += good
         print(("PASS  " if good else "FAIL  ") + label + ("" if good else "\n      " + note), flush=True)
+        reality = ob.get("streamSettings", {}).get("realitySettings")
+        if not good and reality:
+            fine, detail = check_dest(reality["serverName"])
+            print("      camouflage site check -> " + detail + ("" if fine else "   <- pick another site (panel: Locations -> Reality)"), flush=True)
     print(f"\n{ok}/{len(entries)} passed")
 
 

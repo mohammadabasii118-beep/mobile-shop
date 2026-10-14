@@ -154,7 +154,7 @@ def node_out(node: Node, request: Request) -> dict:
     url = public_url(request)
     return {
         "id": node.id, "name": node.name, "cc": node.cc, "address": node.address,
-        "cf_domain": node.cf_domain, "cf_address": node.cf_address, "conflicts": node.conflicts or [], "port_range": list(PORT_RANGE),
+        "reality_sni": node.reality_sni or REALITY_SNI, "cf_domain": node.cf_domain, "cf_address": node.cf_address, "conflicts": node.conflicts or [], "port_range": list(PORT_RANGE),
         "online": is_online(node), "load": node.load, "reality_ready": bool(node.reality_pub),
         "last_seen": node.last_seen.isoformat() + "Z" if node.last_seen else None,
         "protocols": [{"proto": p.proto, "enabled": p.enabled, "port": p.port,
@@ -201,6 +201,19 @@ def create_node(body: NodeIn, request: Request, db: Session = Depends(get_db)):
                 l2tp_psk=secrets.token_urlsafe(12))
     ensure_protocols(node)
     db.add(node)
+    db.commit()
+    return node_out(node, request)
+
+
+class RealitySni(BaseModel):
+    sni: str = Field(pattern=r"^([A-Za-z0-9\-]+\.)+[A-Za-z]{2,}$")
+
+
+@app.put("/api/nodes/{node_id}/reality", dependencies=[Depends(require_admin)])
+def set_reality_sni(node_id: int, body: RealitySni, request: Request, db: Session = Depends(get_db)):
+    """The site Reality imitates. It must answer TLS 1.3 with h2 from the node; not every site does everywhere."""
+    node = db.get(Node, node_id) or _404()
+    node.reality_sni = body.sni.lower()
     db.commit()
     return node_out(node, request)
 
@@ -382,7 +395,7 @@ def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db
                           "wg_ip": wg_ip(u.id), "protos": protos})
     agent_sha = hashlib.sha256((ROOT / "agent" / "agent.py").read_bytes()).hexdigest()
     return {"agent_sha256": agent_sha,
-            "node": {"name": node.name, "reality_sni": REALITY_SNI, "ss_method": SS_METHOD,
+            "node": {"name": node.name, "reality_sni": node.reality_sni or REALITY_SNI, "ss_method": SS_METHOD,
                      "ss_key": node.ss_key, "l2tp_psk": node.l2tp_psk},
             "protocols": enabled, "users": users}
 
