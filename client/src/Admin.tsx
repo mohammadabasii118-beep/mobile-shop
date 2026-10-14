@@ -273,7 +273,7 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
   );
 }
 
-interface AdminOrder { id: number; userId: number; tgId: number; name: string; avatar: string | null; gems: number; toman: number; stars: number; method: string; note: string | null; status: string; createdAt: number; doneAt: number | null }
+interface AdminOrder { id: number; userId: number; tgId: number; name: string; avatar: string | null; gems: number; coins: number; toman: number; stars: number; method: string; note: string | null; status: string; createdAt: number; doneAt: number | null }
 const ORDER_FA: Record<string, string> = { pending: 'در انتظار', delivered: 'تحویل شد', canceled: 'لغو شد' };
 
 /** فروشگاه: ۶ پیشنهاد کارت روزانه، بسته‌های سکه (با الماس) و الماس (با تومان)، آدرس درگاه، و سفارش‌ها */
@@ -287,7 +287,7 @@ function ShopTab({ cfg, refresh, run }: TabProps) {
   useEffect(() => { void loadOrders(); /* eslint-disable-next-line */ }, []);
   const saveShop = () => run(async () => refresh((await call('/api/admin/config', { config: d })) as GameConfig), 'فروشگاه ذخیره شد');
   const when = (t: number) => new Date(t).toLocaleString('fa-IR', { dateStyle: 'medium', timeStyle: 'short' });
-  const act = (id: number, action: 'deliver' | 'cancel') => run(async () => { setOrders((await call('/api/admin/order', { id, action })).orders); }, action === 'deliver' ? 'الماس به حساب بازیکن اضافه شد' : 'سفارش لغو شد');
+  const act = (id: number, action: 'deliver' | 'cancel') => run(async () => { setOrders((await call('/api/admin/order', { id, action })).orders); }, action === 'deliver' ? 'به حساب بازیکن اضافه شد' : 'سفارش لغو شد');
   const shown = orders.filter((o) => only === 'all' || o.status === 'pending');
   const num = (label: string, v: number, on: (x: number) => void) => <label className="field">{label}<input type="number" min={0} value={v} onChange={(e) => on(n(e.target.value))} /></label>;
 
@@ -295,7 +295,7 @@ function ShopTab({ cfg, refresh, run }: TabProps) {
     <div className="cols">
       <div className="box">
         <h3>پیشنهاد روزانه (۶ کارت)</h3>
-        <small className="hint" style={{ textAlign: 'start' }}>هر اسلات: کارت، تعداد، و قیمت با الماس و/یا سکه (قیمت ۰ = با آن ارز نمی‌شود خرید). هر بازیکن هر پیشنهاد را روزی یک‌بار می‌تواند بخرد (بازنشانی نیمه‌شب تهران). با عوض‌کردن اسلات، همان لحظه دوباره قابل خرید می‌شود. اسلات «خاموش» نمایش داده نمی‌شود.</small>
+        <small className="hint" style={{ textAlign: 'start' }}>هر اسلات: کارت، تعداد، و فقط یک قیمت (اول ارز را انتخاب کن: الماس یا سکه؛ فقط همان در فروشگاه نمایش داده می‌شود). هر بازیکن هر پیشنهاد را روزی یک‌بار می‌تواند بخرد (بازنشانی نیمه‌شب تهران). با عوض‌کردن اسلات، همان لحظه دوباره قابل خرید می‌شود. اسلات «خاموش» نمایش داده نمی‌شود.</small>
         {d.shop.cards.map((o, i) => (
           <div key={i} className="giftbox">
             <b>اسلات {fa(i + 1)}</b>
@@ -307,8 +307,12 @@ function ShopTab({ cfg, refresh, run }: TabProps) {
                 </select>
               </label>
               {num('تعداد', o.count, (x) => upd((c) => { c.shop.cards[i].count = Math.max(1, x); }))}
-              {num('قیمت (الماس)', o.priceGems, (x) => upd((c) => { c.shop.cards[i].priceGems = x; }))}
-              {num('قیمت (سکه)', o.priceCoins, (x) => upd((c) => { c.shop.cards[i].priceCoins = x; }))}
+              <label className="field">قیمت با
+                <select value={o.currency} onChange={(e) => upd((c) => { c.shop.cards[i].currency = e.target.value as 'gems' | 'coins'; })}>
+                  <option value="gems">الماس</option><option value="coins">سکه</option>
+                </select>
+              </label>
+              {num(`قیمت (${o.currency === 'gems' ? 'الماس' : 'سکه'})`, o.price, (x) => upd((c) => { c.shop.cards[i].price = Math.max(1, x); }))}
             </div>
           </div>
         ))}
@@ -316,17 +320,23 @@ function ShopTab({ cfg, refresh, run }: TabProps) {
       </div>
 
       <div className="box">
-        <h3>باکس سکه (با الماس)</h3>
+        <h3>باکس سکه</h3>
+        <small className="hint" style={{ textAlign: 'start' }}>هر بسته یا با الماس فروخته می‌شود (فوری) یا با تومان (کارت‌به‌کارت؛ مثل خرید الماس، سفارش در بخش پایین می‌آید و تو تحویل می‌دهی). فقط همان یک قیمت نمایش داده می‌شود. بسته‌های تومانی تا وقتی کارت‌به‌کارت را فعال نکرده‌ای نمایش داده نمی‌شوند.</small>
         {d.shop.coinPacks.map((k, i) => (
           <div key={k.id} className="giftbox">
             <div className="fgrid">
               {num('مقدار سکه', k.coins, (x) => upd((c) => { c.shop.coinPacks[i].coins = Math.max(1, x); }))}
-              {num('قیمت (الماس)', k.gems, (x) => upd((c) => { c.shop.coinPacks[i].gems = Math.max(1, x); }))}
+              <label className="field">فروش با
+                <select value={k.currency} onChange={(e) => upd((c) => { c.shop.coinPacks[i].currency = e.target.value as 'gems' | 'toman'; })}>
+                  <option value="gems">الماس (فوری)</option><option value="toman">تومان (کارت‌به‌کارت)</option>
+                </select>
+              </label>
+              {num(`قیمت (${k.currency === 'gems' ? 'الماس' : 'تومان'})`, k.price, (x) => upd((c) => { c.shop.coinPacks[i].price = Math.max(1, x); }))}
             </div>
             <button className="btn ghost neg" onClick={() => upd((c) => { c.shop.coinPacks.splice(i, 1); })}>حذف</button>
           </div>
         ))}
-        <button className="btn ghost" disabled={d.shop.coinPacks.length >= 12} onClick={() => upd((c) => { c.shop.coinPacks.push({ id: `c${Date.now().toString(36)}`, coins: 1000, gems: 20 }); })}>+ بسته‌ی سکه</button>
+        <button className="btn ghost" disabled={d.shop.coinPacks.length >= 12} onClick={() => upd((c) => { c.shop.coinPacks.push({ id: `c${Date.now().toString(36)}`, coins: 1000, currency: 'gems', price: 20 }); })}>+ بسته‌ی سکه</button>
 
         <h3>خرید الماس (تومان / استار)</h3>
         <small className="hint" style={{ textAlign: 'start' }}>برای هر بسته می‌توانی هر دو قیمت را بگذاری یا یکی را ۰ کنی (۰ = با آن روش نمی‌شود خرید). هر بسته حداقل یک قیمت لازم دارد.</small>
@@ -369,12 +379,12 @@ function ShopTab({ cfg, refresh, run }: TabProps) {
           <div key={o.id} className="giftbox">
             <div className="who"><Av url={o.avatar} name={o.name} /> <b>{o.name}</b> <span className={`tag ${o.status === 'pending' ? '' : o.status === 'delivered' ? 'ok' : 'bad'}`}>{ORDER_FA[o.status] ?? o.status}</span></div>
             <small>شناسه‌ی تلگرام: <b className="num">{o.tgId}</b> · شناسه‌ی بازی: <b className="num">{fa(o.userId)}</b></small>
-            <small>خرید: <b className="num">{fa(o.gems)}</b> الماس — {o.method === 'stars' ? `${fa(o.stars)} استار (تلگرام، خودکار)` : `${fa(o.toman)} تومان (کارت‌به‌کارت)`} · سفارش #{fa(o.id)}</small>
+            <small>خرید: <b className="num">{o.coins > 0 ? `${fa(o.coins)} سکه` : `${fa(o.gems)} الماس`}</b> — {o.method === 'stars' ? `${fa(o.stars)} استار (تلگرام، خودکار)` : `${fa(o.toman)} تومان (کارت‌به‌کارت)`} · سفارش #{fa(o.id)}</small>
             {o.note && <small>کد پیگیری بازیکن: <b className="num">{o.note}</b></small>}
             <small>تاریخ ثبت: {when(o.createdAt)}{o.doneAt ? ` · بررسی: ${when(o.doneAt)}` : ''}</small>
             {o.status === 'pending' && (
               <div className="row">
-                {o.method === 'card' && <button className="btn ghost pos" onClick={() => void act(o.id, 'deliver')}>تحویل (+{fa(o.gems)} الماس)</button>}
+                {o.method === 'card' && <button className="btn ghost pos" onClick={() => void act(o.id, 'deliver')}>تحویل (+{o.coins > 0 ? `${fa(o.coins)} سکه` : `${fa(o.gems)} الماس`})</button>}
                 <button className="btn ghost neg" onClick={() => void act(o.id, 'cancel')}>لغو</button>
               </div>
             )}

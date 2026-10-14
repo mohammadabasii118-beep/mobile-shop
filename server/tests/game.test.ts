@@ -205,41 +205,53 @@ describe('game economy', () => {
   });
 
   describe('shop', () => {
-    it('buys a daily card offer with coins or gems, once per day, adding the right copies', () => {
+    it('buys a daily card offer with the single currency set for the slot, once per day, adding the right copies', () => {
       const db = (game as any).d.db;
       db.prepare('UPDATE users SET coins = 1000, gems = 100').run();
-      const [giv, , , , , sohrab] = cfg.shop.cards;
+      const giv = cfg.shop.cards[0], sohrab = cfg.shop.cards[5];
+      expect([giv.currency, sohrab.currency]).toEqual(['coins', 'gems']);
       // کارتی که دارم: count نسخه به تعداد اضافه می‌شود
-      const r1 = game.buyShopCard(uid, 0, 'coins');
-      expect(r1).toMatchObject({ cardId: giv.cardId, count: giv.count, isNew: false });
-      expect(game.profile(uid).coins).toBe(1000 - giv.priceCoins);
+      expect(game.buyShopCard(uid, 0)).toMatchObject({ cardId: giv.cardId, count: giv.count, isNew: false });
+      expect(game.profile(uid).coins).toBe(1000 - giv.price);
+      expect(game.profile(uid).gems).toBe(100);                                  // ارز دیگر دست نمی‌خورد
       expect(game.profile(uid).cards.find((c) => c.id === giv.cardId)!.copies).toBe(giv.count);
-      expect(() => game.buyShopCard(uid, 0, 'gems')).toThrow(/امروز/);          // یک‌بار در روز
-      // کارت جدید: خودِ کارت + بقیه به‌عنوان تعداد
-      const r2 = game.buyShopCard(uid, 5, 'gems');
-      expect(r2).toMatchObject({ cardId: sohrab.cardId, isNew: true });
-      expect(game.profile(uid).gems).toBe(100 - sohrab.priceGems);
+      expect(() => game.buyShopCard(uid, 0)).toThrow(/امروز/);                  // یک‌بار در روز
+      // کارت جدید با الماس: خودِ کارت + بقیه به‌عنوان تعداد
+      expect(game.buyShopCard(uid, 5)).toMatchObject({ cardId: sohrab.cardId, isNew: true });
+      expect(game.profile(uid).gems).toBe(100 - sohrab.price);
       expect(game.profile(uid).cards.find((c) => c.id === sohrab.cardId)).toMatchObject({ level: 1, copies: sohrab.count - 1 });
       // فردا دوباره می‌شود
       t += 24 * 3600 * 1000;
       expect(game.shopState(uid).bought).toEqual([]);
-      game.buyShopCard(uid, 0, 'coins');
+      game.buyShopCard(uid, 0);
       // موجودی کافی نیست
       db.prepare('UPDATE users SET coins = 0, gems = 0').run();
-      expect(() => game.buyShopCard(uid, 1, 'coins')).toThrow(/سکه/);
-      expect(() => game.buyShopCard(uid, 1, 'gems')).toThrow(/الماس/);
-      expect(() => game.buyShopCard(uid, 9, 'gems')).toThrow(GameError);
+      expect(() => game.buyShopCard(uid, 1)).toThrow(/سکه/);
+      expect(() => game.buyShopCard(uid, 5)).toThrow(/الماس/);
+      expect(() => game.buyShopCard(uid, 9)).toThrow(GameError);
     });
 
-    it('coin packs cost gems', () => {
+    it('coin packs: priced in gems (instant) or in toman (card-to-card order, delivered by the admin)', () => {
       (game as any).d.db.prepare('UPDATE users SET gems = 30').run();
       const pk = cfg.shop.coinPacks[0];
+      expect(pk.currency).toBe('gems');
       game.buyCoinPack(uid, pk.id);
       const p = game.profile(uid);
-      expect([p.gems, p.coins]).toEqual([30 - pk.gems, 100 + pk.coins]);
+      expect([p.gems, p.coins]).toEqual([30 - pk.price, 100 + pk.coins]);
       expect(() => game.buyCoinPack(uid, 'nope')).toThrow(GameError);
       (game as any).d.db.prepare('UPDATE users SET gems = 0').run();
       expect(() => game.buyCoinPack(uid, pk.id)).toThrow(/الماس/);
+      // بسته‌ای که با تومان فروخته می‌شود: با الماس نمی‌شود خرید، سفارش کارت‌به‌کارت می‌سازد و تحویلش سکه اضافه می‌کند
+      const tomanPack = { id: 'ct', coins: 2000, currency: 'toman' as const, price: 30000 };
+      const g = new Game({ db: openDb(), cfg: { ...cfg, shop: { ...cfg.shop, card: { enabled: true, number: '6037991234567890', holder: 'x', bank: 'y' }, coinPacks: [...cfg.shop.coinPacks, tomanPack] } }, now: () => t, rng: () => rngVal });
+      const u = g.upsertUser({ tgId: 11, name: 'V', avatar: null });
+      expect(() => g.buyCoinPack(u, 'ct')).toThrow(/با الماس فروخته/);
+      const o = g.createOrder(u, 'ct', 'card');
+      expect(o).toMatchObject({ coins: 2000, gems: 0, toman: 30000 });
+      expect(() => g.createOrder(u, 'ct', 'stars')).toThrow(/استار/);
+      g.adminOrderAction(o.id, 'deliver');
+      expect(g.profile(u)).toMatchObject({ coins: 100 + 2000, gems: 50 });
+      expect(g.adminOrders()[0]).toMatchObject({ coins: 2000, gems: 0 });
     });
 
     it('card-to-card orders: pending with a note until the admin delivers (once), cap of 5 pending', () => {

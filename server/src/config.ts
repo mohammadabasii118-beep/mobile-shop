@@ -50,8 +50,7 @@ export function validateConfig(cfg: GameConfig): GameConfig {
     if (!o || typeof o.cardId !== 'string') bad(`فروشگاه: اسلات ${i + 1} نامعتبر است`);
     if (o.cardId === '') return;
     if (!ids.has(o.cardId)) bad(`فروشگاه: کارت ناشناخته ${o.cardId}`);
-    if (!isInt(o.count, 1, 999) || !isInt(o.priceGems, 0) || !isInt(o.priceCoins, 0)) bad(`فروشگاه: تعداد یا قیمت اسلات ${i + 1} نامعتبر است`);
-    if (o.priceGems === 0 && o.priceCoins === 0) bad(`فروشگاه: اسلات ${i + 1} حداقل یک قیمت (الماس یا سکه) لازم دارد`);
+    if (!isInt(o.count, 1, 999) || !isInt(o.price, 1) || (o.currency !== 'gems' && o.currency !== 'coins')) bad(`فروشگاه: تعداد، ارز یا قیمت اسلات ${i + 1} نامعتبر است (قیمت حداقل ۱)`);
   });
   const packIds = new Set<string>();
   for (const pk of [...sh.coinPacks, ...sh.gemPacks] as { id: string }[]) {
@@ -59,7 +58,7 @@ export function validateConfig(cfg: GameConfig): GameConfig {
     packIds.add(pk.id);
   }
   if (sh.coinPacks.length > 12 || sh.gemPacks.length > 12) bad('فروشگاه: حداکثر ۱۲ بسته');
-  for (const pk of sh.coinPacks) if (!isInt(pk.coins, 1) || !isInt(pk.gems, 1)) bad('فروشگاه: بسته‌ی سکه نامعتبر است');
+  for (const pk of sh.coinPacks) if (!isInt(pk.coins, 1) || !isInt(pk.price, 1, 1_000_000_000) || (pk.currency !== 'gems' && pk.currency !== 'toman')) bad('فروشگاه: بسته‌ی سکه نامعتبر است');
   for (const pk of sh.gemPacks) {
     if (!isInt(pk.gems, 1) || !isInt(pk.toman, 0, 1_000_000_000) || !isInt(pk.stars, 0, 10_000)) bad('فروشگاه: بسته‌ی الماس نامعتبر است');
     if (pk.toman === 0 && pk.stars === 0) bad('فروشگاه: هر بسته‌ی الماس حداقل یک قیمت (تومان یا استار) لازم دارد');
@@ -136,6 +135,9 @@ export function loadConfigWithOverride(overridePath: string, basePath = CONFIG_P
   if (!merged.shop) merged.shop = base.shop;
   else {
     delete merged.shop.gatewayUrl;
+    // قیمت دوگانه‌ی قدیمی → یک ارز و یک قیمت (الماس اگر بود، وگرنه سکه)
+    merged.shop.cards = (merged.shop.cards ?? base.shop.cards).map((o: any) => (o?.currency ? o : { cardId: o.cardId, count: o.count, currency: o.priceGems > 0 ? 'gems' : 'coins', price: o.priceGems > 0 ? o.priceGems : (o.priceCoins || 1) }));
+    merged.shop.coinPacks = (merged.shop.coinPacks ?? base.shop.coinPacks).map((k: any) => (k?.currency ? k : { id: k.id, coins: k.coins, currency: 'gems', price: k.gems || 1 }));
     merged.shop.card = merged.shop.card ?? base.shop.card;
     merged.shop.starsEnabled = merged.shop.starsEnabled ?? base.shop.starsEnabled;
     merged.shop.gemPacks = (merged.shop.gemPacks ?? base.shop.gemPacks).map((g: any) => (typeof g?.stars === 'number' ? g : { ...g, stars: base.shop.gemPacks.find((x) => x.id === g.id)?.stars ?? 0 }));

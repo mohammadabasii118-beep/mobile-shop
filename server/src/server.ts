@@ -410,7 +410,7 @@ export function createGameServer(opt: ServerOptions) {
         case '/api/deck': game.setDeck(userId, body.cards); break;
         case '/api/upgrade': extra = { upgrade: game.upgradeCard(userId, String(body.cardId)) }; break;
         case '/api/shop/state': extra = { shop: game.shopState(userId) }; break;
-        case '/api/shop/buy-card': extra = { bought: game.buyShopCard(userId, Number(body.slot), body.currency) }; break;
+        case '/api/shop/buy-card': extra = { bought: game.buyShopCard(userId, Number(body.slot)) }; break;
         case '/api/shop/buy-coins': extra = { got: game.buyCoinPack(userId, String(body.id)) }; break;
         case '/api/shop/order': { // کارت‌به‌کارت: سفارش ثبت می‌شود و مشخصات کارت نمایش داده می‌شود؛ تحویل دستی از پنل
           const o = game.createOrder(userId, String(body.id), 'card');

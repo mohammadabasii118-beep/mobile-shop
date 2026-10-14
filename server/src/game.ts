@@ -278,7 +278,7 @@ export class Game {
   /** شماره‌ی روز به وقت تهران (نیمه‌شب ۰۰:۰۰ عوض می‌شود): پیشنهادهای کارت هر روز دوباره قابل خرید است */
   shopDay(): number { return Math.floor((this.d.now() + 12_600_000) / 86_400_000); }
   shopNextResetMs(): number { return (this.shopDay() + 1) * 86_400_000 - 12_600_000 - this.d.now(); }
-  private offerSig(o: { cardId: string; count: number; priceGems: number; priceCoins: number }) { return `${o.cardId}|${o.count}|${o.priceGems}|${o.priceCoins}`; }
+  private offerSig(o: { cardId: string; count: number; currency: string; price: number }) { return `${o.cardId}|${o.count}|${o.currency}|${o.price}`; }
 
   /** وضعیت فروشگاه برای یک بازیکن: کدام پیشنهادهای امروز را خریده، تا بازنشانی چقدر مانده، سفارش‌های اخیرش */
   shopState(userId: number) {
@@ -288,19 +288,17 @@ export class Game {
     cfg.shop.cards.forEach((o, slot) => {
       if (o.cardId && db.prepare('SELECT 1 FROM shop_buys WHERE user_id = ? AND slot = ? AND day = ? AND sig = ?').get(userId, slot, day, this.offerSig(o))) bought.push(slot);
     });
-    const orders = (db.prepare('SELECT id, gems, toman, stars, method, status, created_at FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 5').all(userId) as any[])
-      .map((r) => ({ id: r.id as number, gems: r.gems as number, toman: r.toman as number, stars: r.stars as number, method: r.method as string, status: r.status as string, createdAt: r.created_at as number }));
+    const orders = (db.prepare('SELECT id, gems, coins, toman, stars, method, status, created_at FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 5').all(userId) as any[])
+      .map((r) => ({ id: r.id as number, gems: r.gems as number, coins: r.coins as number, toman: r.toman as number, stars: r.stars as number, method: r.method as string, status: r.status as string, createdAt: r.created_at as number }));
     return { bought, resetInMs: this.shopNextResetMs(), orders };
   }
 
-  /** خرید یک پیشنهاد کارت با سکه یا الماس؛ هر پیشنهاد در هر روز یک‌بار برای هر بازیکن */
-  buyShopCard(userId: number, slot: number, currency: 'coins' | 'gems') {
+  /** خرید یک پیشنهاد کارت (با همان ارزی که ادمین برای اسلات گذاشته)؛ هر پیشنهاد در هر روز یک‌بار برای هر بازیکن */
+  buyShopCard(userId: number, slot: number) {
     const { db, cfg } = this.d;
     const o = cfg.shop.cards[slot];
     if (!Number.isInteger(slot) || !o || !o.cardId) throw new GameError('این پیشنهاد وجود ندارد');
-    if (currency !== 'coins' && currency !== 'gems') throw new GameError('نوع پرداخت نامعتبر است');
-    const price = currency === 'coins' ? o.priceCoins : o.priceGems;
-    if (!(price > 0)) throw new GameError('این پیشنهاد با این ارز قابل خرید نیست');
+    const { currency, price } = o;
     const day = this.shopDay(), sig = this.offerSig(o);
     if (db.prepare('SELECT 1 FROM shop_buys WHERE user_id = ? AND slot = ? AND day = ? AND sig = ?').get(userId, slot, day, sig)) throw new GameError('این پیشنهاد را امروز خریده‌ای');
     const paid = Number(db.prepare(`UPDATE users SET ${currency} = ${currency} - ? WHERE id = ? AND ${currency} >= ?`).run(price, userId, price).changes);
@@ -316,8 +314,8 @@ export class Game {
   buyCoinPack(userId: number, packId: string) {
     const { db, cfg } = this.d;
     const pk = cfg.shop.coinPacks.find((x) => x.id === packId);
-    if (!pk) throw new GameError('این بسته وجود ندارد');
-    const paid = Number(db.prepare('UPDATE users SET gems = gems - ? WHERE id = ? AND gems >= ?').run(pk.gems, userId, pk.gems).changes);
+    if (!pk || pk.currency !== 'gems') throw new GameError('این بسته با الماس فروخته نمی‌شود');
+    const paid = Number(db.prepare('UPDATE users SET gems = gems - ? WHERE id = ? AND gems >= ?').run(pk.price, userId, pk.price).changes);
     if (paid !== 1) throw new GameError('الماس کافی نداری');
     db.prepare('UPDATE users SET coins = coins + ? WHERE id = ?').run(pk.coins, userId);
     return { coins: pk.coins };
@@ -329,16 +327,19 @@ export class Game {
    */
   createOrder(userId: number, packId: string, method: 'card' | 'stars' = 'card') {
     const { db, cfg } = this.d;
-    const pk = cfg.shop.gemPacks.find((x) => x.id === packId);
-    if (!pk) throw new GameError('این بسته وجود ندارد');
-    if (method === 'card' && (!cfg.shop.card.enabled || !(pk.toman > 0))) throw new GameError('پرداخت کارت‌به‌کارت برای این بسته فعال نیست');
-    if (method === 'stars' && (!cfg.shop.starsEnabled || !(pk.stars > 0))) throw new GameError('پرداخت با استار برای این بسته فعال نیست');
+    // بسته‌ی الماس (تومان یا استار) یا بسته‌ی سکه‌ای که با تومان فروخته می‌شود (فقط کارت‌به‌کارت)
+    const gp = cfg.shop.gemPacks.find((x) => x.id === packId);
+    const cp = cfg.shop.coinPacks.find((x) => x.id === packId && x.currency === 'toman');
+    if (!gp && !cp) throw new GameError('این بسته وجود ندارد');
+    const item = gp ? { id: gp.id, gems: gp.gems, coins: 0, toman: gp.toman, stars: gp.stars } : { id: cp!.id, gems: 0, coins: cp!.coins, toman: cp!.price, stars: 0 };
+    if (method === 'card' && (!cfg.shop.card.enabled || !(item.toman > 0))) throw new GameError('پرداخت کارت‌به‌کارت برای این بسته فعال نیست');
+    if (method === 'stars' && (!gp || !cfg.shop.starsEnabled || !(item.stars > 0))) throw new GameError('پرداخت با استار برای این بسته فعال نیست');
     db.prepare("UPDATE orders SET status = 'canceled', done_at = ? WHERE user_id = ? AND status = 'pending' AND method = 'stars' AND created_at < ?").run(this.d.now(), userId, this.d.now() - 3_600_000);
     const pending = Number((db.prepare("SELECT COUNT(*) n FROM orders WHERE user_id = ? AND status = 'pending'").get(userId) as any).n);
     if (pending >= 5) throw new GameError('چند سفارش در انتظار داری؛ اول صبر کن تا بررسی شوند');
-    const r = db.prepare('INSERT INTO orders (user_id, pack_id, gems, toman, stars, method, created_at) VALUES (?,?,?,?,?,?,?)')
-      .run(userId, pk.id, pk.gems, method === 'card' ? pk.toman : 0, method === 'stars' ? pk.stars : 0, method, this.d.now());
-    return { id: Number(r.lastInsertRowid), gems: pk.gems, toman: method === 'card' ? pk.toman : 0, stars: method === 'stars' ? pk.stars : 0 };
+    const toman = method === 'card' ? item.toman : 0, stars = method === 'stars' ? item.stars : 0;
+    const r = db.prepare('INSERT INTO orders (user_id, pack_id, gems, coins, toman, stars, method, created_at) VALUES (?,?,?,?,?,?,?,?)').run(userId, item.id, item.gems, item.coins, toman, stars, method, this.d.now());
+    return { id: Number(r.lastInsertRowid), gems: item.gems, coins: item.coins, toman, stars };
   }
 
   /** کد پیگیری/۴ رقم آخر کارتِ پرداخت‌کننده (برای تطبیق در پنل) */
@@ -379,20 +380,20 @@ export class Game {
   }
 
   adminOrders(status?: string) {
-    const rows = this.d.db.prepare(`SELECT o.id, o.user_id, o.gems, o.toman, o.stars, o.method, o.note, o.status, o.created_at, o.done_at, u.tg_id, u.name, u.avatar FROM orders o JOIN users u ON u.id = o.user_id ${status ? 'WHERE o.status = ?' : ''} ORDER BY o.id DESC LIMIT 200`).all(...(status ? [status] : [])) as any[];
-    return rows.map((r) => ({ id: r.id as number, userId: r.user_id as number, tgId: r.tg_id as number, name: r.name as string, avatar: (r.avatar ?? null) as string | null, gems: r.gems as number, toman: r.toman as number, stars: r.stars as number, method: r.method as string, note: (r.note ?? null) as string | null, status: r.status as string, createdAt: r.created_at as number, doneAt: (r.done_at ?? null) as number | null }));
+    const rows = this.d.db.prepare(`SELECT o.id, o.user_id, o.gems, o.coins, o.toman, o.stars, o.method, o.note, o.status, o.created_at, o.done_at, u.tg_id, u.name, u.avatar FROM orders o JOIN users u ON u.id = o.user_id ${status ? 'WHERE o.status = ?' : ''} ORDER BY o.id DESC LIMIT 200`).all(...(status ? [status] : [])) as any[];
+    return rows.map((r) => ({ id: r.id as number, userId: r.user_id as number, tgId: r.tg_id as number, name: r.name as string, avatar: (r.avatar ?? null) as string | null, gems: r.gems as number, coins: r.coins as number, toman: r.toman as number, stars: r.stars as number, method: r.method as string, note: (r.note ?? null) as string | null, status: r.status as string, createdAt: r.created_at as number, doneAt: (r.done_at ?? null) as number | null }));
   }
 
   /** تحویل دستی (فقط کارت‌به‌کارت) یا لغو یک سفارش در انتظار؛ هر سفارش فقط یک‌بار قابل تصمیم است */
   adminOrderAction(id: number, action: 'deliver' | 'cancel') {
     const { db } = this.d;
-    const o = db.prepare('SELECT user_id, gems, status, method FROM orders WHERE id = ?').get(id) as any;
+    const o = db.prepare('SELECT user_id, gems, coins, status, method FROM orders WHERE id = ?').get(id) as any;
     if (!o) throw new GameError('سفارش پیدا نشد');
     if (o.status !== 'pending') throw new GameError('این سفارش قبلاً بررسی شده');
     if (action === 'deliver') {
       if (o.method !== 'card') throw new GameError('سفارش‌های استار خودکار بعد از پرداخت تحویل می‌شوند');
       db.prepare("UPDATE orders SET status = 'delivered', done_at = ? WHERE id = ? AND status = 'pending'").run(this.d.now(), id);
-      db.prepare('UPDATE users SET gems = gems + ? WHERE id = ?').run(o.gems, o.user_id);
+      db.prepare('UPDATE users SET gems = gems + ?, coins = coins + ? WHERE id = ?').run(o.gems, o.coins, o.user_id);
     } else if (action === 'cancel') {
       db.prepare("UPDATE orders SET status = 'canceled', done_at = ? WHERE id = ? AND status = 'pending'").run(this.d.now(), id);
     } else throw new GameError('عملیات نامعتبر است');

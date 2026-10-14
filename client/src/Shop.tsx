@@ -5,7 +5,7 @@ import { call } from './net';
 import { openInvoice, openLink } from './telegram';
 import { CardTile, Gem, Icon, Modal, fa, fmtTime } from './ui';
 
-interface ShopState { bought: number[]; resetInMs: number; orders: { id: number; gems: number; toman: number; stars: number; method: string; status: string; createdAt: number }[] }
+interface ShopState { bought: number[]; resetInMs: number; orders: { id: number; gems: number; coins: number; toman: number; stars: number; method: string; status: string; createdAt: number }[] }
 const STATUS_FA: Record<string, string> = { pending: 'در انتظار تأیید', delivered: 'تحویل شد', canceled: 'لغو شد' };
 const cardFmt = (n: string) => n.replace(/\D/g, '').replace(/(\d{4})(?=\d)/g, '$1 ').trim();
 
@@ -15,7 +15,7 @@ export function Shop({ ctx }: { ctx: Ctx }) {
   const [at, setAt] = useState(Date.now());
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState(false);
-  const [order, setOrder] = useState<{ id: number; gems: number; toman: number; note: string; sent: boolean } | null>(null);
+  const [order, setOrder] = useState<{ id: number; gems: number; coins: number; toman: number; note: string; sent: boolean } | null>(null);
 
   const load = useCallback(async () => {
     try { const j = await call('/api/shop/state'); setSt(j.shop); setAt(Date.now()); } catch (e) { toast((e as Error).message); }
@@ -29,8 +29,8 @@ export function Shop({ ctx }: { ctx: Ctx }) {
     try { await fn(); } catch (e) { toast((e as Error).message); } finally { setBusy(false); }
   };
 
-  const buyCard = (slot: number, currency: 'coins' | 'gems') => act(async () => {
-    const j = await call('/api/shop/buy-card', { slot, currency });
+  const buyCard = (slot: number) => act(async () => {
+    const j = await call('/api/shop/buy-card', { slot });
     setProfile(j.profile);
     toast(`${cfg.cards.find((c) => c.id === j.bought.cardId)?.name ?? 'کارت'} × ${fa(j.bought.count)} خریداری شد ✨`);
     await load();
@@ -50,7 +50,7 @@ export function Shop({ ctx }: { ctx: Ctx }) {
     if (!order) return;
     await call('/api/shop/order-note', { id: order.id, note: order.note });
     setOrder({ ...order, sent: true });
-    toast('ثبت شد؛ بعد از بررسی، الماس اضافه می‌شود');
+    toast('ثبت شد؛ بعد از بررسی اضافه می‌شود');
     await load();
   });
   const copy = async (text: string) => { try { await navigator.clipboard.writeText(text); toast('کپی شد'); } catch { toast('کپی نشد؛ شماره را دستی بنویس'); } };
@@ -93,16 +93,9 @@ export function Shop({ ctx }: { ctx: Ctx }) {
                 </div>
                 {done ? <div className="sold">✓ خریداری شد</div> : (
                   <div className="prices">
-                    {o.priceGems > 0 && (
-                      <button className="pbtn gem" disabled={busy || p.gems < o.priceGems} onClick={() => void buyCard(slot, 'gems')} aria-label={`خرید با ${fa(o.priceGems)} الماس`}>
-                        <Gem /> <b className="num">{fa(o.priceGems)}</b>
-                      </button>
-                    )}
-                    {o.priceCoins > 0 && (
-                      <button className="pbtn coin" disabled={busy || p.coins < o.priceCoins} onClick={() => void buyCard(slot, 'coins')} aria-label={`خرید با ${fa(o.priceCoins)} سکه`}>
-                        <Icon n="coin" /> <b className="num">{fa(o.priceCoins)}</b>
-                      </button>
-                    )}
+                    <button className={`pbtn ${o.currency === 'gems' ? 'gem' : 'coin'}`} disabled={busy || (o.currency === 'gems' ? p.gems : p.coins) < o.price} onClick={() => void buyCard(slot)} aria-label={`خرید با ${fa(o.price)} ${o.currency === 'gems' ? 'الماس' : 'سکه'}`}>
+                      {o.currency === 'gems' ? <Gem /> : <Icon n="coin" />} <b className="num">{fa(o.price)}</b>
+                    </button>
                   </div>
                 )}
               </div>
@@ -113,16 +106,18 @@ export function Shop({ ctx }: { ctx: Ctx }) {
       </section>
 
       <section className="shopsec">
-        <header className="shophd"><h2>باکس سکه</h2><small>با الماس</small></header>
+        <header className="shophd"><h2>باکس سکه</h2></header>
         <div className="packs">
-          {cfg.shop.coinPacks.map((k) => (
+          {cfg.shop.coinPacks.filter((k) => k.currency === 'gems' || cfg.shop.card.enabled).map((k) => (
             <div key={k.id} className="pack coinp">
               <div className="pico"><Icon n="coin" /></div>
               <b className="num">{fa(k.coins)}</b><small>سکه</small>
-              <button className="pbtn gem" disabled={busy || p.gems < k.gems} onClick={() => void buyCoins(k.id)}><Gem /> <b className="num">{fa(k.gems)}</b></button>
+              {k.currency === 'gems'
+                ? <button className="pbtn gem" disabled={busy || p.gems < k.price} onClick={() => void buyCoins(k.id)}><Gem /> <b className="num">{fa(k.price)}</b></button>
+                : <button className="pbtn toman" disabled={busy} onClick={() => void payCard(k.id)} aria-label={`خرید کارت‌به‌کارت ${fa(k.price)} تومان`}><b className="num">{fa(k.price)}</b> <small>تومان</small></button>}
             </div>
           ))}
-          {cfg.shop.coinPacks.length === 0 && <p className="shopempty">فعلاً بسته‌ای نیست.</p>}
+          {cfg.shop.coinPacks.filter((k) => k.currency === 'gems' || cfg.shop.card.enabled).length === 0 && <p className="shopempty">فعلاً بسته‌ای نیست.</p>}
         </div>
       </section>
 
@@ -145,7 +140,7 @@ export function Shop({ ctx }: { ctx: Ctx }) {
           <div className="myorders">
             <small>سفارش‌های اخیر تو</small>
             {st.orders.map((o) => (
-              <div key={o.id} className={`ord ${o.status}`}><span>#{fa(o.id)} · <b className="num">{fa(o.gems)}</b> الماس · {o.method === 'stars' ? `${fa(o.stars)} استار` : `${fa(o.toman)} تومان`}</span><em>{STATUS_FA[o.status] ?? o.status}</em></div>
+              <div key={o.id} className={`ord ${o.status}`}><span>#{fa(o.id)} · <b className="num">{o.coins > 0 ? `${fa(o.coins)} سکه` : `${fa(o.gems)} الماس`}</b> · {o.method === 'stars' ? `${fa(o.stars)} استار` : `${fa(o.toman)} تومان`}</span><em>{STATUS_FA[o.status] ?? o.status}</em></div>
             ))}
           </div>
         )}
@@ -155,13 +150,13 @@ export function Shop({ ctx }: { ctx: Ctx }) {
         <Modal onClose={() => setOrder(null)}>
           <div className="center-in cardpay">
             <h3>پرداخت کارت‌به‌کارت</h3>
-            <p><Gem /> {fa(order.gems)} الماس — مبلغ: <b className="num">{fa(order.toman)}</b> تومان</p>
+            <p>{order.coins > 0 ? <span className="coinv"><Icon n="coin" /> {fa(order.coins)} سکه</span> : <><Gem /> {fa(order.gems)} الماس</>} — مبلغ: <b className="num">{fa(order.toman)}</b> تومان</p>
             <div className="cardbox">
               <small>شماره‌ی کارت (روی آن بزن تا کپی شود)</small>
               <button className="cnum num" dir="ltr" onClick={() => void copy(cfg.shop.card.number.replace(/\D/g, ''))}>{cardFmt(cfg.shop.card.number)}</button>
               <span>به نام <b>{cfg.shop.card.holder || '—'}</b>{cfg.shop.card.bank ? ` · ${cfg.shop.card.bank}` : ''}</span>
             </div>
-            <p className="hint">دقیقاً مبلغ بالا را واریز کن. بعد کد پیگیری (یا ۴ رقم آخر کارتِ خودت) را بنویس و «پرداخت کردم» را بزن. ادمین بررسی می‌کند و الماس به حسابت اضافه می‌شود. کد سفارش: <b className="num">#{fa(order.id)}</b> · شناسه‌ی تو: <b className="num">{fa(p.id)}</b></p>
+            <p className="hint">دقیقاً مبلغ بالا را واریز کن. بعد کد پیگیری (یا ۴ رقم آخر کارتِ خودت) را بنویس و «پرداخت کردم» را بزن. ادمین بررسی می‌کند و به حسابت اضافه می‌شود. کد سفارش: <b className="num">#{fa(order.id)}</b> · شناسه‌ی تو: <b className="num">{fa(p.id)}</b></p>
             {order.sent ? <p className="sent">✓ ثبت شد، منتظر بررسی ادمین باش.</p> : (
               <>
                 <input className="notein" value={order.note} maxLength={60} onChange={(e) => setOrder({ ...order, note: e.target.value })} placeholder="کد پیگیری یا ۴ رقم آخر کارت" />

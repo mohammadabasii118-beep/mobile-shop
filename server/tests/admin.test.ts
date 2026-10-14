@@ -155,11 +155,13 @@ describe('shop admin', () => {
     expect((await call(42, '/api/admin/config', { config: withCard({ enabled: true, number: '12', holder: 'x', bank: 'y' }) })).status).toBe(400);
     expect((await call(43, '/api/admin/config', { config: withCard({ enabled: true, number: '6037 9912 3456 7890', holder: 'x', bank: 'y' }) })).status).toBe(403);
     expect((await call(42, '/api/admin/config', { config: withCard({ enabled: true, number: '6037 9912 3456 7890', holder: 'علی رضایی', bank: 'ملی' }) })).status).toBe(200);
-    // اسلات با کارت ناشناخته یا بدون قیمت، و بسته‌ی بدون هیچ قیمتی رد می‌شود
+    // اسلات با کارت ناشناخته یا بدون قیمت یا با ارز نامعتبر، و بسته‌ی بدون هیچ قیمتی رد می‌شود
     const bad1 = JSON.parse(JSON.stringify(pub)); bad1.shop.cards[0].cardId = 'nope';
     expect((await call(42, '/api/admin/config', { config: bad1 })).status).toBe(400);
-    const bad2 = JSON.parse(JSON.stringify(pub)); bad2.shop.cards[0].priceGems = 0; bad2.shop.cards[0].priceCoins = 0;
+    const bad2 = JSON.parse(JSON.stringify(pub)); bad2.shop.cards[0].price = 0;
     expect((await call(42, '/api/admin/config', { config: bad2 })).status).toBe(400);
+    const bad4 = JSON.parse(JSON.stringify(pub)); bad4.shop.cards[0].currency = 'rial';
+    expect((await call(42, '/api/admin/config', { config: bad4 })).status).toBe(400);
     const bad3 = JSON.parse(JSON.stringify(pub)); bad3.shop.gemPacks[0].toman = 0; bad3.shop.gemPacks[0].stars = 0;
     expect((await call(42, '/api/admin/config', { config: bad3 })).status).toBe(400);
     // سفارش کارت‌به‌کارت: مشخصات کارت برمی‌گردد، یادداشت پیگیری، تحویل فقط یک‌بار
@@ -178,6 +180,21 @@ describe('shop admin', () => {
 });
 
 describe('config override (survives code updates)', () => {
+  it('migrates the old two-price shop shape to one currency and one price', async () => {
+    const { writeFileSync } = await import('node:fs');
+    const { loadConfigWithOverride } = await import('../src/config');
+    const base = loadConfig();
+    const file = join(dataDir, 'override-shop.json');
+    const old: any = JSON.parse(JSON.stringify(base));
+    old.shop.cards = old.shop.cards.map((o: any, i: number) => ({ cardId: o.cardId, count: o.count, priceGems: i === 0 ? 7 : 0, priceCoins: 123 }));
+    old.shop.coinPacks = [{ id: 'c1', coins: 900, gems: 15 }];
+    writeFileSync(file, JSON.stringify(old));
+    const m = loadConfigWithOverride(file);
+    expect(m.shop.cards[0]).toMatchObject({ currency: 'gems', price: 7 });      // الماس اگر بود
+    expect(m.shop.cards[1]).toMatchObject({ currency: 'coins', price: 123 });   // وگرنه سکه
+    expect(m.shop.coinPacks[0]).toEqual({ id: 'c1', coins: 900, currency: 'gems', price: 15 });
+  });
+
   it('migrates old saved settings: box xp removed, upgrade xp and online rewards filled from base', async () => {
     const { writeFileSync } = await import('node:fs');
     const { loadConfigWithOverride } = await import('../src/config');

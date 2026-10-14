@@ -60,6 +60,7 @@ export function openDb(path = ':memory:'): Db {
     );
   `);
   try { db.exec("ALTER TABLE orders ADD COLUMN method TEXT NOT NULL DEFAULT 'card'"); } catch { /* ستون از قبل هست */ }
+  try { db.exec('ALTER TABLE orders ADD COLUMN coins INTEGER NOT NULL DEFAULT 0'); } catch { /* ستون از قبل هست */ }
   try { db.exec('ALTER TABLE orders ADD COLUMN note TEXT'); } catch { /* ستون از قبل هست */ }
   try { db.exec('ALTER TABLE orders ADD COLUMN stars INTEGER NOT NULL DEFAULT 0'); } catch { /* ستون از قبل هست */ }
   try { db.exec('ALTER TABLE orders ADD COLUMN charge_id TEXT'); } catch { /* ستون از قبل هست */ }

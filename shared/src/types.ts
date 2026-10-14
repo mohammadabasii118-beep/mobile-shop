@@ -48,8 +48,9 @@ export interface SoloPit {
 }
 
 /** فروشگاه: یک پیشنهاد کارت روزانه (cardId خالی = اسلات خاموش). قیمت ۰ یعنی با آن ارز نمی‌شود خرید. */
-export interface ShopCardOffer { cardId: string; count: number; priceGems: number; priceCoins: number }
-export interface CoinPack { id: string; coins: number; gems: number }
+export interface ShopCardOffer { cardId: string; count: number; /** با چه ارزی فروخته شود (فقط همین یکی در فروشگاه دیده می‌شود) */ currency: 'gems' | 'coins'; price: number }
+/** بسته‌ی سکه: currency='gems' (فوری، با الماس) یا 'toman' (کارت‌به‌کارت، تحویل دستی از پنل) */
+export interface CoinPack { id: string; coins: number; currency: 'gems' | 'toman'; price: number }
 /** بسته‌ی الماس: toman = قیمت کارت‌به‌کارت (۰ = با کارت نمی‌شود)، stars = قیمت با استار تلگرام (۰ = با استار نمی‌شود) */
 export interface GemPack { id: string; gems: number; toman: number; stars: number }
 export interface ShopCfg {

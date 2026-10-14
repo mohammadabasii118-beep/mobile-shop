@@ -1518,55 +1518,58 @@
       {
         "cardId": "giv",
         "count": 3,
-        "priceGems": 5,
-        "priceCoins": 150
+        "currency": "coins",
+        "price": 150
       },
       {
         "cardId": "bijan",
         "count": 3,
-        "priceGems": 5,
-        "priceCoins": 150
+        "currency": "coins",
+        "price": 150
       },
       {
         "cardId": "arash",
         "count": 3,
-        "priceGems": 5,
-        "priceCoins": 150
+        "currency": "coins",
+        "price": 150
       },
       {
         "cardId": "gordafarid",
         "count": 2,
-        "priceGems": 15,
-        "priceCoins": 450
+        "currency": "coins",
+        "price": 450
       },
       {
         "cardId": "kaveh",
         "count": 2,
-        "priceGems": 15,
-        "priceCoins": 450
+        "currency": "coins",
+        "price": 450
       },
       {
         "cardId": "sohrab",
         "count": 1,
-        "priceGems": 40,
-        "priceCoins": 1200
+        "currency": "gems",
+        "price": 40
       }
     ],
     "coinPacks": [
       {
         "id": "c1",
         "coins": 500,
-        "gems": 10
+        "currency": "gems",
+        "price": 10
       },
       {
         "id": "c2",
         "coins": 1500,
-        "gems": 25
+        "currency": "gems",
+        "price": 25
       },
       {
         "id": "c3",
         "coins": 5000,
-        "gems": 75
+        "currency": "gems",
+        "price": 75
       }
     ],
     "gemPacks": [
