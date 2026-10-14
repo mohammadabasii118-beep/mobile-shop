@@ -277,7 +277,8 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
               {reasonText && <small>{reasonText}</small>}
               {result.reward?.coins ? <p className="rwline"><span className="coinv"><Icon n="coin" /> +{fa(result.reward.coins)}</span> سکه</p> : null}
               {onlineRewardLines(result.reward).map((l) => <p key={l} className="rwline">{l}</p>)}
-              {result.youWon && <p>{rewardText(result.reward, result.reward?.type ? cfg.box.types[result.reward.type]?.name : undefined)}</p>}
+              {result.friendly && <p>بازی دوستانه بود؛ جایزه‌ای ندارد 🤝</p>}
+              {result.youWon && !result.friendly && <p>{rewardText(result.reward, result.reward?.type ? cfg.box.types[result.reward.type]?.name : undefined)}</p>}
               <button className="btn" onClick={onExit}>بازگشت به منو</button>
             </div>
           </div>

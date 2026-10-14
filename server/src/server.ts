@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { ABILITY_META, resolveCard, type CardDef, type ClientMsg, type GameConfig, type ServerMsg, type Side } from '@game/shared';
+import { ABILITY_META, resolveCard, type CardDef, type ClientMsg, type FriendView, type GameConfig, type ServerMsg, type Side } from '@game/shared';
 import { validateConfig } from './config';
 import { currentBundle } from './version';
 import { authenticate, type AuthOptions } from './auth';
@@ -14,7 +14,7 @@ import { Game, GameError } from './game';
 export interface ServerOptions {
   db: Db; cfg: GameConfig; auth: AuthOptions; staticDir?: string;
   now?: () => number; rng?: () => number;
-  pauseMs?: number; botDelayMs?: number; turnMs?: number; heartbeatMs?: number;
+  pauseMs?: number; botDelayMs?: number; turnMs?: number; heartbeatMs?: number; inviteMs?: number;
   /** آدرس API تلگرام (برای تست قابل تغییر) */
   telegramApi?: string;
   /** پوشه‌ی داده (عکس‌های آپلودشده) */
@@ -92,8 +92,14 @@ export function createGameServer(opt: ServerOptions) {
     return res === 'delivered' ? '✅ پرداخت انجام شد و الماس به حسابت اضافه شد. موفق باشی!' : null;
   };
 
+  const decorateFriends = (s: ReturnType<Game['friendsState']>) => ({
+    ...s,
+    friends: s.friends.map((f): FriendView => { const c = conns.get(f.id); return { ...f, online: !!c && c.ws.readyState === 1, busy: !!c && (!!c.battle || c.queued) }; })
+      .sort((a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name)),
+  });
+
   // ---------- مبارزه ----------
-  function startBattle(mode: 'solo' | 'pvp', a: Participant, b: Participant, humans: Conn[], soloStage?: number) {
+  function startBattle(mode: 'solo' | 'pvp', a: Participant, b: Participant, humans: Conn[], soloStage?: number, friendly = false) {
     const id = randomUUID();
     const battle = new Battle({
       id, mode, cfg, rng, turnMs: turnMs(), pauseMs: opt.pauseMs ?? 900, botDelayMs: opt.botDelayMs ?? 700,
@@ -104,8 +110,8 @@ export function createGameServer(opt: ServerOptions) {
           const side = battle.sideOf(c.userId)!;
           const won = side === winner;
           let reward = null;
-          try { reward = game.recordResult(c.userId, won, mode === 'solo' ? 'solo' : 'multi', won ? soloStage : undefined); } catch (e) { console.error(e); }
-          send(c, { t: 'battleEnd', battleId: id, winner, youWon: won, reason, reward, profile: game.profile(c.userId) });
+          if (!friendly) try { reward = game.recordResult(c.userId, won, mode === 'solo' ? 'solo' : 'multi', won ? soloStage : undefined); } catch (e) { console.error(e); }
+          send(c, { t: 'battleEnd', battleId: id, winner, youWon: won, reason, friendly, reward, profile: game.profile(c.userId) });
         }
       },
     }, a, b);
@@ -118,8 +124,54 @@ export function createGameServer(opt: ServerOptions) {
     side, name: c.name, userId: c.userId, send: (m) => send(c, m), units: game.deckUnits(c.userId),
   });
 
+  // ---------- دعوت دوستانه ----------
+  const invites = new Map<number, { to: number; timer: NodeJS.Timeout }>(); // کلید: فرستنده
+  const busy = (c: Conn) => !!c.battle || c.queued;
+  const dropInvite = (from: number, status?: Extract<ServerMsg, { t: 'inviteResult' }>['status']) => {
+    const inv = invites.get(from);
+    if (!inv) return;
+    clearTimeout(inv.timer); invites.delete(from);
+    if (status) { const a = conns.get(from); if (a) send(a, { t: 'inviteResult', status }); }
+  };
+  const dropInvitesOf = (userId: number) => {
+    dropInvite(userId);
+    for (const [from, inv] of invites) if (inv.to === userId) dropInvite(from, 'offline');
+  };
+
   function handleMsg(c: Conn, m: ClientMsg) {
     switch (m.t) {
+      case 'invite': {
+        const to = Number(m.to);
+        if (busy(c)) return send(c, { t: 'error', message: 'الان درگیر مبارزه یا صف هستی' });
+        if (!game.areFriends(c.userId, to)) return send(c, { t: 'error', message: 'این بازیکن دوست تو نیست' });
+        game.deckUnits(c.userId);
+        const peer = conns.get(to);
+        if (!peer || peer.ws.readyState !== 1) return send(c, { t: 'inviteResult', status: 'offline' });
+        if (busy(peer) || [...invites.values()].some((i) => i.to === to)) return send(c, { t: 'inviteResult', status: 'busy' });
+        dropInvite(c.userId);
+        const timer = setTimeout(() => dropInvite(c.userId, 'expired'), opt.inviteMs ?? 30_000);
+        timer.unref();
+        invites.set(c.userId, { to, timer });
+        return send(peer, { t: 'invited', from: c.userId, name: c.name });
+      }
+      case 'inviteCancel': {
+        const inv = invites.get(c.userId);
+        if (inv) { dropInvite(c.userId); const peer = conns.get(inv.to); if (peer) send(peer, { t: 'inviteResult', status: 'canceled' }); }
+        return;
+      }
+      case 'inviteReply': {
+        const from = Number(m.from);
+        const inv = invites.get(from);
+        if (!inv || inv.to !== c.userId) return;
+        if (!m.accept) return dropInvite(from, 'declined');
+        const host = conns.get(from);
+        if (!host || host.ws.readyState !== 1) { dropInvite(from); return send(c, { t: 'inviteResult', status: 'offline' }); }
+        if (busy(host) || busy(c)) { dropInvite(from, 'busy'); return send(c, { t: 'inviteResult', status: 'busy' }); }
+        game.deckUnits(c.userId);
+        dropInvite(from);
+        startBattle('pvp', human(host, 'A'), human(c, 'B'), [host, c], undefined, true);
+        return;
+      }
       case 'queue': {
         if (!game.profile(c.userId).channelOk) return send(c, { t: 'error', message: 'اول باید عضو کانال بشی' });
         if (c.battle || c.queued) return send(c, { t: 'error', message: 'الان درگیر مبارزه یا صف هستی' });
@@ -219,6 +271,7 @@ export function createGameServer(opt: ServerOptions) {
       if (!conn) return;
       console.log(`[ws] ${conn.name} (${conn.userId}) قطع شد؛ کد=${code}${reason?.length ? ` دلیل=${reason.toString()}` : ''}${conn.battle ? ' — وسط مبارزه بود (می‌بازد)' : ''}`);
       queue = queue.filter((q) => q !== conn);
+      dropInvitesOf(conn.userId);
       if (conns.get(conn.userId) === conn) conns.delete(conn.userId);
       const b = conn.battle;
       if (b) { const side = b.sideOf(conn.userId); if (side) b.forfeit(side); }
@@ -429,6 +482,16 @@ export function createGameServer(opt: ServerOptions) {
           try { extra = { order: o, url: await createStarsInvoice(o) }; } catch (e) { game.cancelOrder(o.id); console.error('[stars]', (e as Error).message); throw new GameError('ساخت فاکتور استار ممکن نشد؛ کمی بعد دوباره امتحان کن'); }
           break;
         }
+        case '/api/friends': extra = { ...decorateFriends(game.friendsState(userId)), code: userId }; break;
+        case '/api/friends/add': {
+          const r = game.addFriend(userId, body.code);
+          const peer = conns.get(r.to);
+          if (peer) send(peer, { t: 'notice', message: r.accepted ? `${game.profile(userId).name} دوستت شد 🤝` : `${game.profile(userId).name} برات درخواست دوستی فرستاد` });
+          extra = { ...decorateFriends(game.friendsState(userId)), code: userId, accepted: r.accepted };
+          break;
+        }
+        case '/api/friends/accept': game.acceptFriend(userId, Number(body.id)); extra = { ...decorateFriends(game.friendsState(userId)), code: userId }; break;
+        case '/api/friends/remove': game.removeFriend(userId, Number(body.id)); extra = { ...decorateFriends(game.friendsState(userId)), code: userId }; break;
         case '/api/leaderboard': extra = { leaders: game.leaderboard(userId), myRank: game.trophyRank(userId) }; break;
         case '/api/box/start': game.startBox(userId, Number(body.slot)); break;
         case '/api/box/open': extra = { reward: game.openBox(userId, Number(body.slot)) }; break;

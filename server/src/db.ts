@@ -74,5 +74,10 @@ export function openDb(path = ':memory:'): Db {
   try { db.exec('ALTER TABLE users ADD COLUMN gems INTEGER NOT NULL DEFAULT 50'); } catch { /* ستون از قبل هست */ }
   try { db.exec('ALTER TABLE users ADD COLUMN channel_ok INTEGER NOT NULL DEFAULT 0'); } catch { /* ستون از قبل هست */ }
   try { db.exec("ALTER TABLE boxes ADD COLUMN type TEXT NOT NULL DEFAULT 'bronze'"); } catch { /* ستون از قبل هست */ }
+  // دوستان: یک ردیف برای هر درخواست (a = فرستنده، b = گیرنده)؛ بعد از پذیرفتن status = accepted
+  db.exec(`CREATE TABLE IF NOT EXISTS friends (
+    a INTEGER NOT NULL, b INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created_at INTEGER NOT NULL,
+    PRIMARY KEY (a, b)
+  )`);
   return db;
 }

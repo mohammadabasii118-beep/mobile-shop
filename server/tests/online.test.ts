@@ -115,6 +115,40 @@ describe('online', () => {
     a.ws.close(); b.ws.close();
   }, 20000);
 
+  it('friends: request, accept, then a friendly invite starts a battle without rewards', async () => {
+    const ia = (await api(220, '/api/me')).profile.id as number;
+    const ib = (await api(221, '/api/me')).profile.id as number;
+    expect((await api(220, '/api/friends/add', { code: String(ia) })).error).toMatch(/خودته/);
+    expect((await api(220, '/api/friends/add', { code: '999999' })).error).toBeTruthy();
+    const r = await api(220, '/api/friends/add', { code: String(ib) });
+    expect(r.accepted).toBe(false);
+    expect((await api(220, '/api/friends/add', { code: String(ib) })).error).toMatch(/قبلاً/);
+    const inc = await api(221, '/api/friends');
+    expect(inc.incoming.map((f: any) => f.id)).toEqual([ia]);
+    const a = new Client(220), b = new Client(221);
+    await a.open(); await b.open();
+    a.send({ t: 'invite', to: ib });                       // هنوز دوست نیستند
+    expect((await a.wait('error')).message).toMatch(/دوست/);
+    await api(221, '/api/friends/accept', { id: ia });
+    expect((await api(220, '/api/friends')).friends[0]).toMatchObject({ id: ib, online: true, busy: false });
+    a.send({ t: 'invite', to: ib });
+    expect((await b.wait('invited')).from).toBe(ia);
+    b.send({ t: 'inviteReply', from: ia, accept: true });
+    const sa = await a.wait('battleStart'); await b.wait('battleStart');
+    expect(sa.mode).toBe('pvp');
+    b.send({ t: 'leave', battleId: sa.battleId });
+    const end = await a.wait('battleEnd', 5000);
+    expect(end).toMatchObject({ youWon: true, friendly: true, reward: null });
+    expect(end.profile.wins).toBe(0);
+    // دعوت ردشده
+    a.send({ t: 'invite', to: ib }); await b.wait('invited');
+    b.send({ t: 'inviteReply', from: ia, accept: false });
+    expect((await a.wait('inviteResult')).status).toBe('declined');
+    await api(220, '/api/friends/remove', { id: ib });
+    expect((await api(221, '/api/friends')).friends).toHaveLength(0);
+    a.ws.close(); b.ws.close();
+  }, 20000);
+
   it('REST: deck, box lifecycle (dev skip), upgrade errors', async () => {
     await api(300, '/api/me');
     expect((await api(300, '/api/deck', { cards: ['giv', 'x', 'bijan'] })).error).toBeTruthy();

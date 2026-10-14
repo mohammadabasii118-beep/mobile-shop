@@ -33,6 +33,7 @@ export function App() {
   const [battle, setBattle] = useState<BattleInit | null>(null);
   const [result, setResult] = useState<Extract<ServerMsg, { t: 'battleEnd' }> | null>(null);
   const [queued, setQueued] = useState(false);
+  const [invited, setInvited] = useState<{ from: number; name: string } | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const sock = useRef(new Socket()).current;
   const timer = useRef<number>();
@@ -69,7 +70,10 @@ export function App() {
       if (m.t === 'ready' || m.t === 'profile') setProfile(m.profile);
       if (m.t === 'queued') setQueued(true);
       if (m.t === 'error') { setQueued(false); toast(m.message); }
-      if (m.t === 'battleStart') { setQueued(false); setResult(null); setBattle({ start: m }); }
+      if (m.t === 'notice') toast(m.message);
+      if (m.t === 'invited') setInvited({ from: m.from, name: m.name });
+      if (m.t === 'inviteResult') setInvited(null);
+      if (m.t === 'battleStart') { setInvited(null); setQueued(false); setResult(null); setBattle({ start: m }); }
     });
   }, [sock, toast]);
 
@@ -108,6 +112,16 @@ export function App() {
         <Modal>
           <div className="center-in"><div className="spinner" /><h3>در حال جستجوی حریف…</h3>
             <button className="btn ghost" onClick={() => { sock.send({ t: 'leaveQueue' }); setQueued(false); }}>انصراف</button></div>
+        </Modal>
+      )}
+      {invited && !battle && (
+        <Modal>
+          <div className="center-in"><h3>⚔ {invited.name} تو را به بازی دوستانه دعوت کرد</h3>
+            <small>بدون جایزه و کاپ</small>
+            <div className="row">
+              <button className="btn" onClick={() => { sock.send({ t: 'inviteReply', from: invited.from, accept: true }); setInvited(null); }}>قبول</button>
+              <button className="btn ghost" onClick={() => { sock.send({ t: 'inviteReply', from: invited.from, accept: false }); setInvited(null); }}>رد</button>
+            </div></div>
         </Modal>
       )}
       {!profile.channelOk && <Gate ctx={ctx} />}

@@ -6,6 +6,7 @@ import { setMuted, setVolume, useMusic, type Channel } from './music';
 import { boxSpeedupCost } from '@game/shared';
 import { Bar, Modal, fa, fmtTime, CardTile, RARITY_FA, Icon, Gem } from './ui';
 import type { LeaderRow } from '@game/shared';
+import { Friends } from './Friends';
 
 export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAdmin: () => void }) {
   const { profile: p, cfg, sock } = ctx;
@@ -17,6 +18,7 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
   }, []);
   const [pitIdx, setPitIdx] = useState(() => Math.max(0, pits.findIndex((q) => q.first + q.stages.length > ctx.profile.soloStage)));
   const [showProfile, setShowProfile] = useState(false);
+  const [showFriends, setShowFriends] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [lb, setLb] = useState<{ rows: LeaderRow[]; myRank: number } | 'loading' | 'error' | null>(null);
   const openLb = async () => {
@@ -95,6 +97,10 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
             <span className="medal8"><svg className="i" viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9 16h6"/></svg></span>
             <span className="mtitle">تک‌نفره</span><FeePill n={cfg.fees?.solo} />
           </button>
+          <button className="mode friend" onClick={() => setShowFriends(true)}>
+            <span className="medal8"><svg className="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.200"/><path d="M3.500 19c.4-3.200 2.700-5 5.500-5s5.100 1.800 5.500 5"/><circle cx="17" cy="9" r="2.400"/><path d="M16 14c2.600-.2 4.200 1.400 4.600 4"/></svg></span>
+            <span className="mtitle">بازی با دوست</span>
+          </button>
           <button className="mode multi" disabled={queued} onClick={() => sock.send({ t: 'queue' })}>
             <span className="medal8"><svg className="i" viewBox="0 0 24 24"><path d="M4 4l9 9M9 4H4v5M20 4l-9 9M15 4h5v5M7 17l-3 3M17 17l3 3"/></svg></span>
             <span className="mtitle">مولتی‌پلیر</span><FeePill n={cfg.fees?.multi} />
@@ -158,6 +164,7 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
           </div>
         </div>
       )}
+      {showFriends && <Friends ctx={ctx} onClose={() => setShowFriends(false)} />}
       {showProfile && <ProfileModal ctx={ctx} onClose={() => setShowProfile(false)} />}
       {page === 'about' && (
         <Modal onClose={() => setPage(null)}>
@@ -226,7 +233,7 @@ function FeePill({ n, small }: { n?: number; small?: boolean }) {
   return <span className={`fee ${small ? 'sm' : ''}`}><Icon n="coin" /> {fa(n)}</span>;
 }
 
-function Avatar({ url, name, big }: { url: string | null; name: string; big?: boolean }) {
+export function Avatar({ url, name, big }: { url: string | null; name: string; big?: boolean }) {
   const [bad, setBad] = useState(false);
   return url && !bad
     ? <img className={`avatar ${big ? 'big' : ''}`} src={url} alt="" onError={() => setBad(true)} />
@@ -241,6 +248,7 @@ function ProfileModal({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) {
       <div className="profile">
         <Avatar url={p.avatar} name={p.name} big />
         <h3>{p.name}</h3>
+        <small>کد دوست: <b className="num">{fa(p.id)}</b></small>
         <div>لول {fa(p.level)} — {fa(p.xp)} / {fa(p.xpNeeded)} XP</div>
         <Bar value={p.xp} max={p.xpNeeded} color="var(--xp)" />
         <div className="grid3">

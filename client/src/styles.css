@@ -610,3 +610,19 @@ html, body, #root, .app, .screen, .battle, .admin { overscroll-behavior: none; }
 /* ترکیب در صفحه‌ی کارت‌ها: هم‌اندازه‌ی «کارت‌های من»، ردیف اول ۳ کارت و ردیف دوم ۲ کارت (وسط‌چین) */
 .deck { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
 .deck > * { flex: 0 0 calc((100% - 20px) / 3); min-width: 0; }
+
+/* دوستان */
+.mode.friend { background: linear-gradient(135deg, rgba(46,160,140,.55), rgba(24,90,110,.55)); }
+.lbpanel.friends { max-height: 86vh; overflow-y: auto; }
+.mycode { display: flex; justify-content: space-between; align-items: center; padding: 8px 4px; }
+.mycode button { padding: 6px 12px; border-radius: 10px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); font-size: 16px; }
+.addrow { display: flex; gap: 8px; margin: 6px 0 10px; }
+.addrow input { flex: 1; min-width: 0; padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,.2); background: rgba(0,0,0,.3); color: #fff; }
+.friends h4 { margin: 12px 0 4px; font-size: 13px; opacity: .8; }
+.flist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.flist li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 12px; background: rgba(255,255,255,.07); }
+.flist .nm { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.flist .nm small { opacity: .7; }
+.flist .btn { padding: 6px 10px; font-size: 13px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: #666; flex: none; }
+.dot.on { background: #3ddc84; box-shadow: 0 0 6px #3ddc84; } .dot.busy { background: #ffb020; }

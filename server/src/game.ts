@@ -1,4 +1,4 @@
-import { boxSpeedupCost, resolveCard, type BattleReward, type BoxContents, type BoxSource, type BoxType, type BoxView, type CardView, type GameConfig, type Profile, type Rarity, type UnitInit } from '@game/shared';
+import { boxSpeedupCost, type FriendBase, resolveCard, type BattleReward, type BoxContents, type BoxSource, type BoxType, type BoxView, type CardView, type GameConfig, type Profile, type Rarity, type UnitInit } from '@game/shared';
 import type { Db } from './db';
 import type { TgUser } from './auth';
 
@@ -293,6 +293,47 @@ export class Game {
   }
 
   /** نفرات برتر بر اساس بیشترین کاپ (در تساوی: لول بالاتر، بعد قدیمی‌تر) */
+  // ---------- دوستان ----------
+  private friendBase(id: number): FriendBase {
+    const r = this.d.db.prepare('SELECT id, name, avatar, level, trophies FROM users WHERE id = ?').get(id) as any;
+    return { id: r.id, name: r.name, avatar: r.avatar, level: r.level, trophies: r.trophies };
+  }
+  areFriends(a: number, b: number): boolean {
+    return !!this.d.db.prepare("SELECT 1 FROM friends WHERE status = 'accepted' AND ((a = ? AND b = ?) OR (a = ? AND b = ?))").get(a, b, b, a);
+  }
+  friendsState(userId: number) {
+    const { db } = this.d;
+    const rows = db.prepare('SELECT a, b, status FROM friends WHERE a = ? OR b = ?').all(userId, userId) as { a: number; b: number; status: string }[];
+    return {
+      friends: rows.filter((r) => r.status === 'accepted').map((r) => this.friendBase(r.a === userId ? r.b : r.a)),
+      incoming: rows.filter((r) => r.status === 'pending' && r.b === userId).map((r) => this.friendBase(r.a)),
+      outgoing: rows.filter((r) => r.status === 'pending' && r.a === userId).map((r) => this.friendBase(r.b)),
+    };
+  }
+  /** درخواست دوستی با «کد دوست» (شناسه‌ی بازیکن). اگر طرف مقابل قبلاً درخواست داده بود، مستقیم دوست می‌شوند. */
+  addFriend(userId: number, code: unknown) {
+    const { db } = this.d;
+    const id = Number(String(code ?? '').replace(/[^0-9۰-۹]/g, '').replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d))));
+    if (!Number.isInteger(id) || id <= 0) throw new GameError('کد دوست نامعتبر است');
+    if (id === userId) throw new GameError('این کد خودته 😄');
+    if (!db.prepare('SELECT 1 FROM users WHERE id = ? AND banned = 0').get(id)) throw new GameError('بازیکنی با این کد پیدا نشد');
+    if (this.areFriends(userId, id)) throw new GameError('شما از قبل دوست هستید');
+    if (db.prepare("SELECT 1 FROM friends WHERE a = ? AND b = ? AND status = 'pending'").get(userId, id)) throw new GameError('درخواست قبلاً فرستاده شده');
+    const n = (db.prepare("SELECT COUNT(*) AS n FROM friends WHERE status = 'accepted' AND (a = ? OR b = ?)").get(userId, userId) as any).n as number;
+    if (n >= 100) throw new GameError('حداکثر ۱۰۰ دوست');
+    if (db.prepare("SELECT 1 FROM friends WHERE a = ? AND b = ? AND status = 'pending'").get(id, userId)) { this.acceptFriend(userId, id); return { accepted: true, to: id }; }
+    db.prepare('INSERT INTO friends (a, b, status, created_at) VALUES (?,?,?,?)').run(userId, id, 'pending', this.d.now());
+    return { accepted: false, to: id };
+  }
+  acceptFriend(userId: number, fromId: number) {
+    const r = this.d.db.prepare("UPDATE friends SET status = 'accepted' WHERE a = ? AND b = ? AND status = 'pending'").run(fromId, userId);
+    if (!Number(r.changes)) throw new GameError('این درخواست وجود ندارد');
+  }
+  /** حذف دوست، رد درخواست دریافتی یا لغو درخواست فرستاده‌شده */
+  removeFriend(userId: number, otherId: number) {
+    this.d.db.prepare('DELETE FROM friends WHERE (a = ? AND b = ?) OR (a = ? AND b = ?)').run(userId, otherId, otherId, userId);
+  }
+
   leaderboard(meId: number, limit = 50) {
     const rows = this.d.db.prepare('SELECT id, name, avatar, level, trophies FROM users WHERE banned = 0 ORDER BY trophies DESC, level DESC, id ASC LIMIT ?').all(limit) as any[];
     return rows.map((r, i) => ({ rank: i + 1, id: r.id as number, name: r.name as string, avatar: (r.avatar ?? null) as string | null, level: r.level as number, trophies: r.trophies as number, me: r.id === meId }));
