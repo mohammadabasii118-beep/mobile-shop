@@ -78,6 +78,9 @@ def make_token() -> str:
 
 def require_admin(authorization: str | None = Header(None)) -> None:
     token = (authorization or "").removeprefix("Bearer ").strip()
+    key = os.environ.get("PANEL_API_KEY", "")
+    if len(key) >= 24 and hmac.compare_digest(token, key):  # long-lived key for bots and scripts
+        return
     exp, _, sig = token.partition(".")
     if not exp.isdigit() or not hmac.compare_digest(sig, _sign(exp)) or int(exp) < time.time():
         raise HTTPException(401, "نشست نامعتبر است")
@@ -478,6 +481,12 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.delete(db.get(User, user_id) or _404())
     db.commit()
     return {"ok": True}
+
+
+@app.get("/api/users/by-name/{name}", dependencies=[Depends(require_admin)])
+def user_by_name(name: str, request: Request, db: Session = Depends(get_db)):
+    user = db.scalar(select(User).where(User.name == name)) or _404()
+    return user_out(user, request)
 
 
 @app.get("/api/users/{user_id}/configs", dependencies=[Depends(require_admin)])

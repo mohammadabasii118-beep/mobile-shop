@@ -697,3 +697,22 @@ def test_agent_adds_routing_and_keeps_the_old_config_when_xray_rejects_it():
     assert (root / "config.json").read_text() == "NEW"
     assert agent.install_xray_config("NEW", errors, test=lambda p: (False, "never asked")) is False   # unchanged: no test, no restart
     assert len(errors) == 1
+
+
+def test_api_key_and_lookup_by_name():
+    import app.main as m
+    with TestClient(app) as c:
+        os.environ["PANEL_API_KEY"] = "k" * 32
+        try:
+            key = {"Authorization": "Bearer " + "k" * 32}
+            assert c.get("/api/nodes", headers={"Authorization": "Bearer wrong"}).status_code == 401
+            assert c.get("/api/nodes", headers=key).status_code == 200
+            u = c.post("/api/users", headers=key, json={"name": "botuser", "quota_gb": 5, "days": 10, "protos": ["vless"]}).json()
+            got = c.get("/api/users/by-name/botuser", headers=key).json()
+            assert got["id"] == u["id"] and got["sub_url"] == u["sub_url"]
+            assert c.get("/api/users/by-name/nobody", headers=key).status_code == 404
+            assert c.patch(f"/api/users/{u['id']}", headers=key, json={"extend_days": 5}).json()["days_left"] in (14, 15)
+            os.environ["PANEL_API_KEY"] = "short"          # a weak key is never accepted
+            assert c.get("/api/nodes", headers={"Authorization": "Bearer short"}).status_code == 401
+        finally:
+            os.environ.pop("PANEL_API_KEY", None)

@@ -65,9 +65,13 @@ PANEL_URL=$PANEL_URL
 PANEL_FROM=$PANEL_FROM
 PANEL_ADMIN_PASSWORD=$PASSWORD
 PANEL_SECRET=$(openssl rand -hex 32)
+PANEL_API_KEY=$(openssl rand -hex 24)
 ENV
   NEW_INSTALL=1
-elif [ -n "$DOMAIN" ]; then
+elif ! grep -q '^PANEL_API_KEY=' "$ENV_FILE"; then   # older install: add the key bots use
+  echo "PANEL_API_KEY=$(openssl rand -hex 24)" >> "$ENV_FILE"
+fi
+if [ -f "$ENV_FILE" ] && [ -z "${NEW_INSTALL:-}" ] && [ -n "$DOMAIN" ]; then
   urls_for "$DOMAIN"
   sed -i "s|^PANEL_URL=.*|PANEL_URL=$PANEL_URL|; s|^PANEL_FROM=.*|PANEL_FROM=$PANEL_FROM|" "$ENV_FILE"
   echo "Address changed to $PANEL_URL (admin password unchanged)."
@@ -83,5 +87,6 @@ echo "Panel is up: $URL"
 if [ -n "${NEW_INSTALL:-}" ]; then
   echo "Admin password: $(grep '^PANEL_ADMIN_PASSWORD=' "$ENV_FILE" | cut -d= -f2-)   (saved in $ENV_FILE)"
 fi
+echo "API key for bots/scripts: in $ENV_FILE (PANEL_API_KEY); use it as: Authorization: Bearer <key>"
 case "$URL" in http://*) echo "WARNING: plain HTTP. Use a domain so node tokens and passwords are encrypted." ;; esac
 echo "Ports 80 and 443 must be open. Next: Locations -> New location, then run the install command on each node."

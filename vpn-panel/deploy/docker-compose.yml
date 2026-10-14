@@ -8,6 +8,7 @@ services:
     environment:
       PANEL_ADMIN_PASSWORD: ${PANEL_ADMIN_PASSWORD:?set it in .env}
       PANEL_SECRET: ${PANEL_SECRET:?set it in .env}
+      PANEL_API_KEY: ${PANEL_API_KEY:-}
       PANEL_PUBLIC_URL: ${PANEL_URL:?set it in .env}
     volumes: [panel-data:/data]
   caddy:
