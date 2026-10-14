@@ -716,3 +716,34 @@ def test_api_key_and_lookup_by_name():
             assert c.get("/api/nodes", headers={"Authorization": "Bearer short"}).status_code == 401
         finally:
             os.environ.pop("PANEL_API_KEY", None)
+
+
+def test_location_can_be_renamed_with_emoji_and_links_follow():
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "france", "cc": "fr", "address": "2.2.2.2"}).json()
+        nh = {"Authorization": "Bearer " + node["install_command"].split("--token ")[1].split()[0]}
+        c.post("/api/node/report", headers=nh, json={"reality_pub": "PUB", "reality_sid": "ab"})
+        user = c.post("/api/users", headers=h, json={"name": "emojiuser", "protos": ["vless", "vmess_ws", "l2tp"],
+                                                      "node_ids": [node["id"]]}).json()
+        url = f"/api/nodes/{node['id']}"
+        assert c.patch(url, headers=h, json={"name": ""}).status_code == 422
+        assert c.patch(url, headers=h, json={"name": "x" * 61}).status_code == 422
+        assert c.patch(url, headers=h, json={"cc": "france"}).status_code == 422
+        assert c.patch(url, headers=h, json={"address": "bad address!"}).status_code == 422
+        r = c.patch(url, headers=h, json={"name": "🇫🇷 France - Paris ⚡", "cc": "fr"}).json()
+        assert r["name"] == "🇫🇷 France - Paris ⚡" and r["cc"] == "FR"
+
+        rows = {e["proto"]: e for e in c.get(f"/api/users/{user['id']}/configs", headers=h).json()}
+        from urllib.parse import quote, unquote
+        assert quote("🇫🇷 France - Paris ⚡-VLESS + Reality") in rows["vless"]["link"]       # percent-encoded in the share link
+        assert unquote(rows["vless"]["link"].split("#", 1)[1]) == "🇫🇷 France - Paris ⚡-VLESS + Reality"
+        assert json.loads(base64.b64decode(rows["vmess_ws"]["link"][8:]))["ps"] == "🇫🇷 France - Paris ⚡-VMess + WebSocket (TLS)"
+        assert rows["l2tp"]["node"] == "🇫🇷 France - Paris ⚡"
+        page = c.get(user["sub_url"].replace("https://panel.test", ""), headers={"accept": "text/html"}).text
+        assert "🇫🇷 France - Paris" in page
+
+        # a new address changes the links, the node stays online with its token
+        c.patch(url, headers=h, json={"address": "3.3.3.3"})
+        assert "@3.3.3.3:" in c.get(f"/api/users/{user['id']}/configs", headers=h).json()[0]["link"]
+        assert c.post("/api/node/report", headers=nh, json={}).status_code == 200

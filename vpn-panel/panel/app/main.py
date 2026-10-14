@@ -246,6 +246,30 @@ def delete_node(node_id: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+class NodePatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=60)  # may contain emoji
+    cc: str | None = Field(default=None, pattern=r"^[A-Za-z]{2}$")
+    address: str | None = Field(default=None, pattern=r"^[A-Za-z0-9.\-]{3,253}$")
+
+
+@app.patch("/api/nodes/{node_id}", dependencies=[Depends(require_admin)])
+def patch_node(node_id: int, body: NodePatch, request: Request, db: Session = Depends(get_db)):
+    """Rename a location (emoji welcome) or change its country code / address. A new address only changes the
+    links handed out; the node itself keeps reporting with its token, so it stays online."""
+    node = db.get(Node, node_id) or _404()
+    if body.name is not None:
+        name = body.name.strip()
+        if not name or any(ord(ch) < 32 for ch in name):
+            raise HTTPException(422, "نام نامعتبر است")
+        node.name = name
+    if body.cc is not None:
+        node.cc = body.cc.upper()
+    if body.address is not None:
+        node.address = body.address
+    db.commit()
+    return node_out(node, request)
+
+
 class ProtoToggle(BaseModel):
     enabled: bool
 

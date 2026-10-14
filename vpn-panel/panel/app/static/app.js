@@ -53,7 +53,7 @@ const views = {
       ${S.nodes.map(n => `<tr><td><span class="cc">${esc(n.cc)}</span>${esc(n.name)}</td><td class="mono">${esc(n.address)}</td>
         <td>${n.online ? n.load + '%' : '—'}</td><td>${n.last_seen ? new Date(n.last_seen).toLocaleString('fa-IR') : 'هنوز وصل نشده'}</td>
         <td><span class="pill ${n.online ? 'good' : 'warn'}">${n.online ? 'آنلاین' : 'آفلاین'}</span>${(n.errors || []).length ? `<br><span class="pill bad wrap">خطا: ${esc(n.errors.join('، '))}</span>` : ''}${n.conflicts.length ? `<br><span class="pill bad wrap" title="پورتی که برنامه‌ی دیگری گرفته؛ آن پروتکل روی این نود بالا نمی‌آید. پورت را در بخش پروتکل‌ها ← پورت‌ها عوض کنید.">تداخل پورت: ${esc(n.conflicts.join('، '))}</span>` : ''}</td>
-        <td><div class="chips"><button class="btn sm" data-install="${n.id}">دستور نصب</button> <button class="btn sm" data-reality="${n.id}">Reality</button> <button class="btn sm" data-cf="${n.id}">کلادفلر${n.cf_domain ? ' ✓' : ''}</button> <button class="btn sm" data-delnode="${n.id}">حذف</button></div></td></tr>`).join('')
+        <td><div class="chips"><button class="btn sm" data-editnode="${n.id}">ویرایش</button> <button class="btn sm" data-install="${n.id}">دستور نصب</button> <button class="btn sm" data-reality="${n.id}">Reality</button> <button class="btn sm" data-cf="${n.id}">کلادفلر${n.cf_domain ? ' ✓' : ''}</button> <button class="btn sm" data-delnode="${n.id}">حذف</button></div></td></tr>`).join('')
         || '<tr><td colspan="6" class="muted">لوکیشنی وجود ندارد.</td></tr>'}</tbody></table></div>`;
   },
   protos() {
@@ -131,6 +131,18 @@ function nodeForm() {
     <label class="f">کد کشور<input type="text" id="nCc" maxlength="2" placeholder="DE"></label>
     <label class="f">آدرس سرور (دامنه یا آی‌پی)<input type="text" id="nAddr" placeholder="de.example.com"></label></div>
     <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="nSave">ساخت و گرفتن دستور نصب</button></div>`);
+}
+const flagOf = cc => /^[A-Za-z]{2}$/.test(cc) ? String.fromCodePoint(...[...cc.toUpperCase()].map(c => 127397 + c.charCodeAt(0))) : '';
+function editNodeDialog(n) {
+  openModal(`<h2>ویرایش لوکیشن</h2>
+    <div class="note">نام به کاربر نشان داده می‌شود (در برنامه‌ی کلاینت و صفحه‌ی اشتراک). می‌توانید ایموجی بگذارید، مثلاً <span dir="ltr">🇹🇷 Turkey - Istanbul ⚡</span>.</div>
+    <div class="form"><label class="f">نام<input type="text" id="enName" value="${esc(n.name)}" maxlength="60"></label>
+      <label class="f">کد کشور (دو حرف)<input type="text" id="enCc" value="${esc(n.cc)}" maxlength="2" dir="ltr"></label>
+      <label class="f">آدرس سرور<input type="text" id="enAddr" value="${esc(n.address)}" dir="ltr"></label></div>
+    <div class="chips"><button class="btn sm" data-addflag>افزودن پرچم ${esc(flagOf(n.cc))}</button>
+      ${['⚡', '🚀', '🔒', '⭐', '🌐'].map(e => `<button class="btn sm" data-addemoji="${e}">${e}</button>`).join('')}</div>
+    <div class="note">اگر آدرس را عوض کنید، لینک‌های کاربران عوض می‌شود و باید اشتراک را به‌روز کنند. نود آنلاین می‌ماند، ولی گواهی TLS آن برای آدرس قبلی صادر شده بود.</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="enSave" data-id="${n.id}">ذخیره</button></div>`);
 }
 function installDialog(n) {
   openModal(`<h2>نصب نود ${esc(n.name)}</h2>
@@ -253,6 +265,13 @@ document.addEventListener('click', async e => {
       const proto = d.setport || d.randport;
       const port = d.setport ? +$('#port-' + proto).value : null;
       await api('PUT', `/nodes/${d.nid}/protocols/${proto}/port`, {port}); await refresh(); toast(port ? 'پورت ذخیره شد' : 'پورت رندوم ساخته شد');
+    }
+    else if (d.editnode) editNodeDialog(nodeBy(+d.editnode));
+    else if ('addflag' in d) { const i = $('#enName'), f = flagOf($('#enCc').value); if (f && !i.value.startsWith(f)) i.value = f + ' ' + i.value.replace(/^\p{RI}{2}\s*/u, ''); }
+    else if (d.addemoji) { const i = $('#enName'); i.value = (i.value.trimEnd() + ' ' + d.addemoji).slice(0, 60); }
+    else if (t.id === 'enSave') {
+      await api('PATCH', '/nodes/' + d.id, {name: $('#enName').value.trim(), cc: $('#enCc').value.trim(), address: $('#enAddr').value.trim()});
+      closeModal(); await refresh(); toast('لوکیشن ذخیره شد');
     }
     else if (d.install) installDialog(nodeBy(+d.install));
     else if (d.cf) cfDialog(nodeBy(+d.cf));
