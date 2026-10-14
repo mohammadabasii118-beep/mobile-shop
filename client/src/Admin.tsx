@@ -6,7 +6,7 @@ import { call, loadConfig } from './net';
 import { initData } from './telegram';
 import { CardTile, Icon, Modal, RARITY_FA, fa } from './ui';
 
-type Tab = 'cards' | 'eco' | 'shop' | 'solo' | 'look' | 'players' | 'json';
+type Tab = 'cards' | 'eco' | 'shop' | 'solo' | 'look' | 'chat' | 'players' | 'json';
 interface Stats { users: number; battles: number; pendingBoxes: number; coins: number; banned: number }
 interface AdminUser { id: number; tg_id: number; name: string; avatar: string | null; level: number; coins: number; gems: number; wins: number; losses: number; banned: number }
 
@@ -53,7 +53,7 @@ export function Admin({ ctx, onExit }: { ctx: Ctx; onExit: () => void }) {
         </div>
       )}
       <div className="tabs" role="tablist">
-        {([['cards', 'کارت‌ها و عکس‌ها'], ['eco', 'جعبه و اقتصاد'], ['shop', 'فروشگاه'], ['solo', 'تک‌نفره (گودال‌ها)'], ['look', 'ظاهر و بنر'], ['players', 'بازیکن‌ها'], ['json', 'پیشرفته']] as [Tab, string][]).map(([k, l]) => (
+        {([['cards', 'کارت‌ها و عکس‌ها'], ['eco', 'جعبه و اقتصاد'], ['shop', 'فروشگاه'], ['solo', 'تک‌نفره (گودال‌ها)'], ['look', 'ظاهر و بنر'], ['chat', 'چت'], ['players', 'بازیکن‌ها'], ['json', 'پیشرفته']] as [Tab, string][]).map(([k, l]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{l}</button>
         ))}
       </div>
@@ -61,6 +61,7 @@ export function Admin({ ctx, onExit }: { ctx: Ctx; onExit: () => void }) {
       {tab === 'eco' && <EcoTab cfg={cfg} refresh={refresh} run={run} />}
       {tab === 'shop' && <ShopTab cfg={cfg} refresh={refresh} run={run} />}
       {tab === 'solo' && <SoloTab cfg={cfg} refresh={refresh} run={run} />}
+      {tab === 'chat' && <ChatTab cfg={cfg} refresh={refresh} run={run} />}
       {tab === 'look' && <LookTab cfg={cfg} refresh={refresh} run={run} />}
       {tab === 'players' && <PlayersTab cfg={cfg} run={run} />}
       {tab === 'json' && <JsonTab cfg={cfg} refresh={refresh} run={run} />}
@@ -556,6 +557,35 @@ function soloText(cfg: GameConfig, cleared: number) {
     g -= n;
   }
   return `${fa(cleared)} لول`;
+}
+
+/** پیام‌های آماده‌ی چت بازی آنلاین: افزودن، ویرایش، حذف؛ متن یا فقط ایموجی */
+function ChatTab({ cfg, refresh, run }: TabProps) {
+  const [list, setList] = useState<string[]>(() => [...(cfg.chatPhrases ?? [])]);
+  const clean = list.map((x) => x.trim());
+  const bad = clean.some((x) => !x || x.length > 24) || list.length > 16;
+  const save = () => run(async () => {
+    const d = JSON.parse(JSON.stringify(cfg)) as GameConfig;
+    d.chatPhrases = clean;
+    refresh((await call('/api/admin/config', { config: d })) as GameConfig);
+  }, 'ذخیره شد و همین الان اعمال شد');
+  return (
+    <div className="box">
+      <h3>پیام‌های آماده‌ی چت <small>(بازی آنلاین، حداکثر ۱۶ پیام)</small></h3>
+      <small className="hint" style={{ textAlign: 'start' }}>هر پیام می‌تواند متن کوتاه یا فقط یک ایموجی باشد (مثلاً 👍 یا 😂). بازیکن با زدن هر کدام، آن را برای حریف نشان می‌دهد.</small>
+      {list.map((x, i) => (
+        <div key={i} className="row" style={{ justifyContent: 'stretch' }}>
+          <input style={{ flex: 1 }} maxLength={24} value={x} onChange={(e) => setList(list.map((y, j) => (j === i ? e.target.value : y)))} />
+          <button className="btn ghost" aria-label="حذف" onClick={() => setList(list.filter((_, j) => j !== i))}>🗑</button>
+        </div>
+      ))}
+      <div className="btns">
+        {list.length < 16 && <button className="btn ghost" onClick={() => setList([...list, ''])}>+ پیام جدید</button>}
+        <button className="btn" disabled={bad} onClick={save}>ذخیره و اعمال</button>
+      </div>
+      {bad && <small className="hint">هر پیام باید خالی نباشد و حداکثر ۲۴ نویسه باشد.</small>}
+    </div>
+  );
 }
 
 function PlayersTab({ cfg, run }: { cfg: GameConfig; run: Run }) {

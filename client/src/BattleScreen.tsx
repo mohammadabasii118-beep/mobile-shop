@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CHAT_PHRASES, type BattleEvent, type ServerMsg, type Side, type UnitView } from '@game/shared';
+import { type BattleEvent, type ServerMsg, type Side, type UnitView } from '@game/shared';
 import type { Ctx } from './App';
 import { onlineRewardLines, rewardText } from './App';
 import { CardTile, Icon, Modal, fa } from './ui';
@@ -66,7 +66,7 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
   const [now, setNow] = useState(Date.now());
   const [chatOpen, setChatOpen] = useState(false);
   const [confirmExit, setConfirmExit] = useState(false);
-  const [bubbles, setBubbles] = useState<{ k: number; id: number; mine: boolean }[]>([]);
+  const [bubbles, setBubbles] = useState<{ k: number; text: string; mine: boolean }[]>([]);
   const queue = useRef<ServerMsg[]>([]);
   const busy = useRef(false);
   const alive = useRef(true);
@@ -107,12 +107,12 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
     }
   }
 
-  const showBubble = (id: number, mine: boolean) => {
-    const b = { k: ++floaterId, id, mine };
+  const showBubble = (text: string, mine: boolean) => {
+    const b = { k: ++floaterId, text, mine };
     setBubbles((x) => [...x.filter((y) => y.mine !== mine), b]);
     setTimeout(() => setBubbles((x) => x.filter((y) => y.k !== b.k)), 3000);
   };
-  const sendChat = (id: number) => { sock.send({ t: 'chat', battleId: start.battleId, id }); showBubble(id, true); setChatOpen(false); };
+  const sendChat = (id: number) => { sock.send({ t: 'chat', battleId: start.battleId, id }); showBubble((cfg.chatPhrases ?? [])[id] ?? '', true); setChatOpen(false); };
 
   async function pump() {
     if (busy.current) return;
@@ -145,7 +145,7 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
         if (m.t === 'battleEnd') setPrompt(null);
         queue.current.push(m); void pump();
       } else if (m.t === 'chat' && m.battleId === start.battleId) {
-        showBubble(m.id, false);
+        showBubble(m.text, false);
       } else if (m.t === 'closed') {
         setLog('ارتباط قطع شد');
       }
@@ -226,11 +226,11 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
       <div className="opp">{start.opponent} {start.mode === 'pvp' ? '🌐' : '🤖'}</div>
       <div className="row3 enemy">{side(enemy).map(tile)}</div>
       <div className="mid">
-        {bubbles.filter((b) => !b.mine).map((b) => <div key={b.k} className="cbubble foe">{CHAT_PHRASES[b.id]}</div>)}
+        {bubbles.filter((b) => !b.mine).map((b) => <div key={b.k} className="cbubble cb-foe">{b.text}</div>)}
         <div className="log">{log}</div>
         <small className="hint">{prompt?.mine ? (prompt.attacker ? `حمله‌ی بعدی (${fa(prompt.attacksLeft)} باقی)` : 'کارتت را بکش و روی کارت حریف رها کن') : prompt ? 'حریف در حال انتخاب است…' : ''}</small>
       </div>
-      {bubbles.filter((b) => b.mine).map((b) => <div key={b.k} className="cbubble me">{CHAT_PHRASES[b.id]}</div>)}
+      {bubbles.filter((b) => b.mine).map((b) => <div key={b.k} className="cbubble cb-self">{b.text}</div>)}
       <div className="row3 mine">{side(me).map(tile)}</div>
 
       {!result && (
@@ -241,7 +241,7 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
       )}
       {chatOpen && !result && (
         <div className="chatpanel">
-          {CHAT_PHRASES.map((p, i) => <button key={i} onClick={() => sendChat(i)}>{p}</button>)}
+          {(cfg.chatPhrases ?? []).map((p, i) => <button key={i} onClick={() => sendChat(i)}>{p}</button>)}
         </div>
       )}
       {confirmExit && !result && (

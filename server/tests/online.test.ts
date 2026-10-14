@@ -107,7 +107,7 @@ describe('online', () => {
     const sa = await a.wait('battleStart'); await b.wait('battleStart');
     a.send({ t: 'chat', battleId: sa.battleId, id: 99 });   // نامعتبر
     a.send({ t: 'chat', battleId: sa.battleId, id: 3 });
-    expect((await b.wait('chat')).id).toBe(3);
+    const ch = await b.wait('chat'); expect(ch.id).toBe(3); expect(ch.text).toBe('موفق باشی');
     b.send({ t: 'leave', battleId: sa.battleId });
     const end = await a.wait('battleEnd', 5000);
     expect(end.youWon).toBe(true);

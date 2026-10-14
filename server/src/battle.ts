@@ -1,5 +1,5 @@
 import {
-  CHAT_PHRASES, attack, createBattle, getUnit, aliveUnits, other, pickAttacker, pickTarget, snapshot, startNextTurn,
+  attack, createBattle, getUnit, aliveUnits, other, pickAttacker, pickTarget, snapshot, startNextTurn,
   type BattleEvent, type BattleState, type GameConfig, type ServerMsg, type Side, type UnitInit, type UnitView,
 } from '@game/shared';
 
@@ -125,11 +125,11 @@ export class Battle {
   private lastChat = 0;
   chat(userId: number, id: number) {
     const side = this.sideOf(userId);
-    if (!side || this.o.mode !== 'pvp' || this.ended || !Number.isInteger(id) || id < 0 || id >= CHAT_PHRASES.length) return;
+    if (!side || this.o.mode !== 'pvp' || this.ended || !Number.isInteger(id) || id < 0 || id >= (this.o.cfg.chatPhrases ?? []).length) return;
     const now = Date.now();
     if (now - this.lastChat < 1000) return;
     this.lastChat = now;
-    this.parts[other(side)].send?.({ t: 'chat', battleId: this.id, id });
+    this.parts[other(side)].send?.({ t: 'chat', battleId: this.id, id, text: this.o.cfg.chatPhrases![id] });
   }
 
   /** قطع اتصال یا خروج: همون لحظه می‌بازه */

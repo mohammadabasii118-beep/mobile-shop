@@ -75,6 +75,8 @@ export interface GameConfig {
   contentVersion?: number;
   /** نسخه‌ی تنظیمات عمومی (برای مهاجرت یک‌بارِ مقدارهایی مثل مهلت نوبت) */
   rev?: number;
+  /** پیام‌های آماده‌ی چت در بازی آنلاین (متن یا فقط ایموجی؛ از پنل مدیریت ← چت) */
+  chatPhrases?: string[];
   turnSeconds: number;
   /** حداکثر تعداد کارت در ترکیب (۳ تا ۵) */
   deckSize: number;

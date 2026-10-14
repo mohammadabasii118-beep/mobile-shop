@@ -13,6 +13,7 @@ export function validateConfig(cfg: GameConfig): GameConfig {
   if (!cfg || typeof cfg !== 'object') bad('کانفیگ نامعتبر است');
   if (!isNum(cfg.turnSeconds, 1)) bad('turnSeconds نامعتبر است');
   if (!isNum(cfg.maxRounds, 1)) bad('maxRounds نامعتبر است');
+  if (cfg.chatPhrases !== undefined && (!Array.isArray(cfg.chatPhrases) || cfg.chatPhrases.length > 16 || cfg.chatPhrases.some((x) => typeof x !== 'string' || !x.trim() || x.length > 24))) bad('پیام‌های چت: حداکثر ۱۶ پیام، هر کدام ۱ تا ۲۴ نویسه');
   if (!Number.isInteger(cfg.deckSize) || cfg.deckSize < 3 || cfg.deckSize > 5) bad('تعداد کارت ترکیب باید بین ۳ و ۵ باشد');
   if (!Array.isArray(cfg.cards) || cfg.cards.length < 3) bad('حداقل ۳ کارت لازم است');
   const ids = new Set<string>();
