@@ -27,6 +27,11 @@ wait_for_apt() {
 
 export DEBIAN_FRONTEND=noninteractive
 wait_for_apt
+# a package install that was killed halfway leaves dpkg unusable ("dpkg was interrupted"): finish it first
+if dpkg --audit 2>/dev/null | grep -q .; then
+  echo "Finishing an interrupted package installation (dpkg --configure -a)..."
+  dpkg --configure -a
+fi
 apt-get update -y
 apt-get install -y curl openssl python3 iptables strongswan strongswan-starter xl2tpd ppp wireguard openvpn ocserv
 
