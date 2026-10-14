@@ -167,6 +167,7 @@ server-key = $CONF_DIR/tls.key
 run-as-user = nobody
 run-as-group = daemon
 socket-file = /run/ocserv.socket
+occtl-socket-file = /run/occtl.socket
 device = vpns
 ipv4-network = 10.66.0.0/24
 dns = 1.1.1.1

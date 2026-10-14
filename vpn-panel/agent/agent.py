@@ -233,31 +233,42 @@ class Counters:
 
 
 def parse_openvpn_status(text):
-    """`status-version 1` file -> [(common_name, real_address, bytes_received + bytes_sent)]."""
-    rows, active = [], False
+    """OpenVPN status file (versions 1, 2 and 3) -> [(common_name, real_address, bytes_received + bytes_sent)].
+    systemd starts openvpn-server@ with --status-version 2, so version 2 is what the node really writes."""
+    rows, cols, v1 = [], None, False
     for line in text.splitlines():
-        if line.startswith("Common Name,"):
-            active = True
+        sep = "\t" if "\t" in line else ","
+        f = line.split(sep)
+        if f[:2] == ["HEADER", "CLIENT_LIST"]:               # versions 2 and 3: named columns
+            cols = f[2:]
+        elif f[0] == "CLIENT_LIST" and cols:
+            d = dict(zip(cols, f[1:]))
+            rx, tx = d.get("Bytes Received", ""), d.get("Bytes Sent", "")
+            if d.get("Common Name") and rx.isdigit() and tx.isdigit():
+                rows.append((d["Common Name"], d.get("Real Address", ""), int(rx) + int(tx)))
+        elif line.startswith("Common Name,"):                # version 1: a section with fixed columns
+            v1 = True
         elif line.startswith(("ROUTING TABLE", "GLOBAL STATS", "END")):
-            active = False
-        elif active:
-            p = line.split(",")
-            if len(p) >= 4 and p[2].isdigit() and p[3].isdigit():
-                rows.append((p[0], p[1], int(p[2]) + int(p[3])))
+            v1 = False
+        elif v1 and len(f) >= 4 and f[2].isdigit() and f[3].isdigit():
+            rows.append((f[0], f[1], int(f[2]) + int(f[3])))
     return rows
 
 
 def parse_occtl_users(text):
-    """`occtl -j show users` -> [(session_id, username, rx + tx)]."""
+    """`occtl -j show users` -> [(session_id, username, rx + tx)]. Key names are matched case-insensitively
+    and raw byte counters (`raw_rx`/`raw_tx`) are preferred over the human readable `rx`/`tx`."""
     try:
         data = json.loads(text)
     except ValueError:
         return []
     out = []
     for u in data if isinstance(data, list) else []:
+        u = {str(k).lower(): v for k, v in u.items()}
         rx, tx = u.get("raw_rx", u.get("rx")), u.get("raw_tx", u.get("tx"))
+        rx, tx = (int(x) if isinstance(x, str) and x.isdigit() else x for x in (rx, tx))
         if u.get("username") and isinstance(rx, int) and isinstance(tx, int):
-            out.append((str(u.get("id", u.get("ID", u["username"]))), u["username"], rx + tx))
+            out.append((str(u.get("id", u["username"])), u["username"], rx + tx))
     return out
 
 
@@ -378,6 +389,15 @@ def wg_usage(cfg):
     return usage
 
 
+def ensure_conf_line(path, key, value):
+    """Append `key = value` to a config file if it does not set `key` yet. True when the file changed."""
+    import re
+    text = read_text(path)
+    if not text or re.search(rf"^{re.escape(key)}\s*=", text, re.M):
+        return False
+    return write_if_changed(path, text.rstrip("\n") + f"\n{key} = {value}\n", 0o644)
+
+
 def restart(service):
     sh("systemctl", "reset-failed", service)  # after repeated crashes systemd refuses to start it again
     sh("systemctl", "restart", service)
@@ -416,6 +436,8 @@ def apply(cfg, reality, tls, wg):
         else:
             sh("systemctl", "restart", "wg-quick@wg0")
     apply_port("/etc/openvpn/server/server.conf", {"port": cfg["protocols"].get("ovpn")}, "openvpn-server@server")
+    if ensure_conf_line("/etc/ocserv/ocserv.conf", "occtl-socket-file", "/run/occtl.socket"):
+        restart("ocserv")  # without this socket `occtl` (users, traffic) cannot talk to ocserv
     apply_port("/etc/ocserv/ocserv.conf", {"tcp-port": cfg["protocols"].get("anyc"),
                                            "udp-port": cfg["protocols"].get("anyc")}, "ocserv")
     write_if_changed("/etc/vpn-node/ovpn-users", render_ovpn_users(cfg), 0o644)  # checked per login

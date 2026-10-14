@@ -499,3 +499,24 @@ def test_reality_camouflage_site_is_configurable_per_node():
         assert c.get("/api/node/config", headers=nh).json()["node"]["reality_sni"] == "addons.mozilla.org"
         link = c.get(f"/api/users/{user['id']}/configs", headers=h).json()[0]["link"]
         assert "sni=addons.mozilla.org" in link
+
+
+def test_openvpn_status_v2_and_ocserv_socket_line():
+    v2 = ("TITLE,OpenVPN 2.6.19\nTIME,2026-10-14 11:00:00,1791975600\n"
+          "HEADER,CLIENT_LIST,Common Name,Real Address,Virtual Address,Virtual IPv6 Address,Bytes Received,Bytes Sent,Connected Since,Connected Since (time_t),Username,Client ID,Peer ID,Data Channel Cipher\n"
+          "CLIENT_LIST,ali_t,1.2.3.4:5555,10.55.0.2,,1500,2500,2026-10-14 10:59:00,1791975540,ali_t,0,0,AES-256-GCM\n"
+          "HEADER,ROUTING_TABLE,Virtual Address,Common Name,Real Address,Last Ref,Last Ref (time_t)\n"
+          "ROUTING_TABLE,10.55.0.2,ali_t,1.2.3.4:5555,2026-10-14 11:00:00,1791975600\nGLOBAL_STATS,Max bcast/mcast queue length,0\nEND\n")
+    assert agent.parse_openvpn_status(v2) == [("ali_t", "1.2.3.4:5555", 4000)]
+    empty = "HEADER,CLIENT_LIST,Common Name,Real Address,Bytes Received,Bytes Sent\nEND\n"   # what the node showed with nobody connected
+    assert agent.parse_openvpn_status(empty) == []
+    v3 = "HEADER\tCLIENT_LIST\tCommon Name\tReal Address\tBytes Received\tBytes Sent\nCLIENT_LIST\tsara\t5.6.7.8:1\t10\t20\n"
+    assert agent.parse_openvpn_status(v3) == [("sara", "5.6.7.8:1", 30)]
+    assert agent.parse_occtl_users('[{"ID": 3, "Username": "ali", "Raw_RX": "100", "Raw_TX": "50"}]') == [("3", "ali", 150)]
+
+    path = Path(tempfile.mkdtemp()) / "ocserv.conf"
+    path.write_text("tcp-port = 4443\nsocket-file = /run/ocserv.socket\n")
+    assert agent.ensure_conf_line(str(path), "occtl-socket-file", "/run/occtl.socket") is True
+    assert path.read_text().endswith("occtl-socket-file = /run/occtl.socket\n")
+    assert agent.ensure_conf_line(str(path), "occtl-socket-file", "/run/occtl.socket") is False   # idempotent
+    assert agent.ensure_conf_line(str(path.parent / "missing.conf"), "x", "y") is False
