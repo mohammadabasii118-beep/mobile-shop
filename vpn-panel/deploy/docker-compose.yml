@@ -1,0 +1,18 @@
+# Run from vpn-panel/:  docker compose --env-file .env -f deploy/docker-compose.yml up -d
+# Caddy gets the HTTPS certificate for PANEL_DOMAIN automatically.
+services:
+  panel:
+    build: {context: .., dockerfile: deploy/Dockerfile}
+    restart: always
+    environment:
+      PANEL_ADMIN_PASSWORD: ${PANEL_ADMIN_PASSWORD:?set it in .env}
+      PANEL_SECRET: ${PANEL_SECRET:?set it in .env}
+      PANEL_PUBLIC_URL: https://${PANEL_DOMAIN:?set it in .env}
+    volumes: [panel-data:/data]
+  caddy:
+    image: caddy:2
+    restart: always
+    ports: ["80:80", "443:443"]
+    command: caddy reverse-proxy --from ${PANEL_DOMAIN} --to panel:8000
+    volumes: [caddy-data:/data]
+volumes: {panel-data: {}, caddy-data: {}}
