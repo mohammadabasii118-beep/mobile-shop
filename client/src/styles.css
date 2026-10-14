@@ -94,8 +94,6 @@ svg.i.f { fill: currentColor; stroke: none; }
 .title { margin: 6px 0 10px; font-family: var(--f-display); font-weight: 400; font-size: 20px; }
 .title small { font-family: var(--f-body); font-size: 12px; }
 .deck, .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
-.deck { grid-template-columns: repeat(5, 1fr); gap: 5px; }
-.deck .card .nm, .deck .card .st { font-size: 9px; }
 .hint { color: var(--muted); font-size: 12px; text-align: center; }
 
 /* ───── کارت ───── */
@@ -609,7 +607,6 @@ html, body, #root, .app, .screen, .battle, .admin { overscroll-behavior: none; }
 .cbubble.cb-self { margin: 0 auto; background: rgba(120,200,255,.3); border-color: rgba(160,220,255,.8); }
 @keyframes rise-in { from { opacity: 0; transform: translateY(6px) scale(.9); } to { opacity: 1; transform: none; } }
 
-/* ترکیب ۵کارتی در صفحه‌ی کارت‌ها: شیلد ردیف دوم (مثل نبرد) */
-.deck .card { aspect-ratio: 3 / 4.75; }
-.deck .card .st { flex-wrap: wrap; row-gap: 1px; }
-.deck .card .st span:nth-child(3) { flex-basis: 100%; justify-content: center; }
+/* ترکیب در صفحه‌ی کارت‌ها: هم‌اندازه‌ی «کارت‌های من»، ردیف اول ۳ کارت و ردیف دوم ۲ کارت (وسط‌چین) */
+.deck { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.deck > * { flex: 0 0 calc((100% - 20px) / 3); min-width: 0; }
