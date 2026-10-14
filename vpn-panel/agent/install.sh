@@ -265,7 +265,7 @@ After=network-online.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/sh -c 'for n in 10.99.0.0/16 10.88.0.0/16 10.77.0.0/24 10.66.0.0/24 10.55.0.0/24; do iptables -t nat -C POSTROUTING -s $n -o $IFACE -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s $n -o $IFACE -j MASQUERADE; done'
+ExecStart=/bin/sh -c 'for n in 10.99.0.0/16 10.88.0.0/16 10.77.0.0/24 10.66.0.0/24 10.55.0.0/24; do iptables -t nat -C POSTROUTING -s \$n -o $IFACE -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -s \$n -o $IFACE -j MASQUERADE; done'
 [Install]
 WantedBy=multi-user.target
 UNIT
