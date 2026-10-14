@@ -593,3 +593,16 @@ def test_forwarding_rules_are_added_once_and_use_docker_user_when_present():
     run, calls = make(False, existing=have)
     agent.ensure_forwarding(run)
     assert not [c for c in calls if "-I" in c or "-A" in c]
+
+
+def test_service_restarts_once_per_config_change():
+    root = Path(tempfile.mkdtemp())
+    conf, state = root / "ipsec.conf", root / "state"
+    restarted = []
+    call = lambda: agent.restart_on_config_change("strongswan-starter", [str(conf)], str(state), restarted.append)
+    assert call() is False and restarted == []                 # no config yet: nothing to do
+    conf.write_text("conn l2tp-psk\n")
+    assert call() is True and restarted == ["strongswan-starter"]   # first pass after the agent update
+    assert call() is False and len(restarted) == 1             # unchanged: not restarted again
+    conf.write_text("conn l2tp-psk\nconn ikev2-eap\n")
+    assert call() is True and len(restarted) == 2              # changed: restarted once more

@@ -135,6 +135,10 @@ def config():
     _, conns = sh("ipsec", "statusall")
     for name in ("l2tp-psk", "ikev2-eap"):
         say("OK" if name in conns else "FAIL", f"ipsec connection {name} {'loaded' if name in conns else 'NOT loaded'}")
+    if "l2tp-psk" not in conns or "ikev2-eap" not in conns:
+        print("        ipsec statusall (first lines):")
+        for line in conns.splitlines()[:12]:
+            print("          " + line[:160])
     say("OK" if os.path.exists("/etc/ipsec.d/certs/server.crt") else "FAIL", "IKEv2 server certificate file")
     code, nproc = sh("systemctl", "show", "openvpn-server@server", "-p", "LimitNPROC", "--value")
     if code == 0:
@@ -144,7 +148,10 @@ def config():
     say("OK" if ovu else "WARN", f"OpenVPN users: {len(ovu)}")
     ocu = [l for l in read("/etc/ocserv/ocpasswd").splitlines() if l.strip()]
     say("OK" if ocu else "WARN", f"AnyConnect users: {len(ocu)}")
-    say("OK" if os.path.exists("/run/occtl.socket") else "WARN", "ocserv control socket (occtl) /run/occtl.socket")
+    sock = os.path.exists("/run/occtl.socket")
+    say("OK" if sock else "WARN", "ocserv control socket (occtl) /run/occtl.socket")
+    if not sock:
+        print("        ocserv.conf socket lines: " + " | ".join(l for l in read("/etc/ocserv/ocserv.conf").splitlines() if "socket" in l))
     wgc = read("/etc/wireguard/wg0.conf")
     say("OK" if "[Peer]" in wgc else "WARN", f"WireGuard peers: {wgc.count('[Peer]')}")
 

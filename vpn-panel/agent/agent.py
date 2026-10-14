@@ -439,6 +439,23 @@ def ensure_forwarding(run=None):
             run("iptables", "-t", table, "-I" if table == "filter" else "-A", ch, *(["1"] if table == "filter" else []), *rule)
 
 
+def restart_on_config_change(service, paths, state_dir="/var/lib/vpn-node", do_restart=None):
+    """Restart `service` once whenever its config files differ from what it was last restarted with.
+    Covers services that apt started with default settings before our files existed. True if restarted."""
+    blob = b"".join(open(p, "rb").read() for p in paths if os.path.exists(p))
+    if not blob:
+        return False
+    digest = hashlib.sha256(blob).hexdigest()
+    marker = os.path.join(state_dir, f"cfg-{service}.sha")
+    if read_text(marker).strip() == digest:
+        return False
+    os.makedirs(state_dir, exist_ok=True)
+    with open(marker, "w") as f:
+        f.write(digest)
+    (do_restart or restart)(service)
+    return True
+
+
 def restart(service):
     sh("systemctl", "reset-failed", service)  # after repeated crashes systemd refuses to start it again
     sh("systemctl", "restart", service)
@@ -477,6 +494,9 @@ def apply(cfg, reality, tls, wg):
         else:
             sh("systemctl", "restart", "wg-quick@wg0")
     ensure_forwarding()
+    restart_on_config_change("strongswan-starter", ["/etc/ipsec.conf"])
+    restart_on_config_change("xl2tpd", ["/etc/xl2tpd/xl2tpd.conf", "/etc/ppp/options.xl2tpd"])
+    restart_on_config_change("ocserv", ["/etc/ocserv/ocserv.conf"])
     if ensure_openvpn_limits():
         sh("systemctl", "daemon-reload")
         restart("openvpn-server@server")

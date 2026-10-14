@@ -289,6 +289,9 @@ UNIT
 systemctl daemon-reload
 systemctl disable --now ocserv.socket 2>/dev/null || true
 systemctl enable --now strongswan-starter xl2tpd xray sing-box wg-quick@wg0 openvpn-server@server ocserv vpn-node-nat vpn-node-agent || true
+# apt starts these with the package's default config as soon as they are installed, and `enable --now` does nothing
+# for a service that is already running: restart so they read the configuration written above
+systemctl restart strongswan-starter xl2tpd ocserv || true
 echo
 # Ports that another program (for example x-ui) already holds: the matching protocol cannot start there
 find_busy() {   # reads `ss -H -ltnup`; prints "proto/port program" for ports we need that a foreign program holds
