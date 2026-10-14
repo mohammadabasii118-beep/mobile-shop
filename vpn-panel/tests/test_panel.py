@@ -619,3 +619,13 @@ def test_pppd_options_that_break_l2tp_are_removed():
     installer = (ROOT / "agent" / "install.sh").read_text()
     section = installer.split("options.xl2tpd <<'EOF2'")[1].split("EOF2")[0]
     assert "lock" not in section.split() and "connect-delay" not in section
+
+
+def test_ocserv_gets_the_occtl_switch():
+    installer = (ROOT / "agent" / "install.sh").read_text()
+    assert "use-occtl = true" in installer and "occtl-socket-file = /run/occtl.socket" in installer
+    path = Path(tempfile.mkdtemp()) / "ocserv.conf"
+    path.write_text("tcp-port = 4443\n")
+    assert agent.ensure_conf_line(str(path), "use-occtl", "true") is True      # an old node's file is repaired
+    assert agent.ensure_conf_line(str(path), "use-occtl", "true") is False
+    assert "use-occtl = true" in path.read_text()

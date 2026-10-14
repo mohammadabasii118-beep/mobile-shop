@@ -517,8 +517,11 @@ def apply(cfg, reality, tls, wg):
         sh("systemctl", "daemon-reload")
         restart("openvpn-server@server")
     apply_port("/etc/openvpn/server/server.conf", {"port": cfg["protocols"].get("ovpn")}, "openvpn-server@server")
-    if ensure_conf_line("/etc/ocserv/ocserv.conf", "occtl-socket-file", "/run/occtl.socket"):
-        restart("ocserv")  # without this socket `occtl` (users, traffic) cannot talk to ocserv
+    # ocserv only creates the control socket `occtl` talks to when use-occtl is on (users and traffic come from it)
+    changed = [ensure_conf_line("/etc/ocserv/ocserv.conf", k, v)
+               for k, v in (("use-occtl", "true"), ("occtl-socket-file", "/run/occtl.socket"))]
+    if any(changed):
+        restart("ocserv")
     apply_port("/etc/ocserv/ocserv.conf", {"tcp-port": cfg["protocols"].get("anyc"),
                                            "udp-port": cfg["protocols"].get("anyc")}, "ocserv")
     write_if_changed("/etc/vpn-node/ovpn-users", render_ovpn_users(cfg), 0o644)  # checked per login
