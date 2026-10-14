@@ -35,7 +35,11 @@ fi
 APP="$INSTALL_DIR/vpn-panel"
 ENV_FILE="$APP/.env"
 
-# Settings: keep an existing .env, otherwise create one
+# Settings: keep an existing .env; --domain on a re-run changes the address
+urls_for() {   # an IP cannot get a certificate: serve plain HTTP
+  if [[ "$1" =~ ^[0-9.]+$ ]]; then PANEL_URL="http://$1"; PANEL_FROM="http://$1"
+  else PANEL_URL="https://$1"; PANEL_FROM="$1"; fi
+}
 if [ ! -f "$ENV_FILE" ]; then
   if [ -z "$DOMAIN" ]; then
     DOMAIN=$(curl -fsS https://api.ipify.org || true)
@@ -43,11 +47,7 @@ if [ ! -f "$ENV_FILE" ]; then
     echo "No --domain given, using the server IP $DOMAIN (plain HTTP)."
   fi
   PASSWORD="${PASSWORD:-$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-16)}"
-  if [[ "$DOMAIN" =~ ^[0-9.]+$ ]]; then   # an IP cannot get a certificate: serve plain HTTP
-    PANEL_URL="http://$DOMAIN"; PANEL_FROM="http://$DOMAIN"
-  else
-    PANEL_URL="https://$DOMAIN"; PANEL_FROM="$DOMAIN"
-  fi
+  urls_for "$DOMAIN"
   umask 077
   cat > "$ENV_FILE" <<ENV
 PANEL_URL=$PANEL_URL
@@ -56,6 +56,10 @@ PANEL_ADMIN_PASSWORD=$PASSWORD
 PANEL_SECRET=$(openssl rand -hex 32)
 ENV
   NEW_INSTALL=1
+elif [ -n "$DOMAIN" ]; then
+  urls_for "$DOMAIN"
+  sed -i "s|^PANEL_URL=.*|PANEL_URL=$PANEL_URL|; s|^PANEL_FROM=.*|PANEL_FROM=$PANEL_FROM|" "$ENV_FILE"
+  echo "Address changed to $PANEL_URL (admin password unchanged)."
 fi
 
 if [ -z "${SKIP_DOCKER:-}" ]; then
