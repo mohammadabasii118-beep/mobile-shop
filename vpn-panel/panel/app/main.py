@@ -132,7 +132,7 @@ def user_out(user: User, request: Request) -> dict:
     return {
         "id": user.id, "name": user.name, "status": user.status(), "enabled": user.enabled,
         "used_gb": round(user.used_bytes / GB, 2), "quota_gb": round(user.quota_bytes / GB, 2),
-        "days_left": days_left, "protos": user.protos, "node_ids": user.node_ids,
+        "days_left": days_left, "expire_at": user.expire_at.isoformat() + "Z" if user.expire_at else None, "protos": user.protos, "node_ids": user.node_ids,
         "sub_url": f"{public_url(request)}/sub/{user.sub_token}",
     }
 
@@ -240,9 +240,12 @@ class UserIn(BaseModel):
 
 class UserPatch(BaseModel):
     enabled: bool | None = None
-    quota_gb: float | None = Field(default=None, ge=0)
-    days: int | None = Field(default=None, ge=0)
+    quota_gb: float | None = Field(default=None, ge=0)  # 0 = unlimited
+    days: int | None = Field(default=None, ge=0)  # expire this many days from now; 0 = never
+    extend_days: int | None = Field(default=None, ge=1, le=3650)  # renew: add to the current expiry
     reset_usage: bool = False
+    protos: list[str] | None = Field(default=None, min_length=1)
+    node_ids: list[int] | None = None
 
 
 @app.get("/api/users", dependencies=[Depends(require_admin)])
@@ -275,6 +278,18 @@ def patch_user(user_id: int, body: UserPatch, request: Request, db: Session = De
         user.quota_bytes = int(body.quota_gb * GB)
     if body.days is not None:
         user.expire_at = utcnow() + timedelta(days=body.days) if body.days else None
+    if body.extend_days:
+        if user.expire_at is None and body.days is None:
+            raise HTTPException(422, "این کاربر انقضا ندارد؛ برای تمدید ابتدا مدت را تعیین کنید")
+        base = max(user.expire_at, utcnow()) if user.expire_at else utcnow()  # expired users renew from today
+        user.expire_at = base + timedelta(days=body.extend_days)
+    if body.protos is not None:
+        if bad := [p for p in body.protos if p not in PROTOCOLS]:
+            raise HTTPException(422, f"پروتکل ناشناخته: {bad[0]}")
+        user.protos = body.protos
+    if body.node_ids is not None:
+        known = set(db.scalars(select(Node.id)))
+        user.node_ids = [i for i in body.node_ids if i in known]
     if body.reset_usage:
         user.used_bytes = 0
     db.commit()

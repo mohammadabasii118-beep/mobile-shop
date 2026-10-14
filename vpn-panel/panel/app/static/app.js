@@ -72,7 +72,7 @@ const views = {
         <td><div style="display:flex;gap:8px;align-items:center"><div class="bar"><i class="${loadCls(pc)}" style="width:${pc}%"></i></div><span class="muted">${fmtGB(u.used_gb)}/${u.quota_gb ? fmtGB(u.quota_gb) : '∞'} GB</span></div></td>
         <td>${u.days_left === null ? 'نامحدود' : u.days_left + ' روز'}</td><td>${u.protos.map(p => `<span class="cc">${esc(protoLabel(p))}</span>`).join('')}</td>
         <td><span class="pill ${st[0]}">${st[1]}</span></td>
-        <td><button class="btn sm" data-cfg="${u.id}">کانفیگ‌ها</button> <button class="btn sm" data-toggle="${u.id}">${u.enabled ? 'غیرفعال' : 'فعال'}</button> <button class="btn sm" data-deluser="${u.id}">حذف</button></td></tr>`; }).join('')
+        <td><button class="btn sm" data-cfg="${u.id}">کانفیگ‌ها</button> <button class="btn sm" data-edit="${u.id}">ویرایش</button> <button class="btn sm" data-toggle="${u.id}">${u.enabled ? 'غیرفعال' : 'فعال'}</button> <button class="btn sm" data-deluser="${u.id}">حذف</button></td></tr>`; }).join('')
         || '<tr><td colspan="6" class="muted">کاربری وجود ندارد.</td></tr>'}</tbody></table></div>`;
   },
 };
@@ -121,6 +121,23 @@ function cfDialog(n) {
       <label class="f">آی‌پی تمیز (اختیاری)<input type="text" id="cfAddr" value="${esc(n.cf_address)}" placeholder="104.16.x.x" dir="ltr"></label></div>
     <div class="note">در کلادفلر: رکورد A دامنه را به آی‌پی ${esc(n.address)} با ابر نارنجی بسازید، SSL/TLS را روی <b>Full</b> بگذارید (نه Strict)، و برای gRPC گزینه‌ی gRPC را در Network روشن کنید. فقط پورت‌های 443، 2053، 2083، 2087، 2096 و 8443 از کلادفلر رد می‌شوند.</div>
     <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="cfSave" data-id="${n.id}">ذخیره</button></div>`);
+}
+function editDialog(u) {
+  openModal(`<h2>ویرایش <span class="mono">${esc(u.name)}</span></h2>
+    <div class="note">${u.expire_at ? 'انقضا: ' + new Date(u.expire_at).toLocaleDateString('fa-IR') + ` (${u.days_left} روز مانده)` : 'بدون انقضا'}
+      · مصرف ${fmtGB(u.used_gb)} از ${u.quota_gb ? fmtGB(u.quota_gb) + ' GB' : 'نامحدود'}</div>
+    <div><div class="muted" style="margin-bottom:6px">تمدید</div><div class="chips">
+      ${[7, 30, 90].map(n => `<button class="btn sm" data-renew="${n}" data-id="${u.id}">+${n} روز</button>`).join('')}
+      <label><input type="checkbox" id="eReset" checked>ریست مصرف هنگام تمدید</label></div></div>
+    <div class="form">
+      <label class="f">حجم (GB، صفر = نامحدود)<input type="number" id="eQuota" value="${u.quota_gb}" min="0" step="any"></label>
+      <label class="f">انقضا از امروز (روز، صفر = نامحدود)<input type="number" id="eDays" value="${u.days_left ?? 0}" min="0"></label></div>
+    <div><div class="muted" style="margin-bottom:6px">لوکیشن‌ها (هیچ‌کدام = همه)</div><div class="chips" id="eNodes">
+      ${S.nodes.map(n => `<label><input type="checkbox" value="${n.id}" ${u.node_ids.includes(n.id) ? 'checked' : ''}>${esc(n.cc)} ${esc(n.name)}</label>`).join('')}</div></div>
+    <div><div class="muted" style="margin-bottom:6px">پروتکل‌ها</div><div class="chips" id="eProtos">
+      ${S.protos.map(p => `<label><input type="checkbox" value="${p.id}" ${u.protos.includes(p.id) ? 'checked' : ''}>${esc(p.label)}</label>`).join('')}</div></div>
+    <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap"><button class="btn sm" data-resetusage="${u.id}">ریست مصرف</button>
+      <span><button class="btn" data-close>انصراف</button> <button class="btn pri" id="eSave" data-id="${u.id}">ذخیره</button></span></div>`);
 }
 function userForm() {
   openModal(`<h2>کاربر جدید</h2><div class="form">
@@ -177,6 +194,20 @@ document.addEventListener('click', async e => {
       await refresh(); configsDialog(u.id);
     }
     else if (d.cfg) await configsDialog(+d.cfg);
+    else if (d.edit) editDialog(S.users.find(x => x.id === +d.edit));
+    else if (d.renew) {
+      await api('PATCH', '/users/' + d.id, {extend_days: +d.renew, reset_usage: $('#eReset').checked, enabled: true});
+      await refresh(); editDialog(S.users.find(x => x.id === +d.id)); toast(`${d.renew} روز تمدید شد`);
+    }
+    else if (d.resetusage) { await api('PATCH', '/users/' + d.resetusage, {reset_usage: true}); await refresh(); editDialog(S.users.find(x => x.id === +d.resetusage)); toast('مصرف صفر شد'); }
+    else if (t.id === 'eSave') {
+      const u = S.users.find(x => x.id === +d.id), checked = s => [...document.querySelectorAll(s + ' input:checked')].map(x => x.value);
+      const body = {protos: checked('#eProtos'), node_ids: checked('#eNodes').map(Number)};
+      const quota = +$('#eQuota').value || 0, days = +$('#eDays').value || 0;
+      if (quota !== u.quota_gb) body.quota_gb = quota;            // send only what changed, so an untouched
+      if (days !== (u.days_left ?? 0)) body.days = days;          // expiry is not reset by rounding
+      await api('PATCH', '/users/' + u.id, body); closeModal(); await refresh(); toast('ذخیره شد');
+    }
     else if (d.toggle) { const u = S.users.find(x => x.id === +d.toggle); await api('PATCH', '/users/' + u.id, {enabled: !u.enabled}); await refresh(); }
     else if (d.deluser) { await api('DELETE', '/users/' + d.deluser); await refresh(); toast('کاربر حذف شد'); }
     else if (d.copy) copy(d.copy);

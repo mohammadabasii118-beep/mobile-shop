@@ -234,3 +234,45 @@ def test_agent_port_rewrite():
     text = "tcp-port = 4443\nudp-port = 4443\nrun-as-user = nobody\n"
     out = agent.set_conf_value(agent.set_conf_value(text, "tcp-port", 5555), "udp-port", 5555)
     assert out == "tcp-port = 5555\nudp-port = 5555\nrun-as-user = nobody\n"
+
+
+def test_edit_and_renew_user():
+    with TestClient(app) as c:
+        h = admin(c)
+        u = c.post("/api/users", headers=h, json={"name": "renewme", "quota_gb": 1, "days": 10, "protos": ["vless"]}).json()
+        patch = lambda body: c.patch(f"/api/users/{u['id']}", headers=h, json=body)
+
+        r = patch({"extend_days": 30}).json()
+        assert r["days_left"] in (39, 40)
+        # an expired user renews from today, not from the old date
+        patch({"days": 1})
+        from app.db import Node, User, engine, utcnow
+        from datetime import timedelta
+        from sqlalchemy.orm import Session
+        with Session(engine) as db:
+            db.get(User, u["id"]).expire_at = utcnow() - timedelta(days=20)
+            db.commit()
+        assert c.get("/api/users", headers=h).json()[0]["status"] == "expired"
+        r = patch({"extend_days": 30, "enabled": True}).json()
+        assert r["status"] == "active" and r["days_left"] in (29, 30)
+
+        # usage reset together with renewal restores a user who hit the quota
+        c.post("/api/nodes", headers=h, json={"name": "Q", "cc": "us", "address": "q.example.com"})
+        with Session(engine) as db:
+            db.get(User, u["id"]).used_bytes = 2 * 1024 ** 3
+            db.commit()
+        assert next(x for x in c.get("/api/users", headers=h).json() if x["id"] == u["id"])["status"] == "quota"
+        r = patch({"extend_days": 1, "reset_usage": True}).json()
+        assert r["status"] == "active" and r["used_gb"] == 0
+
+        # edit protocols and nodes; unknown protocols and node ids are rejected / dropped
+        assert patch({"protos": ["nope"]}).status_code == 422
+        r = patch({"protos": ["vless", "wg"], "node_ids": [999999]}).json()
+        assert r["protos"] == ["vless", "wg"] and r["node_ids"] == []
+        r = patch({"quota_gb": 0}).json()
+        assert r["quota_gb"] == 0
+
+        # unlimited users cannot be "extended" without setting a term first
+        patch({"days": 0})
+        assert patch({"extend_days": 5}).status_code == 422
+        assert patch({"days": 3, "extend_days": 5}).json()["days_left"] in (7, 8)
