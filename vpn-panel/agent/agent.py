@@ -75,8 +75,11 @@ def render_xray(cfg, reality, tls, busy=frozenset()):
         "api": {"tag": "api", "services": ["StatsService"]},
         "policy": {"levels": {"0": {"statsUserUplink": True, "statsUserDownlink": True}}},
         "inbounds": inbounds,
-        "outbounds": [{"protocol": "freedom", "tag": "direct"}, {"protocol": "blackhole", "tag": "block"}],
-        "routing": {"rules": [{"type": "field", "inboundTag": ["api"], "outboundTag": "api"}]},
+        # `direct` stays first: it is the default outbound. Panel-defined outbounds and rules come after.
+        "outbounds": [{"protocol": "freedom", "tag": "direct"}, {"protocol": "blackhole", "tag": "block"}]
+                     + list(cfg.get("outbounds", [])),
+        "routing": {"rules": [{"type": "field", "inboundTag": ["api"], "outboundTag": "api"}]
+                    + list(cfg.get("rules", []))},
     }
 
 
@@ -488,11 +491,38 @@ def apply_port(path, values, service):
         restart(service)
 
 
+XRAY_CONFIG = "/usr/local/etc/xray/config.json"
+
+
+def install_xray_config(text, errors, test=None):
+    """Write the new Xray config only if Xray accepts it; a bad outbound or rule must not take every inbound down.
+    A rejected config is reported through `errors` and the running one is kept. True when restart is needed."""
+    if read_text(XRAY_CONFIG) == text:
+        return False
+    candidate = os.path.join(STATE_DIR, "xray.candidate.json")
+    write_if_changed(candidate, text, 0o600)
+    ok, why = (test or xray_test)(candidate)
+    if not ok:
+        errors.append("xray config rejected, previous one kept: " + why)
+        return False
+    return write_if_changed(XRAY_CONFIG, text, 0o644)
+
+
+def xray_test(path):
+    import shutil
+    if not shutil.which("xray"):
+        return True, ""
+    r = sh("xray", "run", "-test", "-config", path)
+    last = [l for l in (r.stdout + r.stderr).strip().splitlines() if "deprecated" not in l]
+    return r.returncode == 0, (last[-1] if last else "")[-260:]
+
+
 def apply(cfg, reality, tls, wg):
     """Write configs and restart what changed. Returns the port conflicts found."""
     tcp_busy, udp_busy, conflicts = port_conflicts(cfg, foreign_listeners(sh("ss", "-H", "-ltnup").stdout))
+    errors = []
     xray_cfg = json.dumps(render_xray(cfg, reality, tls, tcp_busy), indent=1)
-    if write_if_changed("/usr/local/etc/xray/config.json", xray_cfg, 0o644):
+    if install_xray_config(xray_cfg, errors):
         restart("xray")
     if write_if_changed("/etc/sing-box/config.json", json.dumps(render_singbox(cfg, tls, udp_busy), indent=1), 0o644):
         restart("sing-box")
@@ -526,7 +556,7 @@ def apply(cfg, reality, tls, wg):
                                            "udp-port": cfg["protocols"].get("anyc")}, "ocserv")
     write_if_changed("/etc/vpn-node/ovpn-users", render_ovpn_users(cfg), 0o644)  # checked per login
     write_if_changed("/etc/ocserv/ocpasswd", render_ocpasswd(cfg, crypt_hash), 0o600)  # checked per login
-    return conflicts
+    return conflicts, errors
 
 
 def cert_sha256(path):
@@ -559,14 +589,14 @@ def main():
         try:
             cfg = api(conf, "GET", "/api/node/config")
             self_update(conf, cfg.get("agent_sha256"))
-            conflicts = apply(cfg, reality, tls, wg)
+            conflicts, errors = apply(cfg, reality, tls, wg)
             for src in (xray_usage(), wg_usage(cfg) if wg else {}, session_usage()):
                 for k, v in src.items():
                     pending[k] = pending.get(k, 0) + v
             api(conf, "POST", "/api/node/report", {
                 "load": cpu_load_percent(), "usage": pending, "reality_pub": reality["public"],
                 "reality_sid": reality["short_id"], "tls_self_signed": conf.get("tls_self_signed", True), "tls_pin": cert_sha256(tls["cert"]),
-                "conflicts": conflicts, "wg_pub": wg["public"] if wg else "", "ovpn_ca": read_text(f"{STATE_DIR}/ovpn/ca.crt")})
+                "conflicts": conflicts, "errors": errors, "wg_pub": wg["public"] if wg else "", "ovpn_ca": read_text(f"{STATE_DIR}/ovpn/ca.crt")})
             pending = {}  # kept in memory until the panel accepted the report
         except Exception as e:  # keep running; the panel may be briefly unreachable
             print("agent error:", e, file=sys.stderr, flush=True)

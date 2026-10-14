@@ -107,7 +107,10 @@ def test_one(xray, outbound):
             return False, "client config rejected: " + proc.stdout.read().strip().splitlines()[-1][:160]
         r = subprocess.run(["curl", "-s", "-o", "/dev/null", "-m", "12", "-w", "%{http_code}"]
                            + (["-k"] if os.environ.get("SELFTEST_INSECURE") else []) + [
-                            "--socks5-hostname", f"127.0.0.1:{port}", TEST_URL], capture_output=True, text=True)
+                            "--socks5-hostname", f"127.0.0.1:{port}", TEST_URL], capture_output=True, text=True,
+                           # a no_proxy that lists the target (e.g. 127.0.0.1) makes curl skip the proxy and the test
+                           # would pass without ever touching the tunnel
+                           env={**os.environ, "no_proxy": "", "NO_PROXY": ""})
         if r.stdout.strip() == "204":
             return True, "ok"
         proc.terminate()

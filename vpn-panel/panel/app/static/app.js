@@ -1,7 +1,7 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null};
-const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', users: 'کاربران'};
+const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null};
+const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', routing: 'مسیریابی', users: 'کاربران'};
 const STATUS = {active: ['good', 'فعال'], disabled: ['bad', 'غیرفعال'], expired: ['bad', 'منقضی'], quota: ['bad', 'حجم تمام شده']};
 
 let token = ''; try { token = localStorage.getItem('tok') || ''; } catch (e) {}
@@ -52,7 +52,7 @@ const views = {
     return `<div class="panel scroll"><table><thead><tr><th>لوکیشن</th><th>آدرس</th><th>بار</th><th>آخرین گزارش</th><th>وضعیت</th><th></th></tr></thead><tbody>
       ${S.nodes.map(n => `<tr><td><span class="cc">${esc(n.cc)}</span>${esc(n.name)}</td><td class="mono">${esc(n.address)}</td>
         <td>${n.online ? n.load + '%' : '—'}</td><td>${n.last_seen ? new Date(n.last_seen).toLocaleString('fa-IR') : 'هنوز وصل نشده'}</td>
-        <td><span class="pill ${n.online ? 'good' : 'warn'}">${n.online ? 'آنلاین' : 'آفلاین'}</span>${n.conflicts.length ? `<br><span class="pill bad wrap" title="پورتی که برنامه‌ی دیگری گرفته؛ آن پروتکل روی این نود بالا نمی‌آید. پورت را در بخش پروتکل‌ها ← پورت‌ها عوض کنید.">تداخل پورت: ${esc(n.conflicts.join('، '))}</span>` : ''}</td>
+        <td><span class="pill ${n.online ? 'good' : 'warn'}">${n.online ? 'آنلاین' : 'آفلاین'}</span>${(n.errors || []).length ? `<br><span class="pill bad wrap">خطا: ${esc(n.errors.join('، '))}</span>` : ''}${n.conflicts.length ? `<br><span class="pill bad wrap" title="پورتی که برنامه‌ی دیگری گرفته؛ آن پروتکل روی این نود بالا نمی‌آید. پورت را در بخش پروتکل‌ها ← پورت‌ها عوض کنید.">تداخل پورت: ${esc(n.conflicts.join('، '))}</span>` : ''}</td>
         <td><div class="chips"><button class="btn sm" data-install="${n.id}">دستور نصب</button> <button class="btn sm" data-reality="${n.id}">Reality</button> <button class="btn sm" data-cf="${n.id}">کلادفلر${n.cf_domain ? ' ✓' : ''}</button> <button class="btn sm" data-delnode="${n.id}">حذف</button></div></td></tr>`).join('')
         || '<tr><td colspan="6" class="muted">لوکیشنی وجود ندارد.</td></tr>'}</tbody></table></div>`;
   },
@@ -64,6 +64,31 @@ const views = {
           return `<td><input type="checkbox" data-node="${n.id}" data-proto="${p.id}" aria-label="${esc(p.label)} در ${esc(n.cc)}" ${np && np.enabled ? 'checked' : ''}></td>`; }).join('')}</tr>`).join('')}
       </tbody></table></div>
       ${portPanel()}`;
+  },
+  routing() {
+    if (!S.nodes.length) return '<div class="note">ابتدا یک لوکیشن اضافه کنید.</div>';
+    const n = nodeBy(S.routeNode) || S.nodes[0], R = S.routing && S.routing.nodeId === n.id ? S.routing.data : null;
+    const sel = `<div class="form"><label class="f">لوکیشن<select id="routeNode">${S.nodes.map(x => `<option value="${x.id}" ${x.id === n.id ? 'selected' : ''}>${esc(x.cc)} ${esc(x.name)}</option>`).join('')}</select></label></div>`;
+    if (!R) { loadRouting(n.id); return sel + '<p class="muted">در حال بارگذاری...</p>'; }
+    const label = id => (R.inbound_ids.find(i => i.id === id) || {label: id}).label;
+    const outName = o => o === 'direct' ? 'مستقیم (direct)' : o === 'block' ? 'مسدود (block)' : o;
+    const cond = r => [r.inbounds.length ? 'ورودی: ' + r.inbounds.map(label).join('، ') : '', r.ports ? 'پورت: ' + r.ports : '',
+      r.domains.length ? 'دامنه: ' + r.domains.join('، ') : '', r.ips.length ? 'آی‌پی: ' + r.ips.join('، ') : ''].filter(Boolean).join(' · ');
+    return `${sel}
+      <div class="note">قانون‌ها به ترتیب بررسی می‌شوند و اولین قانونی که بخورد، ترافیک را از خروجی خودش رد می‌کند. بقیه‌ی ترافیک مستقیم می‌رود. فقط ورودی‌های Xray (VLESS، VMess، Trojan، Shadowsocks) قابل مسیریابی‌اند. هر قانون را می‌توانید برای مواقع ضروری روشن یا خاموش کنید.</div>
+      <div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><h2>خروجی‌ها</h2><button class="btn sm pri" data-rt-addout>+ خروجی جدید</button></div>
+        <div class="scroll"><table><thead><tr><th>نام</th><th>نوع</th><th>مقصد</th><th></th></tr></thead><tbody>
+        <tr><td class="mono">direct</td><td>داخلی</td><td class="muted">مستقیم به اینترنت (پیش‌فرض)</td><td></td></tr>
+        <tr><td class="mono">block</td><td>داخلی</td><td class="muted">مسدود کردن</td><td></td></tr>
+        ${R.outbounds.map(o => `<tr><td class="mono">${esc(o.name)}</td><td>${esc(o.kind)}</td><td class="mono">${esc(o.summary)}</td><td><button class="btn sm" data-rt-delout="${o.id}">حذف</button></td></tr>`).join('')}
+        </tbody></table></div></div>
+      <div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><h2>قانون‌های مسیریابی</h2><button class="btn sm pri" data-rt-addrule>+ قانون جدید</button></div>
+        <div class="scroll"><table><thead><tr><th>روشن</th><th>شرط</th><th>خروجی</th><th>یادداشت</th><th></th></tr></thead><tbody>
+        ${R.rules.map((r, i) => `<tr><td><input type="checkbox" data-rt-toggle="${r.id}" ${r.enabled ? 'checked' : ''} aria-label="روشن یا خاموش"></td>
+          <td style="white-space:normal;min-width:220px">${esc(cond(r))}</td><td class="mono">${esc(outName(r.outbound))}</td><td>${esc(r.note)}</td>
+          <td><button class="btn sm" data-rt-up="${r.id}" ${i === 0 ? 'disabled' : ''}>↑</button> <button class="btn sm" data-rt-down="${r.id}" ${i === R.rules.length - 1 ? 'disabled' : ''}>↓</button> <button class="btn sm" data-rt-delrule="${r.id}">حذف</button></td></tr>`).join('')
+          || '<tr><td colspan="5" class="muted">قانونی نیست؛ همه‌ی ترافیک مستقیم می‌رود.</td></tr>'}
+        </tbody></table></div></div>`;
   },
   users() {
     return `<div class="panel scroll"><table><thead><tr><th>کاربر</th><th>مصرف</th><th>انقضا</th><th>پروتکل‌ها</th><th>وضعیت</th><th></th></tr></thead><tbody>
@@ -148,6 +173,36 @@ function editDialog(u) {
     <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap"><button class="btn sm" data-resetusage="${u.id}">ریست مصرف</button>
       <span><button class="btn" data-close>انصراف</button> <button class="btn pri" id="eSave" data-id="${u.id}">ذخیره</button></span></div>`);
 }
+async function loadRouting(id) {
+  try { S.routing = {nodeId: id, data: await api('GET', `/nodes/${id}/routing`)}; render(); } catch (e) { if (e.message !== 'login') toast(e.message); }
+}
+function outboundDialog(kind = 'link') {
+  const f = (id, label, ph = '', type = 'text') => `<label class="f">${label}<input type="${type}" id="${id}" placeholder="${ph}" dir="ltr"></label>`;
+  const fields = {
+    link: f('oLink', 'لینک (vless:// vmess:// trojan:// ss://)', 'vless://...'),
+    socks: f('oAddr', 'آدرس سرور') + f('oPort', 'پورت', '1080', 'number') + f('oUser', 'نام کاربری (اختیاری)') + f('oPass', 'رمز (اختیاری)'),
+    http: f('oAddr', 'آدرس سرور') + f('oPort', 'پورت', '8080', 'number') + f('oUser', 'نام کاربری (اختیاری)') + f('oPass', 'رمز (اختیاری)'),
+    wireguard: f('oEndpoint', 'Endpoint (host:port)', 'engage.cloudflareclient.com:2408') + f('oSecret', 'کلید خصوصی') + f('oPub', 'کلید عمومی سرور')
+      + f('oLocal', 'آدرس داخلی', '172.16.0.2/32') + f('oReserved', 'Reserved (برای WARP، سه عدد)', '12, 34, 56'),
+  };
+  openModal(`<h2>خروجی جدید</h2><div class="form">
+    <label class="f">نام (حروف کوچک انگلیسی)<input type="text" id="oName" placeholder="warp" dir="ltr"></label>
+    <label class="f">نوع<select id="oKind">${[['link', 'لینک'], ['socks', 'SOCKS'], ['http', 'HTTP'], ['wireguard', 'WireGuard / WARP']].map(([k, l]) => `<option value="${k}" ${k === kind ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
+    <div class="form">${fields[kind]}</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="oSave">افزودن</button></div>`);
+}
+function ruleDialog() {
+  const R = S.routing.data;
+  openModal(`<h2>قانون مسیریابی جدید</h2>
+    <div><div class="muted" style="margin-bottom:6px">ورودی‌ها (هیچ‌کدام = همه‌ی ورودی‌های Xray)</div><div class="chips" id="rIn">
+      ${R.inbound_ids.map(i => `<label><input type="checkbox" value="${i.id}">${esc(i.label)}</label>`).join('')}</div></div>
+    <div class="form"><label class="f">پورت مقصد (مثل 443 یا 80,443 یا 8000-9000)<input type="text" id="rPorts" dir="ltr"></label>
+      <label class="f">خروجی<select id="rOut"><option value="direct">مستقیم (direct)</option><option value="block">مسدود (block)</option>${R.outbounds.map(o => `<option value="${esc(o.name)}">${esc(o.name)}</option>`).join('')}</select></label></div>
+    <div class="form"><label class="f">دامنه‌ها (هر خط یکی؛ مثل geosite:google یا domain:example.com)<textarea id="rDomains" rows="3" dir="ltr" style="background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:inherit;font:inherit"></textarea></label>
+      <label class="f">آی‌پی‌ها (هر خط یکی؛ مثل 1.2.3.0/24 یا geoip:ir)<textarea id="rIps" rows="3" dir="ltr" style="background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:inherit;font:inherit"></textarea></label></div>
+    <label class="f">یادداشت (اختیاری)<input type="text" id="rNote"></label>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="ruleSave">افزودن</button></div>`);
+}
 function userForm() {
   openModal(`<h2>کاربر جدید</h2><div class="form">
     <label class="f">نام کاربری<input type="text" id="fName" placeholder="ali_t"></label>
@@ -230,12 +285,37 @@ document.addEventListener('click', async e => {
     }
     else if (d.toggle) { const u = S.users.find(x => x.id === +d.toggle); await api('PATCH', '/users/' + u.id, {enabled: !u.enabled}); await refresh(); }
     else if (d.deluser) { await api('DELETE', '/users/' + d.deluser); await refresh(); toast('کاربر حذف شد'); }
+    else if ('rtAddout' in d) outboundDialog();
+    else if (t.id === 'oSave') {
+      const v = id => ($('#' + id) || {}).value || '', k = $('#oKind').value;
+      S.routing.data = await api('POST', `/nodes/${S.routing.nodeId}/outbounds`, {name: v('oName'), kind: k, link: v('oLink'), address: v('oAddr'),
+        port: +v('oPort') || 0, username: v('oUser'), password: v('oPass'), endpoint: v('oEndpoint'), secret_key: v('oSecret'),
+        public_key: v('oPub'), local_address: v('oLocal'), reserved: v('oReserved')});
+      closeModal(); render(); toast('خروجی افزوده شد');
+    }
+    else if (d.rtDelout) { S.routing.data = await api('DELETE', '/outbounds/' + d.rtDelout); render(); toast('خروجی و قانون‌های وابسته حذف شد'); }
+    else if ('rtAddrule' in d) ruleDialog();
+    else if (t.id === 'ruleSave') {
+      const lines = id => $('#' + id).value.split('\n').map(x => x.trim()).filter(Boolean);
+      S.routing.data = await api('POST', `/nodes/${S.routing.nodeId}/rules`, {inbounds: [...document.querySelectorAll('#rIn input:checked')].map(x => x.value),
+        ports: $('#rPorts').value.trim(), domains: lines('rDomains'), ips: lines('rIps'), outbound: $('#rOut').value, note: $('#rNote').value.trim()});
+      closeModal(); render(); toast('قانون افزوده شد؛ ظرف ۳۰ ثانیه روی نود اعمال می‌شود');
+    }
+    else if (d.rtDelrule) { S.routing.data = await api('DELETE', '/rules/' + d.rtDelrule); render(); }
+    else if (d.rtUp || d.rtDown) { S.routing.data = await api('PATCH', '/rules/' + (d.rtUp || d.rtDown), {move: d.rtUp ? 'up' : 'down'}); render(); }
     else if (d.copy) copy(d.copy);
     else if ('close' in d || t.id === 'modal') closeModal();
   } catch (err) { if (err.message !== 'login') toast(err.message); }
 });
 document.addEventListener('change', async e => {
   if (e.target.id === 'portNode') { S.portNode = +e.target.value; render(); return; }
+  if (e.target.id === 'routeNode') { S.routeNode = +e.target.value; S.routing = null; render(); return; }
+  if (e.target.id === 'oKind') { const keep = $('#oName').value; outboundDialog(e.target.value); $('#oName').value = keep; return; }
+  if (e.target.dataset.rtToggle) {
+    try { S.routing.data = await api('PATCH', '/rules/' + e.target.dataset.rtToggle, {enabled: e.target.checked}); render(); toast(e.target.checked ? 'قانون روشن شد' : 'قانون خاموش شد'); }
+    catch (err) { toast(err.message); }
+    return;
+  }
   const d = e.target.dataset; if (!d.proto) return;
   try { await api('PUT', `/nodes/${d.node}/protocols/${d.proto}`, {enabled: e.target.checked}); await refresh(); }
   catch (err) { toast(err.message); }

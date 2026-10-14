@@ -21,7 +21,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .catalog import PROTOCOLS, REALITY_SNI, SS_METHOD
-from .db import Node, NodeProtocol, User, engine, get_db, init_db, utcnow
+from .db import Node, NodeProtocol, Outbound, Rule, User, engine, get_db, init_db, utcnow
+from . import routing
 from .subpage import render_sub_page
 from .subscription import info_entries, new_wg_keypair, subscription_body, user_entries, user_ss_key, wg_ip
 
@@ -154,7 +155,7 @@ def node_out(node: Node, request: Request) -> dict:
     url = public_url(request)
     return {
         "id": node.id, "name": node.name, "cc": node.cc, "address": node.address,
-        "reality_sni": node.reality_sni or REALITY_SNI, "cf_domain": node.cf_domain, "cf_address": node.cf_address, "conflicts": node.conflicts or [], "port_range": list(PORT_RANGE),
+        "reality_sni": node.reality_sni or REALITY_SNI, "cf_domain": node.cf_domain, "cf_address": node.cf_address, "conflicts": node.conflicts or [], "errors": node.errors or [], "port_range": list(PORT_RANGE),
         "online": is_online(node), "load": node.load, "reality_ready": bool(node.reality_pub),
         "last_seen": node.last_seen.isoformat() + "Z" if node.last_seen else None,
         "protocols": [{"proto": p.proto, "enabled": p.enabled, "port": p.port,
@@ -280,6 +281,130 @@ def set_port(node_id: int, proto: str, body: PortIn, request: Request, db: Sessi
     np.port = port
     db.commit()
     return node_out(node, request)
+
+
+# ---------- outbounds and routing rules ----------
+class OutboundIn(BaseModel):
+    name: str
+    kind: str
+    link: str = ""
+    address: str = ""
+    port: int = 0
+    username: str = ""
+    password: str = ""
+    secret_key: str = ""
+    public_key: str = ""
+    endpoint: str = ""
+    local_address: str = ""
+    reserved: str = ""
+
+
+class RuleIn(BaseModel):
+    inbounds: list[str] = []
+    ports: str = ""
+    domains: list[str] = Field(default=[], max_length=100)
+    ips: list[str] = Field(default=[], max_length=100)
+    outbound: str = "direct"
+    note: str = Field(default="", max_length=120)
+
+
+def routing_out(node: Node) -> dict:
+    return {"inbound_ids": [{"id": i, "label": PROTOCOLS[i]["label"]} for i in routing.INBOUND_IDS],
+            "outbounds": [{"id": o.id, "name": o.name, "kind": o.kind, "summary": o.data.get("summary", "")}
+                          for o in node.outbounds],
+            "rules": [{"id": r.id, "enabled": r.enabled, "inbounds": r.inbounds, "ports": r.ports,
+                       "domains": r.domains, "ips": r.ips, "outbound": r.outbound, "note": r.note}
+                      for r in sorted(node.rules, key=lambda x: (x.position, x.id))]}
+
+
+@app.get("/api/nodes/{node_id}/routing", dependencies=[Depends(require_admin)])
+def get_routing(node_id: int, db: Session = Depends(get_db)):
+    return routing_out(db.get(Node, node_id) or _404())
+
+
+@app.post("/api/nodes/{node_id}/outbounds", dependencies=[Depends(require_admin)])
+def add_outbound(node_id: int, body: OutboundIn, db: Session = Depends(get_db)):
+    node = db.get(Node, node_id) or _404()
+    name = body.name.strip().lower()
+    if not routing.NAME.match(name) or name in routing.BUILTIN or name == "api":
+        raise HTTPException(422, "نام فقط حروف کوچک انگلیسی، عدد و خط تیره (حداکثر ۲۴ حرف) و غیر از direct/block/api")
+    if any(o.name == name for o in node.outbounds):
+        raise HTTPException(409, "این نام قبلاً وجود دارد")
+    try:
+        xray, summary = routing.build_outbound(body.kind, body.model_dump())
+    except (ValueError, TypeError) as e:
+        raise HTTPException(422, str(e))
+    db.add(Outbound(node_id=node.id, name=name, kind=body.kind, data={"xray": xray, "summary": summary}))
+    db.commit()
+    db.refresh(node)
+    return routing_out(node)
+
+
+@app.delete("/api/outbounds/{outbound_id}", dependencies=[Depends(require_admin)])
+def delete_outbound(outbound_id: int, db: Session = Depends(get_db)):
+    ob = db.get(Outbound, outbound_id) or _404()
+    node = db.get(Node, ob.node_id)
+    for r in list(node.rules):
+        if r.outbound == ob.name:  # a rule pointing nowhere would silently stop matching
+            db.delete(r)
+    db.delete(ob)
+    db.commit()
+    db.refresh(node)
+    return routing_out(node)
+
+
+@app.post("/api/nodes/{node_id}/rules", dependencies=[Depends(require_admin)])
+def add_rule(node_id: int, body: RuleIn, db: Session = Depends(get_db)):
+    node = db.get(Node, node_id) or _404()
+    ports = body.ports.replace(" ", "")
+    domains = [x.strip() for x in body.domains if x.strip()]
+    ips = [x.strip() for x in body.ips if x.strip()]
+    try:
+        routing.validate_rule(body.inbounds, ports, domains, ips)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    if body.outbound not in routing.BUILTIN and body.outbound not in {o.name for o in node.outbounds}:
+        raise HTTPException(422, "خروجی انتخاب‌شده وجود ندارد")
+    last = max((r.position for r in node.rules), default=0)
+    db.add(Rule(node_id=node.id, position=last + 1, inbounds=body.inbounds, ports=ports, domains=domains, ips=ips,
+                outbound=body.outbound, note=body.note.strip()))
+    db.commit()
+    db.refresh(node)
+    return routing_out(node)
+
+
+class RulePatch(BaseModel):
+    enabled: bool | None = None
+    move: str | None = Field(default=None, pattern="^(up|down)$")
+
+
+@app.patch("/api/rules/{rule_id}", dependencies=[Depends(require_admin)])
+def patch_rule(rule_id: int, body: RulePatch, db: Session = Depends(get_db)):
+    rule = db.get(Rule, rule_id) or _404()
+    node = db.get(Node, rule.node_id)
+    if body.enabled is not None:
+        rule.enabled = body.enabled
+    if body.move:
+        ordered = sorted(node.rules, key=lambda x: (x.position, x.id))
+        i = ordered.index(rule)
+        j = i - 1 if body.move == "up" else i + 1
+        if 0 <= j < len(ordered):
+            ordered[i], ordered[j] = ordered[j], ordered[i]
+        for pos, r in enumerate(ordered, 1):
+            r.position = pos
+    db.commit()
+    db.refresh(node)
+    return routing_out(node)
+
+
+@app.delete("/api/rules/{rule_id}", dependencies=[Depends(require_admin)])
+def delete_rule(rule_id: int, db: Session = Depends(get_db)):
+    rule = db.get(Rule, rule_id) or _404()
+    node = db.get(Node, rule.node_id)
+    db.delete(rule)
+    db.commit()
+    db.refresh(node)
+    return routing_out(node)
 
 
 class UserIn(BaseModel):
@@ -409,7 +534,8 @@ def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db
                           "ss_key": user_ss_key(u.uuid), "wg_pub": u.wg_public,
                           "wg_ip": wg_ip(u.id), "protos": protos})
     agent_sha = hashlib.sha256((ROOT / "agent" / "agent.py").read_bytes()).hexdigest()
-    return {"agent_sha256": agent_sha,
+    outbounds, rules = routing.node_routing(node.outbounds, node.rules)
+    return {"agent_sha256": agent_sha, "outbounds": outbounds, "rules": rules,
             "node": {"name": node.name, "reality_sni": node.reality_sni or REALITY_SNI, "ss_method": SS_METHOD,
                      "ss_key": node.ss_key, "l2tp_psk": node.l2tp_psk},
             "protocols": enabled, "users": users}
@@ -425,12 +551,14 @@ class Report(BaseModel):
     wg_pub: str = ""
     ovpn_ca: str = ""
     conflicts: list[str] = Field(default=[], max_length=50)
+    errors: list[str] = Field(default=[], max_length=20)
 
 
 @app.post("/api/node/report")
 def node_report(body: Report, node: Node = Depends(require_node), db: Session = Depends(get_db)):
     node.last_seen, node.load = utcnow(), body.load
     node.conflicts = [c[:120] for c in body.conflicts]
+    node.errors = [e[:300] for e in body.errors]
     node.tls_self_signed = body.tls_self_signed
     node.tls_pin = body.tls_pin or node.tls_pin
     if body.reality_pub:

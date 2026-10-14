@@ -35,10 +35,38 @@ class Node(Base):
     reality_sni: Mapped[str] = mapped_column(default="www.apple.com")  # camouflage site for Reality
     cf_domain: Mapped[str] = mapped_column(default="")
     cf_address: Mapped[str] = mapped_column(default="")
+    errors: Mapped[list] = mapped_column(JSON, default=list)  # configs the agent rejected, from the agent
     wg_pub: Mapped[str] = mapped_column(default="")
     ovpn_ca: Mapped[str] = mapped_column(default="")
     protocols: Mapped[list["NodeProtocol"]] = relationship(
         cascade="all, delete-orphan", order_by="NodeProtocol.id")
+    outbounds: Mapped[list["Outbound"]] = relationship(cascade="all, delete-orphan", order_by="Outbound.id")
+    rules: Mapped[list["Rule"]] = relationship(cascade="all, delete-orphan", order_by="Rule.position, Rule.id")
+
+
+class Outbound(Base):
+    """Where a node can send traffic instead of straight to the internet (a proxy, WARP, another server)."""
+    __tablename__ = "outbounds"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    node_id: Mapped[int] = mapped_column(ForeignKey("nodes.id"))
+    name: Mapped[str]  # tag is "out-" + name
+    kind: Mapped[str]  # link | socks | http | wireguard
+    data: Mapped[dict] = mapped_column(JSON, default=dict)  # {"xray": outbound dict, "summary": str}
+
+
+class Rule(Base):
+    """Send matching traffic of a node through an outbound (Xray routing rule). Evaluated in `position` order."""
+    __tablename__ = "rules"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    node_id: Mapped[int] = mapped_column(ForeignKey("nodes.id"))
+    position: Mapped[int] = mapped_column(default=0)
+    enabled: Mapped[bool] = mapped_column(default=True)
+    inbounds: Mapped[list] = mapped_column(JSON, default=list)  # our protocol ids, e.g. "vless"
+    ports: Mapped[str] = mapped_column(default="")  # destination ports "443,8000-9000"
+    domains: Mapped[list] = mapped_column(JSON, default=list)
+    ips: Mapped[list] = mapped_column(JSON, default=list)
+    outbound: Mapped[str] = mapped_column(default="direct")  # direct | block | an Outbound name
+    note: Mapped[str] = mapped_column(default="")
 
 
 class NodeProtocol(Base):

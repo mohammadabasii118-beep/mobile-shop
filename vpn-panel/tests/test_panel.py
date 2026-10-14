@@ -629,3 +629,71 @@ def test_ocserv_gets_the_occtl_switch():
     assert agent.ensure_conf_line(str(path), "use-occtl", "true") is True      # an old node's file is repaired
     assert agent.ensure_conf_line(str(path), "use-occtl", "true") is False
     assert "use-occtl = true" in path.read_text()
+
+
+def test_outbounds_and_routing_rules_reach_the_node_config():
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "Route", "cc": "de", "address": "6.6.6.6"}).json()
+        nh = {"Authorization": "Bearer " + node["install_command"].split("--token ")[1].split()[0]}
+        base = f"/api/nodes/{node['id']}"
+        assert c.get(f"{base}/routing", headers=h).json()["outbounds"] == []
+
+        # outbounds: validation, creation, secrets stay out of the listing
+        assert c.post(f"{base}/outbounds", headers=h, json={"name": "Direct", "kind": "socks", "address": "1.1.1.1", "port": 1}).status_code == 422
+        assert c.post(f"{base}/outbounds", headers=h, json={"name": "bad", "kind": "link", "link": "hysteria2://x@h:1"}).status_code == 422
+        assert c.post(f"{base}/outbounds", headers=h, json={"name": "up", "kind": "socks", "address": "not a host!", "port": 1}).status_code == 422
+        r = c.post(f"{base}/outbounds", headers=h, json={"name": "up", "kind": "socks", "address": "9.9.9.9", "port": 1080,
+                                                          "username": "u", "password": "secret-pw"}).json()
+        assert r["outbounds"][0]["summary"] == "socks → 9.9.9.9:1080" and "secret-pw" not in json.dumps(r)
+        assert c.post(f"{base}/outbounds", headers=h, json={"name": "up", "kind": "socks", "address": "9.9.9.9", "port": 1}).status_code == 409
+        link = "vless://11111111-1111-1111-1111-111111111111@5.6.7.8:443?encryption=none&security=reality&sni=www.apple.com&fp=chrome&pbk=AAAA&sid=ab&type=tcp&flow=xtls-rprx-vision#x"
+        assert c.post(f"{base}/outbounds", headers=h, json={"name": "second", "kind": "link", "link": link}).json()["outbounds"][1]["summary"] == "vless → 5.6.7.8:443"
+
+        # rules: a condition is required, ports and outbounds are checked
+        post = lambda body: c.post(f"{base}/rules", headers=h, json=body)
+        assert post({"outbound": "direct"}).status_code == 422
+        assert post({"ports": "99999", "outbound": "block"}).status_code == 422
+        assert post({"ports": "80;443", "outbound": "block"}).status_code == 422
+        assert post({"inbounds": ["wg"], "outbound": "block"}).status_code == 422        # not an Xray inbound
+        assert post({"ports": "443", "outbound": "ghost"}).status_code == 422
+        assert post({"ports": "25", "outbound": "block", "note": "no smtp"}).status_code == 200
+        assert post({"inbounds": ["vless", "trojan"], "domains": ["geosite:google"], "outbound": "up"}).status_code == 200
+        assert post({"ips": ["geoip:ir"], "ports": "8000-9000", "outbound": "second"}).status_code == 200
+
+        cfg = c.get("/api/node/config", headers=nh).json()
+        assert [o["tag"] for o in cfg["outbounds"]] == ["out-up", "out-second"]
+        assert cfg["outbounds"][0]["protocol"] == "socks"
+        assert cfg["rules"][0] == {"type": "field", "outboundTag": "block", "port": "25"}
+        assert cfg["rules"][1] == {"type": "field", "outboundTag": "out-up", "inboundTag": ["vless", "trojan"], "domain": ["geosite:google"]}
+        assert cfg["rules"][2]["ip"] == ["geoip:ir"] and cfg["rules"][2]["port"] == "8000-9000"
+
+        # order, switch, and deleting an outbound removes the rules that used it
+        rules = c.get(f"{base}/routing", headers=h).json()["rules"]
+        c.patch(f"/api/rules/{rules[2]['id']}", headers=h, json={"move": "up"})
+        assert [r["outboundTag"] for r in c.get("/api/node/config", headers=nh).json()["rules"]] == ["block", "out-second", "out-up"]
+        c.patch(f"/api/rules/{rules[0]['id']}", headers=h, json={"enabled": False})
+        assert "block" not in [r["outboundTag"] for r in c.get("/api/node/config", headers=nh).json()["rules"]]
+        out_id = c.get(f"{base}/routing", headers=h).json()["outbounds"][0]["id"]
+        left = c.delete(f"/api/outbounds/{out_id}", headers=h).json()
+        assert [o["name"] for o in left["outbounds"]] == ["second"] and all(r["outbound"] != "up" for r in left["rules"])
+
+
+def test_agent_adds_routing_and_keeps_the_old_config_when_xray_rejects_it():
+    cfg = sample_cfg()
+    cfg["outbounds"] = [{"tag": "out-up", "protocol": "socks", "settings": {"servers": [{"address": "9.9.9.9", "port": 1080}]}}]
+    cfg["rules"] = [{"type": "field", "outboundTag": "out-up", "port": "443"}]
+    x = agent.render_xray(cfg, {"private": "P", "short_id": "ab"}, {"cert": "/c", "key": "/k"})
+    assert [o["tag"] for o in x["outbounds"]] == ["direct", "block", "out-up"]          # direct stays the default
+    assert x["routing"]["rules"][0]["outboundTag"] == "api" and x["routing"]["rules"][1]["port"] == "443"   # api rule first
+
+    root = Path(tempfile.mkdtemp())
+    agent.XRAY_CONFIG, agent.STATE_DIR = str(root / "config.json"), str(root)
+    (root / "config.json").write_text("OLD")
+    errors = []
+    assert agent.install_xray_config("NEW", errors, test=lambda p: (False, "bad outbound")) is False
+    assert (root / "config.json").read_text() == "OLD" and "previous one kept: bad outbound" in errors[0]
+    assert agent.install_xray_config("NEW", errors, test=lambda p: (True, "")) is True
+    assert (root / "config.json").read_text() == "NEW"
+    assert agent.install_xray_config("NEW", errors, test=lambda p: (False, "never asked")) is False   # unchanged: no test, no restart
+    assert len(errors) == 1
