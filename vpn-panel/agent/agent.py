@@ -423,6 +423,16 @@ def apply(cfg, reality, tls, wg):
     return conflicts
 
 
+def cert_sha256(path):
+    """SHA-256 (hex) of the first certificate in a PEM file: what clients pin for a self-signed node."""
+    import ssl
+    try:
+        pem = open(path).read().split("-----END CERTIFICATE-----")[0] + "-----END CERTIFICATE-----\n"
+        return hashlib.sha256(ssl.PEM_cert_to_DER_cert(pem)).hexdigest()
+    except (OSError, ValueError):
+        return ""
+
+
 def read_text(path):
     try:
         with open(path) as f:
@@ -449,7 +459,7 @@ def main():
                     pending[k] = pending.get(k, 0) + v
             api(conf, "POST", "/api/node/report", {
                 "load": cpu_load_percent(), "usage": pending, "reality_pub": reality["public"],
-                "reality_sid": reality["short_id"], "tls_self_signed": conf.get("tls_self_signed", True),
+                "reality_sid": reality["short_id"], "tls_self_signed": conf.get("tls_self_signed", True), "tls_pin": cert_sha256(tls["cert"]),
                 "conflicts": conflicts, "wg_pub": wg["public"] if wg else "", "ovpn_ca": read_text(f"{STATE_DIR}/ovpn/ca.crt")})
             pending = {}  # kept in memory until the panel accepted the report
         except Exception as e:  # keep running; the panel may be briefly unreachable

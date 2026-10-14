@@ -393,6 +393,7 @@ class Report(BaseModel):
     reality_pub: str = ""
     reality_sid: str = ""
     tls_self_signed: bool = True
+    tls_pin: str = Field(default="", max_length=128, pattern=r"^[0-9a-fA-F]*$")
     wg_pub: str = ""
     ovpn_ca: str = ""
     conflicts: list[str] = Field(default=[], max_length=50)
@@ -403,6 +404,7 @@ def node_report(body: Report, node: Node = Depends(require_node), db: Session = 
     node.last_seen, node.load = utcnow(), body.load
     node.conflicts = [c[:120] for c in body.conflicts]
     node.tls_self_signed = body.tls_self_signed
+    node.tls_pin = body.tls_pin or node.tls_pin
     if body.reality_pub:
         node.reality_pub, node.reality_sid = body.reality_pub, body.reality_sid
     node.wg_pub, node.ovpn_ca = body.wg_pub or node.wg_pub, body.ovpn_ca or node.ovpn_ca

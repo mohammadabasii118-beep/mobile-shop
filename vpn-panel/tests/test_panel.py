@@ -465,3 +465,21 @@ def test_self_signed_tls_links_carry_insecure_flags():
         assert vm["allowInsecure"] == 1 and vm["insecure"] == "1"
         for proto in ("vless_ws", "trojan"):
             assert "allowInsecure=1&insecure=1" in rows[proto]["link"]
+
+
+def test_links_pin_the_self_signed_certificate():
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "Pin", "cc": "de", "address": "8.8.4.4"}).json()
+        nh = {"Authorization": "Bearer " + node["install_command"].split("--token ")[1].split()[0]}
+        c.post("/api/node/report", headers=nh, json={"tls_pin": "ab" * 32, "tls_self_signed": True})
+        user = c.post("/api/users", headers=h, json={"name": "pinned", "protos": ["vless_ws", "vmess_ws", "trojan"],
+                                                      "node_ids": [node["id"]]}).json()
+        rows = {e["proto"]: e for e in c.get(f"/api/users/{user['id']}/configs", headers=h).json()}
+        assert "&pcs=" + "ab" * 32 in rows["vless_ws"]["link"] and "&pcs=" + "ab" * 32 in rows["trojan"]["link"]
+        assert json.loads(base64.b64decode(rows["vmess_ws"]["link"][8:]))["pcs"] == "ab" * 32
+        # a real certificate (not self-signed) needs no pin
+        c.post("/api/node/report", headers=nh, json={"tls_self_signed": False})
+        rows = {e["proto"]: e for e in c.get(f"/api/users/{user['id']}/configs", headers=h).json()}
+        assert "pcs=" not in rows["trojan"]["link"] and "insecure" not in rows["trojan"]["link"]
+        assert c.post("/api/node/report", headers=nh, json={"tls_pin": "not hex!"}).status_code == 422
