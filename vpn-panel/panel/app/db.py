@@ -30,6 +30,8 @@ class Node(Base):
     reality_pub: Mapped[str] = mapped_column(default="")
     reality_sid: Mapped[str] = mapped_column(default="")
     tls_self_signed: Mapped[bool] = mapped_column(default=True)
+    cf_domain: Mapped[str] = mapped_column(default="")
+    cf_address: Mapped[str] = mapped_column(default="")
     wg_pub: Mapped[str] = mapped_column(default="")
     ovpn_ca: Mapped[str] = mapped_column(default="")
     protocols: Mapped[list["NodeProtocol"]] = relationship(

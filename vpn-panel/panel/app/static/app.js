@@ -53,7 +53,7 @@ const views = {
       ${S.nodes.map(n => `<tr><td><span class="cc">${esc(n.cc)}</span>${esc(n.name)}</td><td class="mono">${esc(n.address)}</td>
         <td>${n.online ? n.load + '%' : '—'}</td><td>${n.last_seen ? new Date(n.last_seen).toLocaleString('fa-IR') : 'هنوز وصل نشده'}</td>
         <td><span class="pill ${n.online ? 'good' : 'warn'}">${n.online ? 'آنلاین' : 'آفلاین'}</span></td>
-        <td><button class="btn sm" data-install="${n.id}">دستور نصب</button> <button class="btn sm" data-delnode="${n.id}">حذف</button></td></tr>`).join('')
+        <td><button class="btn sm" data-install="${n.id}">دستور نصب</button> <button class="btn sm" data-cf="${n.id}">کلادفلر${n.cf_domain ? ' ✓' : ''}</button> <button class="btn sm" data-delnode="${n.id}">حذف</button></td></tr>`).join('')
         || '<tr><td colspan="6" class="muted">لوکیشنی وجود ندارد.</td></tr>'}</tbody></table></div>`;
   },
   protos() {
@@ -98,6 +98,15 @@ function installDialog(n) {
     <pre>${esc(n.install_command)}</pre>
     <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-copy="${esc(n.install_command)}">کپی دستور</button><button class="btn pri" data-close>بستن</button></div>`);
 }
+function cfDialog(n) {
+  openModal(`<h2>کلادفلر برای ${esc(n.name)}</h2>
+    <p class="muted" style="margin:0">برای VLESS/VMess/Trojan با WebSocket و VLESS با gRPC ورودی جداگانه‌ی «Cloudflare» ساخته می‌شود. خالی بگذارید تا غیرفعال شود.</p>
+    <div class="form">
+      <label class="f">دامنه (پروکسی‌شده در کلادفلر، ابر نارنجی)<input type="text" id="cfDomain" value="${esc(n.cf_domain)}" placeholder="cdn.example.com" dir="ltr"></label>
+      <label class="f">آی‌پی تمیز (اختیاری)<input type="text" id="cfAddr" value="${esc(n.cf_address)}" placeholder="104.16.x.x" dir="ltr"></label></div>
+    <div class="note">در کلادفلر: رکورد A دامنه را به آی‌پی ${esc(n.address)} با ابر نارنجی بسازید، SSL/TLS را روی <b>Full</b> بگذارید (نه Strict)، و برای gRPC گزینه‌ی gRPC را در Network روشن کنید. فقط پورت‌های 443، 2053، 2083، 2087، 2096 و 8443 از کلادفلر رد می‌شوند.</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="cfSave" data-id="${n.id}">ذخیره</button></div>`);
+}
 function userForm() {
   openModal(`<h2>کاربر جدید</h2><div class="form">
     <label class="f">نام کاربری<input type="text" id="fName" placeholder="ali_t"></label>
@@ -137,6 +146,8 @@ document.addEventListener('click', async e => {
       await refresh(); installDialog(n);
     }
     else if (d.install) installDialog(nodeBy(+d.install));
+    else if (d.cf) cfDialog(nodeBy(+d.cf));
+    else if (t.id === 'cfSave') { await api('PUT', `/nodes/${d.id}/cloudflare`, {cf_domain: $('#cfDomain').value.trim(), cf_address: $('#cfAddr').value.trim()}); closeModal(); await refresh(); toast('ذخیره شد'); }
     else if (d.delnode) { await api('DELETE', '/nodes/' + d.delnode); closeModal(); await refresh(); toast('لوکیشن حذف شد'); }
     else if (t.id === 'addUser') userForm();
     else if (t.id === 'fSave') {

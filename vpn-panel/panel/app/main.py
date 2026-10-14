@@ -104,6 +104,7 @@ def node_out(node: Node, request: Request) -> dict:
     url = public_url(request)
     return {
         "id": node.id, "name": node.name, "cc": node.cc, "address": node.address,
+        "cf_domain": node.cf_domain, "cf_address": node.cf_address,
         "online": is_online(node), "load": node.load, "reality_ready": bool(node.reality_pub),
         "last_seen": node.last_seen.isoformat() + "Z" if node.last_seen else None,
         "protocols": [{"proto": p.proto, "enabled": p.enabled, "port": p.port} for p in node.protocols],
@@ -148,6 +149,19 @@ def create_node(body: NodeIn, request: Request, db: Session = Depends(get_db)):
                 l2tp_psk=secrets.token_urlsafe(12))
     ensure_protocols(node)
     db.add(node)
+    db.commit()
+    return node_out(node, request)
+
+
+class NodeCdn(BaseModel):
+    cf_domain: str = Field(default="", pattern=r"^([A-Za-z0-9\-]+\.)+[A-Za-z]{2,}$|^$")
+    cf_address: str = Field(default="", pattern=r"^[A-Za-z0-9.\-]{0,253}$")
+
+
+@app.put("/api/nodes/{node_id}/cloudflare", dependencies=[Depends(require_admin)])
+def set_cloudflare(node_id: int, body: NodeCdn, request: Request, db: Session = Depends(get_db)):
+    node = db.get(Node, node_id) or _404()
+    node.cf_domain, node.cf_address = body.cf_domain.lower(), body.cf_address
     db.commit()
     return node_out(node, request)
 

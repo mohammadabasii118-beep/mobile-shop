@@ -176,3 +176,28 @@ def test_agent_renderers_new_protocols():
     assert agent.render_ocpasswd(cfg, lambda p: "H(" + p + ")") == "ali_t:*:H(pw1)\n"
     sec = agent.render_ipsec_secrets(cfg)
     assert ': PSK "psk123"' in sec and 'ali_t : EAP "pw1"' in sec and "RSA" in sec
+
+
+def test_cloudflare_entries():
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "CF", "cc": "de", "address": "1.2.3.4"}).json()
+        user = c.post("/api/users", headers=h, json={"name": "cfuser", "protos": ["vless_ws", "vmess_ws", "vless_tcp", "vless_grpc"],
+                                                      "node_ids": [node["id"]]}).json()
+        rows = c.get(f"/api/users/{user['id']}/configs", headers=h).json()
+        assert not any("Cloudflare" in r["label"] for r in rows)
+        assert c.put(f"/api/nodes/{node['id']}/cloudflare", headers=h, json={"cf_domain": "not a domain"}).status_code == 422
+        r = c.put(f"/api/nodes/{node['id']}/cloudflare", headers=h,
+                  json={"cf_domain": "CDN.Example.com", "cf_address": "104.16.1.1"})
+        assert r.json()["cf_domain"] == "cdn.example.com"
+        rows = c.get(f"/api/users/{user['id']}/configs", headers=h).json()
+        cf = {r["proto"]: r for r in rows if "Cloudflare" in r["label"]}
+        assert set(cf) == {"vless_ws", "vmess_ws", "vless_grpc"}  # TCP cannot go through Cloudflare
+        link = cf["vless_ws"]["link"]
+        assert "@104.16.1.1:2083" in link and "sni=cdn.example.com" in link and "host=cdn.example.com" in link
+        assert "allowInsecure" not in link
+        vm = json.loads(base64.b64decode(cf["vmess_ws"]["link"][8:]))
+        assert vm["add"] == "104.16.1.1" and vm["host"] == "cdn.example.com" and vm["allowInsecure"] == 0
+        # the direct entries still point at the node itself
+        direct = next(r for r in rows if r["proto"] == "vless_ws" and "Cloudflare" not in r["label"])
+        assert "@1.2.3.4:2083" in direct["link"]

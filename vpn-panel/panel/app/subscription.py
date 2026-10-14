@@ -6,7 +6,7 @@ from urllib.parse import quote
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PrivateKey
 
-from .catalog import GRPC_SERVICE, PROTOCOLS, REALITY_SNI, SS_METHOD, WS_PATHS
+from .catalog import CF_PORTS, CF_PROTOS, GRPC_SERVICE, PROTOCOLS, REALITY_SNI, SS_METHOD, WS_PATHS
 from .db import Node, User
 
 
@@ -44,48 +44,53 @@ def _manual(entry: dict, fields: dict, text: str | None = None) -> dict:
     return entry
 
 
-def build_entry(user: User, node: Node, proto: str, port: int) -> dict | None:
+def build_entry(user: User, node: Node, proto: str, port: int, cdn: bool = False) -> dict | None:
     """One config entry for (user, node, proto). `link` is a share URI. Protocols entered by
     hand or imported from a file have link=None and carry `summary` (one line) and `copy` (full text)."""
     meta = PROTOCOLS[proto]
-    tag = quote(f"{node.name}-{meta['label']}")
-    host, insecure = node.address, node.tls_self_signed
-    e = {"node": node.name, "cc": node.cc, "proto": proto, "label": meta["label"],
+    label = meta["label"] + (" · Cloudflare" if cdn else "")
+    tag = quote(f"{node.name}-{label}")
+    if cdn:  # connect to the CDN (or a clean IP); the domain is the TLS name and Host header
+        conn, host, insecure = node.cf_address or node.cf_domain, node.cf_domain, False
+    else:
+        conn = host = node.address
+        insecure = node.tls_self_signed
+    e = {"node": node.name, "cc": node.cc, "proto": proto, "label": label,
          "link": None, "details": None, "summary": None, "copy": None}
     tls = _tls_q(host, insecure)
     if proto == "vless":
         if not node.reality_pub:
             return None
-        e["link"] = (f"vless://{user.uuid}@{host}:{port}?encryption=none&security=reality&sni={REALITY_SNI}"
+        e["link"] = (f"vless://{user.uuid}@{conn}:{port}?encryption=none&security=reality&sni={REALITY_SNI}"
                      f"&fp=chrome&pbk={node.reality_pub}&sid={node.reality_sid}&type=tcp&flow=xtls-rprx-vision#{tag}")
     elif proto == "vless_tcp":
-        e["link"] = f"vless://{user.uuid}@{host}:{port}?encryption=none&{tls}&type=tcp#{tag}"
+        e["link"] = f"vless://{user.uuid}@{conn}:{port}?encryption=none&{tls}&type=tcp#{tag}"
     elif proto == "vless_ws":
         path = quote(WS_PATHS[proto], safe="")
-        e["link"] = f"vless://{user.uuid}@{host}:{port}?encryption=none&{tls}&type=ws&host={host}&path={path}#{tag}"
+        e["link"] = f"vless://{user.uuid}@{conn}:{port}?encryption=none&{tls}&type=ws&host={host}&path={path}#{tag}"
     elif proto == "vless_grpc":
-        e["link"] = (f"vless://{user.uuid}@{host}:{port}?encryption=none&{tls}&type=grpc"
+        e["link"] = (f"vless://{user.uuid}@{conn}:{port}?encryption=none&{tls}&type=grpc"
                      f"&serviceName={GRPC_SERVICE}&mode=gun#{tag}")
     elif proto in ("vmess_ws", "vmess_tcp"):
         ws = proto == "vmess_ws"
-        cfg = {"v": "2", "ps": f"{node.name}-{meta['label']}", "add": host, "port": str(port), "id": user.uuid,
+        cfg = {"v": "2", "ps": f"{node.name}-{label}", "add": conn, "port": str(port), "id": user.uuid,
                "aid": "0", "scy": "auto", "net": "ws" if ws else "tcp", "type": "none", "host": host if ws else "",
                "path": WS_PATHS[proto] if ws else "", "tls": "tls", "sni": host,
                "allowInsecure": 1 if insecure else 0}
         e["link"] = "vmess://" + base64.b64encode(json.dumps(cfg).encode()).decode()
     elif proto == "trojan":
-        e["link"] = f"trojan://{quote(user.password)}@{host}:{port}?{tls}#{tag}"
+        e["link"] = f"trojan://{quote(user.password)}@{conn}:{port}?{tls}#{tag}"
     elif proto == "trojan_ws":
         path = quote(WS_PATHS[proto], safe="")
-        e["link"] = f"trojan://{quote(user.password)}@{host}:{port}?{tls}&type=ws&host={host}&path={path}#{tag}"
+        e["link"] = f"trojan://{quote(user.password)}@{conn}:{port}?{tls}&type=ws&host={host}&path={path}#{tag}"
     elif proto == "ss":
         cred = _b64url(f"{SS_METHOD}:{node.ss_key}:{user_ss_key(user.uuid)}")
-        e["link"] = f"ss://{cred}@{host}:{port}#{tag}"
+        e["link"] = f"ss://{cred}@{conn}:{port}#{tag}"
     elif proto == "hy2":
-        e["link"] = (f"hysteria2://{quote(user.password)}@{host}:{port}?sni={host}"
+        e["link"] = (f"hysteria2://{quote(user.password)}@{conn}:{port}?sni={host}"
                      f"{'&insecure=1' if insecure else ''}#{tag}")
     elif proto == "tuic":
-        e["link"] = (f"tuic://{user.uuid}:{quote(user.password)}@{host}:{port}?congestion_control=bbr"
+        e["link"] = (f"tuic://{user.uuid}:{quote(user.password)}@{conn}:{port}?congestion_control=bbr"
                      f"&udp_relay_mode=native&alpn=h3&sni={host}{'&allow_insecure=1' if insecure else ''}#{tag}")
     elif proto == "wg":
         if not node.wg_pub:
@@ -127,6 +132,8 @@ def user_entries(user: User, nodes: list[Node]) -> list[dict]:
                 e = build_entry(user, node, np.proto, np.port)
                 if e:
                     out.append(e)
+                if node.cf_domain and np.proto in CF_PROTOS and np.port in CF_PORTS:
+                    out.append(build_entry(user, node, np.proto, np.port, cdn=True))
     return out
 
 

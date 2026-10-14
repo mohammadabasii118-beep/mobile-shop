@@ -30,3 +30,7 @@ PROTOCOLS = {
     "ikev2": _p("IKEv2/IPsec", "strongSwan", 500, "پایدار روی موبایل؛ نیاز به گواهی معتبر", uri=False),
     "anyc": _p("Cisco AnyConnect", "ocserv", 4443, "سازگار با کلاینت‌های AnyConnect/OpenConnect", uri=False),
 }
+
+# Cloudflare proxies only these HTTPS ports, and only WebSocket/gRPC style traffic.
+CF_PORTS = {443, 2053, 2083, 2087, 2096, 8443}
+CF_PROTOS = ("vless_ws", "vmess_ws", "trojan_ws", "vless_grpc")
