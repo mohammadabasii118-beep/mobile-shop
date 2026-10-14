@@ -14,9 +14,11 @@ def _p(label, engine, port, desc, uri=True):
 
 PROTOCOLS = {
     "vless": _p("VLESS + Reality", "xray", 443, "پیشنهادی؛ بدون نیاز به دامنه و گواهی"),
+    "vless_tcp": _p("VLESS + TCP (TLS)", "xray", 2097, "TCP ساده روی TLS"),
     "vless_ws": _p("VLESS + WebSocket (TLS)", "xray", 2083, "WS روی TLS"),
     "vless_grpc": _p("VLESS + gRPC (TLS)", "xray", 2096, "gRPC روی TLS"),
     "vmess_ws": _p("VMess + WebSocket (TLS)", "xray", 2053, "سازگار با اغلب کلاینت‌ها"),
+    "vmess_tcp": _p("VMess + TCP (TLS)", "xray", 2098, "TCP ساده روی TLS"),
     "trojan": _p("Trojan", "xray", 8443, "TLS؛ با گواهی خودامضا یا واقعی"),
     "trojan_ws": _p("Trojan + WebSocket (TLS)", "xray", 2087, "WS روی TLS"),
     "ss": _p("Shadowsocks 2022", "xray", 8388, "سبک و سریع"),

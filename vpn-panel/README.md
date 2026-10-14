@@ -2,8 +2,8 @@
 
 پنل مدیریت مشابه مرزبان/سنایی با چند نود (لوکیشن)، کاربر با حجم و انقضا، و لینک اشتراک واحد.
 
-**پروتکل‌ها (۱۴ مورد):**
-- Xray: VLESS+Reality، VLESS+WebSocket، VLESS+gRPC، VMess+WebSocket، Trojan، Trojan+WebSocket، Shadowsocks 2022
+**پروتکل‌ها (۱۶ مورد):**
+- Xray: VLESS+Reality، VLESS+TCP، VLESS+WebSocket، VLESS+gRPC، VMess+TCP، VMess+WebSocket، Trojan، Trojan+WebSocket، Shadowsocks 2022
 - sing-box: Hysteria2، TUIC v5
 - سیستمی: WireGuard، OpenVPN، L2TP/IPsec، IKEv2/IPsec (strongSwan)، Cisco AnyConnect (ocserv)
 اضافه‌کردن پروتکل جدید: یک ردیف در `panel/app/catalog.py`، یک renderer در `agent/agent.py`، یک لینک‌ساز در `panel/app/subscription.py`.
@@ -34,7 +34,7 @@ docker compose --env-file .env -f deploy/docker-compose.yml up -d
 3. پنل یک دستور نصب نشان می‌دهد. آن را روی سرور جدید با root اجرا کنید:
    `bash <(curl -sL https://panel.example.com/node-install.sh) --token TOKEN --address de.example.com`
 4. در فایروال سرویس‌دهنده این پورت‌ها را باز کنید:
-   - TCP: 443، 2053، 2083، 2087، 2096، 8443، 8388، 4443
+   - TCP: 443، 2053، 2083، 2087، 2096، 2097، 2098، 8443، 8388، 4443
    - UDP: 8388، 36712، 8444، 51820، 1194، 4443، 500، 4500، 1701
 5. حدود یک دقیقه بعد نود «آنلاین» می‌شود. از آن پس هر تغییر کاربر یا پروتکل ظرف ۳۰ ثانیه روی نود اعمال می‌شود.
 

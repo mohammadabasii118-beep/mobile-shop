@@ -225,6 +225,6 @@ systemctl disable --now ocserv.socket 2>/dev/null || true
 systemctl enable --now strongswan-starter xl2tpd xray sing-box wg-quick@wg0 openvpn-server@server ocserv vpn-node-nat vpn-node-agent || true
 echo
 echo "Done. Open these ports in the provider firewall:"
-echo "  TCP 443, 2053, 2083, 2087, 2096, 8443, 8388, 4443"
+echo "  TCP 443, 2053, 2083, 2087, 2096, 2097, 2098, 8443, 8388, 4443"
 echo "  UDP 8388, 36712, 8444, 51820, 1194, 4443, 500, 4500, 1701"
 echo "The node should show as online in the panel within a minute."

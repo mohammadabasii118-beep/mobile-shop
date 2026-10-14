@@ -58,16 +58,20 @@ def build_entry(user: User, node: Node, proto: str, port: int) -> dict | None:
             return None
         e["link"] = (f"vless://{user.uuid}@{host}:{port}?encryption=none&security=reality&sni={REALITY_SNI}"
                      f"&fp=chrome&pbk={node.reality_pub}&sid={node.reality_sid}&type=tcp&flow=xtls-rprx-vision#{tag}")
+    elif proto == "vless_tcp":
+        e["link"] = f"vless://{user.uuid}@{host}:{port}?encryption=none&{tls}&type=tcp#{tag}"
     elif proto == "vless_ws":
         path = quote(WS_PATHS[proto], safe="")
         e["link"] = f"vless://{user.uuid}@{host}:{port}?encryption=none&{tls}&type=ws&host={host}&path={path}#{tag}"
     elif proto == "vless_grpc":
         e["link"] = (f"vless://{user.uuid}@{host}:{port}?encryption=none&{tls}&type=grpc"
                      f"&serviceName={GRPC_SERVICE}&mode=gun#{tag}")
-    elif proto == "vmess_ws":
+    elif proto in ("vmess_ws", "vmess_tcp"):
+        ws = proto == "vmess_ws"
         cfg = {"v": "2", "ps": f"{node.name}-{meta['label']}", "add": host, "port": str(port), "id": user.uuid,
-               "aid": "0", "scy": "auto", "net": "ws", "type": "none", "host": host, "path": WS_PATHS[proto],
-               "tls": "tls", "sni": host, "allowInsecure": 1 if insecure else 0}
+               "aid": "0", "scy": "auto", "net": "ws" if ws else "tcp", "type": "none", "host": host if ws else "",
+               "path": WS_PATHS[proto] if ws else "", "tls": "tls", "sni": host,
+               "allowInsecure": 1 if insecure else 0}
         e["link"] = "vmess://" + base64.b64encode(json.dumps(cfg).encode()).decode()
     elif proto == "trojan":
         e["link"] = f"trojan://{quote(user.password)}@{host}:{port}?{tls}#{tag}"

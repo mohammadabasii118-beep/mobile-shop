@@ -110,7 +110,7 @@ def test_agent_renderers():
     assert agent.render_singbox(cfg, tls)["inbounds"] == []
 
 
-ALL = ["vless", "vless_ws", "vless_grpc", "vmess_ws", "trojan", "trojan_ws", "ss", "hy2", "tuic",
+ALL = ["vless", "vless_tcp", "vmess_tcp", "vless_ws", "vless_grpc", "vmess_ws", "trojan", "trojan_ws", "ss", "hy2", "tuic",
        "wg", "ovpn", "l2tp", "ikev2", "anyc"]
 
 
@@ -134,6 +134,8 @@ def test_all_protocols_have_entries_and_node_config():
                                                       "ovpn_ca": "-----BEGIN CERTIFICATE-----\nX\n-----END CERTIFICATE-----"})
         rows = {e["proto"]: e for e in c.get(f"/api/users/{user['id']}/configs", headers=h).json()}
         assert set(rows) == set(ALL)
+        assert "type=tcp" in rows["vless_tcp"]["link"] and "security=tls" in rows["vless_tcp"]["link"]
+        assert json.loads(base64.b64decode(rows["vmess_tcp"]["link"][8:]))["net"] == "tcp"
         assert "type=ws" in rows["vless_ws"]["link"] and "path=%2Fvless" in rows["vless_ws"]["link"]
         assert "type=grpc" in rows["vless_grpc"]["link"] and "serviceName=grpc" in rows["vless_grpc"]["link"]
         vm = rows["vmess_ws"]["link"]
@@ -154,13 +156,14 @@ def test_wireguard_keypair_is_valid():
 
 def test_agent_renderers_new_protocols():
     cfg = sample_cfg()
-    allp = ["vless_ws", "vless_grpc", "vmess_ws", "trojan_ws", "tuic", "wg", "ovpn", "ikev2", "anyc"]
-    cfg["protocols"].update({"vless_ws": 2083, "vless_grpc": 2096, "vmess_ws": 2053, "trojan_ws": 2087,
+    allp = ["vless_tcp", "vmess_tcp", "vless_ws", "vless_grpc", "vmess_ws", "trojan_ws", "tuic", "wg", "ovpn", "ikev2", "anyc"]
+    cfg["protocols"].update({"vless_tcp": 2097, "vmess_tcp": 2098, "vless_ws": 2083, "vless_grpc": 2096, "vmess_ws": 2053, "trojan_ws": 2087,
                              "tuic": 8444, "wg": 51820, "ovpn": 1194, "ikev2": 500, "anyc": 4443})
     cfg["users"][0]["protos"] += allp
     cfg["users"][0].update({"wg_pub": "WGPUBU", "wg_ip": "10.88.0.2"})
     tls = {"cert": "/c", "key": "/k"}
     x = {i["tag"]: i for i in agent.render_xray(cfg, {"private": "P", "short_id": "ab"}, tls)["inbounds"]}
+    assert x["vless_tcp"]["streamSettings"]["network"] == "tcp" and x["vmess_tcp"]["streamSettings"]["security"] == "tls"
     assert x["vless_ws"]["streamSettings"]["network"] == "ws"
     assert x["vless_ws"]["streamSettings"]["wsSettings"]["path"] == "/vless"
     assert x["vless_grpc"]["streamSettings"]["grpcSettings"]["serviceName"] == "grpc"

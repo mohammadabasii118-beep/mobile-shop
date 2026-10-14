@@ -46,6 +46,7 @@ def render_xray(cfg, reality, tls):
             "privateKey": reality["private"], "shortIds": [reality["short_id"]]}},
         decryption="none")
     vless_plain = lambda p: [{"id": u["uuid"], "email": u["name"]} for u in users_for(cfg, p)]
+    add("vless_tcp", "vless", vless_plain("vless_tcp"), tls_stream("tcp"), decryption="none")
     add("vless_ws", "vless", vless_plain("vless_ws"),
         tls_stream("ws", wsSettings={"path": WS_PATHS["vless_ws"]}), decryption="none")
     add("vless_grpc", "vless", vless_plain("vless_grpc"),
@@ -53,6 +54,9 @@ def render_xray(cfg, reality, tls):
     add("vmess_ws", "vmess",
         [{"id": u["uuid"], "email": u["name"], "alterId": 0} for u in users_for(cfg, "vmess_ws")],
         tls_stream("ws", wsSettings={"path": WS_PATHS["vmess_ws"]}))
+    add("vmess_tcp", "vmess",
+        [{"id": u["uuid"], "email": u["name"], "alterId": 0} for u in users_for(cfg, "vmess_tcp")],
+        tls_stream("tcp"))
     trojan = lambda p: [{"password": u["password"], "email": u["name"]} for u in users_for(cfg, p)]
     add("trojan", "trojan", trojan("trojan"), tls_stream("tcp"))
     add("trojan_ws", "trojan", trojan("trojan_ws"),
