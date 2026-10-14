@@ -179,7 +179,7 @@ function productForm(p, done) {
     try {
       const { items } = await api(`/panels/${encodeURIComponent(panelSel.value)}/inbounds`);
       clear(pickSel); pickSel.append(h('option', { value: '' }, `انتخاب از لیست پنل (${num(items.length)} inbound)…`));
-      items.forEach((i) => pickSel.append(h('option', { value: i.id, disabled: !i.enable || !['vless', 'vmess', 'trojan', 'shadowsocks'].includes(i.protocol), selected: panelSel.value === (p?.xuiProviderId || 'default') && i.id === p?.xuiInboundId }, `#${i.id} · ${i.remark || '—'} · ${i.protocol}:${i.port}${i.enable ? '' : ' (غیرفعال)'}`)));
+      items.forEach((i) => pickSel.append(h('option', { value: i.id, disabled: !i.enable || !['profile', 'vless', 'vmess', 'trojan', 'shadowsocks'].includes(i.protocol), selected: panelSel.value === (p?.xuiProviderId || 'default') && i.id === p?.xuiInboundId }, (i.protocol === 'profile' ? `پروفایل ${i.id} · ${i.remark || '—'}` : `#${i.id} · ${i.remark || '—'} · ${i.protocol}:${i.port}${i.enable ? '' : ' (غیرفعال)'}`))));
       pickSel._items = items;
     } catch { clear(pickSel); pickSel.append(h('option', { value: '' }, 'خواندن لیست ممکن نشد — شماره را دستی بنویسید')); }
   };

@@ -80,7 +80,7 @@ async function putSetting(c: ApiCtx) {
 const receiptType = (b: Buffer) => (b[0] === 0xff && b[1] === 0xd8 ? 'image/jpeg' : b[0] === 0x89 && b[1] === 0x50 ? 'image/png' : b.subarray(8, 12).toString() === 'WEBP' ? 'image/webp' : 'application/octet-stream');
 
 const productBody = z.object({
-  name: z.string().trim().min(1).max(80), description: z.string().trim().max(500).optional().nullable(),
+  name: z.string().trim().min(1).max(80), description: z.string().trim().max(500).nullish().transform((v) => v ?? ''),
   durationDays: z.number().int(), trafficGB: z.number().int(), price: z.number().int(), xuiInboundId: z.number().int(), xuiProviderId: z.string().max(40).optional(),
   protocol: z.nativeEnum(Protocol), isActive: z.boolean().optional(), sortOrder: z.number().int().optional(),
   categoryId: z.string().nullable().optional(),

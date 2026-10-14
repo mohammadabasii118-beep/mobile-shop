@@ -151,7 +151,7 @@ describe('web panel: products, coupons, services, settings, support, audit', () 
     const c = await login();
     const bad = await call(c, 'POST', '/products', { name: '', durationDays: 0, trafficGB: 1, price: 1, xuiInboundId: 1, protocol: 'VLESS' });
     expect(bad.status).toBe(400);
-    const made = await call(c, 'POST', '/products', { name: 'پلن تست', durationDays: 30, trafficGB: 10, price: 100000, xuiInboundId: 1, protocol: 'VLESS' });
+    const made = await call(c, 'POST', '/products', { name: 'پلن تست', durationDays: 30, trafficGB: 10, price: 100000, xuiInboundId: 1, protocol: 'VLESS', description: null });
     expect(made.status).toBe(200);
     const id = made.json.id;
     expect((await call(c, 'PATCH', `/products/${id}`, { price: 120000, isActive: false })).json).toMatchObject({ price: 120000, isActive: false });
