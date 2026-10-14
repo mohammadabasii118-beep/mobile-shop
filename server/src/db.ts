@@ -43,6 +43,22 @@ export function openDb(path = ':memory:'): Db {
     );
   `);
   try { db.exec('ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0'); } catch { /* ستون از قبل هست */ }
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS shop_buys (
+      user_id INTEGER NOT NULL, slot INTEGER NOT NULL, day INTEGER NOT NULL, sig TEXT NOT NULL,
+      PRIMARY KEY (user_id, slot, day, sig)
+    );
+    CREATE TABLE IF NOT EXISTS orders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      pack_id TEXT NOT NULL,
+      gems INTEGER NOT NULL,
+      toman INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',   -- pending | delivered | canceled
+      created_at INTEGER NOT NULL,
+      done_at INTEGER
+    );
+  `);
   // کاپ‌ها: فقط از نبردهای آنلاین کم و زیاد می‌شود
   try { db.exec('ALTER TABLE users ADD COLUMN trophies INTEGER NOT NULL DEFAULT 0'); } catch { /* ستون از قبل هست */ }
   // الماس سرخ: همه (قدیمی و جدید) با ۵۰ شروع می‌کنند

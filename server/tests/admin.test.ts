@@ -146,6 +146,37 @@ describe('banner', () => {
   });
 });
 
+describe('shop admin', () => {
+  it('gateway url is admin-only, hidden from players, survives other config saves; orders are delivered once', async () => {
+    expect((await call(42, '/api/admin/shop', { gatewayUrl: 'javascript:alert(1)' })).status).toBe(400);
+    expect((await call(43, '/api/admin/shop', { gatewayUrl: 'https://pay.example/x?o={order}' })).status).toBe(403);
+    expect((await call(42, '/api/admin/shop', { gatewayUrl: 'https://pay.example/x?o={order}&a={amount}' })).status).toBe(200);
+    const pub = await (await fetch(base + '/api/config')).json() as any;
+    expect(pub.shop.gatewayUrl).toBeUndefined();                       // به بازیکن‌ها داده نمی‌شود
+    expect(pub.shop.cards).toHaveLength(6);
+    // ذخیره‌ی بقیه‌ی تنظیمات (بدون آدرس) آدرس درگاه را پاک نمی‌کند
+    expect((await call(42, '/api/admin/config', { config: pub })).status).toBe(200);
+    expect((await (await call(42, '/api/admin/shop')).json() as any).gatewayUrl).toBe('https://pay.example/x?o={order}&a={amount}');
+    // اسلات با کارت ناشناخته یا بدون قیمت رد می‌شود
+    const bad1 = JSON.parse(JSON.stringify(pub)); bad1.shop.cards[0].cardId = 'nope';
+    expect((await call(42, '/api/admin/config', { config: bad1 })).status).toBe(400);
+    const bad2 = JSON.parse(JSON.stringify(pub)); bad2.shop.cards[0].priceGems = 0; bad2.shop.cards[0].priceCoins = 0;
+    expect((await call(42, '/api/admin/config', { config: bad2 })).status).toBe(400);
+    // سفارش: ثبت (با لینک درگاه) → تحویل فقط یک‌بار (برای تست، عضویت اجباری کانال خاموش)
+    expect((await call(42, '/api/admin/config', { config: { ...pub, channel: { ...pub.channel, required: false } } })).status).toBe(200);
+    const me = await (await call(45, '/api/me')).json() as any;
+    const ord = await (await call(45, '/api/shop/order', { id: pub.shop.gemPacks[0].id })).json() as any;
+    expect(ord.url).toBe(`https://pay.example/x?o=${ord.order.id}&a=${pub.shop.gemPacks[0].toman}`);
+    const list = await (await call(42, '/api/admin/orders?status=pending')).json() as any;
+    expect(list.orders.find((o: any) => o.id === ord.order.id)).toMatchObject({ name: me.profile.name, status: 'pending' });
+    expect((await call(43, '/api/admin/order', { id: ord.order.id, action: 'deliver' })).status).toBe(403);
+    expect((await call(42, '/api/admin/order', { id: ord.order.id, action: 'deliver' })).status).toBe(200);
+    expect((await call(42, '/api/admin/order', { id: ord.order.id, action: 'deliver' })).status).toBe(400);
+    const after = await (await call(45, '/api/me')).json() as any;
+    expect(after.profile.gems).toBe(me.profile.gems + pub.shop.gemPacks[0].gems);
+  });
+});
+
 describe('config override (survives code updates)', () => {
   it('migrates old saved settings: box xp removed, upgrade xp and online rewards filled from base', async () => {
     const { writeFileSync } = await import('node:fs');

@@ -217,6 +217,8 @@ export function createGameServer(opt: ServerOptions) {
 
   /** کانفیگ جدید را اعتبارسنجی می‌کند، در حافظه جایگزین و روی دیسک ذخیره می‌کند (بدون ری‌استارت سرور). */
   function commitConfig(next: GameConfig) {
+    // آدرس درگاه فقط از بخش مخصوص خودش عوض می‌شود؛ ذخیره‌ی بقیه‌ی تنظیمات آن را پاک نکند
+    if (next.shop && next.shop.gatewayUrl === undefined) next.shop.gatewayUrl = cfg.shop?.gatewayUrl ?? '';
     validateConfig(next);
     for (const old of cfg.cards) {
       if (!next.cards.some((c) => c.id === old.id) && game.cardOwned(old.id)) throw new GameError(`کارت «${old.name}» را بازیکن‌ها دارند و قابل حذف نیست`);
@@ -316,6 +318,19 @@ export function createGameServer(opt: ServerOptions) {
         return json(res, 200, { users: game.adminUsers(url.searchParams.get('q') ?? '') });
       case '/api/admin/user':
         return json(res, 200, { user: game.adminUser(Number(url.searchParams.get('id'))) });
+      case '/api/admin/shop': {
+        if (req.method !== 'POST') return json(res, 200, { gatewayUrl: cfg.shop.gatewayUrl ?? '' });
+        const b = await readBody(req);
+        const next = clone(); next.shop.gatewayUrl = String(b.gatewayUrl ?? '').trim();
+        commitConfig(next);
+        return json(res, 200, { gatewayUrl: cfg.shop.gatewayUrl ?? '' });
+      }
+      case '/api/admin/orders': return json(res, 200, { orders: game.adminOrders(url.searchParams.get('status') || undefined) });
+      case '/api/admin/order': {
+        const b = await readBody(req);
+        game.adminOrderAction(Number(b.id), b.action as 'deliver' | 'cancel');
+        return json(res, 200, { orders: game.adminOrders() });
+      }
       case '/api/admin/balance': {
         const b = await readBody(req);
         game.adminBalance(Number(b.userId), b.currency as 'coins' | 'gems', { delta: b.delta, set: b.set });
@@ -342,7 +357,8 @@ export function createGameServer(opt: ServerOptions) {
   }
 
   async function api(req: IncomingMessage, res: ServerResponse, path: string) {
-    if (path === '/api/config') return json(res, 200, cfg);
+    // به بازیکن‌ها آدرس درگاه داده نمی‌شود (فقط موقع ثبت سفارش)
+    if (path === '/api/config') return json(res, 200, { ...cfg, shop: { ...cfg.shop, gatewayUrl: undefined } });
     if (path === '/api/version') { res.setHeader('cache-control', 'no-store'); return json(res, 200, { bundle: currentBundle(opt.staticDir) }); }
     const hdr = req.headers['x-init-data'];
     const u = authenticate(Array.isArray(hdr) ? hdr[0] : hdr, opt.auth);
@@ -377,6 +393,15 @@ export function createGameServer(opt: ServerOptions) {
         case '/api/me': break;
         case '/api/deck': game.setDeck(userId, body.cards); break;
         case '/api/upgrade': extra = { upgrade: game.upgradeCard(userId, String(body.cardId)) }; break;
+        case '/api/shop/state': extra = { shop: game.shopState(userId) }; break;
+        case '/api/shop/buy-card': extra = { bought: game.buyShopCard(userId, Number(body.slot), body.currency) }; break;
+        case '/api/shop/buy-coins': extra = { got: game.buyCoinPack(userId, String(body.id)) }; break;
+        case '/api/shop/order': {
+          if (!cfg.shop.gatewayUrl) throw new GameError('درگاه پرداخت هنوز فعال نشده؛ به پشتیبانی پیام بده');
+          const o = game.createOrder(userId, String(body.id));
+          extra = { order: o, url: game.gatewayLink(o, u.tgId) };
+          break;
+        }
         case '/api/leaderboard': extra = { leaders: game.leaderboard(userId), myRank: game.trophyRank(userId) }; break;
         case '/api/box/start': game.startBox(userId, Number(body.slot)); break;
         case '/api/box/open': extra = { reward: game.openBox(userId, Number(body.slot)) }; break;

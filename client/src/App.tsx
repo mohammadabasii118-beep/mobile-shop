@@ -3,6 +3,7 @@ import type { GameConfig, Profile, ServerMsg } from '@game/shared';
 import { loadConfig, loadProfile, reloadIfOutdated, Socket } from './net';
 import { Home } from './Home';
 import { CardsScreen } from './CardsScreen';
+import { Shop } from './Shop';
 import { BattleScreen, type BattleInit } from './BattleScreen';
 import { Admin } from './Admin';
 import { Gate } from './Gate';
@@ -24,7 +25,7 @@ export function App() {
   const [cfg, setCfg] = useState<GameConfig | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [tab, setTab] = useState<'home' | 'cards' | 'admin'>('home');
+  const [tab, setTab] = useState<'home' | 'cards' | 'shop' | 'admin'>('home');
   const [battle, setBattle] = useState<BattleInit | null>(null);
   const [result, setResult] = useState<Extract<ServerMsg, { t: 'battleEnd' }> | null>(null);
   const [queued, setQueued] = useState(false);
@@ -81,7 +82,7 @@ export function App() {
       ) : (
         tab === 'admin' ? <Admin ctx={ctx} onExit={async () => { setTab('home'); try { setCfg(await loadConfig()); } catch { /* ignore */ } }} /> : <>
           <div className="screen">
-            {tab === 'home' ? <Home ctx={ctx} queued={queued} onAdmin={() => setTab('admin')} /> : <CardsScreen ctx={ctx} />}
+            {tab === 'home' ? <Home ctx={ctx} queued={queued} onAdmin={() => setTab('admin')} /> : tab === 'cards' ? <CardsScreen ctx={ctx} /> : <Shop ctx={ctx} />}
           </div>
           <nav className="nav">
             <button className={tab === 'home' ? 'on' : ''} onClick={() => setTab('home')} aria-current={tab === 'home' ? 'page' : undefined}>
@@ -91,6 +92,10 @@ export function App() {
             <button className={tab === 'cards' ? 'on' : ''} onClick={() => setTab('cards')} aria-current={tab === 'cards' ? 'page' : undefined}>
               <svg className="ni" viewBox="0 0 24 24" aria-hidden><rect x="4" y="5" width="11" height="15" rx="2" /><path d="M9 3.500h8a2 2 0 0 1 2 2V16" /><path d="M7.500 12l1.500-3 1.500 3-1.500 3z" /></svg>
               <span>کارت‌ها</span>
+            </button>
+            <button className={tab === 'shop' ? 'on' : ''} onClick={() => setTab('shop')} aria-current={tab === 'shop' ? 'page' : undefined}>
+              <svg className="ni" viewBox="0 0 24 24" aria-hidden><path d="M4 9l1.200-4.500h13.600L20 9" /><path d="M4 9a2.700 2.700 0 0 0 5.300 0 2.700 2.700 0 0 0 5.400 0A2.700 2.700 0 0 0 20 9" /><path d="M5.500 12v7.500h13V12" /><path d="M10 19.500v-4.500h4v4.500" /></svg>
+              <span>فروشگاه</span>
             </button>
           </nav>
         </>

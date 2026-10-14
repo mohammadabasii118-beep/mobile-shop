@@ -3,7 +3,7 @@ import type { Ctx } from './App';
 import { call } from './net';
 import { isDev, openLink } from './telegram';
 import { setMuted, setVolume, useMusic, type Channel } from './music';
-import { Bar, Modal, fa, fmtTime, CardTile, RARITY_FA, Icon } from './ui';
+import { Bar, Modal, fa, fmtTime, CardTile, RARITY_FA, Icon, Gem } from './ui';
 import type { LeaderRow } from '@game/shared';
 
 export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAdmin: () => void }) {
@@ -32,7 +32,7 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
         </button>
         <div className="wallet" aria-label="دارایی">
           <span className="cur coin"><Icon n="coin" /> <b className="num">{fa(p.coins)}</b></span>
-          <span className="cur gem"><svg className="gemi" viewBox="0 0 24 24" aria-hidden><defs><linearGradient id="gemg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7a86" /><stop offset="1" stop-color="#b3122e" /></linearGradient></defs><path d="M6 3h12l4 6-10 12L2 9z" fill="url(#gemg)" stroke="#ffd0d6" strokeWidth="1" strokeLinejoin="round" /><path d="M2 9h20M9 3l-2 6 5 12 5-12-2-6" fill="none" stroke="rgba(255,255,255,.55)" strokeWidth=".8" /></svg> <b className="num">{fa(p.gems ?? 0)}</b></span>
+          <span className="cur gem"><Gem /> <b className="num">{fa(p.gems ?? 0)}</b></span>
         </div>
         <button className="me" onClick={() => setShowProfile(true)} aria-label="پروفایل">
           <span className="av">

@@ -40,6 +40,25 @@ export function validateConfig(cfg: GameConfig): GameConfig {
     for (const l of rows) if (!isNum(l.copies, 1) || !isNum(l.coins) || !isNum(l.xp)) bad('ردیف جدول ارتقا نامعتبر است');
   }
   if (!Array.isArray(cfg.xpPerLevel) || cfg.xpPerLevel.length < 1 || cfg.xpPerLevel.some((x) => !isNum(x, 1))) bad('جدول XP نامعتبر است');
+  const sh = cfg.shop;
+  if (!sh || !Array.isArray(sh.cards) || sh.cards.length !== 6 || !Array.isArray(sh.coinPacks) || !Array.isArray(sh.gemPacks)) bad('تنظیمات فروشگاه نامعتبر است (باید دقیقاً ۶ اسلات کارت داشته باشد)');
+  if (sh.gatewayUrl !== undefined && sh.gatewayUrl !== '' && (typeof sh.gatewayUrl !== 'string' || sh.gatewayUrl.length > 600 || !/^https?:\/\//i.test(sh.gatewayUrl))) bad('آدرس درگاه باید با http:// یا https:// شروع شود');
+  const isInt = (v: unknown, min: number, max = 10_000_000) => Number.isInteger(v) && (v as number) >= min && (v as number) <= max;
+  sh.cards.forEach((o, i) => {
+    if (!o || typeof o.cardId !== 'string') bad(`فروشگاه: اسلات ${i + 1} نامعتبر است`);
+    if (o.cardId === '') return;
+    if (!ids.has(o.cardId)) bad(`فروشگاه: کارت ناشناخته ${o.cardId}`);
+    if (!isInt(o.count, 1, 999) || !isInt(o.priceGems, 0) || !isInt(o.priceCoins, 0)) bad(`فروشگاه: تعداد یا قیمت اسلات ${i + 1} نامعتبر است`);
+    if (o.priceGems === 0 && o.priceCoins === 0) bad(`فروشگاه: اسلات ${i + 1} حداقل یک قیمت (الماس یا سکه) لازم دارد`);
+  });
+  const packIds = new Set<string>();
+  for (const pk of [...sh.coinPacks, ...sh.gemPacks] as { id: string }[]) {
+    if (!pk || typeof pk.id !== 'string' || !/^[A-Za-z0-9_]{1,24}$/.test(pk.id) || packIds.has(pk.id)) bad('فروشگاه: شناسه‌ی بسته‌ها باید یکتا باشد');
+    packIds.add(pk.id);
+  }
+  if (sh.coinPacks.length > 12 || sh.gemPacks.length > 12) bad('فروشگاه: حداکثر ۱۲ بسته');
+  for (const pk of sh.coinPacks) if (!isInt(pk.coins, 1) || !isInt(pk.gems, 1)) bad('فروشگاه: بسته‌ی سکه نامعتبر است');
+  for (const pk of sh.gemPacks) if (!isInt(pk.gems, 1) || !isInt(pk.toman, 1, 1_000_000_000)) bad('فروشگاه: بسته‌ی الماس نامعتبر است');
   const on = cfg.online;
   if (!on || !isNum(on.winCoins) || !isNum(on.winXp) || !isNum(on.trophiesWin) || !isNum(on.trophiesLoss)) bad('جایزه‌ی نبرد آنلاین نامعتبر است');
   const b = cfg.box;
@@ -108,6 +127,7 @@ export function loadConfigWithOverride(overridePath: string, basePath = CONFIG_P
     const lv = merged.upgrade?.levels;
     merged.upgrade = Array.isArray(lv) ? { maxLevel: merged.upgrade.maxLevel, byRarity: { common: lv, rare: lv, epic: lv } } : base.upgrade;
   }
+  if (!merged.shop) merged.shop = base.shop;
   // جایزه‌ی آنلاین (جدید): اگر نبود از پایه
   if (!merged.online) merged.online = base.online;
   // XP دیگر از جعبه نمی‌آید (حذف از نوع‌ها) و هر ردیف ارتقا مقدار XP دارد (اگر نبود از پایه‌ی همان نوع و ردیف)

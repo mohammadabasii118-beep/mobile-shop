@@ -1512,5 +1512,80 @@
     "winXp": 5,
     "trophiesWin": 10,
     "trophiesLoss": 6
+  },
+  "shop": {
+    "gatewayUrl": "",
+    "cards": [
+      {
+        "cardId": "giv",
+        "count": 3,
+        "priceGems": 5,
+        "priceCoins": 150
+      },
+      {
+        "cardId": "bijan",
+        "count": 3,
+        "priceGems": 5,
+        "priceCoins": 150
+      },
+      {
+        "cardId": "arash",
+        "count": 3,
+        "priceGems": 5,
+        "priceCoins": 150
+      },
+      {
+        "cardId": "gordafarid",
+        "count": 2,
+        "priceGems": 15,
+        "priceCoins": 450
+      },
+      {
+        "cardId": "kaveh",
+        "count": 2,
+        "priceGems": 15,
+        "priceCoins": 450
+      },
+      {
+        "cardId": "sohrab",
+        "count": 1,
+        "priceGems": 40,
+        "priceCoins": 1200
+      }
+    ],
+    "coinPacks": [
+      {
+        "id": "c1",
+        "coins": 500,
+        "gems": 10
+      },
+      {
+        "id": "c2",
+        "coins": 1500,
+        "gems": 25
+      },
+      {
+        "id": "c3",
+        "coins": 5000,
+        "gems": 75
+      }
+    ],
+    "gemPacks": [
+      {
+        "id": "g1",
+        "gems": 50,
+        "toman": 49000
+      },
+      {
+        "id": "g2",
+        "gems": 120,
+        "toman": 99000
+      },
+      {
+        "id": "g3",
+        "gems": 300,
+        "toman": 199000
+      }
+    ]
   }
 }

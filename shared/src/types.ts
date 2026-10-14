@@ -47,6 +47,18 @@ export interface SoloPit {
   stages: SoloStage[];
 }
 
+/** فروشگاه: یک پیشنهاد کارت روزانه (cardId خالی = اسلات خاموش). قیمت ۰ یعنی با آن ارز نمی‌شود خرید. */
+export interface ShopCardOffer { cardId: string; count: number; priceGems: number; priceCoins: number }
+export interface CoinPack { id: string; coins: number; gems: number }
+export interface GemPack { id: string; gems: number; toman: number }
+export interface ShopCfg {
+  /** آدرس درگاه پرداخت (دستی از پنل)؛ جای‌نگهدارها: {order} {amount} {gems} {user}. به بازیکن‌ها فرستاده نمی‌شود، فقط موقع ثبت سفارش. */
+  gatewayUrl?: string;
+  cards: ShopCardOffer[];
+  coinPacks: CoinPack[];
+  gemPacks: GemPack[];
+}
+
 export interface GameConfig {
   /** نسخه‌ی محتوای کارت‌ها/ترکیب اولیه/سولو: اگر عوض شود، تنظیمات ذخیره‌شده‌ی قدیمی این بخش‌ها با نسخه‌ی جدید جایگزین می‌شود */
   contentVersion?: number;
@@ -61,6 +73,7 @@ export interface GameConfig {
   /** هزینه‌ی ارتقا برای هر نوع کارت (ساده/معمولی/کمیاب)؛ ردیف i = از لول i+1 به i+2 */
   upgrade: { maxLevel: number; byRarity: Record<Rarity, { copies: number; coins: number; /** XP که بازیکن با همین ارتقا می‌گیرد */ xp: number }[]> };
   xpPerLevel: number[];
+  shop: ShopCfg;
   /** جایزه‌ی هر برد در بخش آنلاین (سولو فقط جعبه می‌دهد) و کاپ‌ها */
   online: { winCoins: number; winXp: number; trophiesWin: number; trophiesLoss: number };
   box: {

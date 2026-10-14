@@ -203,4 +203,63 @@ describe('game economy', () => {
     expect(new Set(p.deck).size).toBe(3);
     expect(p.deck.every((id) => p.cards.some((c) => c.id === id))).toBe(true);
   });
+
+  describe('shop', () => {
+    it('buys a daily card offer with coins or gems, once per day, adding the right copies', () => {
+      const db = (game as any).d.db;
+      db.prepare('UPDATE users SET coins = 1000, gems = 100').run();
+      const [giv, , , , , sohrab] = cfg.shop.cards;
+      // کارتی که دارم: count نسخه به تعداد اضافه می‌شود
+      const r1 = game.buyShopCard(uid, 0, 'coins');
+      expect(r1).toMatchObject({ cardId: giv.cardId, count: giv.count, isNew: false });
+      expect(game.profile(uid).coins).toBe(1000 - giv.priceCoins);
+      expect(game.profile(uid).cards.find((c) => c.id === giv.cardId)!.copies).toBe(giv.count);
+      expect(() => game.buyShopCard(uid, 0, 'gems')).toThrow(/امروز/);          // یک‌بار در روز
+      // کارت جدید: خودِ کارت + بقیه به‌عنوان تعداد
+      const r2 = game.buyShopCard(uid, 5, 'gems');
+      expect(r2).toMatchObject({ cardId: sohrab.cardId, isNew: true });
+      expect(game.profile(uid).gems).toBe(100 - sohrab.priceGems);
+      expect(game.profile(uid).cards.find((c) => c.id === sohrab.cardId)).toMatchObject({ level: 1, copies: sohrab.count - 1 });
+      // فردا دوباره می‌شود
+      t += 24 * 3600 * 1000;
+      expect(game.shopState(uid).bought).toEqual([]);
+      game.buyShopCard(uid, 0, 'coins');
+      // موجودی کافی نیست
+      db.prepare('UPDATE users SET coins = 0, gems = 0').run();
+      expect(() => game.buyShopCard(uid, 1, 'coins')).toThrow(/سکه/);
+      expect(() => game.buyShopCard(uid, 1, 'gems')).toThrow(/الماس/);
+      expect(() => game.buyShopCard(uid, 9, 'gems')).toThrow(GameError);
+    });
+
+    it('coin packs cost gems', () => {
+      (game as any).d.db.prepare('UPDATE users SET gems = 30').run();
+      const pk = cfg.shop.coinPacks[0];
+      game.buyCoinPack(uid, pk.id);
+      const p = game.profile(uid);
+      expect([p.gems, p.coins]).toEqual([30 - pk.gems, 100 + pk.coins]);
+      expect(() => game.buyCoinPack(uid, 'nope')).toThrow(GameError);
+      (game as any).d.db.prepare('UPDATE users SET gems = 0').run();
+      expect(() => game.buyCoinPack(uid, pk.id)).toThrow(/الماس/);
+    });
+
+    it('gem orders: pending until the admin delivers (once), cap of 5 pending, gateway link placeholders', () => {
+      const pk = cfg.shop.gemPacks[0];
+      const o = game.createOrder(uid, pk.id);
+      expect(o).toMatchObject({ gems: pk.gems, toman: pk.toman });
+      expect(game.profile(uid).gems).toBe(50);                       // هنوز چیزی اضافه نشده
+      expect(game.adminOrders()[0]).toMatchObject({ id: o.id, status: 'pending', tgId: 1 });
+      game.adminOrderAction(o.id, 'deliver');
+      expect(game.profile(uid).gems).toBe(50 + pk.gems);
+      expect(() => game.adminOrderAction(o.id, 'deliver')).toThrow(/قبلاً/);   // دوبار تحویل نمی‌شود
+      expect(game.profile(uid).gems).toBe(50 + pk.gems);
+      const o2 = game.createOrder(uid, pk.id);
+      game.adminOrderAction(o2.id, 'cancel');
+      expect(game.profile(uid).gems).toBe(50 + pk.gems);
+      for (let i = 0; i < 5; i++) game.createOrder(uid, pk.id);
+      expect(() => game.createOrder(uid, pk.id)).toThrow(/سفارش/);
+      const g2 = new Game({ db: openDb(), cfg: { ...cfg, shop: { ...cfg.shop, gatewayUrl: 'https://pay.example/go?o={order}&a={amount}&u={user}' } }, now: () => t, rng: () => rngVal });
+      expect(g2.gatewayLink({ id: 7, gems: 50, toman: 49000 }, 123)).toBe('https://pay.example/go?o=7&a=49000&u=123');
+      expect(game.gatewayLink({ id: 7, gems: 50, toman: 49000 }, 123)).toBeNull();
+    });
+  });
 });

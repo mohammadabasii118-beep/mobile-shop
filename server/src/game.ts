@@ -274,6 +274,93 @@ export class Game {
     return rows.map((r, i) => ({ rank: i + 1, id: r.id as number, name: r.name as string, avatar: (r.avatar ?? null) as string | null, level: r.level as number, trophies: r.trophies as number, me: r.id === meId }));
   }
 
+  // ---------- فروشگاه ----------
+  /** شماره‌ی روز به وقت تهران (نیمه‌شب ۰۰:۰۰ عوض می‌شود): پیشنهادهای کارت هر روز دوباره قابل خرید است */
+  shopDay(): number { return Math.floor((this.d.now() + 12_600_000) / 86_400_000); }
+  shopNextResetMs(): number { return (this.shopDay() + 1) * 86_400_000 - 12_600_000 - this.d.now(); }
+  private offerSig(o: { cardId: string; count: number; priceGems: number; priceCoins: number }) { return `${o.cardId}|${o.count}|${o.priceGems}|${o.priceCoins}`; }
+
+  /** وضعیت فروشگاه برای یک بازیکن: کدام پیشنهادهای امروز را خریده، تا بازنشانی چقدر مانده، سفارش‌های اخیرش */
+  shopState(userId: number) {
+    const { db, cfg } = this.d;
+    const day = this.shopDay();
+    const bought: number[] = [];
+    cfg.shop.cards.forEach((o, slot) => {
+      if (o.cardId && db.prepare('SELECT 1 FROM shop_buys WHERE user_id = ? AND slot = ? AND day = ? AND sig = ?').get(userId, slot, day, this.offerSig(o))) bought.push(slot);
+    });
+    const orders = (db.prepare('SELECT id, gems, toman, status, created_at FROM orders WHERE user_id = ? ORDER BY id DESC LIMIT 5').all(userId) as any[])
+      .map((r) => ({ id: r.id as number, gems: r.gems as number, toman: r.toman as number, status: r.status as string, createdAt: r.created_at as number }));
+    return { bought, resetInMs: this.shopNextResetMs(), orders };
+  }
+
+  /** خرید یک پیشنهاد کارت با سکه یا الماس؛ هر پیشنهاد در هر روز یک‌بار برای هر بازیکن */
+  buyShopCard(userId: number, slot: number, currency: 'coins' | 'gems') {
+    const { db, cfg } = this.d;
+    const o = cfg.shop.cards[slot];
+    if (!Number.isInteger(slot) || !o || !o.cardId) throw new GameError('این پیشنهاد وجود ندارد');
+    if (currency !== 'coins' && currency !== 'gems') throw new GameError('نوع پرداخت نامعتبر است');
+    const price = currency === 'coins' ? o.priceCoins : o.priceGems;
+    if (!(price > 0)) throw new GameError('این پیشنهاد با این ارز قابل خرید نیست');
+    const day = this.shopDay(), sig = this.offerSig(o);
+    if (db.prepare('SELECT 1 FROM shop_buys WHERE user_id = ? AND slot = ? AND day = ? AND sig = ?').get(userId, slot, day, sig)) throw new GameError('این پیشنهاد را امروز خریده‌ای');
+    const paid = Number(db.prepare(`UPDATE users SET ${currency} = ${currency} - ? WHERE id = ? AND ${currency} >= ?`).run(price, userId, price).changes);
+    if (paid !== 1) throw new GameError(currency === 'coins' ? 'سکه‌ی کافی نداری' : 'الماس کافی نداری');
+    db.prepare('INSERT INTO shop_buys (user_id, slot, day, sig) VALUES (?,?,?,?)').run(userId, slot, day, sig);
+    const has = db.prepare('SELECT 1 FROM user_cards WHERE user_id = ? AND card_id = ?').get(userId, o.cardId);
+    if (has) db.prepare('UPDATE user_cards SET copies = copies + ? WHERE user_id = ? AND card_id = ?').run(o.count, userId, o.cardId);
+    else db.prepare('INSERT INTO user_cards (user_id, card_id, copies) VALUES (?,?,?)').run(userId, o.cardId, o.count - 1); // اولین کارت = داشتنِ کارت؛ بقیه = تعدادِ ارتقا
+    return { cardId: o.cardId, count: o.count, isNew: !has };
+  }
+
+  /** خرید بسته‌ی سکه با الماس */
+  buyCoinPack(userId: number, packId: string) {
+    const { db, cfg } = this.d;
+    const pk = cfg.shop.coinPacks.find((x) => x.id === packId);
+    if (!pk) throw new GameError('این بسته وجود ندارد');
+    const paid = Number(db.prepare('UPDATE users SET gems = gems - ? WHERE id = ? AND gems >= ?').run(pk.gems, userId, pk.gems).changes);
+    if (paid !== 1) throw new GameError('الماس کافی نداری');
+    db.prepare('UPDATE users SET coins = coins + ? WHERE id = ?').run(pk.coins, userId);
+    return { coins: pk.coins };
+  }
+
+  /** ثبت سفارشِ خرید الماس با تومان (پرداخت بیرونی؛ تحویل دستی از پنل). حداکثر ۵ سفارش در انتظار برای هر نفر. */
+  createOrder(userId: number, packId: string) {
+    const { db, cfg } = this.d;
+    const pk = cfg.shop.gemPacks.find((x) => x.id === packId);
+    if (!pk) throw new GameError('این بسته وجود ندارد');
+    const pending = Number((db.prepare("SELECT COUNT(*) n FROM orders WHERE user_id = ? AND status = 'pending'").get(userId) as any).n);
+    if (pending >= 5) throw new GameError('چند سفارش در انتظار تأیید داری؛ اول صبر کن تا بررسی شوند');
+    const r = db.prepare('INSERT INTO orders (user_id, pack_id, gems, toman, created_at) VALUES (?,?,?,?,?)').run(userId, pk.id, pk.gems, pk.toman, this.d.now());
+    return { id: Number(r.lastInsertRowid), gems: pk.gems, toman: pk.toman };
+  }
+
+  /** لینک درگاه برای یک سفارش (جای‌نگهدارها جایگزین می‌شوند)؛ null اگر درگاه تنظیم نشده */
+  gatewayLink(order: { id: number; gems: number; toman: number }, tgId: number): string | null {
+    const g = this.d.cfg.shop.gatewayUrl;
+    if (!g) return null;
+    const m: Record<string, string> = { order: String(order.id), amount: String(order.toman), gems: String(order.gems), user: String(tgId) };
+    return g.replace(/\{(order|amount|gems|user)\}/g, (_, k) => encodeURIComponent(m[k]));
+  }
+
+  adminOrders(status?: string) {
+    const rows = this.d.db.prepare(`SELECT o.id, o.user_id, o.gems, o.toman, o.status, o.created_at, o.done_at, u.tg_id, u.name, u.avatar FROM orders o JOIN users u ON u.id = o.user_id ${status ? 'WHERE o.status = ?' : ''} ORDER BY o.id DESC LIMIT 200`).all(...(status ? [status] : [])) as any[];
+    return rows.map((r) => ({ id: r.id as number, userId: r.user_id as number, tgId: r.tg_id as number, name: r.name as string, avatar: (r.avatar ?? null) as string | null, gems: r.gems as number, toman: r.toman as number, status: r.status as string, createdAt: r.created_at as number, doneAt: (r.done_at ?? null) as number | null }));
+  }
+
+  /** تحویل (الماس به حساب بازیکن اضافه می‌شود) یا لغو یک سفارش؛ هر سفارش فقط یک‌بار قابل تصمیم است */
+  adminOrderAction(id: number, action: 'deliver' | 'cancel') {
+    const { db } = this.d;
+    const o = db.prepare('SELECT user_id, gems, status FROM orders WHERE id = ?').get(id) as any;
+    if (!o) throw new GameError('سفارش پیدا نشد');
+    if (o.status !== 'pending') throw new GameError('این سفارش قبلاً بررسی شده');
+    if (action === 'deliver') {
+      db.prepare("UPDATE orders SET status = 'delivered', done_at = ? WHERE id = ? AND status = 'pending'").run(this.d.now(), id);
+      db.prepare('UPDATE users SET gems = gems + ? WHERE id = ?').run(o.gems, o.user_id);
+    } else if (action === 'cancel') {
+      db.prepare("UPDATE orders SET status = 'canceled', done_at = ? WHERE id = ? AND status = 'pending'").run(this.d.now(), id);
+    } else throw new GameError('عملیات نامعتبر است');
+  }
+
   // ---------- ابزارهای مدیریت ----------
   adminStats() {
     const { db } = this.d;

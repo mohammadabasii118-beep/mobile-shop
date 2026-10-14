@@ -29,6 +29,17 @@ export function Icon({ n }: { n: 'heart' | 'sword' | 'shield' | 'coin' | 'spark'
   return <svg className={`i ${n === 'heart' || n === 'spark' ? 'f' : ''}`} viewBox="0 0 24 24" aria-hidden="true">{paths[n]}</svg>;
 }
 
+/** الماس سرخ (همه‌جا یک شکل) */
+export function Gem({ className = 'gemi' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden>
+      <defs><linearGradient id="gemg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ff7a86" /><stop offset="1" stopColor="#b3122e" /></linearGradient></defs>
+      <path d="M6 3h12l4 6-10 12L2 9z" fill="url(#gemg)" stroke="#ffd0d6" strokeWidth="1" strokeLinejoin="round" />
+      <path d="M2 9h20M9 3l-2 6 5 12 5-12-2-6" fill="none" stroke="rgba(255,255,255,.55)" strokeWidth=".8" />
+    </svg>
+  );
+}
+
 function Emblem({ glyph }: { glyph: string }) {
   return (
     <svg className="e" viewBox="0 0 100 100" aria-hidden="true">
