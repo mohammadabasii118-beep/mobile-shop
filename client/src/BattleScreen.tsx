@@ -4,6 +4,7 @@ import type { Ctx } from './App';
 import { onlineRewardLines, rewardText } from './App';
 import { CardTile, Icon, Modal, fa } from './ui';
 import { haptic, setClosingConfirm } from './telegram';
+import { playSfx } from './sfx';
 
 type Start = Extract<ServerMsg, { t: 'battleStart' }>;
 type End = Extract<ServerMsg, { t: 'battleEnd' }>;
@@ -93,7 +94,7 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
         setLog(`نوبت ${ev.side === me ? ctx.profile.name : start.opponent}`); break;
       case 'attack':
         setActive(ev.from); setAttacking(ev.from); await sleep(260); haptic();
-        setAttacking(null); setHit(ev.to);
+        setAttacking(null); setHit(ev.to); playSfx('hit');
         patch(ev.to, (u) => ({ shield: u.shield - ev.shieldLost, hp: u.hp - ev.hpLost }));
         float(ev.to, `-${fa(ev.dmg)}`, ev.hpLost === 0 ? 'shieldhit' : 'dmg'); if (ev.empowered) float(ev.from, '🔥 ۲×', 'heal'); addFx(ev.to, 'spark', 700);
         setLog(`${nameOf(ev.from, list)} ← ${nameOf(ev.to, list)}  ${fa(ev.dmg)} آسیب`);
