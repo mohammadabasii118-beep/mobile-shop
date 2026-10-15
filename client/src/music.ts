@@ -107,3 +107,6 @@ export const setMuted = (ch: Channel, m: boolean) => set(ch, { muted: m });
 export function useMusic(ch: Channel = 'menu'): State {
   return useSyncExternalStore((f) => { subs.add(f); return () => subs.delete(f); }, () => state[ch]);
 }
+
+/** صدای کلیک دکمه‌ها وقتی موسیقی منو قطع (یا صفر) است، قطع می‌ماند */
+export const sfxEnabled = () => !(state.menu.muted || state.menu.volume === 0);
