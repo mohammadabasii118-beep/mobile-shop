@@ -136,6 +136,8 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
   // تا وقتی نبرد در جریان است، بستن بازی تأیید می‌خواهد
   useEffect(() => { setClosingConfirm(true); return () => setClosingConfirm(false); }, []);
   useEffect(() => { if (result) setClosingConfirm(false); }, [result]);
+  // صدای پیروزی (در همه‌ی حالت‌ها: سولو، آنلاین، دوستانه)
+  useEffect(() => { if (result?.youWon) playSfx('win'); }, [result]);
 
   useEffect(() => {
     alive.current = true;
