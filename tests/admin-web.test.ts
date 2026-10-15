@@ -320,4 +320,15 @@ describe('button looks', () => {
     const { prisma: db } = await import('../src/db/client');
     expect((await db.product.findUniqueOrThrow({ where: { id: p1.id } })).buttonStyle).toBe('danger');
   });
+
+  it('deactivating a product from the panel removes it from the buy menu', async () => {
+    const { menuLevel } = await import('../src/modules/categories/service');
+    const c = await login();
+    const pr = await makeProduct({ name: 'مخفی‌شونده' });
+    expect((await menuLevel(null)).products.map((x) => x.id)).toContain(pr.id);
+    const r = await call(c, 'PATCH', `/products/${pr.id}`, { isActive: false });
+    expect(r.status).toBe(200);
+    expect((await prisma.product.findUniqueOrThrow({ where: { id: pr.id } })).isActive).toBe(false);
+    expect((await menuLevel(null)).products.map((x) => x.id)).not.toContain(pr.id);
+  });
 });
