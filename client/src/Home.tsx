@@ -6,6 +6,7 @@ import { setMuted, setVolume, useMusic, type Channel } from './music';
 import { boxSpeedupCost } from '@game/shared';
 import { Bar, Modal, fa, fmtTime, CardTile, RARITY_FA, Icon, Gem } from './ui';
 import type { LeaderRow } from '@game/shared';
+import { playSfx } from './sfx';
 import { FriendPicker, FriendsPanel } from './Friends';
 
 export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAdmin: () => void }) {
@@ -279,7 +280,7 @@ function Boxes({ ctx }: { ctx: Ctx }) {
     try {
       const j = await call(path, { slot });
       setProfile(j.profile);
-      if (j.reward) setReward(j.reward);
+      if (j.reward) { setReward(j.reward); playSfx('reward'); }
     } catch (e) { toast((e as Error).message); }
   };
   const bySlot = new Map(p.boxes.map((b) => [b.slot, b]));

@@ -1,8 +1,8 @@
 import { sfxEnabled } from './music';
 
 /** افکت‌های صوتی کوتاه (با Web Audio تا روی موبایل بدون تأخیر پخش شوند): کلیک دکمه‌ها و ضربه‌ی کارت‌ها */
-const FILES = { click: '/assets/sfx_click.mp3', hit: '/assets/sfx_hit.mp3' } as const;
-const GAIN = { click: 0.7, hit: 0.9 } as const;
+const FILES = { click: '/assets/sfx_click.mp3', hit: '/assets/sfx_hit.mp3', reward: '/assets/sfx_reward.mp3' } as const;
+const GAIN = { click: 0.7, hit: 0.9, reward: 0.9 } as const;
 export type Sfx = keyof typeof FILES;
 
 let ctx: AudioContext | null = null;
