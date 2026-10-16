@@ -260,7 +260,7 @@ describe('config override (survives code updates)', () => {
     expect(m.deckSize).toBe(5);
     expect(m.rev).toBe(2);
     expect(m.cards[0].hp).toBe(321);
-    expect(m.cards.find((c) => c.id === 'sohrab')!.chargeAttacks).toBe(3);
+    expect(m.cards.find((c) => c.id === 'sohrab')!.chargeAttacks).toBe(4);
     expect(m.solo.pits[2].stages[0].deck).toHaveLength(5);
     // بعد از مهاجرت، تغییر ادمین دیگر برنمی‌گردد
     m.turnSeconds = 20; writeFileSync(file, JSON.stringify(m));

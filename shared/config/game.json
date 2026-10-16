@@ -1,5 +1,5 @@
 {
-  "contentVersion": 3,
+  "contentVersion": 4,
   "turnSeconds": 15,
   "maxRounds": 100,
   "startingDeck": [
@@ -122,6 +122,146 @@
       ]
     },
     {
+      "id": "goodarz",
+      "name": "گودرز",
+      "rarity": "common",
+      "hp": 160,
+      "atk": 12,
+      "shield": 22,
+      "levels": [
+        {
+          "hp": 224,
+          "atk": 17,
+          "shield": 31
+        },
+        {
+          "hp": 288,
+          "atk": 22,
+          "shield": 40
+        },
+        {
+          "hp": 352,
+          "atk": 26,
+          "shield": 48
+        },
+        {
+          "hp": 416,
+          "atk": 31,
+          "shield": 57
+        },
+        {
+          "hp": 480,
+          "atk": 36,
+          "shield": 66
+        }
+      ]
+    },
+    {
+      "id": "tus",
+      "name": "توس",
+      "rarity": "common",
+      "hp": 108,
+      "atk": 19,
+      "shield": 6,
+      "levels": [
+        {
+          "hp": 151,
+          "atk": 27,
+          "shield": 8
+        },
+        {
+          "hp": 194,
+          "atk": 34,
+          "shield": 11
+        },
+        {
+          "hp": 238,
+          "atk": 42,
+          "shield": 13
+        },
+        {
+          "hp": 281,
+          "atk": 49,
+          "shield": 16
+        },
+        {
+          "hp": 324,
+          "atk": 57,
+          "shield": 18
+        }
+      ]
+    },
+    {
+      "id": "hector",
+      "name": "هکتور",
+      "rarity": "common",
+      "hp": 125,
+      "atk": 15,
+      "shield": 14,
+      "levels": [
+        {
+          "hp": 175,
+          "atk": 21,
+          "shield": 20
+        },
+        {
+          "hp": 225,
+          "atk": 27,
+          "shield": 25
+        },
+        {
+          "hp": 275,
+          "atk": 33,
+          "shield": 31
+        },
+        {
+          "hp": 325,
+          "atk": 39,
+          "shield": 36
+        },
+        {
+          "hp": 375,
+          "atk": 45,
+          "shield": 42
+        }
+      ]
+    },
+    {
+      "id": "raham",
+      "name": "رهام",
+      "rarity": "common",
+      "hp": 96,
+      "atk": 22,
+      "shield": 2,
+      "levels": [
+        {
+          "hp": 134,
+          "atk": 31,
+          "shield": 3
+        },
+        {
+          "hp": 173,
+          "atk": 40,
+          "shield": 4
+        },
+        {
+          "hp": 211,
+          "atk": 48,
+          "shield": 4
+        },
+        {
+          "hp": 250,
+          "atk": 57,
+          "shield": 5
+        },
+        {
+          "hp": 288,
+          "atk": 66,
+          "shield": 6
+        }
+      ]
+    },
+    {
       "id": "gordafarid",
       "name": "گردآفرید",
       "rarity": "rare",
@@ -136,6 +276,10 @@
       "params": {
         "rage": 30
       },
+      "special": {
+        "rage": 60
+      },
+      "chargeAttacks": 4,
       "levels": [
         {
           "hp": 141,
@@ -143,6 +287,9 @@
           "shield": 0,
           "params": {
             "rage": 32
+          },
+          "special": {
+            "rage": 64
           }
         },
         {
@@ -151,6 +298,9 @@
           "shield": 0,
           "params": {
             "rage": 34
+          },
+          "special": {
+            "rage": 68
           }
         },
         {
@@ -159,6 +309,9 @@
           "shield": 0,
           "params": {
             "rage": 36
+          },
+          "special": {
+            "rage": 72
           }
         },
         {
@@ -167,6 +320,9 @@
           "shield": 0,
           "params": {
             "rage": 38
+          },
+          "special": {
+            "rage": 76
           }
         },
         {
@@ -175,10 +331,12 @@
           "shield": 0,
           "params": {
             "rage": 40
+          },
+          "special": {
+            "rage": 80
           }
         }
-      ],
-      "chargeAttacks": 3
+      ]
     },
     {
       "id": "kaveh",
@@ -193,15 +351,22 @@
         }
       ],
       "params": {
-        "teamShield": 8
+        "teamShield": 5
       },
+      "special": {
+        "teamShield": 10
+      },
+      "chargeAttacks": 3,
       "levels": [
         {
           "hp": 184,
           "atk": 22,
           "shield": 26,
           "params": {
-            "teamShield": 12
+            "teamShield": 7
+          },
+          "special": {
+            "teamShield": 14
           }
         },
         {
@@ -209,7 +374,10 @@
           "atk": 28,
           "shield": 34,
           "params": {
-            "teamShield": 15
+            "teamShield": 9
+          },
+          "special": {
+            "teamShield": 18
           }
         },
         {
@@ -217,7 +385,10 @@
           "atk": 35,
           "shield": 42,
           "params": {
-            "teamShield": 19
+            "teamShield": 12
+          },
+          "special": {
+            "teamShield": 24
           }
         },
         {
@@ -225,7 +396,10 @@
           "atk": 41,
           "shield": 50,
           "params": {
-            "teamShield": 22
+            "teamShield": 14
+          },
+          "special": {
+            "teamShield": 28
           }
         },
         {
@@ -233,11 +407,321 @@
           "atk": 48,
           "shield": 58,
           "params": {
-            "teamShield": 26
+            "teamShield": 16
+          },
+          "special": {
+            "teamShield": 32
           }
         }
+      ]
+    },
+    {
+      "id": "siavash",
+      "name": "سیاوش",
+      "rarity": "rare",
+      "hp": 122,
+      "atk": 18,
+      "shield": 10,
+      "abilities": [
+        {
+          "id": "splash"
+        }
       ],
-      "chargeAttacks": 3
+      "params": {
+        "splash": 20
+      },
+      "special": {
+        "splash": 40
+      },
+      "chargeAttacks": 4,
+      "levels": [
+        {
+          "hp": 176,
+          "atk": 26,
+          "shield": 14,
+          "params": {
+            "splash": 22
+          },
+          "special": {
+            "splash": 44
+          }
+        },
+        {
+          "hp": 229,
+          "atk": 34,
+          "shield": 19,
+          "params": {
+            "splash": 24
+          },
+          "special": {
+            "splash": 48
+          }
+        },
+        {
+          "hp": 283,
+          "atk": 42,
+          "shield": 23,
+          "params": {
+            "splash": 26
+          },
+          "special": {
+            "splash": 52
+          }
+        },
+        {
+          "hp": 337,
+          "atk": 50,
+          "shield": 28,
+          "params": {
+            "splash": 28
+          },
+          "special": {
+            "splash": 56
+          }
+        },
+        {
+          "hp": 390,
+          "atk": 58,
+          "shield": 32,
+          "params": {
+            "splash": 30
+          },
+          "special": {
+            "splash": 60
+          }
+        }
+      ]
+    },
+    {
+      "id": "achilles",
+      "name": "آشیل",
+      "rarity": "rare",
+      "hp": 100,
+      "atk": 23,
+      "shield": 0,
+      "abilities": [
+        {
+          "id": "crit"
+        }
+      ],
+      "params": {
+        "crit": 25
+      },
+      "special": {
+        "crit": 50
+      },
+      "chargeAttacks": 4,
+      "levels": [
+        {
+          "hp": 144,
+          "atk": 33,
+          "shield": 0,
+          "params": {
+            "crit": 28
+          },
+          "special": {
+            "crit": 55
+          }
+        },
+        {
+          "hp": 188,
+          "atk": 43,
+          "shield": 0,
+          "params": {
+            "crit": 30
+          },
+          "special": {
+            "crit": 60
+          }
+        },
+        {
+          "hp": 232,
+          "atk": 53,
+          "shield": 0,
+          "params": {
+            "crit": 32
+          },
+          "special": {
+            "crit": 65
+          }
+        },
+        {
+          "hp": 276,
+          "atk": 63,
+          "shield": 0,
+          "params": {
+            "crit": 35
+          },
+          "special": {
+            "crit": 70
+          }
+        },
+        {
+          "hp": 320,
+          "atk": 74,
+          "shield": 0,
+          "params": {
+            "crit": 38
+          },
+          "special": {
+            "crit": 75
+          }
+        }
+      ]
+    },
+    {
+      "id": "peri",
+      "name": "پری",
+      "rarity": "rare",
+      "hp": 105,
+      "atk": 10,
+      "shield": 10,
+      "abilities": [
+        {
+          "id": "shield_ally"
+        }
+      ],
+      "params": {
+        "periShield": 20
+      },
+      "special": {
+        "periShield": 40
+      },
+      "chargeAttacks": 3,
+      "levels": [
+        {
+          "hp": 151,
+          "atk": 14,
+          "shield": 14,
+          "params": {
+            "periShield": 22
+          },
+          "special": {
+            "periShield": 44
+          }
+        },
+        {
+          "hp": 197,
+          "atk": 19,
+          "shield": 19,
+          "params": {
+            "periShield": 24
+          },
+          "special": {
+            "periShield": 48
+          }
+        },
+        {
+          "hp": 244,
+          "atk": 23,
+          "shield": 23,
+          "params": {
+            "periShield": 26
+          },
+          "special": {
+            "periShield": 52
+          }
+        },
+        {
+          "hp": 290,
+          "atk": 28,
+          "shield": 28,
+          "params": {
+            "periShield": 28
+          },
+          "special": {
+            "periShield": 56
+          }
+        },
+        {
+          "hp": 336,
+          "atk": 32,
+          "shield": 32,
+          "params": {
+            "periShield": 30
+          },
+          "special": {
+            "periShield": 60
+          }
+        }
+      ]
+    },
+    {
+      "id": "kirke",
+      "name": "کیرکه",
+      "rarity": "rare",
+      "hp": 95,
+      "atk": 21,
+      "shield": 0,
+      "abilities": [
+        {
+          "id": "poison"
+        }
+      ],
+      "params": {
+        "poison": 4
+      },
+      "special": {
+        "poison": 8
+      },
+      "chargeAttacks": 4,
+      "levels": [
+        {
+          "hp": 137,
+          "atk": 30,
+          "shield": 0,
+          "params": {
+            "poison": 5
+          },
+          "special": {
+            "poison": 10
+          }
+        },
+        {
+          "hp": 179,
+          "atk": 39,
+          "shield": 0,
+          "params": {
+            "poison": 5
+          },
+          "special": {
+            "poison": 10
+          }
+        },
+        {
+          "hp": 220,
+          "atk": 49,
+          "shield": 0,
+          "params": {
+            "poison": 5
+          },
+          "special": {
+            "poison": 10
+          }
+        },
+        {
+          "hp": 262,
+          "atk": 58,
+          "shield": 0,
+          "params": {
+            "poison": 6
+          },
+          "special": {
+            "poison": 12
+          }
+        },
+        {
+          "hp": 304,
+          "atk": 67,
+          "shield": 0,
+          "params": {
+            "poison": 6
+          },
+          "special": {
+            "poison": 12
+          }
+        }
+      ]
     },
     {
       "id": "sohrab",
@@ -258,6 +742,11 @@
         "pierce": 20,
         "lifesteal": 15
       },
+      "special": {
+        "pierce": 40,
+        "lifesteal": 30
+      },
+      "chargeAttacks": 4,
       "levels": [
         {
           "hp": 163,
@@ -266,6 +755,10 @@
           "params": {
             "pierce": 22,
             "lifesteal": 16
+          },
+          "special": {
+            "pierce": 44,
+            "lifesteal": 32
           }
         },
         {
@@ -275,6 +768,10 @@
           "params": {
             "pierce": 24,
             "lifesteal": 17
+          },
+          "special": {
+            "pierce": 48,
+            "lifesteal": 34
           }
         },
         {
@@ -284,6 +781,10 @@
           "params": {
             "pierce": 26,
             "lifesteal": 18
+          },
+          "special": {
+            "pierce": 52,
+            "lifesteal": 36
           }
         },
         {
@@ -293,6 +794,10 @@
           "params": {
             "pierce": 28,
             "lifesteal": 19
+          },
+          "special": {
+            "pierce": 56,
+            "lifesteal": 38
           }
         },
         {
@@ -302,10 +807,197 @@
           "params": {
             "pierce": 30,
             "lifesteal": 20
+          },
+          "special": {
+            "pierce": 60,
+            "lifesteal": 40
           }
         }
+      ]
+    },
+    {
+      "id": "faramarz",
+      "name": "فرامرز",
+      "rarity": "epic",
+      "hp": 100,
+      "atk": 17,
+      "shield": 6,
+      "abilities": [
+        {
+          "id": "fire_walker"
+        },
+        {
+          "id": "double_chance"
+        }
       ],
-      "chargeAttacks": 3
+      "params": {
+        "fireWalk": 20,
+        "doubleChance": 15
+      },
+      "special": {
+        "fireWalk": 40,
+        "doubleChance": 30
+      },
+      "chargeAttacks": 4,
+      "levels": [
+        {
+          "hp": 148,
+          "atk": 25,
+          "shield": 9,
+          "params": {
+            "fireWalk": 22,
+            "doubleChance": 16
+          },
+          "special": {
+            "fireWalk": 44,
+            "doubleChance": 33
+          }
+        },
+        {
+          "hp": 196,
+          "atk": 33,
+          "shield": 12,
+          "params": {
+            "fireWalk": 24,
+            "doubleChance": 18
+          },
+          "special": {
+            "fireWalk": 48,
+            "doubleChance": 36
+          }
+        },
+        {
+          "hp": 244,
+          "atk": 41,
+          "shield": 15,
+          "params": {
+            "fireWalk": 26,
+            "doubleChance": 20
+          },
+          "special": {
+            "fireWalk": 52,
+            "doubleChance": 39
+          }
+        },
+        {
+          "hp": 292,
+          "atk": 50,
+          "shield": 18,
+          "params": {
+            "fireWalk": 28,
+            "doubleChance": 21
+          },
+          "special": {
+            "fireWalk": 56,
+            "doubleChance": 42
+          }
+        },
+        {
+          "hp": 340,
+          "atk": 58,
+          "shield": 20,
+          "params": {
+            "fireWalk": 30,
+            "doubleChance": 22
+          },
+          "special": {
+            "fireWalk": 60,
+            "doubleChance": 45
+          }
+        }
+      ]
+    },
+    {
+      "id": "artemisia",
+      "name": "آرتمیسیا",
+      "rarity": "epic",
+      "hp": 112,
+      "atk": 22,
+      "shield": 8,
+      "abilities": [
+        {
+          "id": "shield_break"
+        },
+        {
+          "id": "pierce"
+        }
+      ],
+      "params": {
+        "shieldBreak": 30,
+        "pierce": 15
+      },
+      "special": {
+        "shieldBreak": 60,
+        "pierce": 30
+      },
+      "chargeAttacks": 4,
+      "levels": [
+        {
+          "hp": 166,
+          "atk": 33,
+          "shield": 12,
+          "params": {
+            "shieldBreak": 33,
+            "pierce": 16
+          },
+          "special": {
+            "shieldBreak": 66,
+            "pierce": 33
+          }
+        },
+        {
+          "hp": 220,
+          "atk": 43,
+          "shield": 16,
+          "params": {
+            "shieldBreak": 36,
+            "pierce": 18
+          },
+          "special": {
+            "shieldBreak": 72,
+            "pierce": 36
+          }
+        },
+        {
+          "hp": 273,
+          "atk": 54,
+          "shield": 20,
+          "params": {
+            "shieldBreak": 39,
+            "pierce": 20
+          },
+          "special": {
+            "shieldBreak": 78,
+            "pierce": 39
+          }
+        },
+        {
+          "hp": 327,
+          "atk": 64,
+          "shield": 23,
+          "params": {
+            "shieldBreak": 42,
+            "pierce": 21
+          },
+          "special": {
+            "shieldBreak": 84,
+            "pierce": 42
+          }
+        },
+        {
+          "hp": 381,
+          "atk": 75,
+          "shield": 27,
+          "params": {
+            "shieldBreak": 45,
+            "pierce": 22
+          },
+          "special": {
+            "shieldBreak": 90,
+            "pierce": 45
+          }
+        }
+      ]
     }
   ],
   "upgrade": {

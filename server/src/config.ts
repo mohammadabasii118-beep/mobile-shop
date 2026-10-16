@@ -27,7 +27,7 @@ export function validateConfig(cfg: GameConfig): GameConfig {
     if (c.chargeAttacks !== undefined && (!Number.isInteger(c.chargeAttacks) || c.chargeAttacks < 0 || c.chargeAttacks > 20)) bad(`تعداد حمله‌ی قدرت ویژه‌ی ${c.id} باید عدد صحیح ۰ تا ۲۰ باشد`);
     for (const a of c.abilities ?? []) if (!a || !ABILITIES[a.id]) bad(`توانایی ناشناخته: ${a?.id}`);
     const okParams = (p: unknown) => p === undefined || (!!p && typeof p === 'object' && Object.values(p as object).every((v) => isNum(v)));
-    if (!okParams(c.params) || (c.levels ?? []).some((l) => !okParams(l?.params))) bad(`عددهای توانایی ${c.id} نامعتبر است`);
+    if (!okParams(c.params) || !okParams(c.special) || (c.levels ?? []).some((l) => !okParams(l?.params) || !okParams(l?.special))) bad(`عددهای توانایی ${c.id} نامعتبر است`);
     if (c.levels !== undefined && (!Array.isArray(c.levels) || c.levels.length > 20 || c.levels.some((l) => !l || !isNum(l.hp, 1) || !isNum(l.atk) || !isNum(l.shield)))) bad(`آمار لول‌های ${c.id} نامعتبر است`);
     if (c.image !== undefined && (typeof c.image !== 'string' || !/^\/uploads\/cards\/[a-z0-9_]+\.(png|jpg|webp)(\?v=\d+)?$/.test(c.image))) bad(`آدرس عکس ${c.id} نامعتبر است`);
   }

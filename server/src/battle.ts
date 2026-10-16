@@ -1,5 +1,5 @@
 import {
-  attack, createBattle, getUnit, aliveUnits, other, pickAttacker, pickTarget, snapshot, startNextTurn,
+  attack, createBattle, isValidTarget, getUnit, aliveUnits, other, pickAttacker, pickTarget, snapshot, startNextTurn,
   type BattleEvent, type BattleState, type GameConfig, type ServerMsg, type Side, type UnitInit, type UnitView,
 } from '@game/shared';
 
@@ -57,7 +57,7 @@ export class Battle {
       uid: u.uid, side: u.side, slot: u.slot, cardId: u.cardId, name: u.name,
       rarity: this.o.cfg.cards.find((c) => c.id === u.cardId)?.rarity ?? null,
       hp: u.hp, maxHp: u.maxHp, shield: u.shield, atk: u.atk, alive: u.alive, abilities: (u.abilities ?? []).map((a) => a.id), level: u.level ?? 1,
-      charge: u.charge, chargeNeed: u.chargeAttacks ?? 0, empowered: u.empowered, cooldown: u.cooldown,
+      charge: u.charge, chargeNeed: u.chargeAttacks ?? 0, empowered: u.empowered, cooldown: u.cooldown, poison: u.poison?.left ?? 0,
     }));
   }
 
@@ -83,7 +83,7 @@ export class Battle {
         }
         const c = await this.choose(part);
         if (this.ended) return;
-        this.broadcast(attack(this.state, c.from, c.to));
+        this.broadcast(attack(this.state, c.from, c.to, this.o.rng));
         await sleep(this.o.pauseMs);
       }
     }
@@ -115,7 +115,7 @@ export class Battle {
     const t = getUnit(this.state, uid);
     if (!f || !f.alive || f.side !== p.part.side) return;
     if (cur.uid ? cur.uid !== from : !cur.available.includes(from)) return;
-    if (!t || !t.alive || t.side === p.part.side) return;
+    if (!t || !isValidTarget(this.state, from, uid)) return;
     clearTimeout(p.timer);
     this.pending = null;
     p.resolve({ from, to: uid });

@@ -4,7 +4,7 @@ export type Side = 'A' | 'B';
 export interface AbilityRef { id: string }
 
 /** آمار یک کارت در یک لول */
-export interface CardStats { hp: number; atk: number; shield: number; /** عددهای توانایی در این لول (مثلاً { rage: 32 }) */ params?: Record<string, number> }
+export interface CardStats { hp: number; atk: number; shield: number; /** عددهای توانایی در این لول (مثلاً { rage: 32 }) */ params?: Record<string, number>; /** عددهای توانایی در حمله‌ی قدرت ویژه (اگر خالی باشد ۲ برابر عدد عادی) */ special?: Record<string, number> }
 
 export type BoxType = 'bronze' | 'silver' | 'gold';
 export const BOX_TYPES: BoxType[] = ['bronze', 'silver', 'gold'];
@@ -34,6 +34,8 @@ export interface CardDef {
   levels?: CardStats[];
   /** عددهای توانایی‌ها در لول ۱؛ برای لول‌های بعد در levels[i].params می‌آید */
   params?: Record<string, number>;
+  /** عددهای توانایی‌ها در حمله‌ی قدرت ویژه، لول ۱ (برای لول‌های بعد در levels[i].special) */
+  special?: Record<string, number>;
   /** توانایی‌ها (هر کارت می‌تواند چند توانایی داشته باشد) */
   abilities?: AbilityRef[];
   /** قدرت ویژه: بعد از این‌همه حمله، حمله‌ی بعدی همه‌ی توانایی‌های کارت را ۲ برابر می‌کند (۰ یا خالی = ندارد) */
@@ -116,6 +118,7 @@ export interface UnitInit {
   abilities?: AbilityRef[];
   /** عددهای توانایی‌ها در همین لول */
   params?: Record<string, number>;
+  special?: Record<string, number>;
   level?: number;
   /** قدرت ویژه: بعد از چند حمله، حمله‌ی بعدی توانایی‌ها را ۲ برابر می‌کند (۰ = ندارد) */
   chargeAttacks?: number;
@@ -135,11 +138,15 @@ export interface Unit extends UnitInit {
   empowered: boolean;
   /** چند نوبتِ بعدیِ همین طرف را کارت خاموش است (۰ = می‌تواند حمله کند) */
   cooldown: number;
+  /** سم فعال: درصدِ جان کامل که در هر نوبتِ همین طرف کم می‌شود و تعداد نوبت‌های باقی‌مانده */
+  poison: { pct: number; left: number } | null;
 }
 
 export type BattleEvent =
   | { type: 'turn'; side: Side; round: number; available: string[] }
-  | { type: 'attack'; from: string; to: string; dmg: number; shieldLost: number; hpLost: number; /** این حمله با قدرت ویژه (توانایی‌های ۲ برابر) بود */ empowered?: boolean }
+  | { type: 'attack'; from: string; to: string; dmg: number; shieldLost: number; hpLost: number; /** این حمله با قدرت ویژه (توانایی‌های ۲ برابر) بود */ empowered?: boolean; /** ضربه‌ی پخش‌شده روی کارت کناری */ splash?: boolean }
+  | { type: 'crit'; uid: string }
+  | { type: 'poison'; uid: string; amount: number }
   | { type: 'charge'; uid: string; charge: number; need: number; empowered: boolean }
   | { type: 'heal'; uid: string; amount: number }
   | { type: 'shield'; uid: string; amount: number }

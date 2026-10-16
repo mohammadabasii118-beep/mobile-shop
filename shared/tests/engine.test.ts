@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { attack, cooldownFor, createBattle, getUnit, pickAttacker, pickTarget, resolveCard, startNextTurn } from '../src';
+import { attack, cooldownFor, isValidTarget, createBattle, getUnit, pickAttacker, pickTarget, resolveCard, startNextTurn } from '../src';
 import type { GameConfig, UnitInit } from '../src';
 import cfg from '../config/game.json';
 
@@ -281,5 +281,142 @@ describe('engine: end conditions and config', () => {
     expect(c.solo.pits).toHaveLength(3);
     c.solo.pits.forEach((pit) => expect(pit.stages).toHaveLength(20));
     (['common', 'rare', 'epic'] as const).forEach((r) => expect(c.upgrade.byRarity[r].length).toBe(c.upgrade.maxLevel - 1));
+  });
+});
+
+describe('engine: new card abilities (mirath-cards-all)', () => {
+  const first = (n = 5, o: Partial<UnitInit> = {}) => deckN(n, { hp: 9999, shield: 0, ...o });
+  const strike = (s: S, from: string, to: string, rng: () => number = () => 0.99) => { startNextTurn(s); const ev = attack(s, from, to, rng); while (s.current && !s.over) ev.push(...attack(s, from, to, rng)); return ev; };
+
+  it('splash: part of the attack lands on a neighbouring card of the target', () => {
+    const d = [u({ atk: 100, abilities: [{ id: 'splash' }], params: { splash: 20 } }), ...deckN(4)];
+    const s = createBattle({ A: d, B: first() }, 'A');
+    const ev = strike(s, 'A0', 'B2');
+    expect(getUnit(s, 'B2')!.hp).toBe(9999 - 100);
+    const sp = ev.find((e) => e.type === 'attack' && (e as any).splash) as any;
+    expect(sp.dmg).toBe(20);
+    expect(Math.abs(Number(sp.to.slice(1)) - 2)).toBe(1);               // کارت کناری
+    expect(getUnit(s, sp.to)!.hp).toBe(9999 - 20);
+  });
+
+  it('crit: with the lucky roll the hit is 1.5x (and a crit event is emitted)', () => {
+    const d = [u({ atk: 40, abilities: [{ id: 'crit' }], params: { crit: 25 } }), ...deckN(4)];
+    const lucky = createBattle({ A: d, B: first() }, 'A');
+    const e1 = strike(lucky, 'A0', 'B0', () => 0);
+    expect((e1.find((e) => e.type === 'attack') as any).dmg).toBe(60);
+    expect(e1.some((e) => e.type === 'crit')).toBe(true);
+    const normal = createBattle({ A: d, B: first() }, 'A');
+    const e2 = strike(normal, 'A0', 'B0', () => 0.99);
+    expect((e2.find((e) => e.type === 'attack') as any).dmg).toBe(40);
+  });
+
+  it('shield_ally (Peri): shields a teammate for a % of her max hp; cannot hit enemies; empowered doubles the %', () => {
+    const peri = u({ hp: 100, atk: 10, chargeAttacks: 1, abilities: [{ id: 'shield_ally' }], params: { periShield: 20 }, special: { periShield: 40 } });
+    const s = createBattle({ A: [peri, ...deckN(4, { shield: 0 })], B: first() }, 'A');
+    startNextTurn(s);
+    expect(isValidTarget(s, 'A0', 'B0')).toBe(false);
+    expect(isValidTarget(s, 'A0', 'A0')).toBe(false);
+    expect(() => attack(s, 'A0', 'B0')).toThrow();
+    attack(s, 'A1', 'B0');                                              // پری حمله نکرده؛ یک کارت دیگر
+    bturn(s, 'A2');
+    startNextTurn(s);
+    attack(s, 'A0', 'A2');
+    expect(getUnit(s, 'A2')!.shield).toBe(20);
+    expect(getUnit(s, 'A0')!.empowered).toBe(true);
+    for (let i = 0; i < 2; i++) { bturn(s, 'A3'); startNextTurn(s); attack(s, s.current!.available.find((x) => x !== 'A0' && x !== 'A2')!, 'B0'); }
+    getUnit(s, 'A0')!.cooldown = 0;
+    bturn(s, 'A3');
+    startNextTurn(s);
+    attack(s, 'A0', 'A4');
+    expect(getUnit(s, 'A4')!.shield).toBe(40);                         // ۲ برابر
+  });
+
+  it('shield_ally: a lone Peri may shield herself', () => {
+    const peri = u({ hp: 100, abilities: [{ id: 'shield_ally' }], params: { periShield: 20 } });
+    const s = createBattle({ A: [peri], B: first(1) }, 'A');
+    startNextTurn(s);
+    expect(isValidTarget(s, 'A0', 'A0')).toBe(true);
+    attack(s, 'A0', 'A0');
+    expect(getUnit(s, 'A0')!.shield).toBe(20);
+  });
+
+  it('poison (Kirke): hits poison the target for 2 of its own turns, % of max hp, ignoring shield', () => {
+    const d = [u({ atk: 10, abilities: [{ id: 'poison' }], params: { poison: 5 } }), ...deckN(4)];
+    const s = createBattle({ A: d, B: first(5, { hp: 1000, shield: 500 }) }, 'A');
+    strike(s, 'A0', 'B0');
+    expect(getUnit(s, 'B0')!.poison).toEqual({ pct: 5, left: 2 });
+    const hp0 = getUnit(s, 'B0')!.hp;
+    const ev1 = startNextTurn(s);                                       // نوبت B: ۱ تیک
+    expect(ev1.find((e) => e.type === 'poison')).toMatchObject({ uid: 'B0', amount: 50 });
+    expect(getUnit(s, 'B0')!.hp).toBe(hp0 - 50);
+    attack(s, 'B1', 'A0');
+    startNextTurn(s); attack(s, 'A1', 'B1');
+    startNextTurn(s);                                                    // تیک دوم
+    expect(getUnit(s, 'B0')!.hp).toBe(hp0 - 100);
+    expect(getUnit(s, 'B0')!.poison).toBeNull();
+  });
+
+  it('poison can kill, and the side that loses its last card to poison loses', () => {
+    const d = [u({ atk: 1, abilities: [{ id: 'poison' }], params: { poison: 50 } }), ...deckN(2)];
+    const s = createBattle({ A: d, B: [u({ hp: 3, shield: 0 })] }, 'A');
+    startNextTurn(s);
+    attack(s, 'A0', 'B0');
+    const ev = startNextTurn(s);
+    expect(ev.some((e) => e.type === 'death')).toBe(true);
+    expect(s.over).toBe(true);
+    expect(s.winner).toBe('A');
+  });
+
+  it('fire_walker (Faramarz): shield grows by a % of the attack after each hit', () => {
+    const d = [u({ atk: 50, shield: 0, abilities: [{ id: 'fire_walker' }], params: { fireWalk: 20 } }), ...deckN(4)];
+    const s = createBattle({ A: d, B: first() }, 'A');
+    strike(s, 'A0', 'B0');
+    expect(getUnit(s, 'A0')!.shield).toBe(10);
+  });
+
+  it('double_chance: with the lucky roll the card attacks twice in one turn', () => {
+    const d = [u({ atk: 10, abilities: [{ id: 'double_chance' }], params: { doubleChance: 15 } }), ...deckN(4)];
+    const lucky = createBattle({ A: d, B: first() }, 'A');
+    startNextTurn(lucky);
+    attack(lucky, 'A0', 'B0', () => 0);
+    expect(lucky.current!.attacksLeft).toBe(1);
+    const no = createBattle({ A: d, B: first() }, 'A');
+    startNextTurn(no);
+    attack(no, 'A0', 'B0', () => 0.99);
+    expect(no.current).toBeNull();
+  });
+
+  it('shield_break (Artemisia): destroys a % of the target shield before the hit, then pierce', () => {
+    const d = [u({ atk: 50, abilities: [{ id: 'shield_break' }, { id: 'pierce' }], params: { shieldBreak: 50, pierce: 20 } }), ...deckN(4)];
+    const s = createBattle({ A: d, B: first(5, { hp: 1000, shield: 100 }) }, 'A');
+    const ev = strike(s, 'A0', 'B0');
+    expect(ev.find((e) => e.type === 'shield')).toMatchObject({ uid: 'B0', amount: -50 });
+    // شیلد ۱۰۰ ← ۵۰؛ ضربه ۵۰: ۱۰ مستقیم به جان، ۴۰ به شیلد
+    expect(getUnit(s, 'B0')!.shield).toBe(10);
+    expect(getUnit(s, 'B0')!.hp).toBe(1000 - 10);
+  });
+
+  it('special values from the card table (not just 2x) are used for the empowered attack', () => {
+    const d = [u({ atk: 10, chargeAttacks: 1, abilities: [{ id: 'fire_walker' }], params: { fireWalk: 16 }, special: { fireWalk: 33 } }), ...deckN(4)];
+    const s = createBattle({ A: d, B: first() }, 'A');
+    strike(s, 'A0', 'B0');                                              // پر شد
+    bturn(s, 'A1');
+    const a0 = getUnit(s, 'A0')!; a0.cooldown = 0; a0.shield = 0;
+    strike(s, 'A0', 'B0');                                              // حمله‌ی ویژه: ۳۳٪ از ۱۰ = ۳
+    expect(a0.shield).toBe(3);
+  });
+
+  it('config: every card ability exists and the 16-card set matches the design doc', () => {
+    const c = cfg as unknown as GameConfig;
+    expect(c.cards).toHaveLength(16);
+    const by = (r: string) => c.cards.filter((x) => x.rarity === r).map((x) => x.id);
+    expect(by('common')).toEqual(['giv', 'bijan', 'arash', 'goodarz', 'tus', 'hector', 'raham']);
+    expect(by('rare')).toEqual(['gordafarid', 'kaveh', 'siavash', 'achilles', 'peri', 'kirke']);
+    expect(by('epic')).toEqual(['sohrab', 'faramarz', 'artemisia']);
+    const fz = c.cards.find((x) => x.id === 'faramarz')!;
+    expect(resolveCard(fz, 4, c).params).toMatchObject({ fireWalk: 26, doubleChance: 20 });
+    expect(resolveCard(fz, 4, c).special).toMatchObject({ fireWalk: 52, doubleChance: 39 });
+    expect(resolveCard(c.cards.find((x) => x.id === 'kirke')!, 6, c)).toMatchObject({ hp: 304, atk: 67, shield: 0, params: { poison: 6 }, special: { poison: 12 } });
+    c.cards.filter((x) => x.rarity === 'common').forEach((x) => expect(x.abilities ?? []).toHaveLength(0));
   });
 });

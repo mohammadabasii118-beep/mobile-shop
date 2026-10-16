@@ -13,15 +13,15 @@ export function upgradeStep(cfg: GameConfig, rarity: Rarity, level: number) {
 /** آمار کارت در یک لول (از جدول آمار خودِ کارت) به‌همراه عددهای توانایی همان لول */
 export function cardStatsAt(def: CardDef, level: number): CardStats {
   const lv = def.levels ?? [];
-  if (level <= 1 || lv.length === 0) return { hp: def.hp, atk: def.atk, shield: def.shield, params: def.params };
+  if (level <= 1 || lv.length === 0) return { hp: def.hp, atk: def.atk, shield: def.shield, params: def.params, special: def.special };
   const row = lv[Math.min(level - 2, lv.length - 1)];
-  return { ...row, params: { ...def.params, ...row.params } };
+  return { ...row, params: { ...def.params, ...row.params }, special: { ...def.special, ...row.special } };
 }
 
 /** کارت را با آمار و عددهای توانایی لولش برای نبرد آماده می‌کند. (پارامتر سوم برای سازگاری است و استفاده نمی‌شود) */
 export function resolveCard(def: CardDef, level: number, _cfg?: unknown): UnitInit {
   const s = cardStatsAt(def, level);
-  return { cardId: def.id, name: def.name, hp: s.hp, atk: s.atk, shield: s.shield, abilities: def.abilities, params: s.params ?? {}, level, chargeAttacks: def.chargeAttacks ?? 0 };
+  return { cardId: def.id, name: def.name, hp: s.hp, atk: s.atk, shield: s.shield, abilities: def.abilities, params: s.params ?? {}, special: s.special ?? {}, level, chargeAttacks: def.chargeAttacks ?? 0 };
 }
 
 export function createBattle(
@@ -44,6 +44,7 @@ export function createBattle(
         charge: 0,
         empowered: false,
         cooldown: 0,
+        poison: null,
       }),
     );
   }
@@ -59,7 +60,7 @@ export function createBattle(
     maxRounds,
   };
   // توانایی‌های «اول مبارزه» (مثل سپر هم‌تیمی) یک‌بار اعمال می‌شوند؛ نمایش اولیه‌ی کارت‌ها همین آمار نهایی است
-  for (const u of units) for (const ab of abilitiesOf(u)) ab.onBattleStart?.({ state, unit: u, params: u.params ?? {}, emit: () => {} });
+  for (const u of units) for (const ab of abilitiesOf(u)) ab.onBattleStart?.({ state, unit: u, params: u.params ?? {}, emit: () => {}, rng: Math.random });
   for (const u of units) u.maxShield = Math.max(u.maxShield, u.shield);
   return state;
 }
@@ -78,8 +79,21 @@ function abilitiesOf(u: Unit) {
   return (u.abilities ?? []).map((a) => ABILITIES[a.id]).filter((a): a is NonNullable<typeof a> => !!a);
 }
 
-function ctxFor(s: BattleState, unit: Unit, events: BattleEvent[]): AbilityCtx {
-  return { state: s, unit, params: unit.params ?? {}, emit: (e) => events.push(e) };
+function ctxFor(s: BattleState, unit: Unit, events: BattleEvent[], rng: Rng = Math.random): AbilityCtx {
+  return { state: s, unit, params: unit.params ?? {}, emit: (e) => events.push(e), rng };
+}
+
+/** مرگ کارتی که جانش تمام شده (با امکان زنده‌شدن دوباره) */
+function settleDeath(s: BattleState, target: Unit, events: BattleEvent[]) {
+  if (target.hp > 0 || !target.alive) return;
+  const tCtx = ctxFor(s, target, events);
+  const saved = abilitiesOf(target).some((ab) => ab.onDeath?.(tCtx) === true);
+  if (!saved) {
+    target.alive = false;
+    target.hp = 0;
+    target.poison = null;
+    events.push({ type: 'death', uid: target.uid });
+  }
 }
 
 function finish(s: BattleState, winner: Side, reason: 'kills' | 'round_cap', events: BattleEvent[]) {
@@ -110,6 +124,15 @@ export function startNextTurn(s: BattleState): BattleEvent[] {
     return events;
   }
   const side = s.nextSide;
+  // سم: در شروع نوبتِ طرفِ مسموم، هر کارتِ مسموم درصدی از جان کامل خودش را از دست می‌دهد
+  for (const u of aliveUnits(s, side)) {
+    if (!u.poison) continue;
+    const amount = Math.max(1, Math.round((u.maxHp * u.poison.pct) / 100));
+    u.hp = Math.max(0, u.hp - amount);
+    events.push({ type: 'poison', uid: u.uid, amount });
+    if (--u.poison.left <= 0) u.poison = null;
+    settleDeath(s, u, events);
+  }
   const alive = aliveUnits(s, side).sort((x, y) => x.slot - y.slot);
   if (alive.length === 0) {
     finish(s, other(side), 'kills', events);
@@ -130,59 +153,80 @@ export function startNextTurn(s: BattleState): BattleEvent[] {
   return events;
 }
 
+/** عددهای حمله‌ی قدرت ویژه: اگر برای کارت عدد مشخصی تعریف شده همان، وگرنه ۲ برابرِ عدد عادی */
+const empoweredParams = (u: Unit) => ({ ...doubled(u.params), ...(u.special ?? {}) });
+const isSupport = (u: Unit) => abilitiesOf(u).some((ab) => ab.support);
+
+/** آیا این کارت می‌تواند این کارت را هدف بگیرد؟ (حمله‌کننده: دشمنِ زنده؛ پشتیبان مثل پری: هم‌تیمیِ زنده، و خودش فقط اگر تنها کارت زنده باشد) */
+export function isValidTarget(s: BattleState, attackerUid: string, targetUid: string): boolean {
+  const a = getUnit(s, attackerUid), t = getUnit(s, targetUid);
+  if (!a || !t || !t.alive) return false;
+  if (!isSupport(a)) return t.side !== a.side;
+  if (t.side !== a.side) return false;
+  return t.uid !== a.uid || aliveUnits(s, a.side).length === 1;
+}
+
 /**
- * حمله‌ی یک کارتِ آماده به یک هدفِ زنده‌ی حریف (هر دو را بازیکن انتخاب می‌کند).
+ * حمله‌ی یک کارتِ آماده به یک هدف (هر دو را بازیکن انتخاب می‌کند).
  * اگر کارت توانایی چندحمله‌ای دارد، بعد از اولین حمله همان کارت باید باقی حمله‌هایش را بزند.
+ * کارت‌های پشتیبان (پری) به‌جای حمله روی یک هم‌تیمی اثر می‌گذارند. rng برای توانایی‌های شانسی است.
  */
-export function attack(s: BattleState, attackerUid: string, targetUid: string): BattleEvent[] {
+export function attack(s: BattleState, attackerUid: string, targetUid: string, rng: Rng = Math.random): BattleEvent[] {
   const events: BattleEvent[] = [];
   if (s.over || !s.current) throw new Error('no active turn');
   const attacker = getUnit(s, attackerUid);
   const target = getUnit(s, targetUid);
   if (!attacker || !attacker.alive || attacker.side !== s.current.side) throw new Error('bad attacker');
+  if (s.current.uid === null && !s.current.available.includes(attackerUid)) throw new Error('attacker not available');
+  if (s.current.uid !== null && s.current.uid !== attackerUid) throw new Error('attacker must be the same card');
+  if (!target || !isValidTarget(s, attackerUid, targetUid)) throw new Error('bad target');
+  const emp = attacker.empowered;
+  const params = emp ? empoweredParams(attacker) : attacker.params ?? {};
   if (s.current.uid === null) {
-    if (!s.current.available.includes(attackerUid)) throw new Error('attacker not available');
     s.current.uid = attackerUid;
     // توانایی‌های «شروع نوبت» (مثل شیلد هر نوبت) وقتی کارت انتخاب شد اجرا می‌شوند
     const abs0 = abilitiesOf(attacker);
-    const c0 = ctxFor(s, attacker, events);
+    const c0 = ctxFor(s, attacker, events, rng);
     for (const ab of abs0) ab.onTurnStart?.(c0);
-    s.current.attacksLeft = Math.max(1, ...abs0.map((ab) => ab.attacksPerTurn?.(attacker.params ?? {}) ?? 1));
-  } else if (s.current.uid !== attackerUid) {
-    throw new Error('attacker must be the same card');
+    s.current.attacksLeft = Math.max(1, ...abs0.map((ab) => ab.attacksPerTurn?.(params, rng) ?? 1));
   }
-  if (!target || !target.alive || target.side === attacker.side) throw new Error('bad target');
 
-  const emp = attacker.empowered;
-  const params = emp ? doubled(attacker.params) : attacker.params ?? {};
-  const aCtx: AbilityCtx = { state: s, unit: attacker, params, emit: (e) => events.push(e) };
+  const aCtx: AbilityCtx = { state: s, unit: attacker, params, emit: (e) => events.push(e), rng };
   const aAbs = abilitiesOf(attacker);
-  // قدرت ویژه: توانایی‌های «یک‌باره» (مثل سپر هم‌تیمی) دوباره و با عدد ۲ برابر اجرا می‌شوند
-  if (emp) for (const ab of aAbs) if (ab.retrigger) ab.onBattleStart?.(aCtx);
-  // عدد حمله با توانایی‌هایی مثل خشم؛ نفوذ: بخشی از ضربه شیلد را رد می‌کند و مستقیم از جان کم می‌شود
-  let dmg = attacker.atk;
-  for (const ab of aAbs) if (ab.modifyAttack) dmg = ab.modifyAttack(aCtx, dmg);
-  const pierceP = Math.min(100, aAbs.reduce((t, ab) => t + (ab.pierce?.(params) ?? 0), 0));
-  const direct = Math.floor((dmg * pierceP) / 100);
-  const normal = dmg - direct;
-  const shieldLost = Math.min(target.shield, normal);
-  target.shield -= shieldLost;
-  const hpLost = Math.min(target.hp, direct + (normal - shieldLost));
-  target.hp -= hpLost;
-  events.push({ type: 'attack', from: attacker.uid, to: target.uid, dmg, shieldLost, hpLost, ...(emp ? { empowered: true } : {}) });
-  for (const ab of aAbs) ab.onAttack?.(aCtx, target, shieldLost + hpLost);
+  /** ضربه‌ی مستقیم به یک کارت (برای پخش ضربه): شیلد اول، بعد جان */
+  aCtx.hit = (victim, amount, opts) => {
+    if (!victim.alive || amount <= 0) return;
+    const sl = Math.min(victim.shield, amount);
+    victim.shield -= sl;
+    const hl = Math.min(victim.hp, amount - sl);
+    victim.hp -= hl;
+    events.push({ type: 'attack', from: attacker.uid, to: victim.uid, dmg: amount, shieldLost: sl, hpLost: hl, ...(opts?.splash ? { splash: true } : {}) });
+    settleDeath(s, victim, events);
+  };
 
-  if (target.hp <= 0) {
-    const tCtx = ctxFor(s, target, events);
-    const saved = abilitiesOf(target).some((ab) => ab.onDeath?.(tCtx) === true);
-    if (!saved) {
-      target.alive = false;
-      target.hp = 0;
-      events.push({ type: 'death', uid: target.uid });
-    }
+  if (isSupport(attacker)) {
+    // پشتیبان: روی هم‌تیمی اثر می‌گذارد (حمله‌ای در کار نیست)
+    for (const ab of aAbs) ab.onSupport?.(aCtx, target);
+  } else {
+    // قدرت ویژه: توانایی‌های «یک‌باره» (مثل سپر هم‌تیمی) دوباره و با عدد ۲ برابر اجرا می‌شوند
+    if (emp) for (const ab of aAbs) if (ab.retrigger) ab.onBattleStart?.(aCtx);
+    for (const ab of aAbs) ab.beforeHit?.(aCtx, target);
+    // عدد حمله با توانایی‌هایی مثل خشم و ضربه‌ی کاری؛ نفوذ: بخشی از ضربه شیلد را رد می‌کند و مستقیم از جان کم می‌شود
+    let dmg = attacker.atk;
+    for (const ab of aAbs) if (ab.modifyAttack) dmg = ab.modifyAttack(aCtx, dmg);
+    const pierceP = Math.min(100, aAbs.reduce((t, ab) => t + (ab.pierce?.(params) ?? 0), 0));
+    const direct = Math.floor((dmg * pierceP) / 100);
+    const normal = dmg - direct;
+    const shieldLost = Math.min(target.shield, normal);
+    target.shield -= shieldLost;
+    const hpLost = Math.min(target.hp, direct + (normal - shieldLost));
+    target.hp -= hpLost;
+    events.push({ type: 'attack', from: attacker.uid, to: target.uid, dmg, shieldLost, hpLost, ...(emp ? { empowered: true } : {}) });
+    for (const ab of aAbs) ab.onAttack?.(aCtx, target, shieldLost + hpLost, dmg);
+    settleDeath(s, target, events);
   }
 
-  // نوار قدرت ویژه: هر حمله کمی پر می‌کند؛ بعد از پر شدن، حمله‌ی بعدی ۲ برابر است و دوباره از صفر
+  // نوار قدرت ویژه: هر حمله (یا هر بار استفاده) کمی پر می‌کند؛ بعد از پر شدن، بار بعد ۲ برابر است و دوباره از صفر
   const need = attacker.chargeAttacks ?? 0;
   if (need > 0) {
     if (emp) { attacker.charge = 0; attacker.empowered = false; }
@@ -191,12 +235,12 @@ export function attack(s: BattleState, attackerUid: string, targetUid: string): 
   }
 
   s.current.attacksLeft--;
-  if (aliveUnits(s, target.side).length === 0) {
+  const foe = other(attacker.side);
+  if (aliveUnits(s, foe).length === 0) {
     finish(s, attacker.side, 'kills', events);
   } else if (s.current.attacksLeft <= 0) {
     // خاموشی: طبق تعداد کارت‌های زنده‌ی همین طرف
-    const cd = cooldownFor(aliveUnits(s, attacker.side).length);
-    attacker.cooldown = cd;
+    attacker.cooldown = cooldownFor(aliveUnits(s, attacker.side).length);
     s.current = null;
   }
   return events;
@@ -212,6 +256,15 @@ export function pickAttacker(s: BattleState, mode: 'random' | 'smart', rng: Rng)
 }
 
 export function pickTarget(s: BattleState, side: Side, mode: 'random' | 'smart', rng: Rng, attackerUid?: string): string {
+  const who = getUnit(s, attackerUid ?? s.current?.uid ?? '');
+  if (who && isSupport(who)) {
+    // پشتیبان: روی هم‌تیمی (ترجیحاً غیر از خودش) اثر می‌گذارد؛ هوشمند: کم‌جان‌ترین نسبت به جان کامل
+    const mates = aliveUnits(s, who.side);
+    const pool = mates.filter((m) => m.uid !== who.uid);
+    const list = pool.length ? pool : mates;
+    if (mode === 'random') return list[Math.floor(rng() * list.length)].uid;
+    return [...list].sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp)[0].uid;
+  }
   const foes = aliveUnits(s, other(side));
   if (mode === 'random') return foes[Math.floor(rng() * foes.length)].uid;
   // هوشمند: اگه بشه یکی رو کشت همون، وگرنه خطرناک‌ترین (بیشترین حمله) رو بزن
@@ -222,7 +275,7 @@ export function pickTarget(s: BattleState, side: Side, mode: 'random' | 'smart',
 }
 
 export const snapshot = (s: BattleState) =>
-  s.units.map((u) => ({ uid: u.uid, hp: u.hp, shield: u.shield, alive: u.alive, charge: u.charge, empowered: u.empowered, cooldown: u.cooldown }));
+  s.units.map((u) => ({ uid: u.uid, hp: u.hp, shield: u.shield, alive: u.alive, charge: u.charge, empowered: u.empowered, cooldown: u.cooldown, poison: u.poison?.left ?? 0 }));
 
 /** هزینه‌ی الماس برای باز کردن فوری جعبه: برای هر stepMinutes دقیقه‌ی باقی‌مانده (رو به بالا) gemsPerStep. مثلاً ۱۲ دقیقه → ۲ پله → ۴ الماس */
 export const boxSpeedupCost = (remainingMs: number, sp: { gemsPerStep: number; stepMinutes: number }) =>

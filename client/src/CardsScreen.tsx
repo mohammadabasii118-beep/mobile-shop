@@ -87,7 +87,11 @@ function Detail({ flash, locked, def, level, copies, cfg, coins, deck, deckSize,
           <p>⚔ حمله: {fa(s.atk)}{d(s.atk, next?.atk)}</p>
           <p>🛡 شیلد: {fa(s.shield)}{d(s.shield, next?.shield)}</p>
           {abilityLines(def.abilities, s.params, fa).map((a) => <p key={a.label} className="ability">✦ <b>{a.label}:</b> {a.text}</p>)}
-          {(def.chargeAttacks ?? 0) > 0 && (def.abilities?.length ?? 0) > 0 && <p className="ability">🔥 <b>قدرت ویژه:</b> بعد از {fa(def.chargeAttacks!)} حمله، حمله‌ی بعدی همه‌ی توانایی‌هایش ۲ برابر می‌شود</p>}
+          {(def.chargeAttacks ?? 0) > 0 && (def.abilities?.length ?? 0) > 0 && (
+            <div className="ability">🔥 <b>قدرت ویژه:</b> بعد از {fa(def.chargeAttacks!)} {def.abilities?.some((a) => a.id === 'shield_ally') ? 'بار استفاده' : 'حمله'}، دفعه‌ی بعد:
+              {abilityLines(def.abilities, { ...s.params, ...s.special }, fa).map((a) => <div key={a.label}>• {a.label}: {a.text}</div>)}
+            </div>
+          )}
           {def.desc && <p className="ability">✦ {def.desc}</p>}
         </div>
       </div>

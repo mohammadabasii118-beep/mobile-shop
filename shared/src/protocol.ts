@@ -4,9 +4,9 @@ export interface UnitView {
   uid: string; side: Side; slot: number; cardId: string; name: string; rarity: Rarity | null;
   hp: number; maxHp: number; shield: number; atk: number; alive: boolean; abilities: string[]; level: number;
   /** قدرت ویژه: تعداد حمله‌ی انجام‌شده، تعدادِ لازم (۰ = ندارد)، آماده بودن (حمله‌ی بعدی ۲ برابر)، و نوبت‌های خاموشی */
-  charge: number; chargeNeed: number; empowered: boolean; cooldown: number;
+  charge: number; chargeNeed: number; empowered: boolean; cooldown: number; /** نوبت‌های باقی‌مانده‌ی سم (۰ = سالم) */ poison: number;
 }
-export interface Snap { uid: string; hp: number; shield: number; alive: boolean; charge: number; empowered: boolean; cooldown: number }
+export interface Snap { uid: string; hp: number; shield: number; alive: boolean; charge: number; empowered: boolean; cooldown: number; poison: number }
 
 export interface FriendBase { id: number; name: string; avatar: string | null; level: number; trophies: number }
 /** دوست با وضعیت: آنلاین بودن و درگیر بودن در مبارزه */

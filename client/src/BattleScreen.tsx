@@ -93,15 +93,24 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
       case 'turn':
         setLog(`نوبت ${ev.side === me ? ctx.profile.name : start.opponent}`); break;
       case 'attack':
+        if (ev.splash) {
+          setHit(ev.to); playSfx('hit');
+          patch(ev.to, (u) => ({ shield: u.shield - ev.shieldLost, hp: u.hp - ev.hpLost }));
+          float(ev.to, `-${fa(ev.dmg)}`, ev.hpLost === 0 ? 'shieldhit' : 'dmg'); addFx(ev.to, 'spark', 700);
+          setLog(`ضربه روی کارت کناری هم پخش شد`);
+          await sleep(450); setHit(null); break;
+        }
         setActive(ev.from); setAttacking(ev.from); await sleep(260); haptic();
         setAttacking(null); setHit(ev.to); playSfx('hit');
         patch(ev.to, (u) => ({ shield: u.shield - ev.shieldLost, hp: u.hp - ev.hpLost }));
         float(ev.to, `-${fa(ev.dmg)}`, ev.hpLost === 0 ? 'shieldhit' : 'dmg'); if (ev.empowered) float(ev.from, '🔥 ۲×', 'heal'); addFx(ev.to, 'spark', 700);
         setLog(`${nameOf(ev.from, list)} ← ${nameOf(ev.to, list)}  ${fa(ev.dmg)} آسیب`);
         await sleep(450); setHit(null); break;
+      case 'crit': float(ev.uid, '💥 ضربه‌ی کاری!', 'heal'); break;
+      case 'poison': patch(ev.uid, (u) => ({ hp: Math.max(0, u.hp - ev.amount) })); float(ev.uid, `☠ -${fa(ev.amount)}`, 'dmg'); setHit(ev.uid); await sleep(500); setHit(null); break;
       case 'charge': patch(ev.uid, () => ({ charge: ev.charge, empowered: ev.empowered })); if (ev.empowered) { float(ev.uid, '🔥 قدرت ویژه!', 'heal'); setLog(`${nameOf(ev.uid, list)} آماده‌ی حمله‌ی ۲ برابر است`); await sleep(450); } break;
       case 'heal': patch(ev.uid, (u) => ({ hp: Math.min(u.maxHp, u.hp + ev.amount) })); float(ev.uid, `+${fa(ev.amount)}`, 'heal'); await sleep(350); break;
-      case 'shield': patch(ev.uid, (u) => ({ shield: u.shield + ev.amount })); float(ev.uid, `🛡+${fa(ev.amount)}`, 'shieldup'); await sleep(350); break;
+      case 'shield': patch(ev.uid, (u) => ({ shield: Math.max(0, u.shield + ev.amount) })); float(ev.uid, ev.amount >= 0 ? `🛡+${fa(ev.amount)}` : `🛡−${fa(-ev.amount)}`, 'shieldup'); await sleep(350); break;
       case 'death': addFx(ev.uid, 'shatter', 1150); patch(ev.uid, () => ({ alive: false, hp: 0 })); setLog(`${nameOf(ev.uid, list)} از پا درآمد 💀`); await sleep(500); break;
       case 'revive': patch(ev.uid, () => ({ alive: true, hp: ev.hp })); float(ev.uid, '🔥 زنده شد', 'heal'); setLog(`${nameOf(ev.uid, list)} دوباره زنده شد!`); await sleep(600); break;
       case 'end': break;
@@ -161,11 +170,19 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
 
   /** کارتِ من می‌تواند الان حمله کند؟ (نوبت من است، کارت آماده است؛ اگر چندحمله‌ای وسط کار است فقط همان کارت) */
   const canDrag = (u: UnitView) => !!prompt?.mine && u.side === me && u.alive && (prompt.attacker ? prompt.attacker === u.uid : prompt.available.includes(u.uid));
-  const foeUnder = (x: number, y: number) => {
+  /** کارت‌های پشتیبان (مثل پری) روی هم‌تیمی اثر می‌گذارند، بقیه روی دشمن */
+  const isSupportUnit = (u?: UnitView) => !!u && u.abilities.includes('shield_ally');
+  const validTarget = (from: UnitView | undefined, t: UnitView) => {
+    if (!from || !t.alive) return false;
+    if (!isSupportUnit(from)) return t.side !== me;
+    return t.side === me && (t.uid !== from.uid || unitsRef.current.filter((q) => q.side === me && q.alive).length === 1);
+  };
+  const foeUnder = (x: number, y: number, fromUid?: string) => {
     const el = document.elementFromPoint(x, y)?.closest('[data-uid]') as HTMLElement | null;
     const uid = el?.dataset.uid;
     const u = uid ? unitsRef.current.find((q) => q.uid === uid) : undefined;
-    return u && u.alive && u.side !== me ? u.uid : null;
+    const from = unitsRef.current.find((q) => q.uid === fromUid);
+    return u && validTarget(from, u) ? u.uid : null;
   };
   const startDrag = (e: React.PointerEvent, u: UnitView) => {
     if (!canDrag(u)) return;
@@ -173,12 +190,12 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     setDrag({ uid: u.uid, x: e.clientX, y: e.clientY, over: null });
   };
-  const moveDrag = (e: React.PointerEvent) => setDrag((d) => (d ? { ...d, x: e.clientX, y: e.clientY, over: foeUnder(e.clientX, e.clientY) } : d));
+  const moveDrag = (e: React.PointerEvent) => setDrag((d) => (d ? { ...d, x: e.clientX, y: e.clientY, over: foeUnder(e.clientX, e.clientY, d.uid) } : d));
   const endDrag = (e: React.PointerEvent, cancel = false) => {
     const d = drag;
     setDrag(null);
     if (!d || cancel || !prompt?.mine) return;
-    const to = foeUnder(e.clientX, e.clientY);
+    const to = foeUnder(e.clientX, e.clientY, d.uid);
     if (to) { sock.send({ t: 'attack', battleId: start.battleId, from: d.uid, uid: to }); setPrompt(null); }
   };
 
@@ -190,7 +207,7 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
     const def = cfg.cards.find((c) => c.id === u.cardId)!;
     const dragging = drag?.uid === u.uid;
     const droptarget = !!drag && drag.over === u.uid;
-    const targetable = !!drag && u.side !== me && u.alive;
+    const targetable = !!drag && validTarget(units.find((q) => q.uid === drag.uid), u) && u.uid !== drag.uid;
     const draggable = canDrag(u);
     const resting = u.alive && (u.side === me ? (prompt?.mine ? !prompt.available.includes(u.uid) : u.cooldown > 0) : (!!prompt && !prompt.mine && !prompt.available.includes(u.uid)));
     const shatter = fxs.find((f) => f.uid === u.uid && f.kind === 'shatter');
@@ -203,6 +220,7 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
           dead={!u.alive} className={cls} hidePips />
         {u.empowered && u.alive && <div className="flame" aria-hidden />}
         {resting && <span className="restb">⏳</span>}
+        {u.alive && u.poison > 0 && <span className="poisonb" title="مسموم">☠</span>}
         {shatter && (
           <div className="shards" aria-hidden>
             {shatter.v.map((v, i) => (
@@ -231,7 +249,7 @@ export function BattleScreen({ ctx, init, onDone, onExit, result }: {
       <div className="mid">
         {bubbles.filter((b) => !b.mine).map((b) => <div key={b.k} className="cbubble cb-foe">{b.text}</div>)}
         <div className="log">{log}</div>
-        <small className="hint">{prompt?.mine ? (prompt.attacker ? `حمله‌ی بعدی (${fa(prompt.attacksLeft)} باقی)` : 'کارتت را بکش و روی کارت حریف رها کن') : prompt ? 'حریف در حال انتخاب است…' : ''}</small>
+        <small className="hint">{prompt?.mine ? (prompt.attacker ? `حمله‌ی بعدی (${fa(prompt.attacksLeft)} باقی)` : 'کارتت را بکش و روی کارت حریف رها کن (پری: روی هم‌تیمی)') : prompt ? 'حریف در حال انتخاب است…' : ''}</small>
       </div>
       {bubbles.filter((b) => b.mine).map((b) => <div key={b.k} className="cbubble cb-self">{b.text}</div>)}
       <div className="row3 mine">{side(me).map(tile)}</div>
