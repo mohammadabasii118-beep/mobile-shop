@@ -107,7 +107,7 @@ export function CardTile(p: TileProps) {
     <>
       <div className="part" style={{ ['--wm' as string]: `url(/assets/window-${f.n}.webp)` }}>
         <div className="pbg" />
-        <CardArt key={p.def.image ?? p.def.id} card={p.def} />
+        <div className="pbox"><CardArt key={p.def.image ?? p.def.id} card={p.def} /></div>
       </div>
       <img className="pfr" src={`/assets/frame-${f.n}.webp`} alt="" draggable={false} />
       <svg className="ptx" viewBox="0 0 800 1108" aria-hidden>

@@ -105,8 +105,10 @@ svg.i.f { fill: currentColor; stroke: none; }
 .card .pbg { position: absolute; inset: 0; background: radial-gradient(circle at 50% 42%, rgba(255,255,255,.28), transparent 45%), linear-gradient(170deg, #6e5a46, #2c2218 65%, #0b0d16); }
 .card[data-r="rare"] .pbg { background: radial-gradient(circle at 50% 42%, rgba(255,255,255,.28), transparent 45%), linear-gradient(170deg, #3b6f86, #12263d 65%, #080c16); }
 .card[data-r="epic"] .pbg { background: radial-gradient(circle at 50% 42%, rgba(255,255,255,.3), transparent 45%), linear-gradient(170deg, #8a5a1f, #2a1a3d 65%, #0b0816); }
-.card .part img.pic { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.card .part svg.e { position: absolute; left: 15%; top: 20%; width: 70%; height: auto; }
+/* عکس در کادرِ «بازِ» پنجره (زیر کتیبه) جا می‌گیرد تا سر و صورت شخصیت زیر کتیبه نرود */
+.card .pbox { position: absolute; left: 8%; right: 10%; top: 20%; bottom: 9%; }
+.card .part img.pic { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 15%; }
+.card .part svg.e { position: absolute; left: 10%; top: 12%; width: 80%; height: auto; }
 .card .pfr, .card .ptx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 /* اسم و اعداد مشکی‌اند و مثل جوهر روی کاغذ می‌نشینند (ترکیب ضرب‌شونده + لبه‌ی کمی ناصاف) */
 .card .ink { fill: #120c06; opacity: .9; mix-blend-mode: multiply; font-family: var(--f-display), Vazirmatn, Tahoma, sans-serif; font-weight: 900; }
