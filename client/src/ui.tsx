@@ -88,9 +88,9 @@ function fitSize(text: string, maxW: number, maxSize: number, minSize: number): 
 /** مرکز نشان گردِ «لول» (گوشه‌ی بالا چپ پنجره‌ی عکس؛ زیر آویز قاب کمیاب) */
 const LV = [140, 396] as const;
 const FRAME = {
-  common: { n: 1, arc: 'M170 150 Q400 82 640 150', lv: [198, 150], c: [[710, 486], [710, 681], [710, 877]] },
-  rare: { n: 2, arc: 'M190 172 Q400 102 612 172', lv: [238, 176], c: [[703, 490], [703, 683], [703, 878]] },
-  epic: { n: 3, arc: 'M190 180 Q400 98 612 180', lv: [236, 184], c: [[705, 484], [705, 673], [705, 860]] },
+  common: { n: 1, ny: 122, lv: [198, 150], c: [[710, 486], [710, 681], [710, 877]] },
+  rare: { n: 2, ny: 144, lv: [238, 176], c: [[703, 490], [703, 683], [703, 878]] },
+  epic: { n: 3, ny: 138, lv: [236, 184], c: [[705, 484], [705, 673], [705, 860]] },
 } as const;
 
 /**
@@ -100,9 +100,9 @@ const FRAME = {
 export function CardTile(p: TileProps) {
   const f = FRAME[p.def.rarity];
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
-  const arcId = `arc${uid}`, inkId = `ink${uid}`;
+  const inkId = `ink${uid}`;
   useSyncExternalStore(fontSubscribe, () => fontsVersion); // بعد از لود فونت‌ها اندازه‌ها دوباره حساب شوند
-  const nameSize = fitSize(p.def.name, 310, 66, 34);
+  const nameSize = fitSize(p.def.name, 330, 70, 34);
   const body = (
     <>
       <div className="part" style={{ ['--wm' as string]: `url(/assets/window-${f.n}.webp)` }}>
@@ -112,7 +112,6 @@ export function CardTile(p: TileProps) {
       <img className="pfr" src={`/assets/frame-${f.n}.webp`} alt="" draggable={false} />
       <svg className="ptx" viewBox="0 0 800 1108" aria-hidden>
         <defs>
-          <path id={arcId} d={f.arc} />
           <filter id={inkId} x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="3" result="n" /><feDisplacementMap in="SourceGraphic" in2="n" scale="2.200" /></filter>
         </defs>
         <g className="lvb">
@@ -120,7 +119,7 @@ export function CardTile(p: TileProps) {
           <circle cx={LV[0]} cy={LV[1]} r="47" fill="none" stroke="#b98a35" strokeWidth="3" />
         </g>
         <g className="ink" filter={`url(#${inkId})`}>
-          <text className="pnm" style={{ fontSize: nameSize }}><textPath href={`#${arcId}`} startOffset="50%" textAnchor="middle">{p.def.name}</textPath></text>
+          <text className="pnm" x="400" y={f.ny} textAnchor="middle" dominantBaseline="central" style={{ fontSize: nameSize }}>{p.def.name}</text>
           <text className="plb" x={LV[0]} y={LV[1] - 17} textAnchor="middle">لول</text>
           <text className="pln" x={LV[0]} y={LV[1] + 24} textAnchor="middle">{fa(p.level)}</text>
           {[p.hp, p.shield, p.atk].map((v, i) => (
