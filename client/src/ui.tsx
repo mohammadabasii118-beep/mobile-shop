@@ -85,6 +85,8 @@ function fitSize(text: string, maxW: number, maxSize: number, minSize: number): 
 }
 
 /** مختصات متن روی هر سه قاب (مقیاس ۸۰۰×۱۱۰۸): خمِ اسم، جای «لول»، و مرکز دایره‌های جان، شیلد و دمیج */
+/** مرکز نشان گردِ «لول» (گوشه‌ی بالا چپ پنجره‌ی عکس؛ زیر آویز قاب کمیاب) */
+const LV = [140, 396] as const;
 const FRAME = {
   common: { n: 1, arc: 'M170 150 Q400 82 640 150', lv: [198, 150], c: [[710, 486], [710, 681], [710, 877]] },
   rare: { n: 2, arc: 'M190 172 Q400 102 612 172', lv: [238, 176], c: [[703, 490], [703, 683], [703, 878]] },
@@ -113,9 +115,14 @@ export function CardTile(p: TileProps) {
           <path id={arcId} d={f.arc} />
           <filter id={inkId} x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="3" result="n" /><feDisplacementMap in="SourceGraphic" in2="n" scale="2.200" /></filter>
         </defs>
+        <g className="lvb">
+          <circle cx={LV[0]} cy={LV[1]} r="58" fill="#e9d6a6" stroke="#8a5a14" strokeWidth="7" />
+          <circle cx={LV[0]} cy={LV[1]} r="47" fill="none" stroke="#b98a35" strokeWidth="3" />
+        </g>
         <g className="ink" filter={`url(#${inkId})`}>
           <text className="pnm" style={{ fontSize: nameSize }}><textPath href={`#${arcId}`} startOffset="50%" textAnchor="middle">{p.def.name}</textPath></text>
-          <text className="plv" x={f.lv[0]} y={f.lv[1]} textAnchor="middle">لول {fa(p.level)}</text>
+          <text className="plb" x={LV[0]} y={LV[1] - 17} textAnchor="middle">لول</text>
+          <text className="pln" x={LV[0]} y={LV[1] + 24} textAnchor="middle">{fa(p.level)}</text>
           {[p.hp, p.shield, p.atk].map((v, i) => (
             <text key={i} className="pn" x={f.c[i][0]} y={f.c[i][1]} textAnchor="middle" style={{ fontSize: fitSize(fa(v), 84, 84, 40) }}>{fa(v)}</text>
           ))}

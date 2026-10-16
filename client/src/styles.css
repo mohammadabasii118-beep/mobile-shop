@@ -111,7 +111,10 @@ svg.i.f { fill: currentColor; stroke: none; }
 /* اسم و اعداد مشکی‌اند و مثل جوهر روی کاغذ می‌نشینند (ترکیب ضرب‌شونده + لبه‌ی کمی ناصاف) */
 .card .ink { fill: #120c06; opacity: .9; mix-blend-mode: multiply; font-family: var(--f-display), Vazirmatn, Tahoma, sans-serif; font-weight: 900; }
 .card .pnm { font-size: 66px; letter-spacing: 0; }
-.card .plv { font-size: 32px; font-weight: 800; }
+.card .plb { font-size: 25px; font-weight: 800; }
+.card .pln { font-size: 66px; dominant-baseline: central; }
+.card .lvb { filter: drop-shadow(0 2px 2px rgba(0,0,0,.55)); }
+@container (max-width: 110px) { .card .lvb, .card .plb, .card .pln { transform-box: fill-box; transform-origin: center; } .card .lvb { transform: scale(1.15); } .card .plb { display: none; } .card .pln { font-size: 72px; } }
 .card .pn { font-size: 84px; dominant-baseline: central; }
 button.card { cursor: pointer; }
 button.card:not(:disabled):active { transform: scale(.96); }
