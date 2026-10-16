@@ -66,21 +66,55 @@ export interface TileProps {
   dead?: boolean; selected?: boolean; onClick?: () => void; disabled?: boolean; badge?: ReactNode; className?: string; small?: boolean;
   maxLevel?: number; hidePips?: boolean;
 }
+/** نمادهای مشترک قاب کارت (فروهر و مدالیون گل‌وبوته‌ای)؛ یک‌بار در برنامه گذاشته می‌شود */
+export function SvgDefs() {
+  return (
+    <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden>
+      <defs>
+        <symbol id="faravahar" viewBox="0 0 90 34">
+          <g fill="currentColor">
+            <g id="fvw"><path d="M43 18 C34 18 22 15 3 6 C14 16 26 21 43 23Z" /><path d="M43 23 C33 23 22 21 7 15 C17 22 28 26 43 27Z" opacity=".9" /><path d="M43 27 C34 27 25 26 14 22 C23 27 31 30 43 31Z" opacity=".8" /></g>
+            <use href="#fvw" transform="translate(90 0) scale(-1 1)" />
+            <circle cx="45" cy="19" r="7" /><circle cx="45" cy="19" r="4.200" fill="#0b1226" /><path d="M45 4l4 8h-8z" /><path d="M45 26v7" stroke="currentColor" strokeWidth="2.500" />
+          </g>
+        </symbol>
+        <symbol id="rosette" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="30" fill="var(--f3)" /><circle cx="32" cy="32" r="30" fill="none" stroke="var(--f1)" strokeWidth="2.500" />
+          <g fill="var(--f1)" stroke="var(--f3)" strokeWidth="1">
+            <ellipse cx="32" cy="9" rx="4.500" ry="7" /><ellipse cx="32" cy="55" rx="4.500" ry="7" /><ellipse cx="9" cy="32" rx="7" ry="4.500" /><ellipse cx="55" cy="32" rx="7" ry="4.500" />
+            <ellipse cx="16" cy="16" rx="4" ry="6.500" transform="rotate(-45 16 16)" /><ellipse cx="48" cy="16" rx="4" ry="6.500" transform="rotate(45 48 16)" />
+            <ellipse cx="16" cy="48" rx="4" ry="6.500" transform="rotate(45 16 48)" /><ellipse cx="48" cy="48" rx="4" ry="6.500" transform="rotate(-45 48 48)" />
+          </g>
+          <circle cx="32" cy="32" r="20" fill="var(--f2)" stroke="var(--f1)" strokeWidth="2" />
+        </symbol>
+      </defs>
+    </svg>
+  );
+}
+
+const Medal = ({ cls, label, value }: { cls: string; label: ReactNode; value: number }) => (
+  <div className={`cb ${cls}`}>
+    <svg viewBox="0 0 64 64" aria-hidden><use href="#rosette" /></svg>
+    <small>{label}</small>
+    <b className="gem">{fa(value)}</b>
+  </div>
+);
+
+/** کارت: عکس کامل داخل قاب شاهانه؛ لول بالا چپ، حمله بالا راست، شیلد و جان پایین چپ */
 export function CardTile(p: TileProps) {
-  const maxL = p.maxLevel ?? 6;
   const body = (
-    <div className="in">
-      <div className="emb">
-        <CardArt key={p.def.image ?? p.def.id} card={p.def} />
-        <span className="lvb">لول {fa(p.level)}</span>
-        {(p.def.abilities?.length ?? 0) > 0 && <span className="abl"><Icon n="spark" /></span>}
-      </div>
-      <div className="nm">{p.def.name}</div>
-      <div className="st">
-        <span><Icon n="heart" />{fa(p.hp)}</span><span><Icon n="sword" />{fa(p.atk)}</span><span><Icon n="shield" />{fa(p.shield)}</span>
-      </div>
-      {!p.hidePips && <div className="pips">{Array.from({ length: maxL }, (_, i) => <i key={i} className={`pip ${i < p.level ? 'on' : ''}`} />)}</div>}
-    </div>
+    <>
+      <div className="fr" />
+      <div className="steps" />
+      <div className="in"><div className="emb"><CardArt key={p.def.image ?? p.def.id} card={p.def} /></div></div>
+      <svg className="wg" viewBox="0 0 90 34" aria-hidden><use href="#faravahar" /></svg>
+      <div className="kat"><span>{p.def.name}</span></div>
+      <Medal cls="lv" label="لول" value={p.level} />
+      <Medal cls="dm" label={<Icon n="sword" />} value={p.atk} />
+      <Medal cls="sh" label={<Icon n="shield" />} value={p.shield} />
+      <Medal cls="hp" label={<Icon n="heart" />} value={p.hp} />
+      {(p.def.abilities?.length ?? 0) > 0 && <span className="abl" aria-hidden><Icon n="spark" /></span>}
+    </>
   );
   const cls = `card ${p.dead ? 'dead' : ''} ${p.selected ? 'sel' : ''} ${p.small ? 'small' : ''} ${p.className ?? ''}`;
   return (

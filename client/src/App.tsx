@@ -9,7 +9,7 @@ import { Admin } from './Admin';
 import { Gate } from './Gate';
 import { initDebug } from './telegram';
 import { setScene } from './music';
-import { Modal, fa } from './ui';
+import { Modal, SvgDefs, fa } from './ui';
 import type { BattleReward } from '@game/shared';
 
 export interface Ctx {
@@ -85,6 +85,7 @@ export function App() {
 
   return (
     <div className="app" style={cfg.ui?.background ? { backgroundImage: `linear-gradient(rgba(8,14,26,.25), rgba(8,14,26,.45)), url(${cfg.ui.background})`, backgroundSize: 'cover', backgroundPosition: 'center bottom', backgroundRepeat: 'no-repeat' } : undefined}>
+      <SvgDefs />
       {battle ? (
         <BattleScreen ctx={ctx} init={battle} onDone={onBattleDone} onExit={() => { setBattle(null); setResult(null); }} result={result} />
       ) : (
