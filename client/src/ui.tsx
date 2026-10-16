@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import type { CardDef, GameConfig } from '@game/shared';
 import { resolveCard } from '@game/shared';
 
@@ -66,28 +66,50 @@ export interface TileProps {
   dead?: boolean; selected?: boolean; onClick?: () => void; disabled?: boolean; badge?: ReactNode; className?: string; small?: boolean;
   maxLevel?: number; hidePips?: boolean;
 }
+/** مختصات متن روی هر سه قاب (مقیاس ۸۰۰×۱۱۰۸): خمِ اسم، جای «لول»، و مرکز دایره‌های جان، شیلد و دمیج */
+const FRAME = {
+  common: { n: 1, arc: 'M170 150 Q400 82 640 150', lv: [198, 150], c: [[710, 486], [710, 681], [710, 877]] },
+  rare: { n: 2, arc: 'M190 172 Q400 102 612 172', lv: [238, 176], c: [[703, 490], [703, 683], [703, 878]] },
+  epic: { n: 3, arc: 'M190 180 Q400 98 612 180', lv: [236, 184], c: [[705, 484], [705, 673], [705, 860]] },
+} as const;
+
+/**
+ * کارت: عکس کامل داخل قاب گریفین (ساده / معمولی / کمیاب هرکدام قاب خودشان را دارند).
+ * اسم روی کتیبه و جان، شیلد و دمیج داخل دایره‌های کاغذی، همه مشکی و مثل جوهر روی کاغذ.
+ */
 export function CardTile(p: TileProps) {
-  const maxL = p.maxLevel ?? 6;
+  const f = FRAME[p.def.rarity];
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
+  const arcId = `arc${uid}`, inkId = `ink${uid}`;
+  const big = (n: number) => (String(Math.round(n)).length <= 2 ? 84 : 68);
   const body = (
-    <div className="in">
-      <div className="emb">
+    <>
+      <div className="part" style={{ ['--wm' as string]: `url(/assets/window-${f.n}.webp)` }}>
+        <div className="pbg" />
         <CardArt key={p.def.image ?? p.def.id} card={p.def} />
-        <span className="lvb">لول {fa(p.level)}</span>
-        {(p.def.abilities?.length ?? 0) > 0 && <span className="abl"><Icon n="spark" /></span>}
       </div>
-      <div className="nm">{p.def.name}</div>
-      <div className="st">
-        <span><Icon n="heart" />{fa(p.hp)}</span><span><Icon n="sword" />{fa(p.atk)}</span><span><Icon n="shield" />{fa(p.shield)}</span>
-      </div>
-      {!p.hidePips && <div className="pips">{Array.from({ length: maxL }, (_, i) => <i key={i} className={`pip ${i < p.level ? 'on' : ''}`} />)}</div>}
-    </div>
+      <img className="pfr" src={`/assets/frame-${f.n}.webp`} alt="" draggable={false} />
+      <svg className="ptx" viewBox="0 0 800 1108" aria-hidden>
+        <defs>
+          <path id={arcId} d={f.arc} />
+          <filter id={inkId} x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="3" result="n" /><feDisplacementMap in="SourceGraphic" in2="n" scale="2.200" /></filter>
+        </defs>
+        <g className="ink" filter={`url(#${inkId})`}>
+          <text className="pnm"><textPath href={`#${arcId}`} startOffset="50%" textAnchor="middle">{p.def.name}</textPath></text>
+          <text className="plv" x={f.lv[0]} y={f.lv[1]} textAnchor="middle">لول {fa(p.level)}</text>
+          {[p.hp, p.shield, p.atk].map((v, i) => (
+            <text key={i} className="pn" x={f.c[i][0]} y={f.c[i][1]} textAnchor="middle" style={{ fontSize: big(v) }}>{fa(v)}</text>
+          ))}
+        </g>
+      </svg>
+    </>
   );
-  const cls = `card ${p.dead ? 'dead' : ''} ${p.selected ? 'sel' : ''} ${p.small ? 'small' : ''} ${p.className ?? ''}`;
+  const cls = `card par ${p.dead ? 'dead' : ''} ${p.selected ? 'sel' : ''} ${p.small ? 'small' : ''} ${p.className ?? ''}`;
   return (
     <div className="cardwrap">
       {p.onClick || p.disabled !== undefined
-        ? <button className={cls} data-r={p.def.rarity} data-tier={frameOf(p.def.rarity)} onClick={p.onClick} disabled={!p.onClick || p.disabled}>{body}</button>
-        : <div className={cls} data-r={p.def.rarity} data-tier={frameOf(p.def.rarity)}>{body}</div>}
+        ? <button className={cls} data-r={p.def.rarity} onClick={p.onClick} disabled={!p.onClick || p.disabled}>{body}</button>
+        : <div className={cls} data-r={p.def.rarity}>{body}</div>}
       {p.badge}
     </div>
   );
