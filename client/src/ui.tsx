@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from 'react';
+import { useId, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { CardDef, GameConfig } from '@game/shared';
 import { resolveCard } from '@game/shared';
 
@@ -66,6 +66,24 @@ export interface TileProps {
   dead?: boolean; selected?: boolean; onClick?: () => void; disabled?: boolean; badge?: ReactNode; className?: string; small?: boolean;
   maxLevel?: number; hidePips?: boolean;
 }
+/**
+ * اندازه‌ی فونت را طوری کم می‌کند که متن در عرض مجاز جا شود (با فونت واقعی؛ با لود فونت دوباره حساب می‌شود).
+ * هر قدر اسم یا عدد بلندتر باشد، فونت کوچک‌تر می‌شود تا از کادر بیرون نزند.
+ */
+let measureCtx: CanvasRenderingContext2D | null = null;
+const fontSubscribe = (f: () => void) => { document.fonts?.addEventListener('loadingdone', f); return () => document.fonts?.removeEventListener('loadingdone', f); };
+let fontsVersion = 0;
+if (typeof document !== 'undefined') document.fonts?.addEventListener('loadingdone', () => { fontsVersion++; });
+function fitSize(text: string, maxW: number, maxSize: number, minSize: number): number {
+  try {
+    measureCtx ??= document.createElement('canvas').getContext('2d');
+    if (!measureCtx) return maxSize;
+    measureCtx.font = `900 ${maxSize}px Lalezar, Vazirmatn, Tahoma, sans-serif`;
+    const w = measureCtx.measureText(text).width;
+    return w <= maxW ? maxSize : Math.max(minSize, Math.floor((maxSize * maxW) / w));
+  } catch { return maxSize; }
+}
+
 /** مختصات متن روی هر سه قاب (مقیاس ۸۰۰×۱۱۰۸): خمِ اسم، جای «لول»، و مرکز دایره‌های جان، شیلد و دمیج */
 const FRAME = {
   common: { n: 1, arc: 'M170 150 Q400 82 640 150', lv: [198, 150], c: [[710, 486], [710, 681], [710, 877]] },
@@ -81,7 +99,8 @@ export function CardTile(p: TileProps) {
   const f = FRAME[p.def.rarity];
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
   const arcId = `arc${uid}`, inkId = `ink${uid}`;
-  const big = (n: number) => (String(Math.round(n)).length <= 2 ? 84 : 68);
+  useSyncExternalStore(fontSubscribe, () => fontsVersion); // بعد از لود فونت‌ها اندازه‌ها دوباره حساب شوند
+  const nameSize = fitSize(p.def.name, 310, 66, 34);
   const body = (
     <>
       <div className="part" style={{ ['--wm' as string]: `url(/assets/window-${f.n}.webp)` }}>
@@ -95,10 +114,10 @@ export function CardTile(p: TileProps) {
           <filter id={inkId} x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="3" result="n" /><feDisplacementMap in="SourceGraphic" in2="n" scale="2.200" /></filter>
         </defs>
         <g className="ink" filter={`url(#${inkId})`}>
-          <text className="pnm"><textPath href={`#${arcId}`} startOffset="50%" textAnchor="middle">{p.def.name}</textPath></text>
+          <text className="pnm" style={{ fontSize: nameSize }}><textPath href={`#${arcId}`} startOffset="50%" textAnchor="middle">{p.def.name}</textPath></text>
           <text className="plv" x={f.lv[0]} y={f.lv[1]} textAnchor="middle">لول {fa(p.level)}</text>
           {[p.hp, p.shield, p.atk].map((v, i) => (
-            <text key={i} className="pn" x={f.c[i][0]} y={f.c[i][1]} textAnchor="middle" style={{ fontSize: big(v) }}>{fa(v)}</text>
+            <text key={i} className="pn" x={f.c[i][0]} y={f.c[i][1]} textAnchor="middle" style={{ fontSize: fitSize(fa(v), 84, 84, 40) }}>{fa(v)}</text>
           ))}
         </g>
       </svg>
