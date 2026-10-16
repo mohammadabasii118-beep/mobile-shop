@@ -1,4 +1,4 @@
-import { useId, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { CardDef, GameConfig } from '@game/shared';
 import { resolveCard } from '@game/shared';
 
@@ -66,75 +66,26 @@ export interface TileProps {
   dead?: boolean; selected?: boolean; onClick?: () => void; disabled?: boolean; badge?: ReactNode; className?: string; small?: boolean;
   maxLevel?: number; hidePips?: boolean;
 }
-/**
- * اندازه‌ی فونت را طوری کم می‌کند که متن در عرض مجاز جا شود (با فونت واقعی؛ با لود فونت دوباره حساب می‌شود).
- * هر قدر اسم یا عدد بلندتر باشد، فونت کوچک‌تر می‌شود تا از کادر بیرون نزند.
- */
-let measureCtx: CanvasRenderingContext2D | null = null;
-const fontSubscribe = (f: () => void) => { document.fonts?.addEventListener('loadingdone', f); return () => document.fonts?.removeEventListener('loadingdone', f); };
-let fontsVersion = 0;
-if (typeof document !== 'undefined') document.fonts?.addEventListener('loadingdone', () => { fontsVersion++; });
-function fitSize(text: string, maxW: number, maxSize: number, minSize: number): number {
-  try {
-    measureCtx ??= document.createElement('canvas').getContext('2d');
-    if (!measureCtx) return maxSize;
-    measureCtx.font = `900 ${maxSize}px Lalezar, Vazirmatn, Tahoma, sans-serif`;
-    const w = measureCtx.measureText(text).width;
-    return w <= maxW ? maxSize : Math.max(minSize, Math.floor((maxSize * maxW) / w));
-  } catch { return maxSize; }
-}
-
-/** مختصات متن روی هر سه قاب (مقیاس ۸۰۰×۱۱۰۸): خمِ اسم، جای «لول»، و مرکز دایره‌های جان، شیلد و دمیج */
-/** مرکز نشان گردِ «لول» (گوشه‌ی بالا چپ پنجره‌ی عکس؛ زیر آویز قاب کمیاب) */
-const LV = [140, 396] as const;
-const FRAME = {
-  common: { n: 1, ny: 122, lv: [198, 150], c: [[710, 486], [710, 681], [710, 877]] },
-  rare: { n: 2, ny: 144, lv: [238, 176], c: [[703, 490], [703, 683], [703, 878]] },
-  epic: { n: 3, ny: 138, lv: [236, 184], c: [[705, 484], [705, 673], [705, 860]] },
-} as const;
-
-/**
- * کارت: عکس کامل داخل قاب گریفین (ساده / معمولی / کمیاب هرکدام قاب خودشان را دارند).
- * اسم روی کتیبه و جان، شیلد و دمیج داخل دایره‌های کاغذی، همه مشکی و مثل جوهر روی کاغذ.
- */
 export function CardTile(p: TileProps) {
-  const f = FRAME[p.def.rarity];
-  const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
-  const inkId = `ink${uid}`;
-  useSyncExternalStore(fontSubscribe, () => fontsVersion); // بعد از لود فونت‌ها اندازه‌ها دوباره حساب شوند
-  const nameSize = fitSize(p.def.name, 330, 70, 34);
   const body = (
-    <>
-      <div className="part" style={{ ['--wm' as string]: `url(/assets/window-${f.n}.webp)` }}>
-        <div className="pbg" />
-        <div className="pbox"><CardArt key={p.def.image ?? p.def.id} card={p.def} /></div>
+    <div className="in">
+      <div className="emb">
+        <CardArt key={p.def.image ?? p.def.id} card={p.def} />
+        <span className="lvb">لول {fa(p.level)}</span>
+        {(p.def.abilities?.length ?? 0) > 0 && <span className="abl"><Icon n="spark" /></span>}
       </div>
-      <img className="pfr" src={`/assets/frame-${f.n}.webp`} alt="" draggable={false} />
-      <svg className="ptx" viewBox="0 0 800 1108" aria-hidden>
-        <defs>
-          <filter id={inkId} x="-5%" y="-5%" width="110%" height="110%"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="3" result="n" /><feDisplacementMap in="SourceGraphic" in2="n" scale="2.200" /></filter>
-        </defs>
-        <g className="lvb">
-          <circle cx={LV[0]} cy={LV[1]} r="58" fill="#e9d6a6" stroke="#8a5a14" strokeWidth="7" />
-          <circle cx={LV[0]} cy={LV[1]} r="47" fill="none" stroke="#b98a35" strokeWidth="3" />
-        </g>
-        <g className="ink" filter={`url(#${inkId})`}>
-          <text className="pnm" x="400" y={f.ny} textAnchor="middle" dominantBaseline="central" style={{ fontSize: nameSize }}>{p.def.name}</text>
-          <text className="plb" x={LV[0]} y={LV[1] - 17} textAnchor="middle">لول</text>
-          <text className="pln" x={LV[0]} y={LV[1] + 24} textAnchor="middle">{fa(p.level)}</text>
-          {[p.hp, p.shield, p.atk].map((v, i) => (
-            <text key={i} className="pn" x={f.c[i][0]} y={f.c[i][1]} textAnchor="middle" style={{ fontSize: fitSize(fa(v), 84, 84, 40) }}>{fa(v)}</text>
-          ))}
-        </g>
-      </svg>
-    </>
+      <div className="nm">{p.def.name}</div>
+      <div className="st">
+        <span><Icon n="heart" />{fa(p.hp)}</span><span><Icon n="sword" />{fa(p.atk)}</span><span><Icon n="shield" />{fa(p.shield)}</span>
+      </div>
+    </div>
   );
-  const cls = `card par ${p.dead ? 'dead' : ''} ${p.selected ? 'sel' : ''} ${p.small ? 'small' : ''} ${p.className ?? ''}`;
+  const cls = `card ${p.dead ? 'dead' : ''} ${p.selected ? 'sel' : ''} ${p.small ? 'small' : ''} ${p.className ?? ''}`;
   return (
     <div className="cardwrap">
       {p.onClick || p.disabled !== undefined
-        ? <button className={cls} data-r={p.def.rarity} onClick={p.onClick} disabled={!p.onClick || p.disabled}>{body}</button>
-        : <div className={cls} data-r={p.def.rarity}>{body}</div>}
+        ? <button className={cls} data-r={p.def.rarity} data-tier={frameOf(p.def.rarity)} onClick={p.onClick} disabled={!p.onClick || p.disabled}>{body}</button>
+        : <div className={cls} data-r={p.def.rarity} data-tier={frameOf(p.def.rarity)}>{body}</div>}
       {p.badge}
     </div>
   );

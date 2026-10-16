@@ -98,27 +98,28 @@ svg.i.f { fill: currentColor; stroke: none; }
 
 /* ───── کارت ───── */
 .cardwrap { position: relative; padding-bottom: 8px; min-width: 0; }
-.card { position: relative; width: 100%; aspect-ratio: 800 / 1108; background: none; padding: 0; border: 0; border-radius: 10px; text-align: center; color: #fff; transition: transform .15s, box-shadow .3s; container-type: inline-size; display: block; filter: drop-shadow(0 4px 6px rgba(0,0,0,.5)); }
-.card[data-r="epic"] { filter: drop-shadow(0 0 10px rgba(255,205,80,.6)) drop-shadow(0 4px 6px rgba(0,0,0,.5)); }
-/* عکس فقط داخل پنجره‌ی قاب دیده می‌شود (ماسک)، خودِ قاب (گریفین‌ها، دایره‌های کاغذی) روی آن می‌افتد */
-.card .part { position: absolute; inset: 0; -webkit-mask-image: var(--wm); mask-image: var(--wm); -webkit-mask-size: 100% 100%; mask-size: 100% 100%; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
-.card .pbg { position: absolute; inset: 0; background: radial-gradient(circle at 50% 42%, rgba(255,255,255,.28), transparent 45%), linear-gradient(170deg, #6e5a46, #2c2218 65%, #0b0d16); }
-.card[data-r="rare"] .pbg { background: radial-gradient(circle at 50% 42%, rgba(255,255,255,.28), transparent 45%), linear-gradient(170deg, #3b6f86, #12263d 65%, #080c16); }
-.card[data-r="epic"] .pbg { background: radial-gradient(circle at 50% 42%, rgba(255,255,255,.3), transparent 45%), linear-gradient(170deg, #8a5a1f, #2a1a3d 65%, #0b0816); }
-/* عکس در کادرِ «بازِ» پنجره (زیر کتیبه) جا می‌گیرد تا سر و صورت شخصیت زیر کتیبه نرود */
-.card .pbox { position: absolute; left: 8%; right: 10%; top: 20%; bottom: 9%; }
-.card .part img.pic { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 15%; }
-.card .part svg.e { position: absolute; left: 10%; top: 12%; width: 80%; height: auto; }
-.card .pfr, .card .ptx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-/* اسم و اعداد مشکی‌اند و مثل جوهر روی کاغذ می‌نشینند (ترکیب ضرب‌شونده + لبه‌ی کمی ناصاف) */
-.card .ink { fill: #120c06; opacity: .9; mix-blend-mode: multiply; font-family: var(--f-display), Vazirmatn, Tahoma, sans-serif; font-weight: 900; }
-.card .pnm { font-size: 66px; letter-spacing: 0; }
-.card .plb { font-size: 25px; font-weight: 800; }
-.card .pln { font-size: 66px; dominant-baseline: central; }
-.card .lvb { filter: drop-shadow(0 2px 2px rgba(0,0,0,.55)); }
-@container (max-width: 110px) { .card .lvb, .card .plb, .card .pln { transform-box: fill-box; transform-origin: center; } .card .lvb { transform: scale(1.15); } .card .plb { display: none; } .card .pln { font-size: 72px; } }
-.card .pn { font-size: 84px; dominant-baseline: central; }
-button.card { cursor: pointer; }
+.card { --fr1: #b07a45; --fr2: #6e4521; --glow: transparent; --art1: #54627a; --art2: #263043; position: relative; width: 100%; aspect-ratio: 3 / 4.15; border-radius: 14px; padding: 4px; background: linear-gradient(150deg, var(--fr1), var(--fr2) 55%, var(--fr1)); box-shadow: 0 0 0 1px rgba(0,0,0,.4), 0 6px 14px rgba(0,0,0,.35), 0 0 16px var(--glow); text-align: center; color: #fff; transition: transform .15s, box-shadow .3s; container-type: inline-size; display: block; }
+.card[data-tier="silver"] { --fr1: #dfe7f1; --fr2: #7d8da3; }
+.card[data-tier="gold"] { --fr1: #ffe08a; --fr2: #b27d12; --glow: rgba(255,200,70,.55); }
+.card[data-r="common"] { --art1: #8a5a35; --art2: #2d1c10; }
+.card[data-r="rare"] { --art1: #7d8da3; --art2: #1f2a3a; }
+.card[data-r="epic"] { --art1: #c9a02e; --art2: #3d2d06; }
+.card .in { position: relative; height: 100%; border-radius: 10px; overflow: hidden; background: linear-gradient(180deg, var(--art1), var(--art2)); display: flex; flex-direction: column; justify-content: flex-end; }
+/* عکس کل کارت را پر می‌کند؛ اسم و آمار روی آن در یک نوار شیشه‌ای می‌نشینند */
+.card .emb { position: absolute; inset: 0; display: grid; place-items: center; overflow: hidden; }
+.card .emb svg.e { width: 78%; height: auto; max-height: 100%; }
+.card .emb img.pic { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.card .lvb { position: absolute; top: 5px; inset-inline-start: 5px; font-size: clamp(8px, 11cqw, 12px); font-weight: 800; background: rgba(0,0,0,.55); border-radius: 8px; padding: 1px 6px; }
+.card .abl { position: absolute; top: 5px; inset-inline-end: 5px; color: var(--gold); font-size: clamp(10px, 14cqw, 15px); filter: drop-shadow(0 1px 2px #000); }
+.card .nm { position: relative; z-index: 2; font-family: var(--f-display); font-size: clamp(11px, 15cqw, 18px); line-height: 1.15; padding: 4px 3px 0; background: linear-gradient(180deg, rgba(10,14,26,0), rgba(10,14,26,.38) 55%); -webkit-backdrop-filter: blur(7px); backdrop-filter: blur(7px); -webkit-mask-image: linear-gradient(180deg, transparent, #000 40%); mask-image: linear-gradient(180deg, transparent, #000 40%); text-shadow: 0 1px 3px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .st { position: relative; z-index: 2; display: flex; justify-content: space-around; font-size: clamp(8px, 11cqw, 12px); font-weight: 800; padding: 3px 2px 4px; background: rgba(10,14,26,.38); -webkit-backdrop-filter: blur(7px); backdrop-filter: blur(7px); text-shadow: 0 1px 3px #000; border-top: 1px solid rgba(255,255,255,.12); }
+.card .st span { display: inline-flex; align-items: center; gap: 2px; }
+.card .pips { display: flex; justify-content: center; gap: 2px; padding: 2px 0; background: rgba(0,0,0,.55); }
+.pip { width: clamp(5px, 8cqw, 9px); height: clamp(5px, 8cqw, 9px); background: rgba(255,255,255,.25); clip-path: polygon(50% 0, 62% 36%, 100% 38%, 70% 60%, 80% 100%, 50% 76%, 20% 100%, 30% 60%, 0 38%, 38% 36%); }
+.pip.on { background: var(--gold); }
+.card[data-tier="gold"] .in::after { content: ''; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,.28) 50%, transparent 65%); transform: translateX(-120%); animation: sheen 3.6s ease-in-out infinite; pointer-events: none; }
+@keyframes sheen { 60%, 100% { transform: translateX(120%); } }
+button.card { cursor: pointer; padding: 4px; }
 button.card:not(:disabled):active { transform: scale(.96); }
 .card.sel { outline: 2px solid var(--turq); outline-offset: 2px; }
 .card.dead { opacity: .3; filter: grayscale(1); }
@@ -397,7 +398,7 @@ html, body, #root, .app, .screen, .battle, .admin { overscroll-behavior: none; }
 .spark { position: absolute; left: 50%; top: 40%; width: 5px; height: 5px; border-radius: 50%; background: #ffd9a0; box-shadow: 0 0 8px #ff9a4a; pointer-events: none; z-index: 6; animation: sparkfly .6s ease-out forwards; }
 @keyframes sparkfly { to { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
 .card.shatter-hide { visibility: hidden; }
-.shards { position: absolute; top: 0; left: 0; right: 0; aspect-ratio: 800 / 1108; pointer-events: none; z-index: 6; }
+.shards { position: absolute; top: 0; left: 0; right: 0; aspect-ratio: 3 / 4.15; pointer-events: none; z-index: 6; }
 .shard { position: absolute; inset: 0; animation: shardfly 1.1s cubic-bezier(.3,0,.6,1) forwards; }
 @keyframes shardfly { 0% { transform: none; opacity: 1; } 20% { transform: translate(calc(var(--dx) * .15), calc(var(--dy) * .15)) rotate(calc(var(--rot) * .2)); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 0; } }
 /* پایان نبرد */
@@ -564,6 +565,9 @@ html, body, #root, .app, .screen, .battle, .admin { overscroll-behavior: none; }
 .gemv .gemi { width: 16px; height: 16px; }
 
 /* ---- نبرد ۵ در ۵: درگ‌ودراپ، نوار قدرت ویژه، تایمر ---- */
+.battle .card .nm { font-size: 9px; }
+.battle .card .st { font-size: 9px; gap: 1px; }
+.battle .card .lvb { font-size: 8px; padding: 1px 4px; }
 .bcard-wrap { touch-action: none; }
 .bcard-wrap .card { transition: transform .18s, filter .2s, box-shadow .2s; }
 .card.draggable { cursor: grab; box-shadow: 0 0 0 2px rgba(255,215,106,.8), 0 0 12px rgba(255,215,106,.5); }
@@ -591,6 +595,9 @@ html, body, #root, .app, .screen, .battle, .admin { overscroll-behavior: none; }
 @media (prefers-reduced-motion: reduce) { .flame { animation: none; } }
 
 /* آمار کارت در نبرد: جان و حمله ردیف اول، شیلد ردیف دوم */
+.battle .card { aspect-ratio: 3 / 4.75; }
+.battle .card .st { flex-wrap: wrap; row-gap: 1px; }
+.battle .card .st span:nth-child(3) { flex-basis: 100%; justify-content: center; }
 .dragghost.over { animation: tremble .12s linear infinite; }
 @keyframes tremble { 0% { transform: translate(-50%, -88%) scale(1.15) rotate(-3deg); } 25% { transform: translate(calc(-50% + 2px), calc(-88% + 1px)) scale(1.15) rotate(-1.5deg); } 50% { transform: translate(calc(-50% - 2px), calc(-88% - 1px)) scale(1.15) rotate(-4.5deg); } 75% { transform: translate(calc(-50% + 1px), calc(-88% - 2px)) scale(1.15) rotate(-2deg); } 100% { transform: translate(-50%, -88%) scale(1.15) rotate(-3deg); } }
 .sidetools { position: fixed; right: 8px; top: 50%; transform: translateY(-50%); z-index: 25; display: flex; flex-direction: column; gap: 10px; }
