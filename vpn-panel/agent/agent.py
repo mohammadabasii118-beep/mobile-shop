@@ -355,8 +355,33 @@ def self_update(conf, expected_sha):
     os.execv(sys.executable, [sys.executable, me])
 
 
+def _cpu_times():
+    """(busy, total) jiffies from /proc/stat; steal time counts as idle (it is the host's, not ours)."""
+    with open("/proc/stat") as f:
+        v = [int(x) for x in f.readline().split()[1:]]
+    idle = v[3] + (v[4] if len(v) > 4 else 0) + (v[7] if len(v) > 7 else 0)
+    return sum(v[:8]) - idle, sum(v[:8])
+
+
+_cpu_prev = None
+
+
 def cpu_load_percent():
-    return min(100, int(os.getloadavg()[0] / (os.cpu_count() or 1) * 100))
+    """CPU in use since the previous report, in percent. (The load average is a run-queue length and reads ~100%
+    on small VPSes that are mostly idle.)"""
+    global _cpu_prev
+    try:
+        now = _cpu_times()
+        if _cpu_prev is None:
+            time.sleep(0.5)
+            prev, now = now, _cpu_times()
+        else:
+            prev = _cpu_prev
+        _cpu_prev = now
+        busy, total = now[0] - prev[0], now[1] - prev[1]
+        return min(100, int(busy / total * 100)) if total > 0 else 0
+    except (OSError, ValueError, IndexError):
+        return min(100, int(os.getloadavg()[0] / (os.cpu_count() or 1) * 100))
 
 
 _hash_cache = {}

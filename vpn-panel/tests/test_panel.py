@@ -860,3 +860,13 @@ def test_per_protocol_address_overrides_only_the_connection_host():
         c.put(f"/api/nodes/{node['id']}/protocols/vless_tcp/host", headers=h, json={"host": ""})
         assert "@hostn.example.com:2097?" in c.get(f"/api/users/{u['id']}/configs", headers=h).text
         assert c.put(f"/api/nodes/{node['id']}/protocols/vless_tcp/host", headers=h, json={"host": "bad host!"}).status_code == 422
+
+
+def test_agent_cpu_percent_is_measured_from_proc_stat():
+    import importlib.util, pathlib
+    spec = importlib.util.spec_from_file_location("agent_mod", pathlib.Path(__file__).parent.parent / "agent" / "agent.py")
+    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+    first = m.cpu_load_percent()                      # primes the sampler (0.5 s window)
+    assert 0 <= first <= 100 and 0 <= m.cpu_load_percent() <= 100
+    busy, total = m._cpu_times()
+    assert 0 <= busy <= total
