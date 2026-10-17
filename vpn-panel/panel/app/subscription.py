@@ -69,6 +69,8 @@ def build_entry(user: User, node: Node, proto: str, port: int, cdn: bool = False
                      f"&fp=chrome&pbk={node.reality_pub}&sid={node.reality_sid}&type=tcp&flow=xtls-rprx-vision#{tag}")
     elif proto == "vless_tcp":
         e["link"] = f"vless://{user.uuid}@{conn}:{port}?encryption=none&{tls}&type=tcp#{tag}"
+    elif proto == "vless_raw":
+        e["link"] = f"vless://{user.uuid}@{conn}:{port}?encryption=none&security=none&type=tcp#{tag}"
     elif proto == "vless_ws":
         path = quote(WS_PATHS[proto], safe="")
         e["link"] = f"vless://{user.uuid}@{conn}:{port}?encryption=none&{tls}&type=ws&host={host}&path={path}#{tag}"

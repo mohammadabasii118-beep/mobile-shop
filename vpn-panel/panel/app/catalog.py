@@ -19,6 +19,7 @@ def _p(label, engine, port, desc, uri=True, fixed=False, counted=True):
 PROTOCOLS = {
     "vless": _p("VLESS + Reality", "xray", 443, "پیشنهادی؛ بدون نیاز به دامنه و گواهی"),
     "vless_tcp": _p("VLESS + TCP (TLS)", "xray", 2097, "TCP ساده روی TLS"),
+    "vless_raw": _p("VLESS + TCP (بدون TLS)", "xray", 80, "مثل اینباند ساده x-ui؛ بدون رمزنگاری، مناسب پشت تونل"),
     "vless_ws": _p("VLESS + WebSocket (TLS)", "xray", 2083, "WS روی TLS"),
     "vless_grpc": _p("VLESS + gRPC (TLS)", "xray", 2096, "gRPC روی TLS"),
     "vmess_ws": _p("VMess + WebSocket (TLS)", "xray", 2053, "سازگار با اغلب کلاینت‌ها"),

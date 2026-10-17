@@ -74,7 +74,7 @@ def test_every_xray_protocol_connects_end_to_end():
     priv = re.search(r"Private\s*Key:\s*(\S+)", out, re.I).group(1)
     pub = re.search(r"(?:Public\s*Key|Password[^:]*):\s*(\S+)", out, re.I).group(1)
 
-    protos = ["vless", "vless_tcp", "vless_ws", "vless_grpc", "vmess_ws", "vmess_tcp", "trojan", "trojan_ws", "ss"]
+    protos = ["vless", "vless_raw", "vless_tcp", "vless_ws", "vless_grpc", "vmess_ws", "vmess_tcp", "trojan", "trojan_ws", "ss"]
     ports = {p: _free_port() for p in protos}
     uid = str(uuid.uuid4())
     node = Node(id=1, name="T", cc="de", address="localhost", token="t", ss_key="AAAAAAAAAAAAAAAAAAAAAA==", l2tp_psk="x",

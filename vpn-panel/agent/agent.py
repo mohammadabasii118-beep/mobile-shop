@@ -49,6 +49,7 @@ def render_xray(cfg, reality, tls, busy=frozenset()):
         decryption="none")
     vless_plain = lambda p: [{"id": u["uuid"], "email": u["name"]} for u in users_for(cfg, p)]
     add("vless_tcp", "vless", vless_plain("vless_tcp"), tls_stream("tcp"), decryption="none")
+    add("vless_raw", "vless", vless_plain("vless_raw"), {"network": "tcp", "security": "none"}, decryption="none")
     add("vless_ws", "vless", vless_plain("vless_ws"),
         tls_stream("ws", wsSettings={"path": WS_PATHS["vless_ws"]}), decryption="none")
     add("vless_grpc", "vless", vless_plain("vless_grpc"),
@@ -106,7 +107,7 @@ def set_conf_value(text, key, value):
 
 
 OURS = {"xray", "sing-box", "openvpn", "ocserv", "ocserv-main", "ocserv-worker", "charon", "xl2tpd"}
-TCP_PROTOS = {"vless", "vless_tcp", "vless_ws", "vless_grpc", "vmess_ws", "vmess_tcp", "trojan", "trojan_ws", "ss", "anyc"}
+TCP_PROTOS = {"vless", "vless_tcp", "vless_raw", "vless_ws", "vless_grpc", "vmess_ws", "vmess_tcp", "trojan", "trojan_ws", "ss", "anyc"}
 UDP_PROTOS = {"hy2", "tuic", "wg", "ovpn", "anyc"}
 
 

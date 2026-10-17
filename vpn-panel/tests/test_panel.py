@@ -112,7 +112,7 @@ def test_agent_renderers():
     assert agent.render_singbox(cfg, tls)["inbounds"] == []
 
 
-ALL = ["vless", "vless_tcp", "vmess_tcp", "vless_ws", "vless_grpc", "vmess_ws", "trojan", "trojan_ws", "ss", "hy2", "tuic",
+ALL = ["vless", "vless_raw", "vless_tcp", "vmess_tcp", "vless_ws", "vless_grpc", "vmess_ws", "trojan", "trojan_ws", "ss", "hy2", "tuic",
        "wg", "ovpn", "l2tp", "ikev2", "anyc"]
 
 
@@ -136,6 +136,7 @@ def test_all_protocols_have_entries_and_node_config():
                                                       "ovpn_ca": "-----BEGIN CERTIFICATE-----\nX\n-----END CERTIFICATE-----"})
         rows = {e["proto"]: e for e in c.get(f"/api/users/{user['id']}/configs", headers=h).json()}
         assert set(rows) == set(ALL)
+        assert "security=none" in rows["vless_raw"]["link"] and ":80?" in rows["vless_raw"]["link"]
         assert "type=tcp" in rows["vless_tcp"]["link"] and "security=tls" in rows["vless_tcp"]["link"]
         assert json.loads(base64.b64decode(rows["vmess_tcp"]["link"][8:]))["net"] == "tcp"
         assert "type=ws" in rows["vless_ws"]["link"] and "path=%2Fvless" in rows["vless_ws"]["link"]
