@@ -165,6 +165,7 @@ function cfDialog(n) {
     <div class="form">
       <label class="f">دامنه (پروکسی‌شده در کلادفلر، ابر نارنجی)<input type="text" id="cfDomain" value="${esc(n.cf_domain)}" placeholder="cdn.example.com" dir="ltr"></label>
       <label class="f">آی‌پی تمیز (اختیاری)<input type="text" id="cfAddr" value="${esc(n.cf_address)}" placeholder="104.16.x.x" dir="ltr"></label></div>
+    <label class="f">آدرس VLESS ساده (بدون TLS)؛ مثلاً دامنه‌ی قبلی x-ui<input type="text" id="rawHost" value="${esc(n.raw_host)}" placeholder="tunnel.example.com" dir="ltr"></label>
     <div class="note">در کلادفلر: رکورد A دامنه را به آی‌پی ${esc(n.address)} با ابر نارنجی بسازید، SSL/TLS را روی <b>Full</b> بگذارید (نه Strict)، و برای gRPC گزینه‌ی gRPC را در Network روشن کنید. فقط پورت‌های 443، 2053، 2083، 2087، 2096 و 8443 از کلادفلر رد می‌شوند.</div>
     <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="cfSave" data-id="${n.id}">ذخیره</button></div>`);
 }
@@ -278,7 +279,7 @@ document.addEventListener('click', async e => {
     else if (d.reality) realityDialog(nodeBy(+d.reality));
     else if (d.pick) $('#rSni').value = d.pick;
     else if (t.id === 'rSave') { await api('PUT', `/nodes/${d.id}/reality`, {sni: $('#rSni').value.trim()}); closeModal(); await refresh(); toast('ذخیره شد؛ ظرف ۳۰ ثانیه روی نود اعمال می‌شود'); }
-    else if (t.id === 'cfSave') { await api('PUT', `/nodes/${d.id}/cloudflare`, {cf_domain: $('#cfDomain').value.trim(), cf_address: $('#cfAddr').value.trim()}); closeModal(); await refresh(); toast('ذخیره شد'); }
+    else if (t.id === 'cfSave') { await api('PUT', `/nodes/${d.id}/cloudflare`, {cf_domain: $('#cfDomain').value.trim(), cf_address: $('#cfAddr').value.trim(), raw_host: $('#rawHost').value.trim()}); closeModal(); await refresh(); toast('ذخیره شد'); }
     else if (d.delnode) { await api('DELETE', '/nodes/' + d.delnode); closeModal(); await refresh(); toast('لوکیشن حذف شد'); }
     else if (t.id === 'addUser') userForm();
     else if (t.id === 'fSave') {

@@ -35,6 +35,7 @@ class Node(Base):
     reality_sni: Mapped[str] = mapped_column(default="www.apple.com")  # camouflage site for Reality
     cf_domain: Mapped[str] = mapped_column(default="")
     cf_address: Mapped[str] = mapped_column(default="")
+    raw_host: Mapped[str] = mapped_column(default="")  # address in plain-VLESS links (e.g. the old x-ui domain)
     errors: Mapped[list] = mapped_column(JSON, default=list)  # configs the agent rejected, from the agent
     wg_pub: Mapped[str] = mapped_column(default="")
     ovpn_ca: Mapped[str] = mapped_column(default="")

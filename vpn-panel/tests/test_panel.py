@@ -803,3 +803,16 @@ def test_bulk_protocols_add_and_remove():
         got = {u["name"]: u["protos"] for u in c.get("/api/users", headers=h).json()}
         assert all("vless_raw" in p for p in got.values())
         assert c.post("/api/users/bulk-protos", headers=h, json={"add": ["nope"]}).status_code == 422
+
+
+def test_plain_vless_link_uses_the_raw_host_override():
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "IR", "cc": "ir", "address": "5.5.5.5"}).json()
+        c.put(f"/api/nodes/{node['id']}/cloudflare", headers=h, json={"raw_host": "tunnel.example.com"})
+        nh = {"Authorization": "Bearer " + node["install_command"].split("--token ")[1].split()[0]}
+        c.post("/api/node/report", headers=nh, json={"reality_pub": "PUB", "reality_sid": "ab"})
+        u = c.post("/api/users", headers=h, json={"name": "rawu", "protos": ["vless_raw", "vless_tcp"], "node_ids": [node["id"]]}).json()
+        links = c.get(f"/api/users/{u['id']}/configs", headers=h).text
+        assert "@tunnel.example.com:80?encryption=none&security=none" in links
+        assert "@5.5.5.5:2097?" in links   # other protocols keep the node address

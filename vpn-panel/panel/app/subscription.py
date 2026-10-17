@@ -70,7 +70,7 @@ def build_entry(user: User, node: Node, proto: str, port: int, cdn: bool = False
     elif proto == "vless_tcp":
         e["link"] = f"vless://{user.uuid}@{conn}:{port}?encryption=none&{tls}&type=tcp#{tag}"
     elif proto == "vless_raw":
-        e["link"] = f"vless://{user.uuid}@{conn}:{port}?encryption=none&security=none&type=tcp#{tag}"
+        e["link"] = f"vless://{user.uuid}@{node.raw_host or conn}:{port}?encryption=none&security=none&type=tcp#{tag}"
     elif proto == "vless_ws":
         path = quote(WS_PATHS[proto], safe="")
         e["link"] = f"vless://{user.uuid}@{conn}:{port}?encryption=none&{tls}&type=ws&host={host}&path={path}#{tag}"
