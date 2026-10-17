@@ -559,10 +559,27 @@ DNSTT_INSTALL = r"""set -e
 d=$(mktemp -d); trap 'rm -rf "$d"' EXIT
 case "$(uname -m)" in x86_64) ga=amd64;; aarch64|arm64) ga=arm64;; *) echo "unsupported CPU $(uname -m)"; exit 1;; esac
 command -v git >/dev/null || { apt-get update -y >/dev/null && apt-get install -y git >/dev/null; }
-curl -fsSL "https://go.dev/dl/go1.22.5.linux-$ga.tar.gz" | tar -C "$d" -xz
+get_go() {
+  for ver in "$@"; do
+    for base in https://go.dev/dl https://dl.google.com/go https://golang.google.cn/dl https://mirrors.aliyun.com/golang; do
+      if curl -fsSL --connect-timeout 15 "$base/$ver.linux-$ga.tar.gz" -o "$d/go.tgz" && tar -C "$d" -xzf "$d/go.tgz" 2>/dev/null; then
+        echo "go $ver from $base"; return 0
+      fi
+    done
+  done
+  return 1
+}
+latest=$(curl -fsSL --connect-timeout 15 'https://go.dev/dl/?mode=json' 2>/dev/null | python3 -c "import sys,json;print(json.load(sys.stdin)[0]['version'])" 2>/dev/null || true)
+if get_go $latest go1.23.4 go1.22.5; then
+  GO="$d/go/bin/go"
+else
+  echo "could not download Go; trying the distribution package"
+  apt-get install -y golang-go >/dev/null && GO=$(command -v go) || { echo "no Go available: download from go.dev, dl.google.com and the apt package all failed"; exit 1; }
+fi
 git clone --depth 1 https://www.bamsoftware.com/git/dnstt.git "$d/dnstt"
 cd "$d/dnstt/dnstt-server"
-GOPATH="$d/gopath" GOCACHE="$d/cache" GOTOOLCHAIN=local "$d/go/bin/go" build -o /usr/local/bin/dnstt-server .
+GOPATH="$d/gopath" GOCACHE="$d/cache" GOTOOLCHAIN=local GOFLAGS=-mod=mod "$GO" build -o /usr/local/bin/dnstt-server .
+echo "dnstt-server installed"
 """
 
 

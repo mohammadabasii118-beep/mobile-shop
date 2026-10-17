@@ -1139,3 +1139,10 @@ def test_dnstt_key_is_shared_and_user_gets_one_entry():
         assert c.get("/api/node/config", headers=nh(n2)).json()["dnstt"] is None
         for n in (n1, n2):
             c.delete(f"/api/nodes/{n['id']}", headers=h)
+
+
+def test_dnstt_install_script_is_valid_shell_with_fallbacks():
+    import subprocess
+    assert subprocess.run(["bash", "-n", "-c", agent.DNSTT_INSTALL], capture_output=True, text=True).returncode == 0
+    for needle in ("go.dev/dl", "dl.google.com/go", "mode=json", "golang-go", "bamsoftware.com/git/dnstt"):
+        assert needle in agent.DNSTT_INSTALL
