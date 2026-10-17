@@ -1267,3 +1267,11 @@ def test_dnstt_client_build_script_is_valid_and_cross_compiles_three_targets():
     for needle in ("windows/amd64:dnstt-client-windows-amd64.exe", "linux/arm64:dnstt-client-android-arm64", "linux/amd64:dnstt-client-linux-amd64",
                    "CGO_ENABLED=0", "proxy.golang.org|", "mode=json"):
         assert needle in text
+
+
+def test_dnstt_remote_check_script_is_valid_shell():
+    import subprocess
+    p = ROOT / "agent" / "dnstt_remote_check.sh"
+    assert subprocess.run(["bash", "-n", str(p)], capture_output=True).returncode == 0
+    text = p.read_text()
+    assert "| OUT=/usr/local/bin/dnstt-client bash" in text and "Permission denied" in text and '-udp "$RESOLVER:53"' in text
