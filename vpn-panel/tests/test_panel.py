@@ -113,7 +113,7 @@ def test_agent_renderers():
 
 
 ALL = ["vless", "vless_raw", "vless_tcp", "vmess_tcp", "vless_ws", "vless_grpc", "vmess_ws", "trojan", "trojan_ws", "ss", "hy2", "tuic",
-       "wg", "ovpn", "l2tp", "ikev2", "anyc"]
+       "wg", "ovpn", "l2tp", "ikev2", "anyc", "dnstt"]
 
 
 def test_all_protocols_have_entries_and_node_config():
@@ -135,7 +135,7 @@ def test_all_protocols_have_entries_and_node_config():
         c.post("/api/node/report", headers=nh, json={"reality_pub": "PUB", "reality_sid": "ab", "wg_pub": "WGPUB",
                                                       "ovpn_ca": "-----BEGIN CERTIFICATE-----\nX\n-----END CERTIFICATE-----"})
         rows = {e["proto"]: e for e in c.get(f"/api/users/{user['id']}/configs", headers=h).json()}
-        assert set(rows) == set(ALL)
+        assert set(rows) == set(ALL) - {"dnstt"}        # DNSTT is off by default and needs a domain and key (own test)
         assert "security=none" in rows["vless_raw"]["link"] and ":80?" in rows["vless_raw"]["link"]
         assert "type=tcp" in rows["vless_tcp"]["link"] and "security=tls" in rows["vless_tcp"]["link"]
         assert json.loads(base64.b64decode(rows["vmess_tcp"]["link"][8:]))["net"] == "tcp"
@@ -967,3 +967,175 @@ def test_sub_admin_permissions_delete_and_edit_are_granted_per_admin():
         # the main admin can grant it later
         c.patch(f"/api/admins/{plain['id']}", headers=h, json={"can_delete": True})
         assert c.delete(f"/api/me/users/{pu}", headers=ph).json() == {"ok": True}
+
+
+def test_agent_dnstt_inner_inbound_unit_and_redirect():
+    cfg = {"node": {"reality_sni": "x"}, "protocols": {"dnstt": 5300, "vless": 443}, "dnstt": {"domain": "t.example.com", "privkey": "ab"},
+           "users": [{"name": "d1", "uuid": "u-1", "password": "p", "ss_key": "k", "protos": ["dnstt"]},
+                     {"name": "d2", "uuid": "u-2", "password": "p", "ss_key": "k", "protos": ["vless"]}]}
+    x = {i["tag"]: i for i in agent.render_xray(cfg, {"private": "P", "public": "Q", "short_id": "ab"}, {"cert": "/c", "key": "/k"})["inbounds"]}
+    d = x["dnstt"]
+    assert d["listen"] == "127.0.0.1" and d["port"] == agent.DNSTT_UPSTREAM_PORT and d["streamSettings"]["security"] == "none"
+    assert d["settings"]["clients"] == [{"id": "u-1", "email": "d1"}]          # only users that have the protocol, never exposed publicly
+    cfg["dnstt"] = None
+    assert "dnstt" not in {i["tag"] for i in agent.render_xray(cfg, {"private": "P", "public": "Q", "short_id": "ab"}, {"cert": "/c", "key": "/k"})["inbounds"]}
+    unit = agent.dnstt_unit(5300, "t.example.com", "/k.key")
+    assert "-udp :5300 -privkey-file /k.key t.example.com 127.0.0.1:%d" % agent.DNSTT_UPSTREAM_PORT in unit
+    # redirect: add when missing, keep when right, replace only OUR stale rule, never touch foreign ones
+    tag = agent.DNSTT_RULE_TAG
+    ours = f"-A PREROUTING -p udp -m udp --dport 53 -m comment --comment {tag} -j REDIRECT --to-ports 5300"
+    foreign = "-A PREROUTING -p udp -m udp --dport 53 -j REDIRECT --to-ports 5353"
+    assert agent.dnstt_redirect_plan("", 5300) == (True, [])
+    assert agent.dnstt_redirect_plan(ours, 5300) == (False, [])
+    add, stale = agent.dnstt_redirect_plan(ours + "\n" + foreign, 5400)
+    assert add and len(stale) == 1 and tag in stale[0] and "5300" in stale[0]
+    calls = []
+
+    class R:
+        def __init__(self, out=""):
+            self.stdout, self.returncode = out, 0
+
+    def run(*cmd):
+        calls.append(cmd)
+        return R(ours + "\n" + foreign) if "-S" in cmd else R()
+    agent.ensure_dnstt_redirect(5400, run)
+    assert any(c[:6] == ("iptables", "-t", "nat", "-D", "PREROUTING", "-p") for c in calls)
+    assert any("-A" in c and "5400" in c and tag in c for c in calls)
+    assert not any("5353" in c for c in calls)                                  # the foreign rule is left alone
+    calls.clear()
+    agent.ensure_dnstt_redirect(None, run)
+    assert [c for c in calls if "-D" in c] and not [c for c in calls if "-A" in c]
+
+
+def test_agent_dnstt_binary_install_is_background_and_retries_hourly(monkeypatch):
+    import threading
+    st = agent._dnstt_install
+    st.update(thread=None, failed_at=0, why="")
+    monkeypatch.setattr(agent, "DNSTT_BIN", "/nonexistent/dnstt-server")
+    monkeypatch.setattr("shutil.which", lambda n: None)
+    done = threading.Event()
+
+    class R:
+        returncode, stdout, stderr = 1, "", "go: no network\nfetch failed: dial tcp"
+
+    def run(*cmd):
+        assert cmd[0] == "bash" and "bamsoftware.com/git/dnstt" in cmd[2]
+        done.set()
+        return R()
+    errors = []
+    assert agent.ensure_dnstt_binary(errors, run=run, now=lambda: 1000.0) is False
+    assert done.wait(5) and errors == []                                          # building: not an error yet
+    st["thread"].join(5)
+    assert st["failed_at"] == 1000.0 and "fetch failed" in st["why"]
+    assert agent.ensure_dnstt_binary(errors, run=run, now=lambda: 1500.0) is False
+    assert errors and "install failed" in errors[0] and "fetch failed" in errors[0]   # reported, not retried yet
+    done.clear()
+    agent.ensure_dnstt_binary([], run=run, now=lambda: 1000.0 + 3601)             # an hour later: tries again
+    assert done.wait(5)
+    st.update(thread=None, failed_at=0, why="")
+
+
+class FakeCloudflare:
+    """Just enough of the Cloudflare DNS API for the sync code."""
+    def __init__(self):
+        self.records, self.seq, self.fail = [], 0, None
+        self.add("A", "ns.example.com", "9.9.9.9")                # records somebody made by hand: never touched
+        self.add("NS", "t.example.com", "ns.example.com")
+
+    def add(self, rtype, name, content):
+        self.seq += 1
+        self.records.append({"id": f"r{self.seq}", "type": rtype, "name": name, "content": content})
+
+    def __call__(self, token, method, path, body=None):
+        from urllib.parse import parse_qs, urlparse
+        import app.dns as d
+        if self.fail:
+            raise d.CfError(self.fail)
+        assert token == "tok_abc"
+        u = urlparse(path)
+        q = {k: v[0] for k, v in parse_qs(u.query).items()}
+        if u.path == "/zones":
+            return [{"id": "z1", "name": q["name"]}] if q["name"] == "example.com" else []
+        assert u.path.startswith("/zones/z1/dns_records")
+        if method == "GET":
+            return [r for r in self.records if r["type"] == q.get("type", r["type"]) and r["name"] == q.get("name", r["name"])]
+        if method == "POST":
+            self.add(body["type"], body["name"], body["content"])
+            return self.records[-1]
+        self.records = [r for r in self.records if not u.path.endswith("/" + r["id"])]
+        return {}
+
+    def mine(self):
+        return sorted((r["type"], r["name"], r["content"]) for r in self.records if r["name"].startswith("nsd") or r["content"].startswith("nsd"))
+
+
+def test_dnstt_cloudflare_records_follow_the_node_checkbox(monkeypatch):
+    import app.dns as d
+    fake = FakeCloudflare()
+    monkeypatch.setattr(d, "call", fake)
+    with TestClient(app) as c:
+        h = admin(c)
+        n1 = c.post("/api/nodes", headers=h, json={"name": "D1", "cc": "tr", "address": "1.2.3.4"}).json()
+        n2 = c.post("/api/nodes", headers=h, json={"name": "D2", "cc": "fr", "address": "5.6.7.8"}).json()
+        assert {p["proto"]: p["enabled"] for p in n1["protocols"]}["dnstt"] is False            # opt-in
+        for bad in ({"domain": "t.other.com", "zone": "example.com"}, {"domain": "example.com", "zone": "example.com"}):
+            assert c.put("/api/dnstt", headers=h, json=bad).status_code == 422
+        r = c.put("/api/dnstt", headers=h, json={"domain": "T.Example.com", "zone": "example.com", "cf_token": "tok_abc"}).json()
+        assert r["domain"] == "t.example.com" and r["token_set"] and r["token_hint"] == "_abc" and "tok_abc" not in json.dumps(r)
+        tog = lambda n, on: c.put(f"/api/nodes/{n['id']}/protocols/dnstt", headers=h, json={"enabled": on}).json()
+        a1, a2 = f"nsd{n1['id']}.example.com", f"nsd{n2['id']}.example.com"
+        res = tog(n1, True)["dns"]
+        assert res["ok"] and res["nodes"][str(n1["id"])] == {"a": "created", "ns": "created"}
+        assert fake.mine() == sorted([("A", a1, "1.2.3.4"), ("NS", "t.example.com", a1)])
+        tog(n2, True)
+        assert len(fake.mine()) == 4
+        assert tog(n2, True)["dns"]["nodes"][str(n2["id"])] == {"a": "exists", "ns": "exists"}   # idempotent
+        tog(n1, False)
+        assert fake.mine() == sorted([("A", a2, "5.6.7.8"), ("NS", "t.example.com", a2)])
+        assert ("A", "ns.example.com", "9.9.9.9") in [(r["type"], r["name"], r["content"]) for r in fake.records]   # hand-made ones stay
+        assert ("NS", "t.example.com", "ns.example.com") in [(r["type"], r["name"], r["content"]) for r in fake.records]
+        # a Cloudflare failure is reported, never raised into the toggle
+        fake.fail = "Authentication error"
+        out = tog(n1, True)
+        assert out["ok"] and out["dns"]["ok"] is False and "Authentication error" in out["dns"]["error"]
+        assert "Authentication error" in c.get("/api/dnstt", headers=h).json()["last_sync"]["error"]
+        fake.fail = None
+        # deleting a node removes its records
+        c.delete(f"/api/nodes/{n2['id']}", headers=h)
+        assert all(a2 not in (name, content) for _, name, content in fake.mine())
+        # a node whose address is a hostname cannot get an A record
+        n3 = c.post("/api/nodes", headers=h, json={"name": "D3", "cc": "nl", "address": "host.example.org"}).json()
+        st = tog(n3, True)["dns"]["nodes"][str(n3["id"])]
+        assert st["a"].startswith("error") and "IPv4" in st["a"]
+        c.delete(f"/api/nodes/{n3['id']}", headers=h)
+        c.delete(f"/api/nodes/{n1['id']}", headers=h)
+
+
+def test_dnstt_key_is_shared_and_user_gets_one_entry():
+    with TestClient(app) as c:
+        h = admin(c)
+        n1 = c.post("/api/nodes", headers=h, json={"name": "K1", "cc": "tr", "address": "1.1.1.1"}).json()
+        n2 = c.post("/api/nodes", headers=h, json={"name": "K2", "cc": "fr", "address": "2.2.2.2"}).json()
+        nh = lambda n: {"Authorization": "Bearer " + n["install_command"].split("--token ")[1].split()[0]}
+        c.put("/api/dnstt", headers=h, json={"domain": "tun.example.com", "zone": "example.com"})
+        for n in (n1, n2):
+            c.put(f"/api/nodes/{n['id']}/protocols/dnstt", headers=h, json={"enabled": True})
+        u = c.post("/api/users", headers=h, json={"name": "dnsu", "protos": ["dnstt", "vless_tcp"]}).json()
+        cfg = c.get("/api/node/config", headers=nh(n1)).json()
+        assert cfg["dnstt"] == {"domain": "tun.example.com", "privkey": ""} and cfg["protocols"]["dnstt"] == 5300     # nothing generated yet
+        assert any(x["name"] == "dnsu" and "dnstt" in x["protos"] for x in cfg["users"])
+        c.post("/api/node/report", headers=nh(n1), json={"dnstt_priv": "aa" * 32, "dnstt_pub": "bb" * 32})
+        c.post("/api/node/report", headers=nh(n2), json={"dnstt_priv": "cc" * 32, "dnstt_pub": "dd" * 32})    # lost the race: ignored
+        for n in (n1, n2):   # both nodes now serve the first key
+            assert c.get("/api/node/config", headers=nh(n)).json()["dnstt"] == {"domain": "tun.example.com", "privkey": "aa" * 32}
+        assert c.get("/api/dnstt", headers=h).json()["pubkey"] == "bb" * 32
+        rows = [e for e in c.get(f"/api/users/{u['id']}/configs", headers=h).json() if e["proto"] == "dnstt"]
+        assert len(rows) == 1                                                       # one entry, not one per node
+        uid = next(x["uuid"] for x in c.get("/api/node/config", headers=nh(n1)).json()["users"] if x["name"] == "dnsu")
+        assert rows[0]["details"]["domain"] == "tun.example.com" and rows[0]["details"]["uuid"] == uid and rows[0]["link"] is None
+        assert "dnstt-client -udp" in rows[0]["copy"] and "bb" * 32 in rows[0]["copy"] and uid in rows[0]["copy"]
+        # off on a node: that node stops getting the config
+        c.put(f"/api/nodes/{n2['id']}/protocols/dnstt", headers=h, json={"enabled": False})
+        assert c.get("/api/node/config", headers=nh(n2)).json()["dnstt"] is None
+        for n in (n1, n2):
+            c.delete(f"/api/nodes/{n['id']}", headers=h)

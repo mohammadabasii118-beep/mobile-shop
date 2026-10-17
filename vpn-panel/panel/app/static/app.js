@@ -1,6 +1,6 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: [], brand: {name: 'پنل چندلوکیشن', logo: '', color: ''}};
+const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: [], brand: {name: 'پنل چندلوکیشن', logo: '', color: ''}, dnstt: null};
 const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', routing: 'مسیریابی', users: 'کاربران', admins: 'ادمین‌ها', look: 'ظاهر پنل'};
 const STATUS = {active: ['good', 'فعال'], disabled: ['bad', 'غیرفعال'], expired: ['bad', 'منقضی'], quota: ['bad', 'حجم تمام شده']};
 
@@ -14,6 +14,7 @@ const ICO = {
   trophy: '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>',
   admin: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><circle cx="12" cy="10" r="2.5"/><path d="M7.5 17c.8-2 2.6-3 4.5-3s3.7 1 4.5 3"/>',
   palette: '<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.7-.7 1.7-1.6 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.7 1.7-1.7H16c3.3 0 6-2.7 6-6 0-4.9-4.5-8.5-10-8.5Z"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
   pie: '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10Z"/>',
 };
 const ic = n => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICO[n]}</svg>`;
@@ -69,7 +70,7 @@ async function refresh() {
     const [users, opts] = await Promise.all([api('GET', '/me/users'), api('GET', '/me/options')]);
     S.users = users; S.nodes = opts.nodes; S.protos = opts.protocols; S.admins = []; S.tab = 'users';
   } else {
-    [S.nodes, S.users, S.protos, S.admins] = await Promise.all([api('GET', '/nodes'), api('GET', '/users'), api('GET', '/protocols'), api('GET', '/admins')]);
+    [S.nodes, S.users, S.protos, S.admins, S.dnstt] = await Promise.all([api('GET', '/nodes'), api('GET', '/users'), api('GET', '/protocols'), api('GET', '/admins'), api('GET', '/dnstt')]);
   }
   const ids = new Set(S.users.map(u => u.id));
   S.sel = new Set([...S.sel].filter(i => ids.has(i)));   // a deleted user cannot stay selected
@@ -118,7 +119,7 @@ const views = {
         ${S.nodes.map(n => { const np = n.protocols.find(x => x.proto === p.id);
           return `<td><input type="checkbox" data-node="${n.id}" data-proto="${p.id}" aria-label="${esc(p.label)} در ${esc(n.cc)}" ${np && np.enabled ? 'checked' : ''}></td>`; }).join('')}</tr>`).join('')}
       </tbody></table></div>
-      ${portPanel()}`;
+      ${portPanel()}${dnsttPanel()}`;
   },
   routing() {
     if (!S.nodes.length) return '<div class="note">ابتدا یک لوکیشن اضافه کنید.</div>';
@@ -193,6 +194,23 @@ const views = {
   },
 };
 
+function dnsttPanel() {
+  const d = S.dnstt; if (!d) return '';
+  const ls = d.last_sync || {}, st = (ls.nodes || {}), cell = v => !v ? '<span class="muted">—</span>' : v.startsWith('error') ? `<span class="pill bad wrap">${esc(v)}</span>` : `<span class="pill good">${esc(v === 'created' ? 'ساخته شد' : v === 'exists' ? 'هست' : 'پاک شد')}</span>`;
+  return `<div class="panel"><h2>${ic('globe')}DNSTT (تونل DNS)</h2>
+    <div class="note">برای وقتی که همه‌چیز بسته است و فقط DNS کار می‌کند؛ خیلی کند است. اول در جدول بالا DNSTT را برای هر نودی که می‌خواهید روشن کنید. رکوردهای DNS (A و NS) را همین‌جا خودکار می‌سازم. فایروال هر نود هم باید <b>UDP 53</b> را باز بگذارد.</div>
+    <div class="form" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+      <label class="f">دامنه‌ی اصلی در Cloudflare<input type="text" id="dtZone" value="${esc(d.zone)}" placeholder="example.com" dir="ltr"></label>
+      <label class="f">دامنه‌ی تونل (ساب‌دامین)<input type="text" id="dtDomain" value="${esc(d.domain)}" placeholder="t.example.com" dir="ltr"></label>
+      <label class="f">توکن Cloudflare ${d.token_set ? `<span class="muted">(ذخیره شده، …${esc(d.token_hint)}؛ خالی = بدون تغییر)</span>` : ''}<input type="password" id="dtToken" autocomplete="off" dir="ltr"></label></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"><button class="btn pri" id="dtSave">ذخیره</button><button class="btn" id="dtSync">همگام‌سازی DNS</button>
+      ${d.token_set ? '<button class="btn danger" id="dtClear">حذف توکن</button>' : ''}</div>
+    ${ls.error ? `<div class="note" style="color:var(--bad)">آخرین همگام‌سازی ناموفق بود: ${esc(ls.error)}</div>` : ''}
+    <div class="scroll"><table><thead><tr><th>لوکیشن</th><th>DNSTT</th><th>رکورد A</th><th>رکورد NS</th></tr></thead><tbody>
+      ${d.nodes.map(n => `<tr><td>${esc(n.name)} <span class="muted mono">${esc(n.address)}</span></td><td>${n.enabled ? '<span class="pill good">روشن</span>' : '<span class="pill">خاموش</span>'}</td>
+        <td>${cell((st[n.id] || {}).a)}</td><td>${cell((st[n.id] || {}).ns)}</td></tr>`).join('')}</tbody></table></div>
+    <div class="note" style="margin-top:10px">${d.pubkey ? `کلید عمومی (برای کلاینت): <span class="mono" style="word-break:break-all">${esc(d.pubkey)}</span>` : 'کلید عمومی بعد از اینکه اولین نود DNSTT را راه انداخت (چند دقیقه، چون برنامه ساخته می‌شود) اینجا می‌آید.'}</div></div>`;
+}
 function portPanel() {
   if (!S.nodes.length) return '';
   const n = nodeBy(S.portNode) || S.nodes[0], [lo, hi] = n.port_range;
@@ -416,6 +434,12 @@ document.addEventListener('click', async e => {
     else if (t.id === 'cfSave') { await api('PUT', `/nodes/${d.id}/cloudflare`, {cf_domain: $('#cfDomain').value.trim(), cf_address: $('#cfAddr').value.trim(), raw_host: $('#rawHost').value.trim()}); closeModal(); await refresh(); toast('ذخیره شد'); }
     else if (d.delnode) { await api('DELETE', '/nodes/' + d.delnode); closeModal(); await refresh(); toast('لوکیشن حذف شد'); }
     else if (t.id === 'addUser') userForm();
+    else if (t.id === 'dtSave' || t.id === 'dtClear') {
+      const body = {domain: $('#dtDomain').value.trim(), zone: $('#dtZone').value.trim()}, tok = $('#dtToken').value.trim();
+      if (t.id === 'dtClear') body.cf_token = ''; else if (tok) body.cf_token = tok;
+      S.dnstt = await api('PUT', '/dnstt', body); render(); toast('ذخیره شد');
+    }
+    else if (t.id === 'dtSync') { S.dnstt = await api('POST', '/dnstt/sync'); render(); toast(S.dnstt.last_sync.ok ? 'DNS همگام شد' : 'همگام‌سازی ناموفق بود'); }
     else if (t.id === 'addAdmin') adminForm();
     else if (t.id === 'bSave') {
       const b = await api('PUT', '/branding', {name: $('#bName').value.trim() || S.brand.name, color: S.draft.color, logo: S.draft.logo});
@@ -541,10 +565,14 @@ document.addEventListener('change', async e => {
     return;
   }
   const d = e.target.dataset; if (!d.proto) return;
-  try { await api('PUT', `/nodes/${d.node}/protocols/${d.proto}`, {enabled: e.target.checked}); await refresh(); }
+  try {
+    const r = await api('PUT', `/nodes/${d.node}/protocols/${d.proto}`, {enabled: e.target.checked}); await refresh();
+    if (r.dns) toast(r.dns.ok ? 'رکوردهای DNS به‌روز شد' : 'DNS: ' + r.dns.error);
+  }
   catch (err) { toast(err.message); }
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'pw') $('#doLogin').click(); });
 
 (async () => { await loadBrand(); if (!token) return showLogin(); try { await refresh(); } catch (e) {} })();
-setInterval(() => { if (token && $('#modal').hidden && S.tab !== 'look') refresh().catch(() => {}); }, 20000);
+setInterval(() => { const a = document.activeElement, typing = a && ['INPUT', 'SELECT', 'TEXTAREA'].includes(a.tagName) && a.id !== 'uq' && $('#view').contains(a);
+  if (token && $('#modal').hidden && S.tab !== 'look' && !typing) refresh().catch(() => {}); }, 20000);

@@ -134,12 +134,35 @@ def build_entry(user: User, node: Node, proto: str, port: int, cdn: bool = False
     return e
 
 
-def user_entries(user: User, nodes: list[Node]) -> list[dict]:
-    out = []
+DNSTT_CLIENT_PORT = 7000
+
+
+def dnstt_entry(user: User, node: Node, info: dict) -> dict:
+    """DNSTT has no share link: the user runs dnstt-client and points a VLESS client at it. One entry serves every
+    node, because all of them answer for the same tunnel domain."""
+    e = {"node": "همه‌ی لوکیشن‌ها", "node_id": node.id, "cc": "DNS", "proto": "dnstt", "label": PROTOCOLS["dnstt"]["label"],
+         "link": None, "details": None, "summary": None, "copy": None, "file_ext": None}
+    text = (f"# 1) dnstt-client را اجرا کنید (هر DNS بازگشتی که در دسترس شماست؛ یا DoH):\n"
+            f"dnstt-client -udp 8.8.8.8:53 -pubkey {info['pub']} {info['domain']} 127.0.0.1:{DNSTT_CLIENT_PORT}\n"
+            f"# یا: dnstt-client -doh https://dns.google/dns-query -pubkey {info['pub']} {info['domain']} 127.0.0.1:{DNSTT_CLIENT_PORT}\n"
+            f"# 2) در برنامه‌ی v2ray/Xray یک ورودی VLESS بسازید:\n"
+            f"# address 127.0.0.1  port {DNSTT_CLIENT_PORT}  id {user.uuid}  encryption none  network tcp  security none")
+    _manual(e, {"domain": info["domain"], "public_key": info["pub"], "uuid": user.uuid, "local_port": DNSTT_CLIENT_PORT}, text)
+    e["summary"] = f"{info['domain']} | uuid {user.uuid} | کلید عمومی در جزئیات"
+    return e
+
+
+def user_entries(user: User, nodes: list[Node], dnstt: dict | None = None) -> list[dict]:
+    out, dnstt_done = [], False
     for node in nodes:
         if user.node_ids and node.id not in user.node_ids:
             continue
         for np in node.protocols:
+            if np.proto == "dnstt":
+                if np.enabled and "dnstt" in user.protos and dnstt and not dnstt_done:
+                    out.append(dnstt_entry(user, node, dnstt))
+                    dnstt_done = True
+                continue
             if np.enabled and np.proto in user.protos:
                 e = build_entry(user, node, np.proto, np.port, conn_host=np.host)
                 if e:

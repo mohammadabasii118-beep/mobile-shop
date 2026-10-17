@@ -20,3 +20,10 @@ A sub-admin session only works on `/api/me`, `/api/me/options`, `/api/me/users` 
 
 ### Per-admin permissions
 `can_edit` and `can_delete` (both default `false`) on `/api/admins`. With them a sub-admin may `PATCH /api/me/users/{id}` (`enabled`, `quota_gb`, `days`, `extend_days`, `reset_usage`, still within `max_quota_gb`/`max_days`) and `DELETE /api/me/users/{id}`, on their own users only. Without the permission both answer 403.
+
+## DNSTT (DNS tunnel)
+`GET/PUT /api/dnstt` (`domain`, `zone`, `cf_token`; the token is never returned, only `token_set`), `POST /api/dnstt/sync`.
+Turning the `dnstt` protocol on or off for a node (`PUT /api/nodes/{id}/protocols/dnstt`) makes the panel create/remove that node's records in Cloudflare:
+`A nsd<node id>.<zone>` -> node IP and `NS <tunnel domain>` -> that name. Records it did not create are never touched.
+The first node that generates the key pair reports it; the panel keeps that key and hands it to every node, so all nodes answer for the same domain.
+Users with the `dnstt` protocol get one config entry (domain, public key, UUID, dnstt-client commands). Inside the tunnel runs a loopback-only VLESS inbound, so each user is metered and limited like any other.

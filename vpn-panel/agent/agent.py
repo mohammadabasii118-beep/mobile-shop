@@ -19,6 +19,7 @@ XRAY_API = "127.0.0.1:10085"
 # ---------- renderers (pure functions, covered by tests) ----------
 WS_PATHS = {"vmess_ws": "/ws", "vless_ws": "/vless", "trojan_ws": "/trojan"}
 GRPC_SERVICE = "grpc"
+DNSTT_UPSTREAM_PORT = 18466   # loopback VLESS inbound behind dnstt-server
 
 
 def users_for(cfg, proto):
@@ -40,6 +41,12 @@ def render_xray(cfg, reality, tls, busy=frozenset()):
             inbounds.append({"tag": proto, "port": ports[proto], "protocol": protocol,
                              "settings": {"clients": clients, **settings}, "streamSettings": stream})
 
+    if cfg.get("dnstt") and users_for(cfg, "dnstt"):
+        # DNSTT hands every tunnelled stream to this loopback-only inbound, which tells the users apart (and meters them)
+        inbounds.append({"tag": "dnstt", "listen": "127.0.0.1", "port": DNSTT_UPSTREAM_PORT, "protocol": "vless",
+                         "settings": {"clients": [{"id": u["uuid"], "email": u["name"]} for u in users_for(cfg, "dnstt")],
+                                      "decryption": "none"},
+                         "streamSettings": {"network": "tcp", "security": "none"}})
     sni = cfg["node"]["reality_sni"]
     add("vless", "vless",
         [{"id": u["uuid"], "email": u["name"], "flow": "xtls-rprx-vision"} for u in users_for(cfg, "vless")],
@@ -108,7 +115,7 @@ def set_conf_value(text, key, value):
 
 OURS = {"xray", "sing-box", "openvpn", "ocserv", "ocserv-main", "ocserv-worker", "charon", "xl2tpd"}
 TCP_PROTOS = {"vless", "vless_tcp", "vless_raw", "vless_ws", "vless_grpc", "vmess_ws", "vmess_tcp", "trojan", "trojan_ws", "ss", "anyc"}
-UDP_PROTOS = {"hy2", "tuic", "wg", "ovpn", "anyc"}
+UDP_PROTOS = {"hy2", "tuic", "wg", "ovpn", "anyc", "dnstt"}
 
 
 def foreign_listeners(ss_text):
@@ -543,6 +550,128 @@ def xray_test(path):
     return r.returncode == 0, (last[-1] if last else "")[-260:]
 
 
+# ---------- DNSTT: DNS tunnel server (one shared domain and key on every node) ----------
+DNSTT_BIN = "/usr/local/bin/dnstt-server"
+DNSTT_KEY = f"{STATE_DIR}/dnstt.key"
+DNSTT_PUB = f"{STATE_DIR}/dnstt.pub"
+DNSTT_UNIT = "/etc/systemd/system/dnstt-server.service"
+DNSTT_INSTALL = r"""set -e
+d=$(mktemp -d); trap 'rm -rf "$d"' EXIT
+case "$(uname -m)" in x86_64) ga=amd64;; aarch64|arm64) ga=arm64;; *) echo "unsupported CPU $(uname -m)"; exit 1;; esac
+command -v git >/dev/null || { apt-get update -y >/dev/null && apt-get install -y git >/dev/null; }
+curl -fsSL "https://go.dev/dl/go1.22.5.linux-$ga.tar.gz" | tar -C "$d" -xz
+git clone --depth 1 https://www.bamsoftware.com/git/dnstt.git "$d/dnstt"
+cd "$d/dnstt/dnstt-server"
+GOPATH="$d/gopath" GOCACHE="$d/cache" GOTOOLCHAIN=local "$d/go/bin/go" build -o /usr/local/bin/dnstt-server .
+"""
+
+
+def dnstt_unit(port, domain, key=DNSTT_KEY):
+    return f"""[Unit]
+Description=DNSTT server
+After=network-online.target
+
+[Service]
+ExecStart={DNSTT_BIN} -udp :{port} -privkey-file {key} {domain} 127.0.0.1:{DNSTT_UPSTREAM_PORT}
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+
+DNSTT_RULE_TAG = "vpn-node-dnstt"   # iptables comment: only rules carrying it are ever touched
+
+
+def dnstt_redirect_plan(rules_text, port):
+    """iptables -t nat -S PREROUTING output -> (add?, [stale rule specs to delete]). Public UDP 53 is redirected to the
+    port dnstt-server listens on, because systemd-resolved usually owns :53 itself."""
+    have, stale = False, []
+    for line in rules_text.splitlines():
+        f = line.split()
+        if line.startswith("-A PREROUTING") and DNSTT_RULE_TAG in f and "--dport" in f and f[f.index("--dport") + 1] == "53" \
+                and "REDIRECT" in f and "--to-ports" in f:
+            if f[f.index("--to-ports") + 1] == str(port):
+                have = True
+            else:
+                stale.append(f[2:])
+    return not have, stale
+
+
+def ensure_dnstt_redirect(port, run=None):
+    """Idempotent; port=None removes our rule(s)."""
+    run = run or sh
+    add, stale = dnstt_redirect_plan(run("iptables", "-t", "nat", "-S", "PREROUTING").stdout, port or 0)
+    for spec in stale:
+        run("iptables", "-t", "nat", "-D", "PREROUTING", *spec)
+    if port is not None and add:
+        run("iptables", "-t", "nat", "-A", "PREROUTING", "-p", "udp", "--dport", "53", "-m", "comment", "--comment", DNSTT_RULE_TAG,
+            "-j", "REDIRECT", "--to-ports", str(port))
+
+
+_dnstt_install = {"thread": None, "failed_at": 0, "why": ""}
+
+
+def ensure_dnstt_binary(errors, run=None, now=time.time):
+    """Build dnstt-server in the background (a few minutes) and retry at most hourly. True once it is installed."""
+    import shutil
+    import threading
+    if os.path.exists(DNSTT_BIN) or shutil.which("dnstt-server"):
+        return True
+    st = _dnstt_install
+    if st["thread"] and st["thread"].is_alive():
+        return False
+    if st["failed_at"] and now() - st["failed_at"] < 3600:
+        errors.append("dnstt-server install failed: " + st["why"])
+        return False
+
+    def work():
+        r = (run or sh)("bash", "-c", DNSTT_INSTALL)
+        if r.returncode != 0:
+            st["failed_at"], st["why"] = now(), ((r.stderr or r.stdout).strip().splitlines() or ["unknown error"])[-1][-200:]
+    st["failed_at"] = 0
+    st["thread"] = threading.Thread(target=work, daemon=True)
+    st["thread"].start()
+    return False
+
+
+def apply_dnstt(cfg, errors, udp_busy=frozenset()):
+    """Returns {"dnstt_priv", "dnstt_pub"} when this node generated the key pair (the panel keeps the first one and
+    hands it to every node), else {}."""
+    d = cfg.get("dnstt")
+    port = cfg["protocols"].get("dnstt")
+    if not d or not port:
+        if os.path.exists(DNSTT_UNIT):   # it was set up here before: undo it
+            sh("systemctl", "disable", "--now", "dnstt-server")
+            ensure_dnstt_redirect(None)
+        return {}
+    if port in udp_busy:
+        return {}   # reported as a port conflict
+    if not ensure_dnstt_binary(errors):
+        return {}
+    out = {}
+    if d.get("privkey"):
+        write_if_changed(DNSTT_KEY, d["privkey"].strip() + "\n", 0o600)
+    elif not os.path.exists(DNSTT_KEY):
+        r = sh(DNSTT_BIN, "-gen-key", "-privkey-file", DNSTT_KEY, "-pubkey-file", DNSTT_PUB)
+        if r.returncode != 0:
+            errors.append("dnstt key generation failed: " + (r.stderr or r.stdout).strip()[-160:])
+            return {}
+    if not d.get("privkey") and os.path.exists(DNSTT_PUB):
+        out = {"dnstt_priv": read_text(DNSTT_KEY).strip(), "dnstt_pub": read_text(DNSTT_PUB).strip()}
+    if write_if_changed(DNSTT_UNIT, dnstt_unit(port, d["domain"]), 0o644):
+        sh("systemctl", "daemon-reload")
+        sh("systemctl", "enable", "dnstt-server")
+    restart_on_config_change("dnstt-server", [DNSTT_UNIT, DNSTT_KEY])
+    ensure_dnstt_redirect(port)
+    if sh("systemctl", "is-active", "dnstt-server").stdout.strip() != "active":
+        last = (sh("journalctl", "-u", "dnstt-server", "-n", "1", "--no-pager", "-o", "cat").stdout or "").strip()
+        errors.append("dnstt-server is not running: " + last[-160:])
+    return out
+
+
 def apply(cfg, reality, tls, wg):
     """Write configs and restart what changed. Returns the port conflicts found."""
     tcp_busy, udp_busy, conflicts = port_conflicts(cfg, foreign_listeners(sh("ss", "-H", "-ltnup").stdout))
@@ -564,6 +693,7 @@ def apply(cfg, reality, tls, wg):
             sh("wg", "syncconf", "wg0", tmp)  # live update, keeps existing sessions
         else:
             sh("systemctl", "restart", "wg-quick@wg0")
+    dnstt = apply_dnstt(cfg, errors, udp_busy)
     ensure_forwarding()
     fix_ppp_options()
     restart_on_config_change("strongswan-starter", ["/etc/ipsec.conf"])
@@ -582,7 +712,7 @@ def apply(cfg, reality, tls, wg):
                                            "udp-port": cfg["protocols"].get("anyc")}, "ocserv")
     write_if_changed("/etc/vpn-node/ovpn-users", render_ovpn_users(cfg), 0o644)  # checked per login
     write_if_changed("/etc/ocserv/ocpasswd", render_ocpasswd(cfg, crypt_hash), 0o600)  # checked per login
-    return conflicts, errors
+    return conflicts, errors, dnstt
 
 
 def cert_sha256(path):
@@ -615,14 +745,14 @@ def main():
         try:
             cfg = api(conf, "GET", "/api/node/config")
             self_update(conf, cfg.get("agent_sha256"))
-            conflicts, errors = apply(cfg, reality, tls, wg)
+            conflicts, errors, dnstt = apply(cfg, reality, tls, wg)
             for src in (xray_usage(), wg_usage(cfg) if wg else {}, session_usage()):
                 for k, v in src.items():
                     pending[k] = pending.get(k, 0) + v
             api(conf, "POST", "/api/node/report", {
                 "load": cpu_load_percent(), "usage": pending, "reality_pub": reality["public"],
                 "reality_sid": reality["short_id"], "tls_self_signed": conf.get("tls_self_signed", True), "tls_pin": cert_sha256(tls["cert"]),
-                "conflicts": conflicts, "errors": errors, "wg_pub": wg["public"] if wg else "", "ovpn_ca": read_text(f"{STATE_DIR}/ovpn/ca.crt")})
+                "conflicts": conflicts, "errors": errors, "wg_pub": wg["public"] if wg else "", "ovpn_ca": read_text(f"{STATE_DIR}/ovpn/ca.crt"), **dnstt})
             pending = {}  # kept in memory until the panel accepted the report
         except Exception as e:  # keep running; the panel may be briefly unreachable
             print("agent error:", e, file=sys.stderr, flush=True)

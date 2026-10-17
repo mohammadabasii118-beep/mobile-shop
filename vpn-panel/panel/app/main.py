@@ -3,6 +3,7 @@ import hashlib
 import sqlite3
 import tempfile
 import hmac
+import json
 import os
 import re
 import secrets
@@ -22,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from .catalog import PROTOCOLS, REALITY_SNI, SS_METHOD
 from .db import Admin, Setting, Node, NodeProtocol, Outbound, Rule, User, engine, get_db, init_db, utcnow
+from . import dns as cfdns
 from . import routing
 from .subpage import render_sub_page
 from .subscription import info_entries, new_wg_keypair, subscription_body, user_entries, user_ss_key, wg_ip
@@ -197,7 +199,8 @@ def backup():
 # ---------- helpers ----------
 def ensure_protocols(node: Node) -> None:
     have = {p.proto for p in node.protocols}
-    node.protocols += [NodeProtocol(proto=k, port=v["port"]) for k, v in PROTOCOLS.items() if k not in have]
+    node.protocols += [NodeProtocol(proto=k, port=v["port"], enabled=k != "dnstt")   # DNSTT needs a domain and builds software: opt-in
+                       for k, v in PROTOCOLS.items() if k not in have]
 
 
 def public_url(request: Request) -> str:
@@ -295,6 +298,9 @@ def set_cloudflare(node_id: int, body: NodeCdn, request: Request, db: Session = 
 def delete_node(node_id: int, db: Session = Depends(get_db)):
     node = db.get(Node, node_id) or _404()
     db.delete(node)
+    db.flush()
+    if dnstt_conf(db)["token"]:
+        run_dns_sync(db)
     for u in db.scalars(select(User)):
         if node_id in u.node_ids:
             u.node_ids = [i for i in u.node_ids if i != node_id]
@@ -336,7 +342,10 @@ def toggle_protocol(node_id: int, proto: str, body: ProtoToggle, db: Session = D
     np = next((p for p in node.protocols if p.proto == proto), None) or _404()
     np.enabled = body.enabled
     db.commit()
-    return {"ok": True}
+    out = {"ok": True}
+    if proto == "dnstt" and dnstt_conf(db)["token"]:
+        out["dns"] = run_dns_sync(db)   # records follow the checkbox
+    return out
 
 
 class PortIn(BaseModel):
@@ -710,7 +719,7 @@ def user_by_name(name: str, request: Request, db: Session = Depends(get_db)):
 @app.get("/api/users/{user_id}/configs", dependencies=[Depends(require_admin)])
 def user_configs(user_id: int, db: Session = Depends(get_db)):
     user = db.get(User, user_id) or _404()
-    return user_entries(user, list(db.scalars(select(Node).order_by(Node.id))))
+    return user_entries(user, list(db.scalars(select(Node).order_by(Node.id))), dnstt_info(db))
 
 
 # ---------- branding ----------
@@ -745,6 +754,94 @@ def set_branding(body: BrandIn, db: Session = Depends(get_db)):
             db.add(Setting(key=f"brand_{k}", value=v))
     db.commit()
     return get_brand(db)
+
+
+# ---------- DNSTT (DNS tunnel; one shared domain and key on every node) ----------
+def get_setting(db: Session, key: str, default: str = "") -> str:
+    row = db.get(Setting, key)
+    return row.value if row else default
+
+
+def put_setting(db: Session, key: str, value: str) -> None:
+    row = db.get(Setting, key)
+    if row:
+        row.value = value
+    else:
+        db.add(Setting(key=key, value=value))
+
+
+def dnstt_conf(db: Session) -> dict:
+    return {"domain": get_setting(db, "dnstt_domain"), "zone": get_setting(db, "dnstt_zone"),
+            "token": get_setting(db, "dnstt_cf_token"), "priv": get_setting(db, "dnstt_priv"), "pub": get_setting(db, "dnstt_pub")}
+
+
+def dnstt_info(db: Session) -> dict | None:
+    c = dnstt_conf(db)
+    return {"domain": c["domain"], "pub": c["pub"]} if c["domain"] and c["pub"] else None
+
+
+def dnstt_nodes(db: Session) -> list[dict]:
+    return [{"id": n.id, "name": n.name, "address": n.address,
+             "enabled": any(p.proto == "dnstt" and p.enabled for p in n.protocols)} for n in db.scalars(select(Node).order_by(Node.id))]
+
+
+def run_dns_sync(db: Session) -> dict:
+    """Make Cloudflare match the nodes that run DNSTT. Never raises: the result (or the error) is kept for the UI."""
+    c = dnstt_conf(db)
+    if not (c["token"] and c["zone"] and c["domain"]):
+        res = {"ok": False, "error": "توکن Cloudflare یا دامنه تنظیم نشده است", "nodes": {}}
+    else:
+        try:
+            res = {"ok": True, "error": "", **cfdns.sync(c["token"], c["zone"], c["domain"], dnstt_nodes(db))}
+        except cfdns.CfError as e:
+            res = {"ok": False, "error": str(e), "nodes": {}}
+    res["at"] = utcnow().isoformat() + "Z"
+    res.pop("zone_id", None)
+    put_setting(db, "dnstt_sync", json.dumps(res))
+    db.commit()
+    return res
+
+
+def dnstt_out(db: Session) -> dict:
+    c = dnstt_conf(db)
+    try:
+        last = json.loads(get_setting(db, "dnstt_sync") or "{}")
+    except ValueError:
+        last = {}
+    return {"domain": c["domain"], "zone": c["zone"], "token_set": bool(c["token"]), "token_hint": c["token"][-4:] if c["token"] else "",
+            "pubkey": c["pub"], "nodes": dnstt_nodes(db), "last_sync": last}
+
+
+class DnsttIn(BaseModel):
+    domain: str = Field(default="", pattern=r"^(([A-Za-z0-9\-]+\.)+[A-Za-z]{2,})?$")
+    zone: str = Field(default="", pattern=r"^(([A-Za-z0-9\-]+\.)+[A-Za-z]{2,})?$")
+    cf_token: str | None = Field(default=None, max_length=200, pattern=r"^[A-Za-z0-9_\-]*$")   # None = keep, "" = remove
+
+
+@app.get("/api/dnstt", dependencies=[Depends(require_admin)])
+def get_dnstt(db: Session = Depends(get_db)):
+    return dnstt_out(db)
+
+
+@app.put("/api/dnstt", dependencies=[Depends(require_admin)])
+def set_dnstt(body: DnsttIn, db: Session = Depends(get_db)):
+    domain, zone = body.domain.lower(), body.zone.lower()
+    if domain and zone and not (domain == zone or domain.endswith("." + zone)):
+        raise HTTPException(422, "دامنه‌ی تونل باید زیرمجموعه‌ی همان دامنه‌ی Cloudflare باشد (مثلاً t.example.com برای example.com)")
+    if domain == zone and domain:
+        raise HTTPException(422, "دامنه‌ی تونل باید یک ساب‌دامین باشد (مثلاً t.example.com)، نه خود دامنه‌ی اصلی")
+    put_setting(db, "dnstt_domain", domain)
+    put_setting(db, "dnstt_zone", zone)
+    if body.cf_token is not None:
+        put_setting(db, "dnstt_cf_token", body.cf_token)
+    db.commit()
+    return dnstt_out(db)
+
+
+@app.post("/api/dnstt/sync", dependencies=[Depends(require_admin)])
+def sync_dnstt(db: Session = Depends(get_db)):
+    run_dns_sync(db)
+    return dnstt_out(db)
 
 
 # ---------- sub-admins ----------
@@ -896,14 +993,14 @@ def me_delete_user(user_id: int, admin: Admin = Depends(require_reseller), db: S
 @app.get("/api/me/users/{user_id}/configs")
 def me_user_configs(user_id: int, admin: Admin = Depends(require_reseller), db: Session = Depends(get_db)):
     user = own_user(db, admin, user_id)
-    return user_entries(user, list(db.scalars(select(Node).order_by(Node.id))))
+    return user_entries(user, list(db.scalars(select(Node).order_by(Node.id))), dnstt_info(db))
 
 
 # ---------- subscription (public, token in URL) ----------
 @app.get("/sub/{token}")
 def subscription(token: str, request: Request, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.sub_token == token)) or _404()
-    entries = user_entries(user, list(db.scalars(select(Node)))) if user.status() == "active" else []
+    entries = user_entries(user, list(db.scalars(select(Node))), dnstt_info(db)) if user.status() == "active" else []
     days_left = max(0, (user.expire_at - utcnow()).days) if user.expire_at else None
     if "text/html" in request.headers.get("accept", ""):  # a person in a browser, not a client app
         return HTMLResponse(render_sub_page(user, entries, days_left, f"{public_url(request)}/sub/{token}", get_brand(db)))
@@ -923,7 +1020,7 @@ def subscription_file(token: str, node_id: int, proto: str, db: Session = Depend
     """The WireGuard .conf / OpenVPN .ovpn file for one location, for clients that import a file."""
     user = db.scalar(select(User).where(User.sub_token == token)) or _404()
     if user.status() == "active":
-        for e in user_entries(user, list(db.scalars(select(Node)))):
+        for e in user_entries(user, list(db.scalars(select(Node))), dnstt_info(db)):
             text = (e["details"] or {}).get("config")
             if e["node_id"] == node_id and e["proto"] == proto and text and e["file_ext"]:
                 slug = re.sub(r"[^A-Za-z0-9]+", "-", e["node"]).strip("-") or f"node{node_id}"
@@ -937,6 +1034,7 @@ def subscription_file(token: str, node_id: int, proto: str, db: Session = Depend
 @app.get("/api/node/config")
 def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db)):
     enabled = {p.proto: p.port for p in node.protocols if p.enabled}
+    dc = dnstt_conf(db)
     users = []
     for u in db.scalars(select(User).order_by(User.id)):
         if u.status() != "active" or (u.node_ids and node.id not in u.node_ids):
@@ -951,7 +1049,8 @@ def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db
     return {"agent_sha256": agent_sha, "outbounds": outbounds, "rules": rules,
             "node": {"name": node.name, "reality_sni": node.reality_sni or REALITY_SNI, "ss_method": SS_METHOD,
                      "ss_key": node.ss_key, "l2tp_psk": node.l2tp_psk},
-            "protocols": enabled, "users": users}
+            "protocols": enabled, "users": users,
+            "dnstt": ({"domain": dc["domain"], "privkey": dc["priv"]} if "dnstt" in enabled and dc["domain"] else None)}
 
 
 class Report(BaseModel):
@@ -965,6 +1064,8 @@ class Report(BaseModel):
     ovpn_ca: str = ""
     conflicts: list[str] = Field(default=[], max_length=50)
     errors: list[str] = Field(default=[], max_length=20)
+    dnstt_priv: str = Field(default="", max_length=200, pattern=r"^[0-9a-fA-F]*$")   # set only by the node that generated the key pair
+    dnstt_pub: str = Field(default="", max_length=200, pattern=r"^[0-9a-fA-F]*$")
 
 
 @app.post("/api/node/report")
@@ -977,6 +1078,9 @@ def node_report(body: Report, node: Node = Depends(require_node), db: Session = 
     if body.reality_pub:
         node.reality_pub, node.reality_sid = body.reality_pub, body.reality_sid
     node.wg_pub, node.ovpn_ca = body.wg_pub or node.wg_pub, body.ovpn_ca or node.ovpn_ca
+    if body.dnstt_priv and body.dnstt_pub and not get_setting(db, "dnstt_priv"):   # the first key pair wins; nodes then adopt it
+        put_setting(db, "dnstt_priv", body.dnstt_priv)
+        put_setting(db, "dnstt_pub", body.dnstt_pub)
     if body.usage:
         for u in db.scalars(select(User).where(User.name.in_(body.usage))):
             u.used_bytes += max(0, body.usage[u.name])
