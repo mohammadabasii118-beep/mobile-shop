@@ -1257,3 +1257,13 @@ def test_dnstt_loopback_passes_the_output_path_to_the_shell_that_builds():
     text = (ROOT / "agent" / "dnstt_loopback.sh").read_text()
     # `OUT=x python3 ... | bash` sets OUT for python only: Go then built with no output file and nothing was installed
     assert "| OUT=/usr/local/bin/dnstt-client bash" in text and "OUT=/usr/local/bin/dnstt-client python3" not in text
+
+
+def test_dnstt_client_build_script_is_valid_and_cross_compiles_three_targets():
+    import subprocess
+    p = ROOT / "agent" / "dnstt_build_clients.sh"
+    assert subprocess.run(["bash", "-n", str(p)], capture_output=True).returncode == 0
+    text = p.read_text()
+    for needle in ("windows/amd64:dnstt-client-windows-amd64.exe", "linux/arm64:dnstt-client-android-arm64", "linux/amd64:dnstt-client-linux-amd64",
+                   "CGO_ENABLED=0", "proxy.golang.org|", "mode=json"):
+        assert needle in text
