@@ -825,3 +825,21 @@ def test_plain_vless_may_use_port_80_but_others_may_not():
         url = lambda p: f"/api/nodes/{node['id']}/protocols/{p}/port"
         assert c.put(url("vless_raw"), headers=h, json={"port": 80}).status_code == 200
         assert c.put(url("vless_ws"), headers=h, json={"port": 80}).status_code == 422
+
+
+def test_bulk_users_delete_protocols_and_locations():
+    with TestClient(app) as c:
+        h = admin(c)
+        n1 = c.post("/api/nodes", headers=h, json={"name": "B1", "cc": "de", "address": "7.7.7.1"}).json()
+        ids = [c.post("/api/users", headers=h, json={"name": f"bk{i}", "protos": ["vless"], "node_ids": [n1["id"]]}).json()["id"] for i in range(3)]
+        r = c.post("/api/users/bulk", headers=h, json={"ids": ids[:2], "add_protos": ["vless_raw"], "remove_protos": ["vless"], "node_ids": []}).json()
+        assert r == {"affected": 2}
+        got = {u["id"]: u for u in c.get("/api/users", headers=h).json()}
+        assert got[ids[0]]["protos"] == ["vless_raw"] and got[ids[0]]["node_ids"] == []
+        assert got[ids[2]]["protos"] == ["vless"] and got[ids[2]]["node_ids"] == [n1["id"]]
+        # removing every protocol is refused silently: the user keeps its last one
+        c.post("/api/users/bulk", headers=h, json={"ids": [ids[2]], "remove_protos": ["vless"]})
+        assert {u["id"]: u for u in c.get("/api/users", headers=h).json()}[ids[2]]["protos"] == ["vless"]
+        assert c.post("/api/users/bulk", headers=h, json={"ids": ids, "delete": True}).json() == {"affected": 3}
+        assert not {u["id"] for u in c.get("/api/users", headers=h).json()} & set(ids)
+        assert c.post("/api/users/bulk", headers=h, json={"ids": ids, "add_protos": ["nope"]}).status_code == 422

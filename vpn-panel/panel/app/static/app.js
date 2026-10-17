@@ -1,6 +1,6 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null};
+const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: ''};
 const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', routing: 'مسیریابی', users: 'کاربران'};
 const STATUS = {active: ['good', 'فعال'], disabled: ['bad', 'غیرفعال'], expired: ['bad', 'منقضی'], quota: ['bad', 'حجم تمام شده']};
 
@@ -31,6 +31,8 @@ function showLogin() {
 
 async function refresh() {
   [S.nodes, S.users, S.protos] = await Promise.all([api('GET', '/nodes'), api('GET', '/users'), api('GET', '/protocols')]);
+  const ids = new Set(S.users.map(u => u.id));
+  S.sel = new Set([...S.sel].filter(i => ids.has(i)));   // a deleted user cannot stay selected
   render();
 }
 
@@ -91,14 +93,22 @@ const views = {
         </tbody></table></div></div>`;
   },
   users() {
-    return `<div class="panel scroll"><table><thead><tr><th>کاربر</th><th>مصرف</th><th>انقضا</th><th>پروتکل‌ها</th><th>وضعیت</th><th></th></tr></thead><tbody>
-      ${S.users.map(u => { const pc = u.quota_gb ? Math.min(100, u.used_gb / u.quota_gb * 100) : 0; const st = STATUS[u.status];
-        return `<tr><td class="mono">${esc(u.name)}</td>
+    const q = S.q.trim().toLowerCase(), rows = S.users.filter(u => !q || u.name.toLowerCase().includes(q));
+    const allOn = rows.length && rows.every(u => S.sel.has(u.id));
+    const bar = S.sel.size ? `<div class="panel" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${S.sel.size} کاربر انتخاب شده</b>
+      <button class="btn sm" id="bulkBtn">افزودن پروتکل / لوکیشن…</button>
+      <button class="btn sm" id="bulkDel" style="color:var(--bad,#c0392b)">حذف انتخاب‌شده‌ها</button>
+      <button class="btn sm" id="selClear">لغو انتخاب</button></div>` : '';
+    return `<div class="panel" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="search" id="uq" placeholder="جست‌وجوی نام کاربر…" value="${esc(S.q)}" style="max-width:260px" dir="ltr">
+        <span class="muted">${rows.length} از ${S.users.length} کاربر</span></div>${bar}
+      <div class="panel scroll"><table><thead><tr><th><input type="checkbox" id="selAll" ${allOn ? 'checked' : ''} aria-label="انتخاب همه‌ی نتیجه‌ها"></th><th>کاربر</th><th>مصرف</th><th>انقضا</th><th>پروتکل‌ها</th><th>وضعیت</th><th></th></tr></thead><tbody>
+      ${rows.map(u => { const pc = u.quota_gb ? Math.min(100, u.used_gb / u.quota_gb * 100) : 0; const st = STATUS[u.status];
+        return `<tr><td><input type="checkbox" data-sel="${u.id}" ${S.sel.has(u.id) ? 'checked' : ''} aria-label="انتخاب ${esc(u.name)}"></td><td class="mono">${esc(u.name)}</td>
         <td><div style="display:flex;gap:8px;align-items:center"><div class="bar"><i class="${loadCls(pc)}" style="width:${pc}%"></i></div><span class="muted">${fmtGB(u.used_gb)}/${u.quota_gb ? fmtGB(u.quota_gb) : '∞'} GB</span></div></td>
         <td>${u.days_left === null ? 'نامحدود' : u.days_left + ' روز'}</td><td>${u.protos.map(p => `<span class="cc">${esc(protoLabel(p))}</span>`).join('')}</td>
         <td><span class="pill ${st[0]}">${st[1]}</span></td>
         <td><button class="btn sm" data-copy="${esc(u.sub_url)}">کپی لینک اشتراک</button> <button class="btn sm" data-cfg="${u.id}">کانفیگ‌ها</button> <button class="btn sm" data-edit="${u.id}">ویرایش</button> <button class="btn sm" data-toggle="${u.id}">${u.enabled ? 'غیرفعال' : 'فعال'}</button> <button class="btn sm" data-deluser="${u.id}">حذف</button></td></tr>`; }).join('')
-        || '<tr><td colspan="6" class="muted">کاربری وجود ندارد.</td></tr>'}</tbody></table></div>`;
+        || '<tr><td colspan="7" class="muted">کاربری وجود ندارد.</td></tr>'}</tbody></table></div>`;
   },
 };
 
@@ -118,9 +128,11 @@ function portPanel() {
 
 function render() {
   $('#title').textContent = TITLES[S.tab];
-  $('#actions').innerHTML = S.tab === 'users' ? '<button class="btn pri" id="addUser">+ کاربر جدید</button>'
+  $('#actions').innerHTML = S.tab === 'users' ? '<button class="btn" id="bulkBtn">عملیات گروهی</button> <button class="btn pri" id="addUser">+ کاربر جدید</button>'
     : S.tab === 'nodes' ? '<button class="btn pri" id="addNode">+ لوکیشن جدید</button>' : '';
+  const typing = document.activeElement && document.activeElement.id === 'uq' ? document.activeElement.selectionStart : null;
   $('#view').innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">${views[S.tab]()}</div>`;
+  if (typing !== null && $('#uq')) { $('#uq').focus(); $('#uq').setSelectionRange(typing, typing); }
   $('#nNodes').textContent = S.nodes.length; $('#nUsers').textContent = S.users.length;
   document.querySelectorAll('nav [data-tab]').forEach(b => b.setAttribute('aria-current', b.dataset.tab === S.tab));
 }
@@ -185,6 +197,26 @@ function editDialog(u) {
       ${S.protos.map(p => `<label><input type="checkbox" value="${p.id}" ${u.protos.includes(p.id) ? 'checked' : ''}>${esc(p.label)}${p.counted ? '' : ' <span class="muted">(حجم شمرده نمی‌شود)</span>'}</label>`).join('')}</div></div>
     <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap"><button class="btn sm" data-resetusage="${u.id}">ریست مصرف</button>
       <span><button class="btn" data-close>انصراف</button> <button class="btn pri" id="eSave" data-id="${u.id}">ذخیره</button></span></div>`);
+}
+function bulkTargets() { return S.sel.size ? [...S.sel] : S.users.map(u => u.id); }
+function bulkDialog() {
+  const n = bulkTargets().length, scope = S.sel.size ? `${n} کاربر انتخاب‌شده` : `همه‌ی ${n} کاربر (چیزی انتخاب نشده)`;
+  openModal(`<h2>عملیات گروهی</h2><div class="note">روی <b>${scope}</b> اعمال می‌شود.</div>
+    <div><div class="muted" style="margin-bottom:6px">پروتکل‌هایی که اضافه شوند</div><div class="chips" id="bAdd">
+      ${S.protos.map(p => `<label><input type="checkbox" value="${p.id}">${esc(p.label)}</label>`).join('')}</div></div>
+    <div><div class="muted" style="margin-bottom:6px">پروتکل‌هایی که برداشته شوند (هر کاربر حداقل یکی را نگه می‌دارد)</div><div class="chips" id="bRem">
+      ${S.protos.map(p => `<label><input type="checkbox" value="${p.id}">${esc(p.label)}</label>`).join('')}</div></div>
+    <label class="f">لوکیشن‌ها<select id="bLoc"><option value="keep">بدون تغییر</option><option value="all">همه‌ی لوکیشن‌ها (جدیدها هم)</option><option value="pick">فقط لوکیشن‌های تیک‌خورده</option></select></label>
+    <div class="chips" id="bNodes">${S.nodes.map(x => `<label><input type="checkbox" value="${x.id}">${esc(x.cc)} ${esc(x.name)}</label>`).join('')}</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="bulkApply">اعمال</button></div>`);
+}
+function bulkDelDialog() {
+  const us = S.users.filter(u => S.sel.has(u.id)), bots = us.filter(u => u.name.startsWith('tg_')).length;
+  openModal(`<h2>حذف ${us.length} کاربر؟</h2>
+    <p class="mono" style="margin:0;word-break:break-all">${us.slice(0, 8).map(u => esc(u.name)).join('، ')}${us.length > 8 ? ` و ${us.length - 8} نفر دیگر` : ''}</p>
+    ${bots ? `<div class="note" style="color:var(--bad,#c0392b)">⚠ ${bots} تا از این‌ها کاربر ربات تلگرام‌اند (نامشان با tg_ شروع می‌شود). حذفشان مشتری را قطع می‌کند.</div>` : ''}
+    <div class="note">حذف برگشت‌پذیر نیست؛ لینک اشتراک آن‌ها از کار می‌افتد.</div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="bulkDelGo" style="background:var(--bad,#c0392b)">حذف قطعی</button></div>`);
 }
 async function loadRouting(id) {
   try { S.routing = {nodeId: id, data: await api('GET', `/nodes/${id}/routing`)}; render(); } catch (e) { if (e.message !== 'login') toast(e.message); }
@@ -288,6 +320,18 @@ document.addEventListener('click', async e => {
         protos: checked('#fProtos'), node_ids: checked('#fNodes').map(Number)});
       await refresh(); configsDialog(u.id);
     }
+    else if (t.id === 'bulkBtn') bulkDialog();
+    else if (t.id === 'bulkDel') bulkDelDialog();
+    else if (t.id === 'selClear') { S.sel.clear(); render(); }
+    else if (t.id === 'bulkDelGo') { const r = await api('POST', '/users/bulk', {ids: [...S.sel], delete: true}); S.sel.clear(); closeModal(); await refresh(); toast(`${r.affected} کاربر حذف شد`); }
+    else if (t.id === 'bulkApply') {
+      const checked = s => [...document.querySelectorAll(s + ' input:checked')].map(x => x.value), loc = $('#bLoc').value;
+      const body = {ids: bulkTargets(), add_protos: checked('#bAdd'), remove_protos: checked('#bRem'),
+        node_ids: loc === 'all' ? [] : loc === 'pick' ? checked('#bNodes').map(Number) : null};
+      if (!body.add_protos.length && !body.remove_protos.length && body.node_ids === null) return toast('چیزی برای اعمال انتخاب نشده');
+      if (loc === 'pick' && !body.node_ids.length) return toast('حداقل یک لوکیشن را تیک بزنید');
+      const r = await api('POST', '/users/bulk', body); closeModal(); await refresh(); toast(`روی ${r.affected} کاربر اعمال شد؛ ظرف ۳۰ ثانیه روی نودها می‌نشیند`);
+    }
     else if (d.cfg) await configsDialog(+d.cfg);
     else if (d.edit) editDialog(S.users.find(x => x.id === +d.edit));
     else if (d.renew) {
@@ -327,7 +371,13 @@ document.addEventListener('click', async e => {
     else if ('close' in d || t.id === 'modal') closeModal();
   } catch (err) { if (err.message !== 'login') toast(err.message); }
 });
+document.addEventListener('input', e => { if (e.target.id === 'uq') { S.q = e.target.value; render(); } });
 document.addEventListener('change', async e => {
+  if (e.target.dataset.sel) { const id = +e.target.dataset.sel; e.target.checked ? S.sel.add(id) : S.sel.delete(id); render(); return; }
+  if (e.target.id === 'selAll') {
+    const q = S.q.trim().toLowerCase();
+    S.users.filter(u => !q || u.name.toLowerCase().includes(q)).forEach(u => e.target.checked ? S.sel.add(u.id) : S.sel.delete(u.id)); render(); return;
+  }
   if (e.target.id === 'portNode') { S.portNode = +e.target.value; render(); return; }
   if (e.target.id === 'routeNode') { S.routeNode = +e.target.value; S.routing = null; render(); return; }
   if (e.target.id === 'oKind') { const keep = $('#oName').value; outboundDialog(e.target.value); $('#oName').value = keep; return; }

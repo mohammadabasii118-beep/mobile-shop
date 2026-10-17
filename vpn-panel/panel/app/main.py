@@ -553,6 +553,34 @@ def bulk_protos(body: BulkProtos, db: Session = Depends(get_db)):
     return {"changed": changed}
 
 
+class BulkIn(BaseModel):
+    ids: list[int] = Field(min_length=1, max_length=5000)
+    delete: bool = False
+    add_protos: list[str] = []
+    remove_protos: list[str] = []
+    node_ids: list[int] | None = None   # None = leave as is, [] = every location
+
+
+@app.post("/api/users/bulk", dependencies=[Depends(require_admin)])
+def bulk_users(body: BulkIn, db: Session = Depends(get_db)):
+    """One operation on many users chosen by id: delete them, or add/remove protocols and set their locations."""
+    if bad := [p for p in body.add_protos + body.remove_protos if p not in PROTOCOLS]:
+        raise HTTPException(422, f"پروتکل ناشناخته: {bad[0]}")
+    known = set(db.scalars(select(Node.id)))
+    users = list(db.scalars(select(User).where(User.id.in_(body.ids))))
+    for u in users:
+        if body.delete:
+            db.delete(u)
+            continue
+        new = [p for p in u.protos if p not in body.remove_protos] + [p for p in body.add_protos if p not in u.protos]
+        if new:   # a user always keeps at least one protocol
+            u.protos = new
+        if body.node_ids is not None:
+            u.node_ids = [i for i in body.node_ids if i in known]
+    db.commit()
+    return {"affected": len(users)}
+
+
 @app.patch("/api/users/{user_id}", dependencies=[Depends(require_admin)])
 def patch_user(user_id: int, body: UserPatch, request: Request, db: Session = Depends(get_db)):
     user = db.get(User, user_id) or _404()
