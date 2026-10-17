@@ -576,7 +576,7 @@ else
   echo "could not download Go; trying the distribution package"
   apt-get install -y golang-go >/dev/null && GO=$(command -v go) || { echo "no Go available: download from go.dev, dl.google.com and the apt package all failed"; exit 1; }
 fi
-git clone --depth 1 https://www.bamsoftware.com/git/dnstt.git "$d/dnstt"
+git clone https://www.bamsoftware.com/git/dnstt.git "$d/dnstt"
 cd "$d/dnstt/dnstt-server"
 GOPATH="$d/gopath" GOCACHE="$d/cache" GOTOOLCHAIN=local GOFLAGS=-mod=mod "$GO" build -o /usr/local/bin/dnstt-server .
 echo "dnstt-server installed"
