@@ -303,7 +303,7 @@ def set_port(node_id: int, proto: str, body: PortIn, request: Request, db: Sessi
         port = secrets.choice(free)
     else:
         port = body.port
-        if port in RESERVED_PORTS:
+        if port in RESERVED_PORTS and not (proto == "vless_raw" and port == 80):   # plain VLESS may take 80 like x-ui did
             raise HTTPException(422, f"پورت {port} رزرو است")
         if port in used:
             raise HTTPException(409, f"پورت {port} را پروتکل دیگری در این نود استفاده می‌کند")

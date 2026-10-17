@@ -816,3 +816,12 @@ def test_plain_vless_link_uses_the_raw_host_override():
         links = c.get(f"/api/users/{u['id']}/configs", headers=h).text
         assert "@tunnel.example.com:80?encryption=none&security=none" in links
         assert "@5.5.5.5:2097?" in links   # other protocols keep the node address
+
+
+def test_plain_vless_may_use_port_80_but_others_may_not():
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "P80", "cc": "tr", "address": "6.6.6.6"}).json()
+        url = lambda p: f"/api/nodes/{node['id']}/protocols/{p}/port"
+        assert c.put(url("vless_raw"), headers=h, json={"port": 80}).status_code == 200
+        assert c.put(url("vless_ws"), headers=h, json={"port": 80}).status_code == 422
