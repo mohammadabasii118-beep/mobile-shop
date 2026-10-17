@@ -161,7 +161,7 @@ def node_out(node: Node, request: Request) -> dict:
         "reality_sni": node.reality_sni or REALITY_SNI, "cf_domain": node.cf_domain, "cf_address": node.cf_address, "raw_host": node.raw_host, "conflicts": node.conflicts or [], "errors": node.errors or [], "port_range": list(PORT_RANGE),
         "online": is_online(node), "load": node.load, "reality_ready": bool(node.reality_pub),
         "last_seen": node.last_seen.isoformat() + "Z" if node.last_seen else None,
-        "protocols": [{"proto": p.proto, "enabled": p.enabled, "port": p.port,
+        "protocols": [{"proto": p.proto, "enabled": p.enabled, "port": p.port, "host": p.host,
                        "fixed": PROTOCOLS[p.proto]["fixed_port"]} for p in node.protocols],
         "install_command": f"bash <(curl -sL {url}/node-install.sh) --token {node.token} --address {node.address}"
                            + ("" if node.address.replace(".", "").isdigit() else " --letsencrypt"),
@@ -287,6 +287,21 @@ def toggle_protocol(node_id: int, proto: str, body: ProtoToggle, db: Session = D
 
 class PortIn(BaseModel):
     port: int | None = Field(default=None, ge=1, le=65535)  # None = pick a random free port
+
+
+class HostIn(BaseModel):
+    host: str = Field(default="", pattern=r"^[A-Za-z0-9.\-]{0,253}$")   # empty = automatic (the node address)
+
+
+@app.put("/api/nodes/{node_id}/protocols/{proto}/host", dependencies=[Depends(require_admin)])
+def set_proto_host(node_id: int, proto: str, body: HostIn, request: Request, db: Session = Depends(get_db)):
+    """Domain or IP that clients of this protocol connect to (a relay, an alias domain, a clean IP). Links only:
+    nothing changes on the node."""
+    node = db.get(Node, node_id) or _404()
+    np = next((p for p in node.protocols if p.proto == proto), None) or _404()
+    np.host = body.host.lower()
+    db.commit()
+    return node_out(node, request)
 
 
 @app.put("/api/nodes/{node_id}/protocols/{proto}/port", dependencies=[Depends(require_admin)])

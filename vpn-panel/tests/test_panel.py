@@ -843,3 +843,20 @@ def test_bulk_users_delete_protocols_and_locations():
         assert c.post("/api/users/bulk", headers=h, json={"ids": ids, "delete": True}).json() == {"affected": 3}
         assert not {u["id"] for u in c.get("/api/users", headers=h).json()} & set(ids)
         assert c.post("/api/users/bulk", headers=h, json={"ids": ids, "add_protos": ["nope"]}).status_code == 422
+
+
+def test_per_protocol_address_overrides_only_the_connection_host():
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "HostN", "cc": "de", "address": "hostn.example.com"}).json()
+        nh = {"Authorization": "Bearer " + node["install_command"].split("--token ")[1].split()[0]}
+        c.post("/api/node/report", headers=nh, json={"reality_pub": "PUB", "reality_sid": "ab"})
+        u = c.post("/api/users", headers=h, json={"name": "hostu", "protos": ["vless_tcp", "vless_ws", "l2tp"], "node_ids": [node["id"]]}).json()
+        r = c.put(f"/api/nodes/{node['id']}/protocols/vless_tcp/host", headers=h, json={"host": "Relay.Example.com"}).json()
+        assert {p["proto"]: p["host"] for p in r["protocols"]}["vless_tcp"] == "relay.example.com"
+        links = c.get(f"/api/users/{u['id']}/configs", headers=h).text
+        assert "@relay.example.com:2097?" in links and "sni=hostn.example.com" in links   # TLS name stays the node's
+        assert "@hostn.example.com:2083?" in links                                          # other protocols unchanged
+        c.put(f"/api/nodes/{node['id']}/protocols/vless_tcp/host", headers=h, json={"host": ""})
+        assert "@hostn.example.com:2097?" in c.get(f"/api/users/{u['id']}/configs", headers=h).text
+        assert c.put(f"/api/nodes/{node['id']}/protocols/vless_tcp/host", headers=h, json={"host": "bad host!"}).status_code == 422

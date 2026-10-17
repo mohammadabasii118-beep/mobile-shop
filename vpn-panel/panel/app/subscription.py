@@ -47,7 +47,7 @@ def _manual(entry: dict, fields: dict, text: str | None = None) -> dict:
     return entry
 
 
-def build_entry(user: User, node: Node, proto: str, port: int, cdn: bool = False) -> dict | None:
+def build_entry(user: User, node: Node, proto: str, port: int, cdn: bool = False, conn_host: str = "") -> dict | None:
     """One config entry for (user, node, proto). `link` is a share URI. Protocols entered by
     hand or imported from a file have link=None and carry `summary` (one line) and `copy` (full text)."""
     meta = PROTOCOLS[proto]
@@ -58,9 +58,14 @@ def build_entry(user: User, node: Node, proto: str, port: int, cdn: bool = False
     else:
         conn = host = node.address
         insecure = node.tls_self_signed
+    # address clients connect to: set per protocol on the location, else the node address. TLS names, the
+    # certificate and IKEv2's remote id keep using the node address, so a relay/alias domain still validates.
+    srv = conn_host or (node.raw_host if proto == "vless_raw" else "") or conn
     e = {"node": node.name, "node_id": node.id, "cc": node.cc, "proto": proto, "label": label,
          "link": None, "details": None, "summary": None, "copy": None,
          "file_ext": {"wg": "conf", "ovpn": "ovpn"}.get(proto)}   # protocols that clients import as a file
+    if not cdn:
+        conn = srv
     tls = _tls_q(host, insecure, node.tls_pin)
     if proto == "vless":
         if not node.reality_pub:
@@ -70,7 +75,7 @@ def build_entry(user: User, node: Node, proto: str, port: int, cdn: bool = False
     elif proto == "vless_tcp":
         e["link"] = f"vless://{user.uuid}@{conn}:{port}?encryption=none&{tls}&type=tcp#{tag}"
     elif proto == "vless_raw":
-        e["link"] = f"vless://{user.uuid}@{node.raw_host or conn}:{port}?encryption=none&security=none&type=tcp#{tag}"
+        e["link"] = f"vless://{user.uuid}@{conn}:{port}?encryption=none&security=none&type=tcp#{tag}"
     elif proto == "vless_ws":
         path = quote(WS_PATHS[proto], safe="")
         e["link"] = f"vless://{user.uuid}@{conn}:{port}?encryption=none&{tls}&type=ws&host={host}&path={path}#{tag}"
@@ -103,29 +108,29 @@ def build_entry(user: User, node: Node, proto: str, port: int, cdn: bool = False
         if not node.wg_pub:
             return None
         text = (f"[Interface]\nPrivateKey = {user.wg_private}\nAddress = {wg_ip(user.id)}/32\nDNS = 1.1.1.1\n\n"
-                f"[Peer]\nPublicKey = {node.wg_pub}\nEndpoint = {host}:{port}\nAllowedIPs = 0.0.0.0/0\n"
+                f"[Peer]\nPublicKey = {node.wg_pub}\nEndpoint = {srv}:{port}\nAllowedIPs = 0.0.0.0/0\n"
                 f"PersistentKeepalive = 25\n")
-        _manual(e, {"server": f"{host}:{port}", "address": wg_ip(user.id), "config": text}, text)
-        e["summary"] = f"فایل کانفیگ WireGuard ({host}:{port}) را در اپ وارد کنید"
+        _manual(e, {"server": f"{srv}:{port}", "address": wg_ip(user.id), "config": text}, text)
+        e["summary"] = f"فایل کانفیگ WireGuard ({srv}:{port}) را در اپ وارد کنید"
     elif proto == "ovpn":
         if not node.ovpn_ca:
             return None
-        text = (f"client\ndev tun\nproto udp\nremote {host} {port}\nresolv-retry infinite\nnobind\n"
+        text = (f"client\ndev tun\nproto udp\nremote {srv} {port}\nresolv-retry infinite\nnobind\n"
                 f"persist-key\npersist-tun\nremote-cert-tls server\nauth-user-pass\ncipher AES-256-GCM\n"
                 f"verb 3\n<ca>\n{node.ovpn_ca.strip()}\n</ca>\n")
-        _manual(e, {"server": f"{host}:{port}", "username": user.name, "password": user.password, "config": text}, text)
+        _manual(e, {"server": f"{srv}:{port}", "username": user.name, "password": user.password, "config": text}, text)
         e["summary"] = f"فایل ovpn؛ کاربر {user.name} | رمز {user.password}"
         e["copy"] = f"# username: {user.name}\n# password: {user.password}\n" + text
     elif proto == "l2tp":
-        _manual(e, {"server": host, "username": user.name, "password": user.password, "psk": node.l2tp_psk})
-        e["copy"] = f"Server: {host}\nUsername: {user.name}\nPassword: {user.password}\nPSK: {node.l2tp_psk}"
-        e["summary"] = f"{host} | {user.name} | {user.password} | PSK: {node.l2tp_psk}"
+        _manual(e, {"server": srv, "username": user.name, "password": user.password, "psk": node.l2tp_psk})
+        e["copy"] = f"Server: {srv}\nUsername: {user.name}\nPassword: {user.password}\nPSK: {node.l2tp_psk}"
+        e["summary"] = f"{srv} | {user.name} | {user.password} | PSK: {node.l2tp_psk}"
     elif proto == "ikev2":
         _manual(e, {"server": host, "remote_id": host, "username": user.name, "password": user.password})
         e["summary"] = f"{host} | {user.name} | {user.password}" + (" | گواهی خودامضا: ابتدا CA را نصب کنید" if insecure else "")
     elif proto == "anyc":
-        _manual(e, {"server": f"{host}:{port}", "username": user.name, "password": user.password})
-        e["summary"] = f"{host}:{port} | {user.name} | {user.password}"
+        _manual(e, {"server": f"{srv}:{port}", "username": user.name, "password": user.password})
+        e["summary"] = f"{srv}:{port} | {user.name} | {user.password}"
     return e
 
 
@@ -136,7 +141,7 @@ def user_entries(user: User, nodes: list[Node]) -> list[dict]:
             continue
         for np in node.protocols:
             if np.enabled and np.proto in user.protos:
-                e = build_entry(user, node, np.proto, np.port)
+                e = build_entry(user, node, np.proto, np.port, conn_host=np.host)
                 if e:
                     out.append(e)
                 if node.cf_domain and np.proto in CF_PROTOS and np.port in CF_PORTS:

@@ -117,13 +117,15 @@ function portPanel() {
   const n = nodeBy(S.portNode) || S.nodes[0], [lo, hi] = n.port_range;
   return `<div class="panel"><h2>پورت‌ها</h2>
     <div class="form" style="margin-bottom:10px"><label class="f">لوکیشن<select id="portNode">${S.nodes.map(x => `<option value="${x.id}" ${x.id === n.id ? 'selected' : ''}>${esc(x.cc)} ${esc(x.name)}</option>`).join('')}</select></label></div>
-    <div class="scroll"><table><thead><tr><th>پروتکل</th><th>پورت</th><th></th></tr></thead><tbody>
+    <div class="scroll"><table><thead><tr><th>پروتکل</th><th>پورت</th><th></th><th>آدرس در لینک‌ها (دامنه یا IP)</th></tr></thead><tbody>
     ${n.protocols.map(np => { const p = S.protos.find(x => x.id === np.proto);
       return `<tr><td>${esc(p.label)}</td><td>${np.fixed ? `<span class="mono">${np.port}</span> <span class="pill">ثابت</span>`
         : `<input type="number" min="1" max="65535" value="${np.port}" id="port-${np.proto}" style="width:110px" dir="ltr">`}</td>
-        <td>${np.fixed ? '' : `<button class="btn sm" data-setport="${np.proto}" data-nid="${n.id}">ذخیره</button> <button class="btn sm" data-randport="${np.proto}" data-nid="${n.id}">رندوم</button>`}</td></tr>`; }).join('')}
+        <td>${np.fixed ? '' : `<button class="btn sm" data-setport="${np.proto}" data-nid="${n.id}">ذخیره</button> <button class="btn sm" data-randport="${np.proto}" data-nid="${n.id}">رندوم</button>`}</td>
+        <td><div style="display:flex;gap:6px;align-items:center"><input type="text" id="host-${np.proto}" value="${esc(np.host || '')}" placeholder="خودکار: ${esc(n.address)}" dir="ltr" style="width:200px">
+          <button class="btn sm" data-sethost="${np.proto}" data-nid="${n.id}">ذخیره</button></div></td></tr>`; }).join('')}
     </tbody></table></div>
-    <div class="note" style="margin-top:10px">رندوم از بازه‌ی ${lo} تا ${hi} انتخاب می‌شود. پورت جدید را در فایروال سرویس‌دهنده باز کنید (بهتر است کل این بازه را از قبل باز بگذارید). لینک‌های قبلی کاربران با پورت قدیمی کار نمی‌کنند؛ کاربران باید اشتراک را به‌روز کنند.</div></div>`;
+    <div class="note" style="margin-top:10px">آدرس خالی یعنی خودکار (آدرس خود لوکیشن)؛ با پر کردن آن، لینک همین پروتکل به دامنه یا IP دیگری وصل می‌شود، مثلاً دامنه‌ی تونل یا IP تمیز. رندوم از بازه‌ی ${lo} تا ${hi} انتخاب می‌شود. پورت جدید را در فایروال سرویس‌دهنده باز کنید (بهتر است کل این بازه را از قبل باز بگذارید). لینک‌های قبلی کاربران با پورت قدیمی کار نمی‌کنند؛ کاربران باید اشتراک را به‌روز کنند.</div></div>`;
 }
 
 function render() {
@@ -293,6 +295,10 @@ document.addEventListener('click', async e => {
     else if (t.id === 'nSave') {
       const n = await api('POST', '/nodes', {name: $('#nName').value.trim(), cc: $('#nCc').value.trim(), address: $('#nAddr').value.trim()});
       await refresh(); installDialog(n);
+    }
+    else if (d.sethost) {
+      await api('PUT', `/nodes/${d.nid}/protocols/${d.sethost}/host`, {host: $('#host-' + d.sethost).value.trim()});
+      await refresh(); toast('آدرس ذخیره شد؛ اشتراک را در برنامه به‌روز کنید (روی نود تغییری لازم نیست)');
     }
     else if (d.setport || d.randport) {
       const proto = d.setport || d.randport;

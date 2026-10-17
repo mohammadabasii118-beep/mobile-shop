@@ -77,6 +77,7 @@ class NodeProtocol(Base):
     proto: Mapped[str]
     enabled: Mapped[bool] = mapped_column(default=True)
     port: Mapped[int]
+    host: Mapped[str] = mapped_column(default="")   # address in this protocol's links; empty = the node address
 
 
 class User(Base):
