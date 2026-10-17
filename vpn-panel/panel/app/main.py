@@ -21,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .catalog import PROTOCOLS, REALITY_SNI, SS_METHOD
-from .db import Admin, Node, NodeProtocol, Outbound, Rule, User, engine, get_db, init_db, utcnow
+from .db import Admin, Setting, Node, NodeProtocol, Outbound, Rule, User, engine, get_db, init_db, utcnow
 from . import routing
 from .subpage import render_sub_page
 from .subscription import info_entries, new_wg_keypair, subscription_body, user_entries, user_ss_key, wg_ip
@@ -713,6 +713,40 @@ def user_configs(user_id: int, db: Session = Depends(get_db)):
     return user_entries(user, list(db.scalars(select(Node).order_by(Node.id))))
 
 
+# ---------- branding ----------
+BRAND_DEFAULT = {"name": "پنل چندلوکیشن", "logo": "", "color": ""}
+
+
+def get_brand(db: Session) -> dict:
+    saved = {s.key: s.value for s in db.scalars(select(Setting).where(Setting.key.like("brand_%")))}
+    return {k: saved.get(f"brand_{k}", v) or (v if k == "name" else "") for k, v in BRAND_DEFAULT.items()}
+
+
+class BrandIn(BaseModel):
+    name: str = Field(min_length=1, max_length=40)
+    color: str = Field(default="", pattern=r"^(#[0-9a-fA-F]{6})?$")
+    # a small picture sent as a data URI; shown in <img> tags only, so an SVG cannot run scripts
+    logo: str = Field(default="", max_length=350_000, pattern=r"^(data:image/(png|jpeg|webp|gif|svg\+xml);base64,[A-Za-z0-9+/=]+)?$")
+
+
+@app.get("/api/branding")
+def branding(db: Session = Depends(get_db)):
+    """Public: the login page and the subscription page show the panel's name and logo."""
+    return get_brand(db)
+
+
+@app.put("/api/branding", dependencies=[Depends(require_admin)])
+def set_branding(body: BrandIn, db: Session = Depends(get_db)):
+    for k, v in (("name", body.name.strip()), ("color", body.color), ("logo", body.logo)):
+        row = db.get(Setting, f"brand_{k}")
+        if row:
+            row.value = v
+        else:
+            db.add(Setting(key=f"brand_{k}", value=v))
+    db.commit()
+    return get_brand(db)
+
+
 # ---------- sub-admins ----------
 class AdminIn(BaseModel):
     username: str = Field(pattern=r"^[A-Za-z0-9_.\-]{3,32}$")
@@ -827,7 +861,7 @@ def subscription(token: str, request: Request, db: Session = Depends(get_db)):
     entries = user_entries(user, list(db.scalars(select(Node)))) if user.status() == "active" else []
     days_left = max(0, (user.expire_at - utcnow()).days) if user.expire_at else None
     if "text/html" in request.headers.get("accept", ""):  # a person in a browser, not a client app
-        return HTMLResponse(render_sub_page(user, entries, days_left, f"{public_url(request)}/sub/{token}"))
+        return HTMLResponse(render_sub_page(user, entries, days_left, f"{public_url(request)}/sub/{token}", get_brand(db)))
     info = info_entries(user, days_left) if os.environ.get("PANEL_SUB_INFO", "1") != "0" else []
     headers = {"subscription-userinfo": f"upload=0; download={user.used_bytes}; total={user.quota_bytes}; "
                f"expire={int(user.expire_at.timestamp()) if user.expire_at else 0}",

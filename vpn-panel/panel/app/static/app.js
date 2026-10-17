@@ -1,7 +1,7 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: []};
-const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', routing: 'مسیریابی', users: 'کاربران', admins: 'ادمین‌ها'};
+const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: [], brand: {name: 'پنل چندلوکیشن', logo: '', color: ''}};
+const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', routing: 'مسیریابی', users: 'کاربران', admins: 'ادمین‌ها', look: 'ظاهر پنل'};
 const STATUS = {active: ['good', 'فعال'], disabled: ['bad', 'غیرفعال'], expired: ['bad', 'منقضی'], quota: ['bad', 'حجم تمام شده']};
 
 const ICO = {
@@ -13,10 +13,28 @@ const ICO = {
   pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
   trophy: '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>',
   admin: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><circle cx="12" cy="10" r="2.5"/><path d="M7.5 17c.8-2 2.6-3 4.5-3s3.7 1 4.5 3"/>',
+  palette: '<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.9 0 1.7-.7 1.7-1.6 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.7 1.7-1.7H16c3.3 0 6-2.7 6-6 0-4.9-4.5-8.5-10-8.5Z"/>',
   pie: '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10Z"/>',
 };
 const ic = n => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICO[n]}</svg>`;
 const num = v => `<span class="num">${v}</span>`;
+
+const logoMark = (b = S.brand) => b.logo ? `<span class="logo img"><img src="${esc(b.logo)}" alt=""></span>` : `<span class="logo">${ic('shield')}</span>`;
+function applyBrand(b) {
+  S.brand = b;
+  document.title = b.name;
+  const fav = document.querySelector('link[rel=icon]'); if (fav) fav.href = b.logo || 'data:,';
+  const nb = $('#brand'); if (nb) nb.innerHTML = `${logoMark(b)}<span>${esc(b.name)}<small>مدیریت VPN</small></span>`;
+  const r = document.documentElement.style, hex = /^#[0-9a-f]{6}$/i.test(b.color) ? b.color : '';
+  ['--accent', '--accent2', '--accent-soft', '--accent-fg', '--glow1'].forEach(k => hex ? 0 : r.removeProperty(k));
+  if (hex) {
+    const [R, G, B] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+    r.setProperty('--accent', hex); r.setProperty('--accent2', `color-mix(in srgb, ${hex} 62%, #0ea5e9)`);
+    r.setProperty('--accent-soft', `color-mix(in srgb, ${hex} 14%, transparent)`); r.setProperty('--glow1', `rgba(${R},${G},${B},.13)`);
+    r.setProperty('--accent-fg', (0.299 * R + 0.587 * G + 0.114 * B) > 150 ? '#06121a' : '#ffffff');   // readable text on the accent
+  }
+}
+async function loadBrand() { try { applyBrand(await (await fetch('/api/branding')).json()); } catch (_) {} }
 
 let token = ''; try { token = localStorage.getItem('tok') || ''; } catch (e) {}
 
@@ -38,7 +56,7 @@ const nodeBy = id => S.nodes.find(n => n.id === id);
 const fmtGB = v => v.toLocaleString('en', {maximumFractionDigits: 2});
 
 function showLogin() {
-  openModal(`<div class="login"><span class="logo">${ic('shield')}</span><h2>پنل چندلوکیشن</h2><span class="muted">برای ادامه رمز مدیر را وارد کنید</span></div>
+  openModal(`<div class="login">${logoMark()}<h2>${esc(S.brand.name)}</h2><span class="muted">برای ادامه رمز مدیر را وارد کنید</span></div>
     <label class="f">نام کاربری <span class="muted">(مدیر اصلی خالی بگذارد)</span><input type="text" id="un" autocomplete="username" dir="ltr"></label>
     <label class="f">رمز<input type="password" id="pw" autocomplete="current-password"></label>
     <button class="btn pri" id="doLogin" style="justify-content:center">ورود</button>`);
@@ -146,6 +164,21 @@ const views = {
         <td><span class="pill ${st[0]}">${st[1]}</span></td>${rs || !S.admins.length ? '' : `<td>${owner(u) ? `<span class="pill acc">${esc(owner(u))}</span>` : '<span class="muted">مدیر اصلی</span>'}</td>`}
         <td><div class="chips" style="flex-wrap:nowrap"><button class="btn sm" data-copy="${esc(u.sub_url)}">کپی لینک</button><button class="btn sm" data-cfg="${u.id}">کانفیگ‌ها</button>${rs ? '' : `<button class="btn sm" data-edit="${u.id}">ویرایش</button><button class="btn sm" data-toggle="${u.id}">${u.enabled ? 'غیرفعال' : 'فعال'}</button><button class="btn sm danger" data-deluser="${u.id}">حذف</button>`}</div></td></tr>`; }).join('')
         || `<tr><td colspan="8" class="muted">کاربری وجود ندارد.</td></tr>`}</tbody></table></div>`;
+  },
+  look() {
+    const b = S.brand, presets = ['#0d9488', '#0284c7', '#7c3aed', '#db2777', '#ea580c', '#16a34a', '#475569'];
+    return `<div class="note">نام و لوگو در نوار کناری، صفحه ورود، تب مرورگر و صفحه اشتراک کاربران دیده می‌شوند.</div>
+      <div class="panel"><div class="form" style="grid-template-columns:1fr">
+        <label class="f">نام پنل<input type="text" id="bName" value="${esc(b.name)}" maxlength="40"></label>
+        <div class="f"><span>لوگو (PNG، JPG، WebP یا SVG؛ خودکار کوچک می‌شود)</span>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span id="bPrev">${logoMark(b)}</span>
+            <input type="file" id="bFile" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="width:auto">
+            <button class="btn sm" id="bClearLogo" ${b.logo ? '' : 'disabled'}>حذف لوگو</button></div></div>
+        <div class="f"><span>رنگ اصلی</span><div class="chips" id="bColors">
+          ${presets.map(c => `<button class="btn sm" data-color="${c}" style="background:${c};width:30px;height:30px;padding:0;border-radius:50%" aria-label="${c}"></button>`).join('')}
+          <input type="color" id="bColor" value="${/^#[0-9a-f]{6}$/i.test(b.color) ? b.color : '#0d9488'}" style="width:44px;height:30px;padding:0;border:0;background:none">
+          <button class="btn sm" data-color="">پیش‌فرض</button></div></div></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn pri" id="bSave">ذخیره</button></div></div>`;
   },
   admins() {
     const pill = a => a.enabled ? '<span class="pill good">فعال</span>' : '<span class="pill bad">غیرفعال</span>';
@@ -334,7 +367,7 @@ async function configsDialog(id) {
 document.addEventListener('click', async e => {
   const t = e.target.closest('button') || e.target, d = t.dataset;   // icons and labels sit inside the buttons
   try {
-    if (d.tab) { S.tab = d.tab; render(); }
+    if (d.tab) { if (S.draft) { S.draft = null; loadBrand(); } S.tab = d.tab; render(); }   // unsaved branding preview is dropped
     else if (t.id === 'themeBtn') { const r = document.documentElement; r.dataset.theme = getComputedStyle(r).colorScheme.includes('dark') ? 'light' : 'dark'; }
     else if (t.id === 'backupBtn') {
       const r = await fetch('/api/backup', {headers: {Authorization: 'Bearer ' + token}});
@@ -379,6 +412,12 @@ document.addEventListener('click', async e => {
     else if (d.delnode) { await api('DELETE', '/nodes/' + d.delnode); closeModal(); await refresh(); toast('لوکیشن حذف شد'); }
     else if (t.id === 'addUser') userForm();
     else if (t.id === 'addAdmin') adminForm();
+    else if (t.id === 'bSave') {
+      const b = await api('PUT', '/branding', {name: $('#bName').value.trim() || S.brand.name, color: S.draft.color, logo: S.draft.logo});
+      applyBrand(b); S.draft = null; render(); toast('ذخیره شد');
+    }
+    else if (t.id === 'bClearLogo') { draft().logo = ''; applyBrand({...S.brand, logo: ''}); render(); }
+    else if ('color' in d && t.closest('#bColors')) { draft().color = d.color; applyBrand({...S.brand, color: d.color}); if (d.color) $('#bColor').value = d.color; }
     else if (d.editadmin) adminForm(S.admins.find(x => x.id === +d.editadmin));
     else if (t.id === 'adSave') {
       const v = id => $('#' + id).value.trim(), body = {max_users: +v('adMax') || 0, max_quota_gb: +v('adQuota') || 0, max_days: +v('adDays') || 0};
@@ -450,8 +489,33 @@ document.addEventListener('click', async e => {
     else if ('close' in d || t.id === 'modal') closeModal();
   } catch (err) { if (err.message !== 'login') toast(err.message); }
 });
-document.addEventListener('input', e => { if (e.target.id === 'uq') { S.q = e.target.value; render(); } });
+function draft() { return S.draft || (S.draft = {color: S.brand.color, logo: S.brand.logo}); }
+function shrink(file) {   // -> data URI no bigger than ~200 px, so it stays small in the database
+  return new Promise((ok, no) => {
+    const fr = new FileReader();
+    fr.onerror = () => no(new Error('فایل خوانده نشد'));
+    fr.onload = () => {
+      if (file.type === 'image/svg+xml') return fr.result.length < 200000 ? ok(fr.result) : no(new Error('SVG بزرگ است (حداکثر ۱۵۰ کیلوبایت)'));
+      const img = new Image();
+      img.onerror = () => no(new Error('تصویر معتبر نیست'));
+      img.onload = () => {
+        const k = Math.min(1, 200 / Math.max(img.width, img.height)), cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(img.width * k)); cv.height = Math.max(1, Math.round(img.height * k));
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height); ok(cv.toDataURL('image/png'));
+      };
+      img.src = fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+document.addEventListener('input', e => {
+  if (e.target.id === 'bColor') { draft().color = e.target.value; applyBrand({...S.brand, color: e.target.value}); return; } if (e.target.id === 'uq') { S.q = e.target.value; render(); } });
 document.addEventListener('change', async e => {
+  if (e.target.id === 'bFile' && e.target.files[0]) {
+    try { const uri = await shrink(e.target.files[0]); draft().logo = uri; applyBrand({...S.brand, logo: uri}); $('#bPrev').innerHTML = logoMark(); $('#bClearLogo').disabled = false; }
+    catch (err) { toast(err.message); }
+    return;
+  }
   if (e.target.dataset.sel) { const id = +e.target.dataset.sel; e.target.checked ? S.sel.add(id) : S.sel.delete(id); render(); return; }
   if (e.target.id === 'selAll') {
     const q = S.q.trim().toLowerCase();
@@ -471,5 +535,5 @@ document.addEventListener('change', async e => {
 });
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'pw') $('#doLogin').click(); });
 
-(async () => { if (!token) return showLogin(); try { await refresh(); } catch (e) {} })();
-setInterval(() => { if (token && $('#modal').hidden) refresh().catch(() => {}); }, 20000);
+(async () => { await loadBrand(); if (!token) return showLogin(); try { await refresh(); } catch (e) {} })();
+setInterval(() => { if (token && $('#modal').hidden && S.tab !== 'look') refresh().catch(() => {}); }, 20000);

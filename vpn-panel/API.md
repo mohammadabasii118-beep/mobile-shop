@@ -14,3 +14,6 @@ Keeps UUID, quota, expiry and used traffic; names that already exist are skipped
 `POST /api/login` takes `{"username":"sara","password":"..."}` for a sub-admin (empty username = main admin).
 Main admin: `GET/POST /api/admins`, `PATCH/DELETE /api/admins/{id}` (`enabled`, `password`, `max_users`, `max_quota_gb`, `max_days`; 0 = no cap).
 A sub-admin session only works on `/api/me`, `/api/me/options`, `/api/me/users` (GET, POST) and `/api/me/users/{id}/configs`; everything else answers 403.
+
+## Branding
+`GET /api/branding` (public) -> `{name, logo, color}`. `PUT /api/branding` (main admin) with `{"name":"My VPN","color":"#7c3aed","logo":"data:image/png;base64,..."}`; empty `logo`/`color` restore the defaults. The name, logo and colour appear in the panel, the login box, the browser tab and the users' subscription page.

@@ -913,3 +913,28 @@ def test_sub_admin_can_only_create_and_see_own_users():
         assert c.post("/api/login", json={"username": "sara", "password": "another-pass1"}).status_code == 401
         assert c.delete(f"/api/admins/{a['id']}", headers=h).json() == {"ok": True}
         assert {u["name"]: u["owner_id"] for u in c.get("/api/users", headers=h).json()}["rs_user1"] is None
+
+
+def test_branding_name_logo_color_public_read_admin_write():
+    import base64 as b64
+    png = "data:image/png;base64," + b64.b64encode(b"\x89PNG\r\n\x1a\n" + b"0" * 40).decode()
+    with TestClient(app) as c:
+        h = admin(c)
+        assert c.get("/api/branding").json() == {"name": "پنل چندلوکیشن", "logo": "", "color": ""}   # public, with defaults
+        assert c.put("/api/branding", json={"name": "X"}).status_code == 401
+        r = c.put("/api/branding", headers=h, json={"name": " Sibdata VPN ", "color": "#7c3aed", "logo": png})
+        assert r.json() == {"name": "Sibdata VPN", "logo": png, "color": "#7c3aed"}
+        assert c.get("/api/branding").json()["name"] == "Sibdata VPN"
+        for bad in ({"name": "x", "color": "red"}, {"name": "x", "logo": "https://evil.example/x.png"},
+                    {"name": "x", "logo": "data:text/html;base64,PHNjcmlwdD4="}, {"name": ""}, {"name": "n" * 41}):
+            assert c.put("/api/branding", headers=h, json=bad).status_code == 422, bad
+        # sub-admins cannot change it
+        c.post("/api/admins", headers=h, json={"username": "brandsub", "password": "longpass1"})
+        sh = {"Authorization": "Bearer " + c.post("/api/login", json={"username": "brandsub", "password": "longpass1"}).json()["token"]}
+        assert c.put("/api/branding", headers=sh, json={"name": "hijack"}).status_code == 403
+        # the subscription page carries the brand
+        u = c.post("/api/users", headers=h, json={"name": "brandu", "protos": ["vless_tcp"]}).json()
+        page = c.get(u["sub_url"].replace("http://testserver", ""), headers={"accept": "text/html"}).text
+        assert "Sibdata VPN" in page and png in page and "--acc:#7c3aed" in page
+        c.put("/api/branding", headers=h, json={"name": "پنل چندلوکیشن"})   # leave defaults for later tests
+        c.put("/api/branding", headers=h, json={"name": "پنل چندلوکیشن", "logo": "", "color": ""})

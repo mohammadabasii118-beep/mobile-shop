@@ -80,6 +80,13 @@ class NodeProtocol(Base):
     host: Mapped[str] = mapped_column(default="")   # address in this protocol's links; empty = the node address
 
 
+class Setting(Base):
+    """Small key/value store for panel-wide options (branding)."""
+    __tablename__ = "settings"
+    key: Mapped[str] = mapped_column(primary_key=True)
+    value: Mapped[str] = mapped_column(default="")
+
+
 class Admin(Base):
     """A sub-admin (reseller): signs in with their own name and password and can only create and view their own users."""
     __tablename__ = "admins"
