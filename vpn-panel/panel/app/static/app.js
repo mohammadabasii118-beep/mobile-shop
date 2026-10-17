@@ -76,6 +76,7 @@ async function refresh() {
   render();
 }
 const isReseller = () => S.me.role === 'reseller';
+const uPath = id => (isReseller() ? '/me/users/' : '/users/') + id;   // a sub-admin goes through /me
 
 const views = {
   dash() {
@@ -162,7 +163,7 @@ const views = {
         <td><div style="display:flex;gap:8px;align-items:center"><div class="bar"><i class="${loadCls(pc)}" style="width:${pc}%"></i></div><span class="muted">${num(fmtGB(u.used_gb) + ' / ' + (u.quota_gb ? fmtGB(u.quota_gb) : '∞') + ' GB')}</span></div></td>
         <td>${u.days_left === null ? 'نامحدود' : u.days_left + ' روز'}</td><td class="pc">${u.protos.map(p => `<span class="cc">${esc(protoLabel(p))}</span>`).join('')}</td>
         <td><span class="pill ${st[0]}">${st[1]}</span></td>${rs || !S.admins.length ? '' : `<td>${owner(u) ? `<span class="pill acc">${esc(owner(u))}</span>` : '<span class="muted">مدیر اصلی</span>'}</td>`}
-        <td><div class="chips" style="flex-wrap:nowrap"><button class="btn sm" data-copy="${esc(u.sub_url)}">کپی لینک</button><button class="btn sm" data-cfg="${u.id}">کانفیگ‌ها</button>${rs ? '' : `<button class="btn sm" data-edit="${u.id}">ویرایش</button><button class="btn sm" data-toggle="${u.id}">${u.enabled ? 'غیرفعال' : 'فعال'}</button><button class="btn sm danger" data-deluser="${u.id}">حذف</button>`}</div></td></tr>`; }).join('')
+        <td><div class="chips" style="flex-wrap:nowrap"><button class="btn sm" data-copy="${esc(u.sub_url)}">کپی لینک</button><button class="btn sm" data-cfg="${u.id}">کانفیگ‌ها</button>${!rs || S.me.can_edit ? `<button class="btn sm" data-edit="${u.id}">ویرایش</button><button class="btn sm" data-toggle="${u.id}">${u.enabled ? 'غیرفعال' : 'فعال'}</button>` : ''}${!rs || S.me.can_delete ? `<button class="btn sm danger" data-deluser="${u.id}">حذف</button>` : ''}</div></td></tr>`; }).join('')
         || `<tr><td colspan="8" class="muted">کاربری وجود ندارد.</td></tr>`}</tbody></table></div>`;
   },
   look() {
@@ -182,12 +183,13 @@ const views = {
   },
   admins() {
     const pill = a => a.enabled ? '<span class="pill good">فعال</span>' : '<span class="pill bad">غیرفعال</span>';
-    return `<div class="note">ادمین فرعی (همکار) با نام کاربری و رمز خودش وارد می‌شود و <b>فقط می‌تواند کاربر بسازد</b> و کاربران خودش را ببیند و لینک و کانفیگشان را بردارد. به لوکیشن‌ها، تنظیمات و کاربران دیگران دسترسی ندارد.</div>
-      <div class="panel scroll"><table><thead><tr><th>نام کاربری</th><th>کاربران</th><th>حداکثر حجم هر کاربر</th><th>حداکثر مدت</th><th>وضعیت</th><th></th></tr></thead><tbody>
+    return `<div class="note">ادمین فرعی (همکار) با نام کاربری و رمز خودش وارد می‌شود و به‌صورت پیش‌فرض <b>فقط می‌تواند کاربر بسازد</b> و کاربران خودش را ببیند و لینک و کانفیگشان را بردارد. حذف و ویرایش را برای هر ادمین جدا می‌توانید اجازه بدهید. به لوکیشن‌ها، تنظیمات و کاربران دیگران دسترسی ندارد.</div>
+      <div class="panel scroll"><table><thead><tr><th>نام کاربری</th><th>کاربران</th><th>حداکثر حجم هر کاربر</th><th>حداکثر مدت</th><th>دسترسی‌ها</th><th>وضعیت</th><th></th></tr></thead><tbody>
       ${S.admins.map(a => `<tr><td><div class="who"><span class="av">${esc(a.username.charAt(0))}</span><span class="mono">${esc(a.username)}</span></div></td>
-        <td>${num(a.users + ' / ' + (a.max_users || '∞'))}</td><td>${a.max_quota_gb ? num(a.max_quota_gb + ' GB') : 'بدون سقف'}</td><td>${a.max_days ? a.max_days + ' روز' : 'بدون سقف'}</td><td>${pill(a)}</td>
+        <td>${num(a.users + ' / ' + (a.max_users || '∞'))}</td><td>${a.max_quota_gb ? num(a.max_quota_gb + ' GB') : 'بدون سقف'}</td><td>${a.max_days ? a.max_days + ' روز' : 'بدون سقف'}</td>
+        <td><span class="pill acc">ساخت</span> ${a.can_edit ? '<span class="pill acc">ویرایش و تمدید</span> ' : ''}${a.can_delete ? '<span class="pill warn">حذف</span>' : ''}</td><td>${pill(a)}</td>
         <td><div class="chips" style="flex-wrap:nowrap"><button class="btn sm" data-editadmin="${a.id}">ویرایش</button><button class="btn sm" data-toggleadmin="${a.id}">${a.enabled ? 'غیرفعال' : 'فعال'}</button><button class="btn sm danger" data-deladmin="${a.id}">حذف</button></div></td></tr>`).join('')
-        || '<tr><td colspan="6" class="muted">هنوز ادمین فرعی نساخته‌اید.</td></tr>'}</tbody></table></div>`;
+        || '<tr><td colspan="7" class="muted">هنوز ادمین فرعی نساخته‌اید.</td></tr>'}</tbody></table></div>`;
   },
 };
 
@@ -274,10 +276,10 @@ function editDialog(u) {
     <div class="form">
       <label class="f">حجم (GB، صفر = نامحدود)<input type="number" id="eQuota" value="${u.quota_gb}" min="0" step="any"></label>
       <label class="f">انقضا از امروز (روز، صفر = نامحدود)<input type="number" id="eDays" value="${u.days_left ?? 0}" min="0"></label></div>
-    <div><div class="muted" style="margin-bottom:6px">لوکیشن‌ها (هیچ‌کدام = همه)</div><div class="chips" id="eNodes">
+    ${isReseller() ? '' : `<div><div class="muted" style="margin-bottom:6px">لوکیشن‌ها (هیچ‌کدام = همه)</div><div class="chips" id="eNodes">
       ${S.nodes.map(n => `<label><input type="checkbox" value="${n.id}" ${u.node_ids.includes(n.id) ? 'checked' : ''}>${esc(n.cc)} ${esc(n.name)}</label>`).join('')}</div></div>
     <div><div class="muted" style="margin-bottom:6px">پروتکل‌ها</div><div class="chips" id="eProtos">
-      ${S.protos.map(p => `<label><input type="checkbox" value="${p.id}" ${u.protos.includes(p.id) ? 'checked' : ''}>${esc(p.label)}${p.counted ? '' : ' <span class="muted">(حجم شمرده نمی‌شود)</span>'}</label>`).join('')}</div></div>
+      ${S.protos.map(p => `<label><input type="checkbox" value="${p.id}" ${u.protos.includes(p.id) ? 'checked' : ''}>${esc(p.label)}${p.counted ? '' : ' <span class="muted">(حجم شمرده نمی‌شود)</span>'}</label>`).join('')}</div></div>`}
     <div style="display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap"><button class="btn sm" data-resetusage="${u.id}">ریست مصرف</button>
       <span><button class="btn" data-close>انصراف</button> <button class="btn pri" id="eSave" data-id="${u.id}">ذخیره</button></span></div>`);
 }
@@ -350,6 +352,9 @@ function adminForm(a) {
     <label class="f">${a ? 'رمز جدید (خالی = بدون تغییر)' : 'رمز (حداقل ۸ کاراکتر)'}<input type="text" id="adPass" dir="ltr" autocomplete="off"></label></div>
     <div class="form">${n('adMax', 'حداکثر تعداد کاربر', a ? a.max_users : 20, 'صفر = بدون سقف')}${n('adQuota', 'حداکثر حجم هر کاربر (GB)', a ? a.max_quota_gb : 50, 'صفر = بدون سقف؛ اگر سقف بگذارید، کاربر نامحدود نمی‌سازد')}
     ${n('adDays', 'حداکثر مدت هر کاربر (روز)', a ? a.max_days : 60, 'صفر = بدون سقف')}</div>
+    <div><div class="muted" style="margin-bottom:6px">دسترسی‌ها (ساخت و دیدن کاربران خودش همیشه هست)</div><div class="chips">
+      <label><input type="checkbox" id="adEdit" ${a && a.can_edit ? 'checked' : ''}>ویرایش و تمدید کاربران خودش</label>
+      <label><input type="checkbox" id="adDel" ${a && a.can_delete ? 'checked' : ''}>حذف کاربران خودش</label></div></div>
     ${a ? '<div class="note">با عوض کردن رمز، ادمین از همه‌ی دستگاه‌ها خارج می‌شود.</div>' : ''}
     <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="adSave" ${a ? `data-id="${a.id}"` : ''}>ذخیره</button></div>`);
 }
@@ -420,7 +425,8 @@ document.addEventListener('click', async e => {
     else if ('color' in d && t.closest('#bColors')) { draft().color = d.color; applyBrand({...S.brand, color: d.color}); if (d.color) $('#bColor').value = d.color; }
     else if (d.editadmin) adminForm(S.admins.find(x => x.id === +d.editadmin));
     else if (t.id === 'adSave') {
-      const v = id => $('#' + id).value.trim(), body = {max_users: +v('adMax') || 0, max_quota_gb: +v('adQuota') || 0, max_days: +v('adDays') || 0};
+      const v = id => $('#' + id).value.trim(), body = {max_users: +v('adMax') || 0, max_quota_gb: +v('adQuota') || 0, max_days: +v('adDays') || 0,
+        can_edit: $('#adEdit').checked, can_delete: $('#adDel').checked};
       if (d.id) { if (v('adPass')) body.password = v('adPass'); await api('PATCH', '/admins/' + d.id, body); }
       else await api('POST', '/admins', {...body, username: v('adUser'), password: v('adPass')});
       closeModal(); await refresh(); toast('ذخیره شد');
@@ -453,20 +459,25 @@ document.addEventListener('click', async e => {
     else if (d.cfg) await configsDialog(+d.cfg);
     else if (d.edit) editDialog(S.users.find(x => x.id === +d.edit));
     else if (d.renew) {
-      await api('PATCH', '/users/' + d.id, {extend_days: +d.renew, reset_usage: $('#eReset').checked, enabled: true});
+      await api('PATCH', uPath(d.id), {extend_days: +d.renew, reset_usage: $('#eReset').checked, enabled: true});
       await refresh(); editDialog(S.users.find(x => x.id === +d.id)); toast(`${d.renew} روز تمدید شد`);
     }
-    else if (d.resetusage) { await api('PATCH', '/users/' + d.resetusage, {reset_usage: true}); await refresh(); editDialog(S.users.find(x => x.id === +d.resetusage)); toast('مصرف صفر شد'); }
+    else if (d.resetusage) { await api('PATCH', uPath(d.resetusage), {reset_usage: true}); await refresh(); editDialog(S.users.find(x => x.id === +d.resetusage)); toast('مصرف صفر شد'); }
     else if (t.id === 'eSave') {
       const u = S.users.find(x => x.id === +d.id), checked = s => [...document.querySelectorAll(s + ' input:checked')].map(x => x.value);
-      const body = {protos: checked('#eProtos'), node_ids: checked('#eNodes').map(Number)};
+      const body = isReseller() ? {} : {protos: checked('#eProtos'), node_ids: checked('#eNodes').map(Number)};
       const quota = +$('#eQuota').value || 0, days = +$('#eDays').value || 0;
       if (quota !== u.quota_gb) body.quota_gb = quota;            // send only what changed, so an untouched
       if (days !== (u.days_left ?? 0)) body.days = days;          // expiry is not reset by rounding
-      await api('PATCH', '/users/' + u.id, body); closeModal(); await refresh(); toast('ذخیره شد');
+      await api('PATCH', uPath(u.id), body); closeModal(); await refresh(); toast('ذخیره شد');
     }
-    else if (d.toggle) { const u = S.users.find(x => x.id === +d.toggle); await api('PATCH', '/users/' + u.id, {enabled: !u.enabled}); await refresh(); }
-    else if (d.deluser) { await api('DELETE', '/users/' + d.deluser); await refresh(); toast('کاربر حذف شد'); }
+    else if (d.toggle) { const u = S.users.find(x => x.id === +d.toggle); await api('PATCH', uPath(u.id), {enabled: !u.enabled}); await refresh(); }
+    else if (d.deluser) {
+      const u = S.users.find(x => x.id === +d.deluser);
+      openModal(`<h2>حذف <span class="mono">${esc(u.name)}</span>؟</h2><div class="note">حذف برگشت‌پذیر نیست و لینک اشتراک این کاربر از کار می‌افتد.</div>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="delUserGo" data-id="${u.id}" style="background:var(--bad)">حذف قطعی</button></div>`);
+    }
+    else if (t.id === 'delUserGo') { await api('DELETE', uPath(d.id)); closeModal(); await refresh(); toast('کاربر حذف شد'); }
     else if ('rtAddout' in d) outboundDialog();
     else if (t.id === 'oSave') {
       const v = id => ($('#' + id) || {}).value || '', k = $('#oKind').value;

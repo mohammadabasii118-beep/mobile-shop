@@ -938,3 +938,32 @@ def test_branding_name_logo_color_public_read_admin_write():
         assert "Sibdata VPN" in page and png in page and "--acc:#7c3aed" in page
         c.put("/api/branding", headers=h, json={"name": "پنل چندلوکیشن"})   # leave defaults for later tests
         c.put("/api/branding", headers=h, json={"name": "پنل چندلوکیشن", "logo": "", "color": ""})
+
+
+def test_sub_admin_permissions_delete_and_edit_are_granted_per_admin():
+    with TestClient(app) as c:
+        h = admin(c)
+        mk = lambda name, **kw: c.post("/api/admins", headers=h, json={"username": name, "password": "longpass1", "max_quota_gb": 50, "max_days": 60, **kw}).json()
+        plain, boss = mk("perm_plain"), mk("perm_boss", can_delete=True, can_edit=True)
+        login = lambda n: {"Authorization": "Bearer " + c.post("/api/login", json={"username": n, "password": "longpass1"}).json()["token"]}
+        ph, bh = login("perm_plain"), login("perm_boss")
+        assert c.get("/api/me", headers=bh).json()["can_delete"] is True and c.get("/api/me", headers=ph).json()["can_delete"] is False
+        mine = lambda hh, n: c.post("/api/me/users", headers=hh, json={"name": n, "protos": ["vless"], "quota_gb": 10, "days": 30}).json()["id"]
+        pu, bu = mine(ph, "perm_pu"), mine(bh, "perm_bu")
+        # without the permission: refused (403), user untouched
+        assert c.delete(f"/api/me/users/{pu}", headers=ph).status_code == 403
+        assert c.patch(f"/api/me/users/{pu}", headers=ph, json={"enabled": False}).status_code == 403
+        # with it: edit within the caps, and only on their own users
+        assert c.patch(f"/api/me/users/{bu}", headers=bh, json={"extend_days": 7, "reset_usage": True}).json()["days_left"] in (36, 37)
+        assert c.patch(f"/api/me/users/{bu}", headers=bh, json={"enabled": False}).json()["status"] == "disabled"
+        assert c.patch(f"/api/me/users/{bu}", headers=bh, json={"quota_gb": 0}).status_code == 422
+        assert c.patch(f"/api/me/users/{bu}", headers=bh, json={"quota_gb": 51}).status_code == 422
+        assert c.patch(f"/api/me/users/{bu}", headers=bh, json={"days": 61}).status_code == 422
+        assert c.patch(f"/api/me/users/{bu}", headers=bh, json={"extend_days": 60}).status_code == 422   # would exceed 60 days left
+        assert c.patch(f"/api/me/users/{pu}", headers=bh, json={"enabled": False}).status_code == 404      # not theirs
+        assert c.delete(f"/api/me/users/{pu}", headers=bh).status_code == 404
+        assert c.delete(f"/api/me/users/{bu}", headers=bh).json() == {"ok": True}
+        assert "perm_bu" not in {u["name"] for u in c.get("/api/users", headers=h).json()}
+        # the main admin can grant it later
+        c.patch(f"/api/admins/{plain['id']}", headers=h, json={"can_delete": True})
+        assert c.delete(f"/api/me/users/{pu}", headers=ph).json() == {"ok": True}

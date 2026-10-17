@@ -97,6 +97,8 @@ class Admin(Base):
     max_users: Mapped[int] = mapped_column(default=0)          # 0 = no cap
     max_quota_gb: Mapped[float] = mapped_column(default=0)     # per user; 0 = no cap
     max_days: Mapped[int] = mapped_column(default=0)           # per user; 0 = no cap
+    can_delete: Mapped[bool] = mapped_column(default=False)    # may delete the users they created
+    can_edit: Mapped[bool] = mapped_column(default=False)      # may renew, change volume/time, enable/disable their users
     token_ver: Mapped[int] = mapped_column(default=0)          # bumped on password change: older sessions die
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 

@@ -17,3 +17,6 @@ A sub-admin session only works on `/api/me`, `/api/me/options`, `/api/me/users` 
 
 ## Branding
 `GET /api/branding` (public) -> `{name, logo, color}`. `PUT /api/branding` (main admin) with `{"name":"My VPN","color":"#7c3aed","logo":"data:image/png;base64,..."}`; empty `logo`/`color` restore the defaults. The name, logo and colour appear in the panel, the login box, the browser tab and the users' subscription page.
+
+### Per-admin permissions
+`can_edit` and `can_delete` (both default `false`) on `/api/admins`. With them a sub-admin may `PATCH /api/me/users/{id}` (`enabled`, `quota_gb`, `days`, `extend_days`, `reset_usage`, still within `max_quota_gb`/`max_days`) and `DELETE /api/me/users/{id}`, on their own users only. Without the permission both answer 403.

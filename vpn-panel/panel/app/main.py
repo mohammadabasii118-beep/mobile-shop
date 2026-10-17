@@ -754,6 +754,8 @@ class AdminIn(BaseModel):
     max_users: int = Field(ge=0, le=100000, default=0)
     max_quota_gb: float = Field(ge=0, le=1000000, default=0)
     max_days: int = Field(ge=0, le=3650, default=0)
+    can_delete: bool = False
+    can_edit: bool = False
 
 
 class AdminPatch(BaseModel):
@@ -762,12 +764,15 @@ class AdminPatch(BaseModel):
     max_users: int | None = Field(default=None, ge=0, le=100000)
     max_quota_gb: float | None = Field(default=None, ge=0, le=1000000)
     max_days: int | None = Field(default=None, ge=0, le=3650)
+    can_delete: bool | None = None
+    can_edit: bool | None = None
 
 
 def admin_out(a: Admin, db: Session) -> dict:
     n = len(list(db.scalars(select(User.id).where(User.owner_id == a.id))))
     return {"id": a.id, "username": a.username, "enabled": a.enabled, "max_users": a.max_users,
-            "max_quota_gb": a.max_quota_gb, "max_days": a.max_days, "users": n}
+            "max_quota_gb": a.max_quota_gb, "max_days": a.max_days, "users": n,
+            "can_delete": a.can_delete, "can_edit": a.can_edit}
 
 
 @app.get("/api/admins", dependencies=[Depends(require_admin)])
@@ -780,7 +785,7 @@ def create_admin(body: AdminIn, db: Session = Depends(get_db)):
     if db.scalar(select(Admin).where(Admin.username == body.username)):
         raise HTTPException(409, "این نام کاربری ادمین وجود دارد")
     a = Admin(username=body.username, pw_hash=hash_pw(body.password), max_users=body.max_users,
-              max_quota_gb=body.max_quota_gb, max_days=body.max_days)
+              max_quota_gb=body.max_quota_gb, max_days=body.max_days, can_delete=body.can_delete, can_edit=body.can_edit)
     db.add(a)
     db.commit()
     return admin_out(a, db)
@@ -791,7 +796,7 @@ def patch_admin(admin_id: int, body: AdminPatch, db: Session = Depends(get_db)):
     a = db.get(Admin, admin_id) or _404()
     if body.enabled is not None:
         a.enabled = body.enabled
-    for f in ("max_users", "max_quota_gb", "max_days"):
+    for f in ("max_users", "max_quota_gb", "max_days", "can_delete", "can_edit"):
         if getattr(body, f) is not None:
             setattr(a, f, getattr(body, f))
     if body.password is not None:
@@ -819,7 +824,7 @@ def me(authorization: str | None = Header(None), db: Session = Depends(get_db)):
     if _is_api_key(token) or (parse_token(token) or ("",))[0] == "sudo":
         return {"role": "sudo"}
     a = require_reseller(authorization, db)
-    return {"role": "reseller", "username": a.username, **{k: v for k, v in admin_out(a, db).items() if k in ("max_users", "max_quota_gb", "max_days", "users")}}
+    return {"role": "reseller", "username": a.username, **{k: v for k, v in admin_out(a, db).items() if k in ("max_users", "max_quota_gb", "max_days", "users", "can_delete", "can_edit")}}
 
 
 @app.get("/api/me/options")
@@ -846,11 +851,51 @@ def me_create_user(body: "UserIn", request: Request, admin: Admin = Depends(requ
     return user_out(new_user(db, body, admin), request)
 
 
-@app.get("/api/me/users/{user_id}/configs")
-def me_user_configs(user_id: int, admin: Admin = Depends(require_reseller), db: Session = Depends(get_db)):
+def own_user(db: Session, admin: Admin, user_id: int) -> User:
     user = db.get(User, user_id)
     if not user or user.owner_id != admin.id:
         _404()
+    return user
+
+
+class MeUserPatch(BaseModel):
+    """What a sub-admin with the edit permission may change on their own users (never protocols or locations)."""
+    enabled: bool | None = None
+    quota_gb: float | None = Field(default=None, ge=0)
+    days: int | None = Field(default=None, ge=0)
+    extend_days: int | None = Field(default=None, ge=1, le=3650)
+    reset_usage: bool = False
+
+
+@app.patch("/api/me/users/{user_id}")
+def me_patch_user(user_id: int, body: MeUserPatch, request: Request, admin: Admin = Depends(require_reseller), db: Session = Depends(get_db)):
+    if not admin.can_edit:
+        raise HTTPException(403, "اجازه‌ی ویرایش کاربر را ندارید")
+    user = own_user(db, admin, user_id)
+    if admin.max_quota_gb and body.quota_gb is not None and not 0 < body.quota_gb <= admin.max_quota_gb:
+        raise HTTPException(422, f"حجم باید بیشتر از صفر و حداکثر {admin.max_quota_gb:g} گیگابایت باشد")
+    if admin.max_days:
+        if body.days is not None and not 0 < body.days <= admin.max_days:
+            raise HTTPException(422, f"مدت باید بیشتر از صفر و حداکثر {admin.max_days} روز باشد")
+        if body.extend_days:
+            base = max(user.expire_at, utcnow()) if user.expire_at else utcnow()
+            if (base + timedelta(days=body.extend_days) - utcnow()).days > admin.max_days:
+                raise HTTPException(422, f"زمان باقی‌مانده نباید از {admin.max_days} روز بیشتر شود")
+    return patch_user(user_id, UserPatch(**body.model_dump()), request, db)
+
+
+@app.delete("/api/me/users/{user_id}")
+def me_delete_user(user_id: int, admin: Admin = Depends(require_reseller), db: Session = Depends(get_db)):
+    if not admin.can_delete:
+        raise HTTPException(403, "اجازه‌ی حذف کاربر را ندارید")
+    db.delete(own_user(db, admin, user_id))
+    db.commit()
+    return {"ok": True}
+
+
+@app.get("/api/me/users/{user_id}/configs")
+def me_user_configs(user_id: int, admin: Admin = Depends(require_reseller), db: Session = Depends(get_db)):
+    user = own_user(db, admin, user_id)
     return user_entries(user, list(db.scalars(select(Node).order_by(Node.id))))
 
 
