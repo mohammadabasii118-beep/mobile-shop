@@ -1230,3 +1230,14 @@ def test_our_own_dnstt_server_is_not_reported_as_a_port_conflict():
     # without this the agent skipped its own DNSTT setup on every pass after the first (the port looked busy)
     _, udp_busy, notes = agent.port_conflicts({"protocols": {"dnstt": 5300}}, foreign)
     assert udp_busy == set() and notes == []
+
+
+def test_dnstt_loopback_script_is_valid_shell_and_parses_the_unit():
+    import subprocess
+    sh_path = ROOT / "agent" / "dnstt_loopback.sh"
+    assert subprocess.run(["bash", "-n", str(sh_path)], capture_output=True).returncode == 0
+    unit = agent.dnstt_unit(5300, "t.example.com", "/k", upstream=2222)
+    exec_line = next(l for l in unit.splitlines() if l.startswith("ExecStart="))
+    parsed = subprocess.run(["bash", "-c", 'EXEC="$1"; echo "$(echo "$EXEC" | grep -oE -- "-udp :[0-9]+" | grep -oE "[0-9]+$") $(echo "$EXEC" | awk "{print \\$(NF-1)}") $(echo "$EXEC" | awk "{print \\$NF}")"',
+                             "x", exec_line], capture_output=True, text=True).stdout.split()
+    assert parsed == ["5300", "t.example.com", "127.0.0.1:2222"]          # the same parsing the script does
