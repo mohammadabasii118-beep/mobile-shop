@@ -4,6 +4,19 @@ const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeN
 const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', routing: 'مسیریابی', users: 'کاربران'};
 const STATUS = {active: ['good', 'فعال'], disabled: ['bad', 'غیرفعال'], expired: ['bad', 'منقضی'], quota: ['bad', 'حجم تمام شده']};
 
+const ICO = {
+  server: '<rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/>',
+  activity: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+  alert: '<path d="m21.7 18-8-14a2 2 0 0 0-3.4 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
+  pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  trophy: '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>',
+  pie: '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10Z"/>',
+};
+const ic = n => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICO[n]}</svg>`;
+const num = v => `<span class="num">${v}</span>`;
+
 let token = ''; try { token = localStorage.getItem('tok') || ''; } catch (e) {}
 
 async function api(method, path, body) {
@@ -24,8 +37,9 @@ const nodeBy = id => S.nodes.find(n => n.id === id);
 const fmtGB = v => v.toLocaleString('en', {maximumFractionDigits: 2});
 
 function showLogin() {
-  openModal(`<h2>ورود مدیر</h2><label class="f">رمز<input type="password" id="pw" autocomplete="current-password" style="background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;width:100%"></label>
-    <div style="text-align:left"><button class="btn pri" id="doLogin">ورود</button></div>`);
+  openModal(`<div class="login"><span class="logo">${ic('shield')}</span><h2>پنل چندلوکیشن</h2><span class="muted">برای ادامه رمز مدیر را وارد کنید</span></div>
+    <label class="f">رمز<input type="password" id="pw" autocomplete="current-password"></label>
+    <button class="btn pri" id="doLogin" style="justify-content:center">ورود</button>`);
   $('#pw').focus();
 }
 
@@ -39,16 +53,27 @@ async function refresh() {
 const views = {
   dash() {
     const on = S.nodes.filter(n => n.online).length, used = S.users.reduce((a, u) => a + u.used_gb, 0);
+    const count = k => S.users.filter(u => u.status === k).length, active = count('active'), blocked = S.users.length - active;
+    const stat = (cls, ico, label, value, sub = '') => `<div class="stat"><span class="ico ${cls}">${ic(ico)}</span><div><span class="l">${label}</span><b>${value}${sub ? `<small>${sub}</small>` : ''}</b></div></div>`;
+    const top = [...S.users].sort((a, b) => b.used_gb - a.used_gb).slice(0, 5), max = Math.max(1, ...top.map(u => u.used_gb));
+    const segs = [['good', 'فعال', active, 'var(--good)'], ['quota', 'حجم تمام', count('quota'), 'var(--warn)'], ['expired', 'منقضی', count('expired'), 'var(--bad)'], ['disabled', 'غیرفعال', count('disabled'), 'var(--muted)']];
     return `<div class="stats">
-      <div class="stat"><span class="muted">لوکیشن آنلاین</span><b>${on} / ${S.nodes.length}</b></div>
-      <div class="stat"><span class="muted">کاربر فعال</span><b>${S.users.filter(u => u.status === 'active').length} / ${S.users.length}</b></div>
-      <div class="stat"><span class="muted">مصرف کل</span><b>${fmtGB(used)} GB</b></div></div>
-      <div class="panel"><h2>بار لوکیشن‌ها</h2><div class="links">${S.nodes.length ? S.nodes.map(n => `
-        <div style="display:grid;grid-template-columns:140px 1fr 44px;gap:8px;align-items:center">
-          <span><span class="cc">${esc(n.cc)}</span>${esc(n.name)}</span>
-          <div class="bar"><i class="${loadCls(n.load)}" style="width:${n.online ? n.load : 0}%"></i></div>
-          <span class="muted mono">${n.online ? n.load + '%' : '—'}</span></div>`).join('') :
-        '<p class="muted">هنوز لوکیشنی اضافه نشده. از بخش «لوکیشن‌ها» اولین نود را اضافه کنید.</p>'}</div></div>`;
+      ${stat('', 'server', 'لوکیشن آنلاین', `${num(on + ' / ' + S.nodes.length)}`)}
+      ${stat('blue', 'users', 'کاربر فعال', `${num(active + ' / ' + S.users.length)}`)}
+      ${stat('blue', 'activity', 'مصرف کل', num(fmtGB(used)), 'GB')}
+      ${stat(blocked || S.nodes.some(n => n.conflicts.length) ? 'warn' : '', 'alert', 'نیازمند توجه', num(blocked + S.nodes.filter(n => n.conflicts.length || (n.errors || []).length).length), 'مورد')}</div>
+      <div class="panel"><h2>${ic('pin')}لوکیشن‌ها</h2>${S.nodes.length ? `<div class="nodes">${S.nodes.map(n => `
+        <div class="ncard ${n.online ? '' : 'off'}"><div class="ring ${loadCls(n.load)}" style="--v:${n.online ? n.load : 0}"><b>${n.online ? n.load + '%' : '—'}</b></div>
+          <div class="t"><strong><span class="cc">${esc(n.cc)}</span>${esc(n.name)}</strong><span class="muted mono">${esc(n.address)}</span>
+            <span><span class="pill ${n.online ? 'good' : 'warn'}">${n.online ? 'آنلاین' : 'آفلاین'}</span>${n.conflicts.length ? ' <span class="pill bad" title="' + esc(n.conflicts.join('، ')) + '">تداخل پورت</span>' : ''}</span></div></div>`).join('')}</div>` :
+        `<div class="empty">${ic('pin')}<span>هنوز لوکیشنی اضافه نشده. از بخش «لوکیشن‌ها» اولین نود را اضافه کنید.</span></div>`}</div>
+      <div class="cols">
+        <div class="panel"><h2>${ic('trophy')}پرمصرف‌ترین کاربران</h2>${top.length ? `<div class="top5">${top.map(u => `
+          <div class="r"><span class="mono">${esc(u.name)}</span><div class="bar"><i class="${u.quota_gb && u.used_gb / u.quota_gb > .9 ? 'bad' : ''}" style="width:${Math.max(3, u.used_gb / max * 100)}%"></i></div>
+            <span class="muted">${num(fmtGB(u.used_gb) + (u.quota_gb ? ' / ' + fmtGB(u.quota_gb) : '') + ' GB')}</span></div>`).join('')}</div>` : `<div class="empty"><span>کاربری نیست.</span></div>`}</div>
+        <div class="panel"><h2>${ic('pie')}وضعیت کاربران</h2>${S.users.length ? `<div class="seg">${segs.filter(x => x[2]).map(x => `<i style="flex:${x[2]};background:${x[3]}" title="${x[1]}: ${x[2]}"></i>`).join('')}</div>
+          <div class="legend">${segs.map(x => `<span><i style="background:${x[3]}"></i>${x[1]} ${num(x[2])}</span>`).join('')}</div>` : `<div class="empty"><span>کاربری نیست.</span></div>`}</div>
+      </div>`;
   },
   nodes() {
     return `<div class="panel scroll"><table><thead><tr><th>لوکیشن</th><th>آدرس</th><th>بار</th><th>آخرین گزارش</th><th>وضعیت</th><th></th></tr></thead><tbody>
@@ -97,17 +122,17 @@ const views = {
     const allOn = rows.length && rows.every(u => S.sel.has(u.id));
     const bar = S.sel.size ? `<div class="panel" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${S.sel.size} کاربر انتخاب شده</b>
       <button class="btn sm" id="bulkBtn">افزودن پروتکل / لوکیشن…</button>
-      <button class="btn sm" id="bulkDel" style="color:var(--bad,#c0392b)">حذف انتخاب‌شده‌ها</button>
+      <button class="btn sm" id="bulkDel" style="color:var(--bad)">حذف انتخاب‌شده‌ها</button>
       <button class="btn sm" id="selClear">لغو انتخاب</button></div>` : '';
     return `<div class="panel" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="search" id="uq" placeholder="جست‌وجوی نام کاربر…" value="${esc(S.q)}" style="max-width:260px" dir="ltr">
         <span class="muted">${rows.length} از ${S.users.length} کاربر</span></div>${bar}
       <div class="panel scroll"><table><thead><tr><th><input type="checkbox" id="selAll" ${allOn ? 'checked' : ''} aria-label="انتخاب همه‌ی نتیجه‌ها"></th><th>کاربر</th><th>مصرف</th><th>انقضا</th><th>پروتکل‌ها</th><th>وضعیت</th><th></th></tr></thead><tbody>
       ${rows.map(u => { const pc = u.quota_gb ? Math.min(100, u.used_gb / u.quota_gb * 100) : 0; const st = STATUS[u.status];
-        return `<tr><td><input type="checkbox" data-sel="${u.id}" ${S.sel.has(u.id) ? 'checked' : ''} aria-label="انتخاب ${esc(u.name)}"></td><td class="mono">${esc(u.name)}</td>
-        <td><div style="display:flex;gap:8px;align-items:center"><div class="bar"><i class="${loadCls(pc)}" style="width:${pc}%"></i></div><span class="muted">${fmtGB(u.used_gb)}/${u.quota_gb ? fmtGB(u.quota_gb) : '∞'} GB</span></div></td>
-        <td>${u.days_left === null ? 'نامحدود' : u.days_left + ' روز'}</td><td>${u.protos.map(p => `<span class="cc">${esc(protoLabel(p))}</span>`).join('')}</td>
+        return `<tr><td><input type="checkbox" data-sel="${u.id}" ${S.sel.has(u.id) ? 'checked' : ''} aria-label="انتخاب ${esc(u.name)}"></td><td><div class="who"><span class="av">${esc(u.name.replace(/^[^A-Za-z0-9]+/, '').charAt(0) || '?')}</span><span class="mono">${esc(u.name)}</span></div></td>
+        <td><div style="display:flex;gap:8px;align-items:center"><div class="bar"><i class="${loadCls(pc)}" style="width:${pc}%"></i></div><span class="muted">${num(fmtGB(u.used_gb) + ' / ' + (u.quota_gb ? fmtGB(u.quota_gb) : '∞') + ' GB')}</span></div></td>
+        <td>${u.days_left === null ? 'نامحدود' : u.days_left + ' روز'}</td><td class="pc">${u.protos.map(p => `<span class="cc">${esc(protoLabel(p))}</span>`).join('')}</td>
         <td><span class="pill ${st[0]}">${st[1]}</span></td>
-        <td><button class="btn sm" data-copy="${esc(u.sub_url)}">کپی لینک اشتراک</button> <button class="btn sm" data-cfg="${u.id}">کانفیگ‌ها</button> <button class="btn sm" data-edit="${u.id}">ویرایش</button> <button class="btn sm" data-toggle="${u.id}">${u.enabled ? 'غیرفعال' : 'فعال'}</button> <button class="btn sm" data-deluser="${u.id}">حذف</button></td></tr>`; }).join('')
+        <td><div class="chips" style="flex-wrap:nowrap"><button class="btn sm" data-copy="${esc(u.sub_url)}">کپی لینک</button><button class="btn sm" data-cfg="${u.id}">کانفیگ‌ها</button><button class="btn sm" data-edit="${u.id}">ویرایش</button><button class="btn sm" data-toggle="${u.id}">${u.enabled ? 'غیرفعال' : 'فعال'}</button><button class="btn sm danger" data-deluser="${u.id}">حذف</button></div></td></tr>`; }).join('')
         || '<tr><td colspan="7" class="muted">کاربری وجود ندارد.</td></tr>'}</tbody></table></div>`;
   },
 };
@@ -274,7 +299,7 @@ async function configsDialog(id) {
 }
 
 document.addEventListener('click', async e => {
-  const t = e.target, d = t.dataset;
+  const t = e.target.closest('button') || e.target, d = t.dataset;   // icons and labels sit inside the buttons
   try {
     if (d.tab) { S.tab = d.tab; render(); }
     else if (t.id === 'themeBtn') { const r = document.documentElement; r.dataset.theme = getComputedStyle(r).colorScheme.includes('dark') ? 'light' : 'dark'; }
