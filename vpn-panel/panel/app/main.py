@@ -528,6 +528,29 @@ def import_users(body: ImportIn, db: Session = Depends(get_db)):
     return {"created": len(made), "skipped": skipped}
 
 
+class BulkProtos(BaseModel):
+    add: list[str] = []
+    remove: list[str] = []
+    names: list[str] = []   # empty = every user
+
+
+@app.post("/api/users/bulk-protos", dependencies=[Depends(require_admin)])
+def bulk_protos(body: BulkProtos, db: Session = Depends(get_db)):
+    """Add and/or remove protocols for many users at once (all users when `names` is empty)."""
+    if bad := [p for p in body.add + body.remove if p not in PROTOCOLS]:
+        raise HTTPException(422, f"پروتکل ناشناخته: {bad[0]}")
+    changed = 0
+    for u in db.scalars(select(User)):
+        if body.names and u.name not in body.names:
+            continue
+        new = [p for p in u.protos if p not in body.remove] + [p for p in body.add if p not in u.protos]
+        if new and new != u.protos:
+            u.protos = new
+            changed += 1
+    db.commit()
+    return {"changed": changed}
+
+
 @app.patch("/api/users/{user_id}", dependencies=[Depends(require_admin)])
 def patch_user(user_id: int, body: UserPatch, request: Request, db: Session = Depends(get_db)):
     user = db.get(User, user_id) or _404()

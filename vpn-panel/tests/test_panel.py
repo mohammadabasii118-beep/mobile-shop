@@ -788,3 +788,16 @@ def test_import_users_from_3xui_keeps_uuid_quota_expiry_and_usage():
         assert uid in cfg
         again = c.post("/api/import/users", headers=h, json={"clients": clients, "protos": ["vless"]}).json()
         assert again["created"] == 0 and len(again["skipped"]) == 2
+
+
+def test_bulk_protocols_add_and_remove():
+    with TestClient(app) as c:
+        h = admin(c)
+        for n in ("aa", "bb"):
+            c.post("/api/users", headers=h, json={"name": n, "protos": ["vless"]})
+        r = c.post("/api/users/bulk-protos", headers=h, json={"add": ["vless_raw"], "remove": ["vless"], "names": ["aa"]}).json()
+        assert r == {"changed": 1}
+        got = {u["name"]: u["protos"] for u in c.get("/api/users", headers=h).json()}
+        assert got == {"aa": ["vless_raw"], "bb": ["vless"]}
+        assert c.post("/api/users/bulk-protos", headers=h, json={"add": ["vless_raw"]}).json() == {"changed": 1}
+        assert c.post("/api/users/bulk-protos", headers=h, json={"add": ["nope"]}).status_code == 422
