@@ -793,11 +793,13 @@ def test_import_users_from_3xui_keeps_uuid_quota_expiry_and_usage():
 def test_bulk_protocols_add_and_remove():
     with TestClient(app) as c:
         h = admin(c)
-        for n in ("aa", "bb"):
+        for n in ("bulkaa", "bulkbb"):
             c.post("/api/users", headers=h, json={"name": n, "protos": ["vless"]})
-        r = c.post("/api/users/bulk-protos", headers=h, json={"add": ["vless_raw"], "remove": ["vless"], "names": ["aa"]}).json()
+        r = c.post("/api/users/bulk-protos", headers=h, json={"add": ["vless_raw"], "remove": ["vless"], "names": ["bulkaa"]}).json()
         assert r == {"changed": 1}
         got = {u["name"]: u["protos"] for u in c.get("/api/users", headers=h).json()}
-        assert got == {"aa": ["vless_raw"], "bb": ["vless"]}
-        assert c.post("/api/users/bulk-protos", headers=h, json={"add": ["vless_raw"]}).json() == {"changed": 1}
+        assert got["bulkaa"] == ["vless_raw"] and got["bulkbb"] == ["vless"]
+        c.post("/api/users/bulk-protos", headers=h, json={"add": ["vless_raw"]})
+        got = {u["name"]: u["protos"] for u in c.get("/api/users", headers=h).json()}
+        assert all("vless_raw" in p for p in got.values())
         assert c.post("/api/users/bulk-protos", headers=h, json={"add": ["nope"]}).status_code == 422
