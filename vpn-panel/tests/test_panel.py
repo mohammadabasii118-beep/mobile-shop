@@ -768,3 +768,22 @@ def test_rotate_replaces_the_link_and_credentials_but_keeps_the_quota():
         assert new_cfg["uuid"] != old_cfg["uuid"] and new_cfg["password"] != old_cfg["password"] and new_cfg["wg_pub"] != old_cfg["wg_pub"]
         assert c.post("/api/users/999999/rotate", headers=h).status_code == 404
         assert c.post(f"/api/users/{user['id']}/rotate").status_code == 401
+
+
+def test_import_users_from_3xui_keeps_uuid_quota_expiry_and_usage():
+    with TestClient(app) as c:
+        h = admin(c)
+        uid = "11111111-2222-4333-8444-555555555555"
+        clients = [{"name": "ali@x", "uuid": uid, "quota_bytes": 5 * 1024**3, "used_bytes": 1024**3,
+                    "expire_ms": 4102444800000, "enabled": True},
+                   {"name": "trial", "uuid": "not-a-uuid", "expire_ms": -86400000 * 3, "enabled": False}]
+        r = c.post("/api/import/users", headers=h, json={"clients": clients, "protos": ["vless"]}).json()
+        assert r == {"created": 2, "skipped": []}
+        users = {u["name"]: u for u in c.get("/api/users", headers=h).json()}
+        assert users["ali_x"]["used_gb"] == 1.0 and users["ali_x"]["quota_gb"] == 5.0
+        assert users["ali_x"]["expire_at"].startswith("2100-")
+        assert users["trial"]["days_left"] in (2, 3) and users["trial"]["status"] == "disabled"
+        cfg = c.get(f"/api/users/{users['ali_x']['id']}/configs", headers=h).text
+        assert uid in cfg
+        again = c.post("/api/import/users", headers=h, json={"clients": clients, "protos": ["vless"]}).json()
+        assert again["created"] == 0 and len(again["skipped"]) == 2

@@ -9,7 +9,7 @@ import secrets
 import time
 import uuid as uuidlib
 from contextlib import asynccontextmanager
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
@@ -471,6 +471,61 @@ def create_user(body: UserIn, request: Request, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     return user_out(user, request)
+
+
+class ImportClient(BaseModel):
+    name: str
+    uuid: str = ""
+    quota_bytes: int = Field(ge=0, default=0)
+    used_bytes: int = Field(ge=0, default=0)
+    expire_ms: int = 0   # 3x-ui: epoch ms; 0 = never; negative = that many ms counted from now
+    enabled: bool = True
+
+
+class ImportIn(BaseModel):
+    clients: list[ImportClient] = Field(max_length=5000)
+    protos: list[str] = Field(min_length=1)
+    node_ids: list[int] = []
+
+
+@app.post("/api/import/users", dependencies=[Depends(require_admin)])
+def import_users(body: ImportIn, db: Session = Depends(get_db)):
+    """Bulk-create users from another panel (3x-ui). Keeps the client's UUID, quota, expiry and used traffic;
+    existing names are skipped, so re-running is safe."""
+    if bad := [p for p in body.protos if p not in PROTOCOLS]:
+        raise HTTPException(422, f"پروتکل ناشناخته: {bad[0]}")
+    names = set(db.scalars(select(User.name)))
+    taken_uuids = set(db.scalars(select(User.uuid)))
+    made, skipped = [], []
+    for c in body.clients:
+        name = re.sub(r"[^A-Za-z0-9_.\-]", "_", c.name)[:32].strip("_") or "user"
+        if len(name) < 2:
+            name += "_u"
+        if name in names:
+            skipped.append(name)
+            continue
+        try:
+            uid = str(uuidlib.UUID(c.uuid))
+        except ValueError:
+            uid = ""
+        if not uid or uid in taken_uuids:
+            uid = str(uuidlib.uuid4())
+        if c.expire_ms > 0:
+            expire = datetime.fromtimestamp(c.expire_ms / 1000, timezone.utc).replace(tzinfo=None)
+        elif c.expire_ms < 0:
+            expire = utcnow() + timedelta(milliseconds=-c.expire_ms)
+        else:
+            expire = None
+        user = User(name=name, sub_token=secrets.token_urlsafe(16), uuid=uid, password=secrets.token_urlsafe(12),
+                    quota_bytes=c.quota_bytes, used_bytes=c.used_bytes, expire_at=expire, enabled=c.enabled,
+                    protos=body.protos, node_ids=body.node_ids)
+        user.wg_private, user.wg_public = new_wg_keypair()
+        db.add(user)
+        names.add(name)
+        taken_uuids.add(uid)
+        made.append(name)
+    db.commit()
+    return {"created": len(made), "skipped": skipped}
 
 
 @app.patch("/api/users/{user_id}", dependencies=[Depends(require_admin)])
