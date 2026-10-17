@@ -1241,3 +1241,13 @@ def test_dnstt_loopback_script_is_valid_shell_and_parses_the_unit():
     parsed = subprocess.run(["bash", "-c", 'EXEC="$1"; echo "$(echo "$EXEC" | grep -oE -- "-udp :[0-9]+" | grep -oE "[0-9]+$") $(echo "$EXEC" | awk "{print \\$(NF-1)}") $(echo "$EXEC" | awk "{print \\$NF}")"',
                              "x", exec_line], capture_output=True, text=True).stdout.split()
     assert parsed == ["5300", "t.example.com", "127.0.0.1:2222"]          # the same parsing the script does
+
+
+def test_dnstt_builds_fall_back_to_other_go_proxies():
+    import importlib.util as iu
+    sp = iu.spec_from_file_location("dnstt_test2", ROOT / "agent" / "dnstt_test.py")
+    m = iu.module_from_spec(sp)
+    sp.loader.exec_module(m)
+    for script in (agent.DNSTT_INSTALL, m.BUILD):
+        # proxy.golang.org answered 403 for one module on a real node; "|" moves on to the next proxy on any error
+        assert "proxy.golang.org|" in script and "goproxy.io" in script and "|direct" in script

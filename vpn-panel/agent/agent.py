@@ -578,7 +578,7 @@ else
 fi
 git clone https://www.bamsoftware.com/git/dnstt.git "$d/dnstt"
 cd "$d/dnstt/dnstt-server"
-GOPATH="$d/gopath" GOCACHE="$d/cache" GOTOOLCHAIN=local GOFLAGS=-mod=mod "$GO" build -o /usr/local/bin/dnstt-server .
+GOPATH="$d/gopath" GOCACHE="$d/cache" GOTOOLCHAIN=local GOFLAGS=-mod=mod GOPROXY="https://proxy.golang.org|https://goproxy.io|https://goproxy.cn|direct" "$GO" build -o /usr/local/bin/dnstt-server .
 echo "dnstt-server installed"
 """
 
