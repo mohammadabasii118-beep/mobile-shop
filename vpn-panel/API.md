@@ -27,3 +27,6 @@ Turning the `dnstt` protocol on or off for a node (`PUT /api/nodes/{id}/protocol
 `A nsd<node id>.<zone>` -> node IP and `NS <tunnel domain>` -> that name. Records it did not create are never touched.
 The first node that generates the key pair reports it; the panel keeps that key and hands it to every node, so all nodes answer for the same domain.
 Users with the `dnstt` protocol get one config entry (domain, public key, UUID, dnstt-client commands). Inside the tunnel runs a loopback-only VLESS inbound, so each user is metered and limited like any other.
+
+### DNSTT inner protocol
+`inner` on `PUT /api/dnstt` is `ssh` (default; what NetMod's "DNSTT + SSH" speaks) or `vless`. In `ssh` mode each node runs a loopback-only sshd (`127.0.0.1:2222`, its own config, unit `vpn-node-sshd`) and manages accounts `vs_<name>` (group `vpnssh`, shell `nologin`, password = the panel user's password); expired or disabled users are removed and their sessions killed. SSH traffic is **not** counted against the user's volume. In `vless` mode a loopback Xray inbound is used and the traffic is counted.

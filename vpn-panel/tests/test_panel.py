@@ -970,7 +970,7 @@ def test_sub_admin_permissions_delete_and_edit_are_granted_per_admin():
 
 
 def test_agent_dnstt_inner_inbound_unit_and_redirect():
-    cfg = {"node": {"reality_sni": "x"}, "protocols": {"dnstt": 5300, "vless": 443}, "dnstt": {"domain": "t.example.com", "privkey": "ab"},
+    cfg = {"node": {"reality_sni": "x"}, "protocols": {"dnstt": 5300, "vless": 443}, "dnstt": {"domain": "t.example.com", "privkey": "ab", "inner": "vless"},
            "users": [{"name": "d1", "uuid": "u-1", "password": "p", "ss_key": "k", "protos": ["dnstt"]},
                      {"name": "d2", "uuid": "u-2", "password": "p", "ss_key": "k", "protos": ["vless"]}]}
     x = {i["tag"]: i for i in agent.render_xray(cfg, {"private": "P", "public": "Q", "short_id": "ab"}, {"cert": "/c", "key": "/k"})["inbounds"]}
@@ -1117,17 +1117,18 @@ def test_dnstt_key_is_shared_and_user_gets_one_entry():
         n1 = c.post("/api/nodes", headers=h, json={"name": "K1", "cc": "tr", "address": "1.1.1.1"}).json()
         n2 = c.post("/api/nodes", headers=h, json={"name": "K2", "cc": "fr", "address": "2.2.2.2"}).json()
         nh = lambda n: {"Authorization": "Bearer " + n["install_command"].split("--token ")[1].split()[0]}
-        c.put("/api/dnstt", headers=h, json={"domain": "tun.example.com", "zone": "example.com"})
+        r = c.put("/api/dnstt", headers=h, json={"domain": "tun.example.com", "zone": "example.com", "inner": "vless"}).json()
+        assert r["inner"] == "vless"
         for n in (n1, n2):
             c.put(f"/api/nodes/{n['id']}/protocols/dnstt", headers=h, json={"enabled": True})
         u = c.post("/api/users", headers=h, json={"name": "dnsu", "protos": ["dnstt", "vless_tcp"]}).json()
         cfg = c.get("/api/node/config", headers=nh(n1)).json()
-        assert cfg["dnstt"] == {"domain": "tun.example.com", "privkey": ""} and cfg["protocols"]["dnstt"] == 5300     # nothing generated yet
+        assert cfg["dnstt"] == {"domain": "tun.example.com", "privkey": "", "inner": "vless"} and cfg["protocols"]["dnstt"] == 5300     # nothing generated yet
         assert any(x["name"] == "dnsu" and "dnstt" in x["protos"] for x in cfg["users"])
         c.post("/api/node/report", headers=nh(n1), json={"dnstt_priv": "aa" * 32, "dnstt_pub": "bb" * 32})
         c.post("/api/node/report", headers=nh(n2), json={"dnstt_priv": "cc" * 32, "dnstt_pub": "dd" * 32})    # lost the race: ignored
         for n in (n1, n2):   # both nodes now serve the first key
-            assert c.get("/api/node/config", headers=nh(n)).json()["dnstt"] == {"domain": "tun.example.com", "privkey": "aa" * 32}
+            assert c.get("/api/node/config", headers=nh(n)).json()["dnstt"] == {"domain": "tun.example.com", "privkey": "aa" * 32, "inner": "vless"}
         assert c.get("/api/dnstt", headers=h).json()["pubkey"] == "bb" * 32
         rows = [e for e in c.get(f"/api/users/{u['id']}/configs", headers=h).json() if e["proto"] == "dnstt"]
         assert len(rows) == 1                                                       # one entry, not one per node
@@ -1160,3 +1161,62 @@ def test_dnstt_test_script_helpers():
     assert c["inbounds"][0]["listen"] == "127.0.0.1" and c["inbounds"][0]["port"] == 7002
     assert m.default_resolver("search x\nnameserver ::1\nnameserver 10.1.2.3\n") == "10.1.2.3"
     assert m.default_resolver("# nothing") == "8.8.8.8"
+
+
+def test_agent_dnstt_ssh_inner_accounts_and_sshd():
+    # no VLESS inbound in ssh mode, and the tunnel forwards to the loopback sshd instead
+    cfg = {"node": {"reality_sni": "x"}, "protocols": {"dnstt": 5300}, "dnstt": {"domain": "t.example.com", "privkey": "ab", "inner": "ssh"},
+           "users": [{"name": "d1", "uuid": "u-1", "password": "p1", "ss_key": "k", "protos": ["dnstt"]}]}
+    tags = {i["tag"] for i in agent.render_xray(cfg, {"private": "P", "public": "Q", "short_id": "ab"}, {"cert": "/c", "key": "/k"})["inbounds"]}
+    assert "dnstt" not in tags
+    assert f"t.example.com 127.0.0.1:{agent.SSH_PORT}" in agent.dnstt_unit(5300, "t.example.com", "/k", upstream=agent.SSH_PORT)
+    conf = agent.sshd_config()
+    for line in ("ListenAddress 127.0.0.1", f"Port {agent.SSH_PORT}", "AllowGroups vpnssh", "PermitRootLogin no", "PubkeyAuthentication no",
+                 "AllowTcpForwarding yes", "PermitTTY no", "X11Forwarding no"):
+        assert line in conf
+    # account names: plain when safe, hashed when not, always under the prefix, always <= 32, collision free
+    n = agent.ssh_username
+    assert n("ali_t") == "vs_ali_t" and n("sara-1") == "vs_sara-1"
+    weird = [n("Ali"), n("ali"), n("ali.t"), n("ali_t"), n("x" * 32), n("y" * 32), n("ZZZZZ")]
+    assert n("Ali") != n("ali") and n("ali.t") != n("ali_t")
+    assert all(u.startswith("vs_") and len(u) <= 32 and all(c in "abcdefghijklmnopqrstuvwxyz0123456789_-" for c in u) for u in weird)
+    assert n("x" * 32) != n("y" * 32)
+    # sync plan: create, change password, remove; never remove what is not ours
+    h = lambda p: __import__("hashlib").sha256(p.encode()).hexdigest()
+    add, upd, rem = agent.plan_ssh_users({"vs_old", "vs_same", "vs_chg"}, {"vs_same": h("p"), "vs_chg": h("old")}, {"vs_same": "p", "vs_chg": "new", "vs_new": "n"})
+    assert (add, upd, rem) == (["vs_new"], ["vs_chg"], ["vs_old"])
+    assert agent.plan_ssh_users({"root", "ubuntu"}, {}, {}) == ([], [], [])      # not prefixed: left alone
+    assert agent.plan_ssh_users({"vs_a"}, {}, {"vs_a": "x"})[1] == ["vs_a"]       # unknown password state -> set it again
+
+
+def test_dnstt_ssh_mode_is_the_default_and_gives_netmod_fields():
+    import hashlib
+    with TestClient(app) as c:
+        h = admin(c)
+        n1 = c.post("/api/nodes", headers=h, json={"name": "S1", "cc": "tr", "address": "3.3.3.3"}).json()
+        nh = {"Authorization": "Bearer " + n1["install_command"].split("--token ")[1].split()[0]}
+        from sqlalchemy.orm import Session
+        from app.db import Setting, engine
+        with Session(engine) as db:                                                               # forget what earlier tests chose
+            if row := db.get(Setting, "dnstt_inner"):
+                db.delete(row)
+                db.commit()
+        assert c.get("/api/dnstt", headers=h).json()["inner"] == "ssh"                           # NetMod's mode is the default
+        assert c.put("/api/dnstt", headers=h, json={"inner": "telnet"}).status_code == 422
+        c.put("/api/dnstt", headers=h, json={"domain": "sshtun.example.com", "zone": "example.com"})
+        c.put(f"/api/nodes/{n1['id']}/protocols/dnstt", headers=h, json={"enabled": True})
+        c.post("/api/node/report", headers=nh, json={"dnstt_priv": "aa" * 32, "dnstt_pub": "bb" * 32})
+        u = c.post("/api/users", headers=h, json={"name": "Net.Mod1", "protos": ["dnstt"]}).json()
+        cfg = c.get("/api/node/config", headers=nh).json()
+        assert cfg["dnstt"]["inner"] == "ssh"
+        row = next(x for x in cfg["users"] if x["name"] == "Net.Mod1")
+        e = next(x for x in c.get(f"/api/users/{u['id']}/configs", headers=h).json() if x["proto"] == "dnstt")
+        d = e["details"]
+        acct = "vs_net_mod1_" + hashlib.sha256(b"Net.Mod1").hexdigest()[:8]
+        assert d["ssh_user"] == acct == agent.ssh_username("Net.Mod1")                             # panel and node derive the same account
+        assert d["ssh_password"] == row["password"] and d["domain"] == "sshtun.example.com" and d["public_key"] == "bb" * 32
+        assert "DNSTT + SSH" in e["copy"] and acct in e["copy"] and row["password"] in e["copy"] and "uuid" not in d
+        c.put("/api/dnstt", headers=h, json={"inner": "vless"})
+        e2 = next(x for x in c.get(f"/api/users/{u['id']}/configs", headers=h).json() if x["proto"] == "dnstt")
+        assert "uuid" in e2["details"] and "ssh_user" not in e2["details"]
+        c.delete(f"/api/nodes/{n1['id']}", headers=h)

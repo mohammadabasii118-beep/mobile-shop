@@ -772,12 +772,13 @@ def put_setting(db: Session, key: str, value: str) -> None:
 
 def dnstt_conf(db: Session) -> dict:
     return {"domain": get_setting(db, "dnstt_domain"), "zone": get_setting(db, "dnstt_zone"),
-            "token": get_setting(db, "dnstt_cf_token"), "priv": get_setting(db, "dnstt_priv"), "pub": get_setting(db, "dnstt_pub")}
+            "token": get_setting(db, "dnstt_cf_token"), "priv": get_setting(db, "dnstt_priv"), "pub": get_setting(db, "dnstt_pub"),
+            "inner": get_setting(db, "dnstt_inner") or "ssh"}
 
 
 def dnstt_info(db: Session) -> dict | None:
     c = dnstt_conf(db)
-    return {"domain": c["domain"], "pub": c["pub"]} if c["domain"] and c["pub"] else None
+    return {"domain": c["domain"], "pub": c["pub"], "inner": c["inner"]} if c["domain"] and c["pub"] else None
 
 
 def dnstt_nodes(db: Session) -> list[dict]:
@@ -809,13 +810,15 @@ def dnstt_out(db: Session) -> dict:
     except ValueError:
         last = {}
     return {"domain": c["domain"], "zone": c["zone"], "token_set": bool(c["token"]), "token_hint": c["token"][-4:] if c["token"] else "",
-            "pubkey": c["pub"], "nodes": dnstt_nodes(db), "last_sync": last}
+            "pubkey": c["pub"], "inner": c["inner"], "nodes": dnstt_nodes(db), "last_sync": last}
 
 
 class DnsttIn(BaseModel):
-    domain: str = Field(default="", pattern=r"^(([A-Za-z0-9\-]+\.)+[A-Za-z]{2,})?$")
-    zone: str = Field(default="", pattern=r"^(([A-Za-z0-9\-]+\.)+[A-Za-z]{2,})?$")
-    cf_token: str | None = Field(default=None, max_length=200, pattern=r"^[A-Za-z0-9_\-]*$")   # None = keep, "" = remove
+    """Every field is optional: what is left out keeps its value."""
+    domain: str | None = Field(default=None, pattern=r"^(([A-Za-z0-9\-]+\.)+[A-Za-z]{2,})?$")
+    zone: str | None = Field(default=None, pattern=r"^(([A-Za-z0-9\-]+\.)+[A-Za-z]{2,})?$")
+    cf_token: str | None = Field(default=None, max_length=200, pattern=r"^[A-Za-z0-9_\-]*$")   # "" = remove
+    inner: str | None = Field(default=None, pattern=r"^(ssh|vless)$")   # what runs inside the tunnel
 
 
 @app.get("/api/dnstt", dependencies=[Depends(require_admin)])
@@ -825,7 +828,9 @@ def get_dnstt(db: Session = Depends(get_db)):
 
 @app.put("/api/dnstt", dependencies=[Depends(require_admin)])
 def set_dnstt(body: DnsttIn, db: Session = Depends(get_db)):
-    domain, zone = body.domain.lower(), body.zone.lower()
+    cur = dnstt_conf(db)
+    domain = (cur["domain"] if body.domain is None else body.domain.lower())
+    zone = (cur["zone"] if body.zone is None else body.zone.lower())
     if domain and zone and not (domain == zone or domain.endswith("." + zone)):
         raise HTTPException(422, "دامنه‌ی تونل باید زیرمجموعه‌ی همان دامنه‌ی Cloudflare باشد (مثلاً t.example.com برای example.com)")
     if domain == zone and domain:
@@ -834,6 +839,8 @@ def set_dnstt(body: DnsttIn, db: Session = Depends(get_db)):
     put_setting(db, "dnstt_zone", zone)
     if body.cf_token is not None:
         put_setting(db, "dnstt_cf_token", body.cf_token)
+    if body.inner:
+        put_setting(db, "dnstt_inner", body.inner)
     db.commit()
     return dnstt_out(db)
 
@@ -1050,7 +1057,7 @@ def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db
             "node": {"name": node.name, "reality_sni": node.reality_sni or REALITY_SNI, "ss_method": SS_METHOD,
                      "ss_key": node.ss_key, "l2tp_psk": node.l2tp_psk},
             "protocols": enabled, "users": users,
-            "dnstt": ({"domain": dc["domain"], "privkey": dc["priv"]} if "dnstt" in enabled and dc["domain"] else None)}
+            "dnstt": ({"domain": dc["domain"], "privkey": dc["priv"], "inner": dc["inner"]} if "dnstt" in enabled and dc["domain"] else None)}
 
 
 class Report(BaseModel):

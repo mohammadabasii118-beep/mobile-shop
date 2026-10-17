@@ -41,7 +41,7 @@ def render_xray(cfg, reality, tls, busy=frozenset()):
             inbounds.append({"tag": proto, "port": ports[proto], "protocol": protocol,
                              "settings": {"clients": clients, **settings}, "streamSettings": stream})
 
-    if cfg.get("dnstt") and users_for(cfg, "dnstt"):
+    if cfg.get("dnstt") and cfg["dnstt"].get("inner", "ssh") == "vless" and users_for(cfg, "dnstt"):
         # DNSTT hands every tunnelled stream to this loopback-only inbound, which tells the users apart (and meters them)
         inbounds.append({"tag": "dnstt", "listen": "127.0.0.1", "port": DNSTT_UPSTREAM_PORT, "protocol": "vless",
                          "settings": {"clients": [{"id": u["uuid"], "email": u["name"]} for u in users_for(cfg, "dnstt")],
@@ -583,13 +583,160 @@ echo "dnstt-server installed"
 """
 
 
-def dnstt_unit(port, domain, key=DNSTT_KEY):
+# ---------- DNSTT inner protocol "ssh": what NetMod's "DNSTT + SSH" speaks ----------
+SSH_PORT = 2222                 # loopback-only sshd that dnstt-server forwards to
+SSH_GROUP = "vpnssh"
+SSH_PREFIX = "vs_"              # only accounts with this prefix, in our group, are ever created or removed
+SSHD_CONF = f"{STATE_DIR}/sshd_config"
+SSHD_UNIT = "/etc/systemd/system/vpn-node-sshd.service"
+SSH_HOST_KEY = f"{STATE_DIR}/ssh_host_ed25519_key"
+SSH_STATE = f"{STATE_DIR}/ssh-users.json"
+
+
+def ssh_username(name):
+    """Panel user name -> Linux account name. Plain when it is already a safe lowercase name, otherwise sanitised with a
+    hash so that two different panel names can never share an account. Mirrored in panel/app/subscription.py."""
+    import re
+    base = re.sub(r"[^a-z0-9_-]", "_", name.lower())
+    if base == name and len(SSH_PREFIX + base) <= 32:
+        return SSH_PREFIX + base
+    return (SSH_PREFIX + base[:20] + "_" + hashlib.sha256(name.encode()).hexdigest()[:8])[:32]
+
+
+def plan_ssh_users(existing, state, wanted):
+    """existing: our account names now; state: {account: sha256(password) we set}; wanted: {account: password}.
+    -> (add, update, remove). Nothing outside the prefix is ever removed."""
+    digest = lambda p: hashlib.sha256(p.encode()).hexdigest()
+    add = sorted(u for u in wanted if u not in existing)
+    update = sorted(u for u in wanted if u in existing and state.get(u) != digest(wanted[u]))
+    remove = sorted(u for u in existing if u not in wanted and u.startswith(SSH_PREFIX))
+    return add, update, remove
+
+
+def sshd_config(port=SSH_PORT):
+    return f"""# managed by the node agent
+Port {port}
+ListenAddress 127.0.0.1
+HostKey {SSH_HOST_KEY}
+PidFile /run/vpn-node-sshd.pid
+AllowGroups {SSH_GROUP}
+PasswordAuthentication yes
+KbdInteractiveAuthentication no
+PubkeyAuthentication no
+PermitRootLogin no
+PermitEmptyPasswords no
+UsePAM yes
+AllowTcpForwarding yes
+AllowAgentForwarding no
+X11Forwarding no
+PermitTTY no
+ForceCommand /bin/false
+ClientAliveInterval 30
+ClientAliveCountMax 4
+LoginGraceTime 30
+MaxAuthTries 4
+MaxStartups 100:30:200
+MaxSessions 20
+UseDNS no
+PrintMotd no
+"""
+
+
+SSHD_UNIT_TEXT = f"""[Unit]
+Description=Loopback SSH for the DNS tunnel
+After=network.target
+
+[Service]
+ExecStartPre=/usr/sbin/sshd -t -f {SSHD_CONF}
+ExecStart=/usr/sbin/sshd -D -e -f {SSHD_CONF}
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+
+def sh_input(cmd, text):
+    return subprocess.run(cmd, input=text, capture_output=True, text=True)
+
+
+def ssh_accounts():
+    """Names of the accounts this agent created: prefix + primary group vpnssh + our comment."""
+    gid = (sh("getent", "group", SSH_GROUP).stdout.strip().split(":") + ["", "", ""])[2]
+    out = set()
+    for line in sh("getent", "passwd").stdout.splitlines():
+        f = line.split(":")
+        if len(f) >= 5 and f[0].startswith(SSH_PREFIX) and f[3] == gid and f[4] == "vpn-node":
+            out.add(f[0])
+    return out
+
+
+def apply_ssh_users(cfg, errors):
+    wanted = {ssh_username(u["name"]): u["password"] for u in users_for(cfg, "dnstt")}
+    state = load_json(SSH_STATE, {}) or {}
+    existing = ssh_accounts()
+    add, update, remove = plan_ssh_users(existing, state, wanted)
+    for name in add:
+        r = sh("useradd", "-M", "-N", "-g", SSH_GROUP, "-s", "/usr/sbin/nologin", "-c", "vpn-node", name)
+        if r.returncode != 0:
+            errors.append(f"ssh account {name}: " + (r.stderr or r.stdout).strip()[-120:])
+            wanted.pop(name, None)
+    for name in add + update:
+        if name in wanted:
+            r = sh_input(["chpasswd", "-e"], f"{name}:{crypt_hash(wanted[name])}\n")
+            if r.returncode != 0:
+                errors.append(f"ssh password {name}: " + (r.stderr or r.stdout).strip()[-120:])
+                wanted.pop(name, None)
+    for name in remove:
+        sh("pkill", "-KILL", "-u", name)   # an expired or disabled user is cut off now, not at the next login
+        sh("userdel", name)
+    new_state = {n: hashlib.sha256(p.encode()).hexdigest() for n, p in wanted.items()}
+    if new_state != state:
+        os.makedirs(STATE_DIR, exist_ok=True)
+        write_if_changed(SSH_STATE, json.dumps(new_state), 0o600)
+
+
+def apply_ssh(cfg, errors):
+    """Run the loopback sshd and keep its accounts in step with the panel's users (inner protocol "ssh")."""
+    import shutil
+    if not shutil.which("sshd") and not os.path.exists("/usr/sbin/sshd"):
+        sh("apt-get", "install", "-y", "openssh-server")
+    if sh("getent", "group", SSH_GROUP).returncode != 0:
+        sh("groupadd", "-f", SSH_GROUP)
+    if not os.path.exists(SSH_HOST_KEY):
+        sh("ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", SSH_HOST_KEY)
+    changed = write_if_changed(SSHD_CONF, sshd_config(), 0o600)
+    if write_if_changed(SSHD_UNIT, SSHD_UNIT_TEXT, 0o644):
+        sh("systemctl", "daemon-reload")
+        sh("systemctl", "enable", "vpn-node-sshd")
+        changed = True
+    if changed or sh("systemctl", "is-active", "vpn-node-sshd").stdout.strip() != "active":
+        restart("vpn-node-sshd")
+    apply_ssh_users(cfg, errors)
+    if sh("systemctl", "is-active", "vpn-node-sshd").stdout.strip() != "active":
+        last = (sh("journalctl", "-u", "vpn-node-sshd", "-n", "1", "--no-pager", "-o", "cat").stdout or "").strip()
+        errors.append("ssh for the dns tunnel is not running: " + last[-140:])
+
+
+def remove_ssh(errors):
+    """Switched back to the VLESS inner protocol (or DNSTT is off): stop the loopback sshd and drop our accounts."""
+    if not os.path.exists(SSHD_UNIT):
+        return
+    sh("systemctl", "disable", "--now", "vpn-node-sshd")
+    for name in ssh_accounts():
+        sh("pkill", "-KILL", "-u", name)
+        sh("userdel", name)
+    write_if_changed(SSH_STATE, "{}", 0o600)
+
+
+def dnstt_unit(port, domain, key=DNSTT_KEY, upstream=None):
     return f"""[Unit]
 Description=DNSTT server
 After=network-online.target
 
 [Service]
-ExecStart={DNSTT_BIN} -udp :{port} -privkey-file {key} {domain} 127.0.0.1:{DNSTT_UPSTREAM_PORT}
+ExecStart={DNSTT_BIN} -udp :{port} -privkey-file {key} {domain} 127.0.0.1:{upstream or DNSTT_UPSTREAM_PORT}
 Restart=always
 RestartSec=3
 NoNewPrivileges=true
@@ -663,6 +810,7 @@ def apply_dnstt(cfg, errors, udp_busy=frozenset()):
         if os.path.exists(DNSTT_UNIT):   # it was set up here before: undo it
             sh("systemctl", "disable", "--now", "dnstt-server")
             ensure_dnstt_redirect(None)
+        remove_ssh(errors)
         return {}
     if port in udp_busy:
         return {}   # reported as a port conflict
@@ -678,7 +826,13 @@ def apply_dnstt(cfg, errors, udp_busy=frozenset()):
             return {}
     if not d.get("privkey") and os.path.exists(DNSTT_PUB):
         out = {"dnstt_priv": read_text(DNSTT_KEY).strip(), "dnstt_pub": read_text(DNSTT_PUB).strip()}
-    if write_if_changed(DNSTT_UNIT, dnstt_unit(port, d["domain"]), 0o644):
+    inner = d.get("inner", "ssh")
+    if inner == "ssh":
+        apply_ssh(cfg, errors)
+    else:
+        remove_ssh(errors)
+    upstream = SSH_PORT if inner == "ssh" else DNSTT_UPSTREAM_PORT
+    if write_if_changed(DNSTT_UNIT, dnstt_unit(port, d["domain"], upstream=upstream), 0o644):
         sh("systemctl", "daemon-reload")
         sh("systemctl", "enable", "dnstt-server")
     restart_on_config_change("dnstt-server", [DNSTT_UNIT, DNSTT_KEY])

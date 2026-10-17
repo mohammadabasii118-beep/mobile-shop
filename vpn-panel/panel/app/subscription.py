@@ -135,6 +135,17 @@ def build_entry(user: User, node: Node, proto: str, port: int, cdn: bool = False
 
 
 DNSTT_CLIENT_PORT = 7000
+SSH_PREFIX = "vs_"
+
+
+def ssh_username(name: str) -> str:
+    """Linux account the node creates for a panel user (the same rule as agent.ssh_username)."""
+    import hashlib
+    import re
+    base = re.sub(r"[^a-z0-9_-]", "_", name.lower())
+    if base == name and len(SSH_PREFIX + base) <= 32:
+        return SSH_PREFIX + base
+    return (SSH_PREFIX + base[:20] + "_" + hashlib.sha256(name.encode()).hexdigest()[:8])[:32]
 
 
 def dnstt_entry(user: User, node: Node, info: dict) -> dict:
@@ -142,6 +153,19 @@ def dnstt_entry(user: User, node: Node, info: dict) -> dict:
     node, because all of them answer for the same tunnel domain."""
     e = {"node": "همه‌ی لوکیشن‌ها", "node_id": node.id, "cc": "DNS", "proto": "dnstt", "label": PROTOCOLS["dnstt"]["label"],
          "link": None, "details": None, "summary": None, "copy": None, "file_ext": None}
+    if info.get("inner", "ssh") == "ssh":
+        acct = ssh_username(user.name)
+        text = (f"# NetMod ← پروتکل «DNSTT + SSH»\n"
+                f"Nameserver (دامنه‌ی تونل): {info['domain']}\n"
+                f"Public key: {info['pub']}\n"
+                f"DNS: 8.8.8.8 (یا DNS اپراتور شما)\n"
+                f"SSH username: {acct}\n"
+                f"SSH password: {user.password}\n"
+                f"# آدرس و پورت SSH هر چه اپ خواست مهم نیست (مثلاً 127.0.0.1 و 22)؛ تونل همیشه به SSH خود سرور می‌رسد.")
+        _manual(e, {"domain": info["domain"], "public_key": info["pub"], "dns": "8.8.8.8", "ssh_user": acct,
+                    "ssh_password": user.password}, text)
+        e["summary"] = f"{info['domain']} | {acct} | {user.password} | کلید عمومی در جزئیات"
+        return e
     text = (f"# 1) dnstt-client را اجرا کنید (هر DNS بازگشتی که در دسترس شماست؛ یا DoH):\n"
             f"dnstt-client -udp 8.8.8.8:53 -pubkey {info['pub']} {info['domain']} 127.0.0.1:{DNSTT_CLIENT_PORT}\n"
             f"# یا: dnstt-client -doh https://dns.google/dns-query -pubkey {info['pub']} {info['domain']} 127.0.0.1:{DNSTT_CLIENT_PORT}\n"

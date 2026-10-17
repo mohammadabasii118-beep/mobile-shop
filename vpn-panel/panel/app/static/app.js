@@ -202,7 +202,10 @@ function dnsttPanel() {
     <div class="form" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
       <label class="f">دامنه‌ی اصلی در Cloudflare<input type="text" id="dtZone" value="${esc(d.zone)}" placeholder="example.com" dir="ltr"></label>
       <label class="f">دامنه‌ی تونل (ساب‌دامین)<input type="text" id="dtDomain" value="${esc(d.domain)}" placeholder="t.example.com" dir="ltr"></label>
+      <label class="f">پروتکل داخل تونل
+        <select id="dtInner"><option value="ssh" ${d.inner === 'ssh' ? 'selected' : ''}>SSH (برای NetMod: «DNSTT + SSH»)</option><option value="vless" ${d.inner === 'vless' ? 'selected' : ''}>VLESS (برای dnstt-client + v2rayNG یا v2rayN)</option></select></label>
       <label class="f">توکن Cloudflare ${d.token_set ? `<span class="muted">(ذخیره شده، …${esc(d.token_hint)}؛ خالی = بدون تغییر)</span>` : ''}<input type="password" id="dtToken" autocomplete="off" dir="ltr"></label></div>
+    ${d.inner === 'ssh' ? '<div class="note">در حالت SSH هر کاربر یک حساب SSH جدا روی نود می‌گیرد (نام کاربری و رمز در «کانفیگ‌ها»ی کاربر). کاربر منقضی یا غیرفعال ظرف ۳۰ ثانیه قطع می‌شود، ولی <b>حجم مصرفی در این حالت شمرده نمی‌شود</b>. اگر حجم برایتان مهم است، حالت VLESS را بگذارید.</div>' : ''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"><button class="btn pri" id="dtSave">ذخیره</button><button class="btn" id="dtSync">همگام‌سازی DNS</button>
       ${d.token_set ? '<button class="btn danger" id="dtClear">حذف توکن</button>' : ''}</div>
     ${ls.error ? `<div class="note" style="color:var(--bad)">آخرین همگام‌سازی ناموفق بود: ${esc(ls.error)}</div>` : ''}
@@ -435,7 +438,7 @@ document.addEventListener('click', async e => {
     else if (d.delnode) { await api('DELETE', '/nodes/' + d.delnode); closeModal(); await refresh(); toast('لوکیشن حذف شد'); }
     else if (t.id === 'addUser') userForm();
     else if (t.id === 'dtSave' || t.id === 'dtClear') {
-      const body = {domain: $('#dtDomain').value.trim(), zone: $('#dtZone').value.trim()}, tok = $('#dtToken').value.trim();
+      const body = {domain: $('#dtDomain').value.trim(), zone: $('#dtZone').value.trim(), inner: $('#dtInner').value}, tok = $('#dtToken').value.trim();
       if (t.id === 'dtClear') body.cf_token = ''; else if (tok) body.cf_token = tok;
       S.dnstt = await api('PUT', '/dnstt', body); render(); toast('ذخیره شد');
     }
