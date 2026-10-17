@@ -80,6 +80,20 @@ class NodeProtocol(Base):
     host: Mapped[str] = mapped_column(default="")   # address in this protocol's links; empty = the node address
 
 
+class Admin(Base):
+    """A sub-admin (reseller): signs in with their own name and password and can only create and view their own users."""
+    __tablename__ = "admins"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(unique=True)
+    pw_hash: Mapped[str]
+    enabled: Mapped[bool] = mapped_column(default=True)
+    max_users: Mapped[int] = mapped_column(default=0)          # 0 = no cap
+    max_quota_gb: Mapped[float] = mapped_column(default=0)     # per user; 0 = no cap
+    max_days: Mapped[int] = mapped_column(default=0)           # per user; 0 = no cap
+    token_ver: Mapped[int] = mapped_column(default=0)          # bumped on password change: older sessions die
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
 class User(Base):
     __tablename__ = "users"
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -95,6 +109,7 @@ class User(Base):
     enabled: Mapped[bool] = mapped_column(default=True)
     protos: Mapped[list] = mapped_column(JSON, default=list)
     node_ids: Mapped[list] = mapped_column(JSON, default=list)  # empty = all nodes
+    owner_id: Mapped[int | None] = mapped_column(default=None)  # sub-admin that created the user; None = main admin
 
     def status(self) -> str:
         if not self.enabled:

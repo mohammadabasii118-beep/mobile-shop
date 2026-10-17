@@ -1,7 +1,7 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: ''};
-const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', routing: 'مسیریابی', users: 'کاربران'};
+const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: []};
+const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', routing: 'مسیریابی', users: 'کاربران', admins: 'ادمین‌ها'};
 const STATUS = {active: ['good', 'فعال'], disabled: ['bad', 'غیرفعال'], expired: ['bad', 'منقضی'], quota: ['bad', 'حجم تمام شده']};
 
 const ICO = {
@@ -12,6 +12,7 @@ const ICO = {
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
   pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
   trophy: '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>',
+  admin: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><circle cx="12" cy="10" r="2.5"/><path d="M7.5 17c.8-2 2.6-3 4.5-3s3.7 1 4.5 3"/>',
   pie: '<path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10Z"/>',
 };
 const ic = n => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICO[n]}</svg>`;
@@ -38,17 +39,25 @@ const fmtGB = v => v.toLocaleString('en', {maximumFractionDigits: 2});
 
 function showLogin() {
   openModal(`<div class="login"><span class="logo">${ic('shield')}</span><h2>پنل چندلوکیشن</h2><span class="muted">برای ادامه رمز مدیر را وارد کنید</span></div>
+    <label class="f">نام کاربری <span class="muted">(مدیر اصلی خالی بگذارد)</span><input type="text" id="un" autocomplete="username" dir="ltr"></label>
     <label class="f">رمز<input type="password" id="pw" autocomplete="current-password"></label>
     <button class="btn pri" id="doLogin" style="justify-content:center">ورود</button>`);
   $('#pw').focus();
 }
 
 async function refresh() {
-  [S.nodes, S.users, S.protos] = await Promise.all([api('GET', '/nodes'), api('GET', '/users'), api('GET', '/protocols')]);
+  S.me = await api('GET', '/me');
+  if (S.me.role === 'reseller') {   // a sub-admin sees only their own users
+    const [users, opts] = await Promise.all([api('GET', '/me/users'), api('GET', '/me/options')]);
+    S.users = users; S.nodes = opts.nodes; S.protos = opts.protocols; S.admins = []; S.tab = 'users';
+  } else {
+    [S.nodes, S.users, S.protos, S.admins] = await Promise.all([api('GET', '/nodes'), api('GET', '/users'), api('GET', '/protocols'), api('GET', '/admins')]);
+  }
   const ids = new Set(S.users.map(u => u.id));
   S.sel = new Set([...S.sel].filter(i => ids.has(i)));   // a deleted user cannot stay selected
   render();
 }
+const isReseller = () => S.me.role === 'reseller';
 
 const views = {
   dash() {
@@ -118,22 +127,34 @@ const views = {
         </tbody></table></div></div>`;
   },
   users() {
-    const q = S.q.trim().toLowerCase(), rows = S.users.filter(u => !q || u.name.toLowerCase().includes(q));
+    const q = S.q.trim().toLowerCase(), rows = S.users.filter(u => !q || u.name.toLowerCase().includes(q)), rs = isReseller();
     const allOn = rows.length && rows.every(u => S.sel.has(u.id));
-    const bar = S.sel.size ? `<div class="panel" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${S.sel.size} کاربر انتخاب شده</b>
+    const owner = u => u.owner_id ? ((S.admins.find(a => a.id === u.owner_id) || {}).username || '؟') : '';
+    const bar = !rs && S.sel.size ? `<div class="panel" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${S.sel.size} کاربر انتخاب شده</b>
       <button class="btn sm" id="bulkBtn">افزودن پروتکل / لوکیشن…</button>
       <button class="btn sm" id="bulkDel" style="color:var(--bad)">حذف انتخاب‌شده‌ها</button>
       <button class="btn sm" id="selClear">لغو انتخاب</button></div>` : '';
-    return `<div class="panel" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="search" id="uq" placeholder="جست‌وجوی نام کاربر…" value="${esc(S.q)}" style="max-width:260px" dir="ltr">
+    const limits = rs ? `<div class="note">شما ${S.me.users} کاربر ساخته‌اید${S.me.max_users ? ` از حداکثر ${S.me.max_users}` : ''}.
+      ${S.me.max_quota_gb ? ` حجم هر کاربر تا ${S.me.max_quota_gb} گیگابایت.` : ''}${S.me.max_days ? ` مدت هر کاربر تا ${S.me.max_days} روز.` : ''}</div>` : '';
+    return `${limits}<div class="panel" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="search" id="uq" placeholder="جست‌وجوی نام کاربر…" value="${esc(S.q)}" style="max-width:260px" dir="ltr">
         <span class="muted">${rows.length} از ${S.users.length} کاربر</span></div>${bar}
-      <div class="panel scroll"><table><thead><tr><th><input type="checkbox" id="selAll" ${allOn ? 'checked' : ''} aria-label="انتخاب همه‌ی نتیجه‌ها"></th><th>کاربر</th><th>مصرف</th><th>انقضا</th><th>پروتکل‌ها</th><th>وضعیت</th><th></th></tr></thead><tbody>
+      <div class="panel scroll"><table><thead><tr>${rs ? '' : `<th><input type="checkbox" id="selAll" ${allOn ? 'checked' : ''} aria-label="انتخاب همه‌ی نتیجه‌ها"></th>`}<th>کاربر</th><th>مصرف</th><th>انقضا</th><th>پروتکل‌ها</th><th>وضعیت</th>${rs || !S.admins.length ? '' : '<th>ساخته‌شده توسط</th>'}<th></th></tr></thead><tbody>
       ${rows.map(u => { const pc = u.quota_gb ? Math.min(100, u.used_gb / u.quota_gb * 100) : 0; const st = STATUS[u.status];
-        return `<tr><td><input type="checkbox" data-sel="${u.id}" ${S.sel.has(u.id) ? 'checked' : ''} aria-label="انتخاب ${esc(u.name)}"></td><td><div class="who"><span class="av">${esc(u.name.replace(/^[^A-Za-z0-9]+/, '').charAt(0) || '?')}</span><span class="mono">${esc(u.name)}</span></div></td>
+        return `<tr>${rs ? '' : `<td><input type="checkbox" data-sel="${u.id}" ${S.sel.has(u.id) ? 'checked' : ''} aria-label="انتخاب ${esc(u.name)}"></td>`}<td><div class="who"><span class="av">${esc(u.name.replace(/^[^A-Za-z0-9]+/, '').charAt(0) || '?')}</span><span class="mono">${esc(u.name)}</span></div></td>
         <td><div style="display:flex;gap:8px;align-items:center"><div class="bar"><i class="${loadCls(pc)}" style="width:${pc}%"></i></div><span class="muted">${num(fmtGB(u.used_gb) + ' / ' + (u.quota_gb ? fmtGB(u.quota_gb) : '∞') + ' GB')}</span></div></td>
         <td>${u.days_left === null ? 'نامحدود' : u.days_left + ' روز'}</td><td class="pc">${u.protos.map(p => `<span class="cc">${esc(protoLabel(p))}</span>`).join('')}</td>
-        <td><span class="pill ${st[0]}">${st[1]}</span></td>
-        <td><div class="chips" style="flex-wrap:nowrap"><button class="btn sm" data-copy="${esc(u.sub_url)}">کپی لینک</button><button class="btn sm" data-cfg="${u.id}">کانفیگ‌ها</button><button class="btn sm" data-edit="${u.id}">ویرایش</button><button class="btn sm" data-toggle="${u.id}">${u.enabled ? 'غیرفعال' : 'فعال'}</button><button class="btn sm danger" data-deluser="${u.id}">حذف</button></div></td></tr>`; }).join('')
-        || '<tr><td colspan="7" class="muted">کاربری وجود ندارد.</td></tr>'}</tbody></table></div>`;
+        <td><span class="pill ${st[0]}">${st[1]}</span></td>${rs || !S.admins.length ? '' : `<td>${owner(u) ? `<span class="pill acc">${esc(owner(u))}</span>` : '<span class="muted">مدیر اصلی</span>'}</td>`}
+        <td><div class="chips" style="flex-wrap:nowrap"><button class="btn sm" data-copy="${esc(u.sub_url)}">کپی لینک</button><button class="btn sm" data-cfg="${u.id}">کانفیگ‌ها</button>${rs ? '' : `<button class="btn sm" data-edit="${u.id}">ویرایش</button><button class="btn sm" data-toggle="${u.id}">${u.enabled ? 'غیرفعال' : 'فعال'}</button><button class="btn sm danger" data-deluser="${u.id}">حذف</button>`}</div></td></tr>`; }).join('')
+        || `<tr><td colspan="8" class="muted">کاربری وجود ندارد.</td></tr>`}</tbody></table></div>`;
+  },
+  admins() {
+    const pill = a => a.enabled ? '<span class="pill good">فعال</span>' : '<span class="pill bad">غیرفعال</span>';
+    return `<div class="note">ادمین فرعی (همکار) با نام کاربری و رمز خودش وارد می‌شود و <b>فقط می‌تواند کاربر بسازد</b> و کاربران خودش را ببیند و لینک و کانفیگشان را بردارد. به لوکیشن‌ها، تنظیمات و کاربران دیگران دسترسی ندارد.</div>
+      <div class="panel scroll"><table><thead><tr><th>نام کاربری</th><th>کاربران</th><th>حداکثر حجم هر کاربر</th><th>حداکثر مدت</th><th>وضعیت</th><th></th></tr></thead><tbody>
+      ${S.admins.map(a => `<tr><td><div class="who"><span class="av">${esc(a.username.charAt(0))}</span><span class="mono">${esc(a.username)}</span></div></td>
+        <td>${num(a.users + ' / ' + (a.max_users || '∞'))}</td><td>${a.max_quota_gb ? num(a.max_quota_gb + ' GB') : 'بدون سقف'}</td><td>${a.max_days ? a.max_days + ' روز' : 'بدون سقف'}</td><td>${pill(a)}</td>
+        <td><div class="chips" style="flex-wrap:nowrap"><button class="btn sm" data-editadmin="${a.id}">ویرایش</button><button class="btn sm" data-toggleadmin="${a.id}">${a.enabled ? 'غیرفعال' : 'فعال'}</button><button class="btn sm danger" data-deladmin="${a.id}">حذف</button></div></td></tr>`).join('')
+        || '<tr><td colspan="6" class="muted">هنوز ادمین فرعی نساخته‌اید.</td></tr>'}</tbody></table></div>`;
   },
 };
 
@@ -155,12 +176,14 @@ function portPanel() {
 
 function render() {
   $('#title').textContent = TITLES[S.tab];
-  $('#actions').innerHTML = S.tab === 'users' ? '<button class="btn" id="bulkBtn">عملیات گروهی</button> <button class="btn pri" id="addUser">+ کاربر جدید</button>'
-    : S.tab === 'nodes' ? '<button class="btn pri" id="addNode">+ لوکیشن جدید</button>' : '';
+  document.querySelectorAll('[data-sudo]').forEach(b => b.hidden = isReseller());
+  $('#actions').innerHTML = S.tab === 'users' ? (isReseller() ? '' : '<button class="btn" id="bulkBtn">عملیات گروهی</button> ') + '<button class="btn pri" id="addUser">+ کاربر جدید</button>'
+    : S.tab === 'nodes' ? '<button class="btn pri" id="addNode">+ لوکیشن جدید</button>'
+    : S.tab === 'admins' ? '<button class="btn pri" id="addAdmin">+ ادمین جدید</button>' : '';
   const typing = document.activeElement && document.activeElement.id === 'uq' ? document.activeElement.selectionStart : null;
   $('#view').innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">${views[S.tab]()}</div>`;
   if (typing !== null && $('#uq')) { $('#uq').focus(); $('#uq').setSelectionRange(typing, typing); }
-  $('#nNodes').textContent = S.nodes.length; $('#nUsers').textContent = S.users.length;
+  $('#nNodes').textContent = S.nodes.length; $('#nUsers').textContent = S.users.length; $('#nAdmins').textContent = S.admins.length || '';
   document.querySelectorAll('nav [data-tab]').forEach(b => b.setAttribute('aria-current', b.dataset.tab === S.tab));
 }
 
@@ -278,8 +301,8 @@ function ruleDialog() {
 function userForm() {
   openModal(`<h2>کاربر جدید</h2><div class="form">
     <label class="f">نام کاربری<input type="text" id="fName" placeholder="ali_t"></label>
-    <label class="f">حجم (GB، صفر = نامحدود)<input type="number" id="fQuota" value="50" min="0"></label>
-    <label class="f">مدت (روز، صفر = نامحدود)<input type="number" id="fDays" value="30" min="0"></label></div>
+    <label class="f">حجم (GB${isReseller() && S.me.max_quota_gb ? `، حداکثر ${S.me.max_quota_gb}` : '، صفر = نامحدود'})<input type="number" id="fQuota" value="${isReseller() && S.me.max_quota_gb ? Math.min(50, S.me.max_quota_gb) : 50}" min="0" ${isReseller() && S.me.max_quota_gb ? `max="${S.me.max_quota_gb}"` : ''}></label>
+    <label class="f">مدت (روز${isReseller() && S.me.max_days ? `، حداکثر ${S.me.max_days}` : '، صفر = نامحدود'})<input type="number" id="fDays" value="${isReseller() && S.me.max_days ? Math.min(30, S.me.max_days) : 30}" min="0" ${isReseller() && S.me.max_days ? `max="${S.me.max_days}"` : ''}></label></div>
     <div><div class="muted" style="margin-bottom:6px">لوکیشن‌ها (هیچ‌کدام = همه)</div><div class="chips" id="fNodes">
       ${S.nodes.map(n => `<label><input type="checkbox" value="${n.id}">${esc(n.cc)} ${esc(n.name)}</label>`).join('')}</div></div>
     <div><div class="muted" style="margin-bottom:6px">پروتکل‌ها</div><div class="chips" id="fProtos">
@@ -287,8 +310,18 @@ function userForm() {
     <div class="note">حجم و زمان بین همه‌ی کانفیگ‌ها و لوکیشن‌های این کاربر مشترک است و با یک لینک اشتراک داده می‌شود.</div>
     <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="fSave">ساخت کاربر</button></div>`);
 }
+function adminForm(a) {
+  const n = (id, label, val, hint) => `<label class="f">${label}<input type="number" id="${id}" value="${val}" min="0" step="any"><span class="muted">${hint}</span></label>`;
+  openModal(`<h2>${a ? 'ویرایش ' + esc(a.username) : 'ادمین جدید'}</h2><div class="form">
+    ${a ? '' : '<label class="f">نام کاربری<input type="text" id="adUser" dir="ltr" placeholder="sara"></label>'}
+    <label class="f">${a ? 'رمز جدید (خالی = بدون تغییر)' : 'رمز (حداقل ۸ کاراکتر)'}<input type="text" id="adPass" dir="ltr" autocomplete="off"></label></div>
+    <div class="form">${n('adMax', 'حداکثر تعداد کاربر', a ? a.max_users : 20, 'صفر = بدون سقف')}${n('adQuota', 'حداکثر حجم هر کاربر (GB)', a ? a.max_quota_gb : 50, 'صفر = بدون سقف؛ اگر سقف بگذارید، کاربر نامحدود نمی‌سازد')}
+    ${n('adDays', 'حداکثر مدت هر کاربر (روز)', a ? a.max_days : 60, 'صفر = بدون سقف')}</div>
+    ${a ? '<div class="note">با عوض کردن رمز، ادمین از همه‌ی دستگاه‌ها خارج می‌شود.</div>' : ''}
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="adSave" ${a ? `data-id="${a.id}"` : ''}>ذخیره</button></div>`);
+}
 async function configsDialog(id) {
-  const u = S.users.find(x => x.id === id), rows = await api('GET', `/users/${id}/configs`);
+  const u = S.users.find(x => x.id === id), rows = await api('GET', `${isReseller() ? '/me' : ''}/users/${id}/configs`);
   openModal(`<h2>کانفیگ‌های <span class="mono">${esc(u.name)}</span></h2>
     <div class="link"><span style="min-width:90px">لینک اشتراک</span><code>${esc(u.sub_url)}</code><button class="btn sm" data-copy="${esc(u.sub_url)}">کپی</button></div>
     <div class="links">${rows.length ? rows.map(r => r.link
@@ -312,7 +345,7 @@ document.addEventListener('click', async e => {
     }
     else if (t.id === 'logoutBtn') { token = ''; try { localStorage.removeItem('tok'); } catch (_) {} showLogin(); }
     else if (t.id === 'doLogin') {
-      const r = await api('POST', '/login', {password: $('#pw').value}); token = r.token;
+      const r = await api('POST', '/login', {password: $('#pw').value, username: $('#un').value.trim()}); token = r.token;
       try { localStorage.setItem('tok', token); } catch (_) {}
       closeModal(); await refresh();
     }
@@ -345,9 +378,24 @@ document.addEventListener('click', async e => {
     else if (t.id === 'cfSave') { await api('PUT', `/nodes/${d.id}/cloudflare`, {cf_domain: $('#cfDomain').value.trim(), cf_address: $('#cfAddr').value.trim(), raw_host: $('#rawHost').value.trim()}); closeModal(); await refresh(); toast('ذخیره شد'); }
     else if (d.delnode) { await api('DELETE', '/nodes/' + d.delnode); closeModal(); await refresh(); toast('لوکیشن حذف شد'); }
     else if (t.id === 'addUser') userForm();
+    else if (t.id === 'addAdmin') adminForm();
+    else if (d.editadmin) adminForm(S.admins.find(x => x.id === +d.editadmin));
+    else if (t.id === 'adSave') {
+      const v = id => $('#' + id).value.trim(), body = {max_users: +v('adMax') || 0, max_quota_gb: +v('adQuota') || 0, max_days: +v('adDays') || 0};
+      if (d.id) { if (v('adPass')) body.password = v('adPass'); await api('PATCH', '/admins/' + d.id, body); }
+      else await api('POST', '/admins', {...body, username: v('adUser'), password: v('adPass')});
+      closeModal(); await refresh(); toast('ذخیره شد');
+    }
+    else if (d.toggleadmin) { const a = S.admins.find(x => x.id === +d.toggleadmin); await api('PATCH', '/admins/' + a.id, {enabled: !a.enabled}); await refresh(); }
+    else if (d.deladmin) {
+      const a = S.admins.find(x => x.id === +d.deladmin);
+      openModal(`<h2>حذف ادمین ${esc(a.username)}؟</h2><div class="note">کاربرانی که ساخته (${a.users} نفر) حذف نمی‌شوند و کار می‌کنند، فقط دیگر به هیچ ادمینی تعلق ندارند.</div>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="delAdminGo" data-id="${a.id}" style="background:var(--bad)">حذف</button></div>`);
+    }
+    else if (t.id === 'delAdminGo') { await api('DELETE', '/admins/' + d.id); closeModal(); await refresh(); toast('ادمین حذف شد'); }
     else if (t.id === 'fSave') {
       const checked = s => [...document.querySelectorAll(s + ' input:checked')].map(x => x.value);
-      const u = await api('POST', '/users', {name: $('#fName').value.trim(), quota_gb: +$('#fQuota').value || 0, days: +$('#fDays').value || 0,
+      const u = await api('POST', isReseller() ? '/me/users' : '/users', {name: $('#fName').value.trim(), quota_gb: +$('#fQuota').value || 0, days: +$('#fDays').value || 0,
         protos: checked('#fProtos'), node_ids: checked('#fNodes').map(Number)});
       await refresh(); configsDialog(u.id);
     }

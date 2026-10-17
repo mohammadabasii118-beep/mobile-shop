@@ -9,3 +9,8 @@ Keeps UUID, quota, expiry and used traffic; names that already exist are skipped
 `POST /api/users/bulk` — `{"ids":[...],"delete":false,"add_protos":[],"remove_protos":[],"node_ids":null}`: delete many users, or add/remove protocols and set locations (`[]` = every location, `null` = unchanged). The users tab has checkboxes, a search box and a bulk dialog for this.
 
 `PUT /api/nodes/{id}/protocols/{proto}/host` — `{"host":"relay.example.com"}`: domain or IP clients of that protocol connect to (empty = automatic, the node address). Only links change; TLS names and certificates keep using the node address.
+
+## Sub-admins (resellers)
+`POST /api/login` takes `{"username":"sara","password":"..."}` for a sub-admin (empty username = main admin).
+Main admin: `GET/POST /api/admins`, `PATCH/DELETE /api/admins/{id}` (`enabled`, `password`, `max_users`, `max_quota_gb`, `max_days`; 0 = no cap).
+A sub-admin session only works on `/api/me`, `/api/me/options`, `/api/me/users` (GET, POST) and `/api/me/users/{id}/configs`; everything else answers 403.

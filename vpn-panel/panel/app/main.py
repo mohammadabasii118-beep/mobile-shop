@@ -21,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .catalog import PROTOCOLS, REALITY_SNI, SS_METHOD
-from .db import Node, NodeProtocol, Outbound, Rule, User, engine, get_db, init_db, utcnow
+from .db import Admin, Node, NodeProtocol, Outbound, Rule, User, engine, get_db, init_db, utcnow
 from . import routing
 from .subpage import render_sub_page
 from .subscription import info_entries, new_wg_keypair, subscription_body, user_entries, user_ss_key, wg_ip
@@ -71,19 +71,65 @@ def _sign(payload: str) -> str:
     return hmac.new(SECRET, payload.encode(), hashlib.sha256).hexdigest()
 
 
-def make_token() -> str:
-    exp = str(int(time.time()) + 7 * 86400)
-    return f"{exp}.{_sign(exp)}"
+def make_token(admin: Admin | None = None) -> str:
+    """Signed, expiring session. Main admin: `exp`; sub-admin: `exp:r:id:ver` (ver changes with the password)."""
+    exp = int(time.time()) + 7 * 86400
+    payload = str(exp) if admin is None else f"{exp}:r:{admin.id}:{admin.token_ver}"
+    return f"{payload}.{_sign(payload)}"
+
+
+def parse_token(token: str) -> tuple[str, int, int] | None:
+    """-> (role, admin id, token version) for a valid, unexpired session; None otherwise."""
+    payload, _, sig = token.rpartition(".")
+    if not payload or not hmac.compare_digest(sig, _sign(payload)):
+        return None
+    parts = payload.split(":")
+    if not parts[0].isdigit() or int(parts[0]) < time.time():
+        return None
+    if len(parts) == 1:
+        return "sudo", 0, 0
+    if len(parts) == 4 and parts[1] == "r" and parts[2].isdigit() and parts[3].isdigit():
+        return "reseller", int(parts[2]), int(parts[3])
+    return None
+
+
+def _bearer(authorization: str | None) -> str:
+    return (authorization or "").removeprefix("Bearer ").strip()
+
+
+def _is_api_key(token: str) -> bool:
+    key = os.environ.get("PANEL_API_KEY", "")
+    return len(key) >= 24 and hmac.compare_digest(token, key)   # long-lived key for bots and scripts
 
 
 def require_admin(authorization: str | None = Header(None)) -> None:
-    token = (authorization or "").removeprefix("Bearer ").strip()
-    key = os.environ.get("PANEL_API_KEY", "")
-    if len(key) >= 24 and hmac.compare_digest(token, key):  # long-lived key for bots and scripts
+    """Main admin only. A sub-admin's valid session is 403 (not 401, which would send them to the login box)."""
+    token = _bearer(authorization)
+    if _is_api_key(token):
         return
-    exp, _, sig = token.partition(".")
-    if not exp.isdigit() or not hmac.compare_digest(sig, _sign(exp)) or int(exp) < time.time():
+    parsed = parse_token(token)
+    if not parsed:
         raise HTTPException(401, "نشست نامعتبر است")
+    if parsed[0] != "sudo":
+        raise HTTPException(403, "این بخش مخصوص مدیر اصلی است")
+
+
+def hash_pw(pw: str) -> str:
+    salt = secrets.token_hex(8)
+    return f"{salt}${hashlib.pbkdf2_hmac('sha256', pw.encode(), salt.encode(), 200_000).hex()}"
+
+
+def check_pw(pw: str, stored: str) -> bool:
+    salt, _, digest = stored.partition("$")
+    return hmac.compare_digest(hashlib.pbkdf2_hmac("sha256", pw.encode(), salt.encode(), 200_000).hex(), digest)
+
+
+def require_reseller(authorization: str | None = Header(None), db: Session = Depends(get_db)) -> Admin:
+    parsed = parse_token(_bearer(authorization))
+    admin = db.get(Admin, parsed[1]) if parsed and parsed[0] == "reseller" else None
+    if not admin or not admin.enabled or admin.token_ver != parsed[2]:
+        raise HTTPException(401, "نشست نامعتبر است")
+    return admin
 
 
 def require_node(authorization: str | None = Header(None), db: Session = Depends(get_db)) -> Node:
@@ -96,6 +142,7 @@ def require_node(authorization: str | None = Header(None), db: Session = Depends
 
 class Login(BaseModel):
     password: str
+    username: str = ""   # empty = the main admin
 
 
 LOGIN_MAX_FAILS, LOGIN_WINDOW = 5, 900
@@ -109,19 +156,26 @@ def client_ip(request: Request) -> str:
 
 
 @app.post("/api/login")
-def login(body: Login, request: Request):
+def login(body: Login, request: Request, db: Session = Depends(get_db)):
     ip, now = client_ip(request), time.time()
     recent = [t for t in _login_fails.get(ip, []) if now - t < LOGIN_WINDOW]
     if len(recent) >= LOGIN_MAX_FAILS:
         raise HTTPException(429, "تلاش‌های اشتباه زیاد بود؛ ۱۵ دقیقه بعد دوباره امتحان کنید")
-    if not hmac.compare_digest(body.password, admin_password()):
+    admin = db.scalar(select(Admin).where(Admin.username == body.username.strip())) if body.username.strip() else None
+    if body.username.strip():
+        ok = bool(admin and admin.enabled and check_pw(body.password, admin.pw_hash))
+        if not admin:
+            check_pw(body.password, "00$00")   # same cost whether or not the name exists
+    else:
+        ok = hmac.compare_digest(body.password, admin_password())
+    if not ok:
         if len(_login_fails) > 10000:  # bound memory
             _login_fails.clear()
         _login_fails[ip] = recent + [now]
         time.sleep(1)  # slow down guessing
-        raise HTTPException(401, "رمز اشتباه است")
+        raise HTTPException(401, "نام کاربری یا رمز اشتباه است" if body.username.strip() else "رمز اشتباه است")
     _login_fails.pop(ip, None)
-    return {"token": make_token()}
+    return {"token": make_token(admin if body.username.strip() else None), "role": "reseller" if body.username.strip() else "sudo"}
 
 
 @app.get("/api/backup", dependencies=[Depends(require_admin)])
@@ -175,7 +229,7 @@ def user_out(user: User, request: Request) -> dict:
     return {
         "id": user.id, "name": user.name, "status": user.status(), "enabled": user.enabled,
         "used_gb": round(user.used_bytes / GB, 2), "quota_gb": round(user.quota_bytes / GB, 2),
-        "days_left": days_left, "expire_at": user.expire_at.isoformat() + "Z" if user.expire_at else None, "protos": user.protos, "node_ids": user.node_ids,
+        "days_left": days_left, "expire_at": user.expire_at.isoformat() + "Z" if user.expire_at else None, "protos": user.protos, "node_ids": user.node_ids, "owner_id": user.owner_id,
         "sub_url": f"{public_url(request)}/sub/{user.sub_token}",
     }
 
@@ -474,8 +528,7 @@ def list_users(request: Request, db: Session = Depends(get_db)):
     return [user_out(u, request) for u in db.scalars(select(User).order_by(User.id.desc()))]
 
 
-@app.post("/api/users", dependencies=[Depends(require_admin)])
-def create_user(body: UserIn, request: Request, db: Session = Depends(get_db)):
+def new_user(db: Session, body: "UserIn", owner: Admin | None = None) -> User:
     if bad := [p for p in body.protos if p not in PROTOCOLS]:
         raise HTTPException(422, f"پروتکل ناشناخته: {bad[0]}")
     if db.scalar(select(User).where(User.name == body.name)):
@@ -483,11 +536,16 @@ def create_user(body: UserIn, request: Request, db: Session = Depends(get_db)):
     user = User(name=body.name, sub_token=secrets.token_urlsafe(16), uuid=str(uuidlib.uuid4()),
                 password=secrets.token_urlsafe(12), quota_bytes=int(body.quota_gb * GB),
                 expire_at=utcnow() + timedelta(days=body.days) if body.days else None,
-                protos=body.protos, node_ids=body.node_ids)
+                protos=body.protos, node_ids=body.node_ids, owner_id=owner.id if owner else None)
     user.wg_private, user.wg_public = new_wg_keypair()
     db.add(user)
     db.commit()
-    return user_out(user, request)
+    return user
+
+
+@app.post("/api/users", dependencies=[Depends(require_admin)])
+def create_user(body: UserIn, request: Request, db: Session = Depends(get_db)):
+    return user_out(new_user(db, body), request)
 
 
 class ImportClient(BaseModel):
@@ -652,6 +710,113 @@ def user_by_name(name: str, request: Request, db: Session = Depends(get_db)):
 @app.get("/api/users/{user_id}/configs", dependencies=[Depends(require_admin)])
 def user_configs(user_id: int, db: Session = Depends(get_db)):
     user = db.get(User, user_id) or _404()
+    return user_entries(user, list(db.scalars(select(Node).order_by(Node.id))))
+
+
+# ---------- sub-admins ----------
+class AdminIn(BaseModel):
+    username: str = Field(pattern=r"^[A-Za-z0-9_.\-]{3,32}$")
+    password: str = Field(min_length=8, max_length=128)
+    max_users: int = Field(ge=0, le=100000, default=0)
+    max_quota_gb: float = Field(ge=0, le=1000000, default=0)
+    max_days: int = Field(ge=0, le=3650, default=0)
+
+
+class AdminPatch(BaseModel):
+    enabled: bool | None = None
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+    max_users: int | None = Field(default=None, ge=0, le=100000)
+    max_quota_gb: float | None = Field(default=None, ge=0, le=1000000)
+    max_days: int | None = Field(default=None, ge=0, le=3650)
+
+
+def admin_out(a: Admin, db: Session) -> dict:
+    n = len(list(db.scalars(select(User.id).where(User.owner_id == a.id))))
+    return {"id": a.id, "username": a.username, "enabled": a.enabled, "max_users": a.max_users,
+            "max_quota_gb": a.max_quota_gb, "max_days": a.max_days, "users": n}
+
+
+@app.get("/api/admins", dependencies=[Depends(require_admin)])
+def list_admins(db: Session = Depends(get_db)):
+    return [admin_out(a, db) for a in db.scalars(select(Admin).order_by(Admin.id))]
+
+
+@app.post("/api/admins", dependencies=[Depends(require_admin)])
+def create_admin(body: AdminIn, db: Session = Depends(get_db)):
+    if db.scalar(select(Admin).where(Admin.username == body.username)):
+        raise HTTPException(409, "این نام کاربری ادمین وجود دارد")
+    a = Admin(username=body.username, pw_hash=hash_pw(body.password), max_users=body.max_users,
+              max_quota_gb=body.max_quota_gb, max_days=body.max_days)
+    db.add(a)
+    db.commit()
+    return admin_out(a, db)
+
+
+@app.patch("/api/admins/{admin_id}", dependencies=[Depends(require_admin)])
+def patch_admin(admin_id: int, body: AdminPatch, db: Session = Depends(get_db)):
+    a = db.get(Admin, admin_id) or _404()
+    if body.enabled is not None:
+        a.enabled = body.enabled
+    for f in ("max_users", "max_quota_gb", "max_days"):
+        if getattr(body, f) is not None:
+            setattr(a, f, getattr(body, f))
+    if body.password is not None:
+        a.pw_hash = hash_pw(body.password)
+        a.token_ver += 1   # signs the admin out everywhere
+    db.commit()
+    return admin_out(a, db)
+
+
+@app.delete("/api/admins/{admin_id}", dependencies=[Depends(require_admin)])
+def delete_admin(admin_id: int, db: Session = Depends(get_db)):
+    """The admin's users stay (they keep working); they just no longer belong to anyone."""
+    a = db.get(Admin, admin_id) or _404()
+    for u in db.scalars(select(User).where(User.owner_id == a.id)):
+        u.owner_id = None
+    db.delete(a)
+    db.commit()
+    return {"ok": True}
+
+
+# ---------- what a sub-admin may do: create users, see and open their own ----------
+@app.get("/api/me")
+def me(authorization: str | None = Header(None), db: Session = Depends(get_db)):
+    token = _bearer(authorization)
+    if _is_api_key(token) or (parse_token(token) or ("",))[0] == "sudo":
+        return {"role": "sudo"}
+    a = require_reseller(authorization, db)
+    return {"role": "reseller", "username": a.username, **{k: v for k, v in admin_out(a, db).items() if k in ("max_users", "max_quota_gb", "max_days", "users")}}
+
+
+@app.get("/api/me/options")
+def me_options(admin: Admin = Depends(require_reseller), db: Session = Depends(get_db)):
+    return {"protocols": [{"id": k, "label": v["label"], "counted": v["counted"]} for k, v in PROTOCOLS.items()],
+            "nodes": [{"id": n.id, "cc": n.cc, "name": n.name} for n in db.scalars(select(Node).order_by(Node.id))]}
+
+
+@app.get("/api/me/users")
+def me_users(request: Request, admin: Admin = Depends(require_reseller), db: Session = Depends(get_db)):
+    return [user_out(u, request) for u in db.scalars(select(User).where(User.owner_id == admin.id).order_by(User.id.desc()))]
+
+
+@app.post("/api/me/users")
+def me_create_user(body: "UserIn", request: Request, admin: Admin = Depends(require_reseller), db: Session = Depends(get_db)):
+    if admin.max_users and len(list(db.scalars(select(User.id).where(User.owner_id == admin.id)))) >= admin.max_users:
+        raise HTTPException(403, f"سقف تعداد کاربر شما ({admin.max_users}) پر شده است")
+    if admin.max_quota_gb and not 0 < body.quota_gb <= admin.max_quota_gb:
+        raise HTTPException(422, f"حجم باید بیشتر از صفر و حداکثر {admin.max_quota_gb:g} گیگابایت باشد")
+    if admin.max_days and not 0 < body.days <= admin.max_days:
+        raise HTTPException(422, f"مدت باید بیشتر از صفر و حداکثر {admin.max_days} روز باشد")
+    known = set(db.scalars(select(Node.id)))
+    body.node_ids = [i for i in body.node_ids if i in known]
+    return user_out(new_user(db, body, admin), request)
+
+
+@app.get("/api/me/users/{user_id}/configs")
+def me_user_configs(user_id: int, admin: Admin = Depends(require_reseller), db: Session = Depends(get_db)):
+    user = db.get(User, user_id)
+    if not user or user.owner_id != admin.id:
+        _404()
     return user_entries(user, list(db.scalars(select(Node).order_by(Node.id))))
 
 

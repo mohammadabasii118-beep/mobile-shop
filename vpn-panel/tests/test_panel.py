@@ -870,3 +870,46 @@ def test_agent_cpu_percent_is_measured_from_proc_stat():
     assert 0 <= first <= 100 and 0 <= m.cpu_load_percent() <= 100
     busy, total = m._cpu_times()
     assert 0 <= busy <= total
+
+
+def test_sub_admin_can_only_create_and_see_own_users():
+    with TestClient(app) as c:
+        h = admin(c)
+        c.post("/api/nodes", headers=h, json={"name": "RS", "cc": "de", "address": "8.8.1.1"})
+        a = c.post("/api/admins", headers=h, json={"username": "sara", "password": "longpass1", "max_users": 2, "max_quota_gb": 50, "max_days": 60}).json()
+        assert c.post("/api/admins", headers=h, json={"username": "sara", "password": "longpass1"}).status_code == 409
+        assert c.post("/api/login", json={"username": "sara", "password": "wrongpass"}).status_code == 401
+        r = c.post("/api/login", json={"username": "sara", "password": "longpass1"}).json()
+        assert r["role"] == "reseller"
+        sh = {"Authorization": "Bearer " + r["token"]}
+        assert c.get("/api/me", headers=sh).json()["username"] == "sara"
+        assert c.get("/api/me", headers=h).json() == {"role": "sudo"}
+        # not allowed: everything of the main admin (403, so the UI does not show the login box)
+        for path in ("/api/users", "/api/nodes", "/api/admins", "/api/backup"):
+            assert c.get(path, headers=sh).status_code == 403, path
+        assert c.post("/api/users", headers=sh, json={"name": "x1", "protos": ["vless"]}).status_code == 403
+        opts = c.get("/api/me/options", headers=sh).json()
+        assert opts["nodes"] and "vless" in {p["id"] for p in opts["protocols"]}
+        mk = lambda n, **kw: c.post("/api/me/users", headers=sh, json={"name": n, "protos": ["vless"], "quota_gb": 10, "days": 30, **kw})
+        assert mk("rs_user1").status_code == 200
+        assert mk("rs_user2", quota_gb=0).status_code == 422          # no unlimited volume under a cap
+        assert mk("rs_user2", quota_gb=51).status_code == 422
+        assert mk("rs_user2", days=90).status_code == 422
+        assert mk("rs_user2").status_code == 200
+        assert mk("rs_user3").status_code == 403                       # max_users reached
+        assert mk("rs_user1").status_code in (403, 409)
+        mine = c.get("/api/me/users", headers=sh).json()
+        assert {u["name"] for u in mine} == {"rs_user1", "rs_user2"} and all(u["owner_id"] == a["id"] for u in mine)
+        other = c.post("/api/users", headers=h, json={"name": "not_hers", "protos": ["vless"]}).json()
+        assert c.get(f"/api/me/users/{other['id']}/configs", headers=sh).status_code == 404
+        assert c.get(f"/api/me/users/{mine[0]['id']}/configs", headers=sh).status_code == 200
+        assert [x["owner_id"] for x in c.get("/api/users", headers=h).json() if x["name"] == "not_hers"] == [None]
+        # lifecycle: new password signs the old session out, disabling blocks it, deleting keeps the users
+        c.patch(f"/api/admins/{a['id']}", headers=h, json={"password": "another-pass1"})
+        assert c.get("/api/me", headers=sh).status_code == 401
+        sh = {"Authorization": "Bearer " + c.post("/api/login", json={"username": "sara", "password": "another-pass1"}).json()["token"]}
+        c.patch(f"/api/admins/{a['id']}", headers=h, json={"enabled": False})
+        assert c.get("/api/me", headers=sh).status_code == 401
+        assert c.post("/api/login", json={"username": "sara", "password": "another-pass1"}).status_code == 401
+        assert c.delete(f"/api/admins/{a['id']}", headers=h).json() == {"ok": True}
+        assert {u["name"]: u["owner_id"] for u in c.get("/api/users", headers=h).json()}["rs_user1"] is None
