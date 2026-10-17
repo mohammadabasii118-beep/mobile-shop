@@ -1220,3 +1220,13 @@ def test_dnstt_ssh_mode_is_the_default_and_gives_netmod_fields():
         e2 = next(x for x in c.get(f"/api/users/{u['id']}/configs", headers=h).json() if x["proto"] == "dnstt")
         assert "uuid" in e2["details"] and "ssh_user" not in e2["details"]
         c.delete(f"/api/nodes/{n1['id']}", headers=h)
+
+
+def test_our_own_dnstt_server_is_not_reported_as_a_port_conflict():
+    ss = ('udp UNCONN 0 0 *:5300 *:* users:(("dnstt-server",pid=1,fd=3))\n'
+          'udp UNCONN 0 0 *:5301 *:* users:(("some-other-dns",pid=2,fd=3))\n')
+    foreign = agent.foreign_listeners(ss)
+    assert ("udp", 5300) not in foreign and foreign[("udp", 5301)] == "some-other-dns"
+    # without this the agent skipped its own DNSTT setup on every pass after the first (the port looked busy)
+    _, udp_busy, notes = agent.port_conflicts({"protocols": {"dnstt": 5300}}, foreign)
+    assert udp_busy == set() and notes == []

@@ -113,7 +113,7 @@ def set_conf_value(text, key, value):
                   text, flags=re.M)
 
 
-OURS = {"xray", "sing-box", "openvpn", "ocserv", "ocserv-main", "ocserv-worker", "charon", "xl2tpd"}
+OURS = {"xray", "sing-box", "openvpn", "ocserv", "ocserv-main", "ocserv-worker", "charon", "xl2tpd", "dnstt-server"}
 TCP_PROTOS = {"vless", "vless_tcp", "vless_raw", "vless_ws", "vless_grpc", "vmess_ws", "vmess_tcp", "trojan", "trojan_ws", "ss", "anyc"}
 UDP_PROTOS = {"hy2", "tuic", "wg", "ovpn", "anyc", "dnstt"}
 
