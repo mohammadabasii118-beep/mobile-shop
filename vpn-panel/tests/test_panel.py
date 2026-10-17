@@ -1146,3 +1146,17 @@ def test_dnstt_install_script_is_valid_shell_with_fallbacks():
     assert subprocess.run(["bash", "-n", "-c", agent.DNSTT_INSTALL], capture_output=True, text=True).returncode == 0
     for needle in ("go.dev/dl", "dl.google.com/go", "mode=json", "golang-go", "bamsoftware.com/git/dnstt"):
         assert needle in agent.DNSTT_INSTALL
+
+
+def test_dnstt_test_script_helpers():
+    import importlib.util as iu, subprocess
+    sp = iu.spec_from_file_location("dnstt_test", ROOT / "agent" / "dnstt_test.py")
+    m = iu.module_from_spec(sp)
+    sp.loader.exec_module(m)
+    assert subprocess.run(["bash", "-n", "-c", m.BUILD], capture_output=True).returncode == 0
+    c = m.xray_client_config("u-1", 7001, 7002)
+    ob = c["outbounds"][0]["settings"]["vnext"][0]
+    assert ob["address"] == "127.0.0.1" and ob["port"] == 7001 and ob["users"][0]["id"] == "u-1"      # VLESS only to the local dnstt-client
+    assert c["inbounds"][0]["listen"] == "127.0.0.1" and c["inbounds"][0]["port"] == 7002
+    assert m.default_resolver("search x\nnameserver ::1\nnameserver 10.1.2.3\n") == "10.1.2.3"
+    assert m.default_resolver("# nothing") == "8.8.8.8"
