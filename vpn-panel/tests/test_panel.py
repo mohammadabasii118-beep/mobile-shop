@@ -1251,3 +1251,9 @@ def test_dnstt_builds_fall_back_to_other_go_proxies():
     for script in (agent.DNSTT_INSTALL, m.BUILD):
         # proxy.golang.org answered 403 for one module on a real node; "|" moves on to the next proxy on any error
         assert "proxy.golang.org|" in script and "goproxy.io" in script and "|direct" in script
+
+
+def test_dnstt_loopback_passes_the_output_path_to_the_shell_that_builds():
+    text = (ROOT / "agent" / "dnstt_loopback.sh").read_text()
+    # `OUT=x python3 ... | bash` sets OUT for python only: Go then built with no output file and nothing was installed
+    assert "| OUT=/usr/local/bin/dnstt-client bash" in text and "OUT=/usr/local/bin/dnstt-client python3" not in text

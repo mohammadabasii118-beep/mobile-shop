@@ -14,7 +14,7 @@ echo "tunnel domain $DOMAIN, dnstt-server UDP :$PORT, forwards to $UPSTREAM"
 if ! command -v dnstt-client >/dev/null; then
   echo "building dnstt-client (a few minutes)..."
   curl -fsSL "${DNSTT_TEST_URL:-https://raw.githubusercontent.com/mohammadabasii118-beep/mobile-shop/claude/vpn-panel/vpn-panel/agent/dnstt_test.py}" -o /root/dnstt_test.py \
-    && OUT=/usr/local/bin/dnstt-client python3 -c "import sys;sys.path.insert(0,'/root');import dnstt_test as m;print(m.BUILD)" | bash >/tmp/dnstt-build.log 2>&1
+    && python3 -c "import sys;sys.path.insert(0,'/root');import dnstt_test as m;print(m.BUILD)" | OUT=/usr/local/bin/dnstt-client bash >/tmp/dnstt-build.log 2>&1
   command -v dnstt-client >/dev/null || { echo "FAIL  could not build dnstt-client; the end of the build log:"; grep -v '^go: downloading' /tmp/dnstt-build.log | tail -15; exit 1; }
 fi
 
