@@ -56,7 +56,7 @@ export interface SoloPit {
   stages: SoloStage[];
 }
 
-/** فروشگاه: یک پیشنهاد کارت روزانه (cardId خالی = اسلات خاموش). قیمت ۰ یعنی با آن ارز نمی‌شود خرید. */
+/** فروشگاه: یک پیشنهاد کارت هفتگی (cardId خالی = اسلات خاموش). قیمت ۰ یعنی با آن ارز نمی‌شود خرید. */
 export interface ShopCardOffer { cardId: string; count: number; /** با چه ارزی فروخته شود (فقط همین یکی در فروشگاه دیده می‌شود) */ currency: 'gems' | 'coins'; price: number }
 /** بسته‌ی سکه: currency='gems' (فوری، با الماس) یا 'toman' (کارت‌به‌کارت، تحویل دستی از پنل) */
 export interface CoinPack { id: string; coins: number; currency: 'gems' | 'toman'; price: number }
@@ -105,7 +105,7 @@ export interface GameConfig {
   };
   solo: { pits: SoloPit[] };
   /** ظاهر: بنر بالای صفحه‌ی اصلی (آدرس عکس آپلودشده از پنل مدیریت) */
-  ui?: { banner?: string; /** پس‌زمینه‌ی بازی (عکس آپلودشده) */ background?: string; /** متن پیام اول /start ربات */ welcome?: string };
+  ui?: { banner?: string; /** پس‌زمینه‌ی بازی (عکس آپلودشده) */ background?: string; /** متن پیام اول /start ربات */ welcome?: string; /** عکس «در حال بروزرسانی» (آپلودشده) */ maintenance?: string; /** روشن = همه‌ی بازیکن‌ها به‌جز ادمین‌ها این عکس را می‌بینند و نمی‌توانند بازی کنند */ maintenanceOn?: boolean };
 }
 
 /** Fully resolved fighter used by the engine (level already applied). */

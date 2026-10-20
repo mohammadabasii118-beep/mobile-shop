@@ -91,16 +91,25 @@ export function CardTile(p: TileProps) {
   );
 }
 
-export function Modal({ children, onClose }: { children: ReactNode; onClose?: () => void }) {
+export function Modal({ children, onClose, closeX }: { children: ReactNode; onClose?: () => void; closeX?: boolean }) {
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="sheet" onClick={(e) => e.stopPropagation()}>{children}</div>
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        {closeX && onClose && <button className="mx" onClick={onClose} aria-label="بستن">✕</button>}
+        {children}
+      </div>
     </div>
   );
 }
 
 export function Bar({ value, max, color = 'var(--gold)' }: { value: number; max: number; color?: string }) {
   return <div className="bar"><i style={{ width: `${Math.min(100, (value / max) * 100)}%`, background: color }} /></div>;
+}
+
+/** زمان طولانی: «۶ روز و ۱۲:۳۰:۰۰» (برای پیشنهاد هفتگی) */
+export function fmtLong(ms: number) {
+  const days = Math.floor(Math.max(0, ms) / 86_400_000);
+  return days > 0 ? `${fa(days)} روز و ${fmtTime(ms - days * 86_400_000)}` : fmtTime(ms);
 }
 
 export function fmtTime(ms: number) {

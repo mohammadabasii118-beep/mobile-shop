@@ -47,6 +47,14 @@ export function App() {
     timer.current = window.setTimeout(() => setToastMsg(null), 2800);
   }, []);
 
+  // اگر ادمین حالت بروزرسانی را روشن کند، بازیکن‌هایی که داخل بازی‌اند هم (حداکثر ۳۰ ثانیه بعد) عکس را می‌بینند
+  useEffect(() => {
+    const t = setInterval(async () => {
+      try { const c = await loadConfig(); setCfg((old) => (old && !!old.ui?.maintenanceOn !== !!c.ui?.maintenanceOn ? c : old)); } catch { /* ignore */ }
+    }, 30_000);
+    return () => clearInterval(t);
+  }, []);
+
   // نسخه‌ی جدید؟ هنگام باز شدن و هر بار که بازی از پس‌زمینه برمی‌گردد چک می‌شود
   useEffect(() => {
     void reloadIfOutdated();
@@ -80,6 +88,7 @@ export function App() {
   if (err) return <div className="center"><h2>😕</h2><p>{err}</p><small className="dbg" dir="rtl">{initDebug()}</small><button className="btn" onClick={() => location.reload()}>تلاش دوباره</button></div>;
   if (!cfg || !profile) return <div className="center"><div className="spinner" /><p>در حال بارگذاری…</p></div>;
 
+  if (cfg.ui?.maintenanceOn && cfg.ui.maintenance && !profile.isAdmin) return <Maintenance image={cfg.ui.maintenance} />;
   const ctx: Ctx = { cfg, setCfg, profile, profileAt, setProfile, sock, toast };
   const onBattleDone = (end: Extract<ServerMsg, { t: 'battleEnd' }>) => { setProfile(end.profile); setResult(end); };
 
@@ -110,7 +119,7 @@ export function App() {
       )}
       {queued && !battle && (
         <Modal>
-          <div className="center-in"><div className="spinner" /><h3>در حال جستجوی حریف…</h3>
+          <div className="center-in"><div className="spinner" /><SearchText />
             <button className="btn ghost" onClick={() => { sock.send({ t: 'leaveQueue' }); setQueued(false); }}>انصراف</button></div>
         </Modal>
       )}
@@ -149,6 +158,31 @@ function InviteBanner({ inv, onReply }: { inv: { from: number; name: string }; o
         <button className="btn ghost" onClick={() => onReply(false)}>رد</button>
       </div>
       <i className="invbar" style={{ animationDuration: '10s' }} />
+    </div>
+  );
+}
+
+const SEARCH_TEXTS = ['صبر کن', 'داره پیدا میشه', 'پیدا شد', 'اینترنتت ضعیفه', 'ای بابا', 'چرا پیدا نمیشه', 'پلیرا کمه', 'منتظر باش'];
+/** موقع جستجوی حریف، هر ۵ ثانیه یک جمله‌ی تصادفی (متفاوت از قبلی) نشان داده می‌شود */
+function SearchText() {
+  const pick = (prev?: string) => { const pool = SEARCH_TEXTS.filter((x) => x !== prev); return pool[Math.floor(Math.random() * pool.length)]; };
+  const [text, setText] = useState(() => pick());
+  useEffect(() => { const t = setInterval(() => setText((p) => pick(p)), 5000); return () => clearInterval(t); }, []);
+  return <h3 key={text} className="searchtxt">{text}</h3>;
+}
+
+/** حالت بروزرسانی: عکس را نشان می‌دهد و تا خاموش‌شدنش (بررسی هر ۱۵ ثانیه) بازی بسته است */
+function Maintenance({ image }: { image: string }) {
+  useEffect(() => {
+    const t = setInterval(async () => {
+      try { const c = await loadConfig(); if (!c.ui?.maintenanceOn) location.reload(); } catch { /* نت قطع است؛ بعداً */ }
+    }, 15_000);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <div className="maint">
+      <img src={image} alt="بازی در حال بروزرسانی است" />
+      <p>بازی در حال بروزرسانی است؛ کمی صبر کن. وقتی تمام شد خودکار باز می‌شود.</p>
     </div>
   );
 }

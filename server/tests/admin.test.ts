@@ -95,7 +95,7 @@ describe('player management', () => {
     expect((await call(43, `/api/admin/user?id=${id}`)).status).toBe(403);
     const d = ((await (await call(42, `/api/admin/user?id=${id}`)).json()) as any).user;
     expect(d).toMatchObject({ tgId: 60, coins: 100, banned: false, level: 1 });
-    expect(d.cards).toHaveLength(3);
+    expect(d.cards).toHaveLength(5);
     const coins = async (b: object) => ((await (await call(42, '/api/admin/coins', { userId: id, ...b })).json()) as any);
     expect((await coins({ delta: 50 })).user.coins).toBe(150);
     expect((await coins({ delta: -30 })).user.coins).toBe(120);
@@ -240,7 +240,8 @@ describe('config override (survives code updates)', () => {
     writeFileSync(file, JSON.stringify(old));
     const merged = loadConfigWithOverride(file);
     expect(merged.cards.map((c) => c.id)).toEqual(base.cards.map((c) => c.id));
-    expect(merged.startingDeck).toEqual(['giv', 'bijan', 'arash']);
+    expect(merged.startingDeck).toEqual(base.startingDeck);
+    expect(merged.startingDeck).toHaveLength(5);
     expect(merged.cards[0].image).toBe('/uploads/cards/giv.png'); // عکس کارت هم‌شناسه حفظ می‌شود
     expect(merged.contentVersion).toBe(base.contentVersion);
   });
@@ -296,5 +297,61 @@ describe('config override (survives code updates)', () => {
     writeFileSync(file, '{ not json');
     expect(loadConfigWithOverride(file).cards[0].hp).toBe(base.cards[0].hp); // فایل خراب → پایه
     expect(loadConfigWithOverride(join(dataDir, 'nope.json')).cards[0].hp).toBe(base.cards[0].hp);
+  });
+});
+
+describe('maintenance mode (update image)', () => {
+  it('needs an image first; when on, non-admins can only fetch /api/me; admins play normally', async () => {
+    const cfg = await (await call(42, '/api/admin/config')).json() as any;
+    expect((await call(42, '/api/admin/config', { config: { ...cfg, ui: { ...cfg.ui, maintenanceOn: true } } })).status).toBe(400);   // بدون عکس
+    expect((await call(43, '/api/admin/maintenance', PNG, 'image/png')).status).toBe(403);
+    const r = await call(42, '/api/admin/maintenance', PNG, 'image/png');
+    expect(r.status).toBe(200);
+    const withImg = await r.json() as any;
+    expect(withImg.ui.maintenance).toMatch(/^\/uploads\/maintenance\.png\?v=\d+$/);
+    expect((await fetch(base + withImg.ui.maintenance.split('?')[0])).status).toBe(200);
+    expect((await call(42, '/api/admin/config', { config: { ...withImg, ui: { ...withImg.ui, maintenanceOn: true } } })).status).toBe(200);
+    expect((await call(50, '/api/me')).status).toBe(200);                       // پروفایل برای فهمیدن ادمین‌بودن
+    const blocked = await call(50, '/api/shop/state');
+    expect(blocked.status).toBe(503);
+    expect(((await blocked.json()) as any).code).toBe('maintenance');
+    expect((await call(42, '/api/shop/state')).status).toBe(200);               // ادمین
+    // خاموش کردن: همه برمی‌گردند
+    const cur = await (await call(42, '/api/admin/config')).json() as any;
+    await call(42, '/api/admin/config', { config: { ...cur, ui: { ...cur.ui, maintenanceOn: false } } });
+    expect((await call(50, '/api/shop/state')).status).toBe(200);
+    await call(42, '/api/admin/maintenance/delete', {});
+    expect(((await (await fetch(base + '/api/config')).json()) as any).ui?.maintenance).toBeUndefined();
+  });
+});
+
+describe('redeem codes', () => {
+  it('admin creates a code with rewards; a player redeems it once; admin deletes it', async () => {
+    expect((await call(43, '/api/admin/codes/save', { code: 'HI', rewards: { coins: 5 } })).status).toBe(403);
+    expect((await call(42, '/api/admin/codes/save', { code: 'x', rewards: { coins: 5 } })).status).toBe(400);           // کد کوتاه
+    expect((await call(42, '/api/admin/codes/save', { code: 'EMPTY1', rewards: {} })).status).toBe(400);                  // بدون جایزه
+    expect((await call(42, '/api/admin/codes/save', { code: 'BAD1', rewards: { cardId: 'nope' } })).status).toBe(400);
+    const ok = await call(42, '/api/admin/codes/save', { code: 'welcome1', rewards: { coins: 500, gems: 7, xp: 5, cardId: 'peri', cardCount: 2, box: 'silver' }, maxUses: 2 });
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as any).codes[0]).toMatchObject({ code: 'WELCOME1', maxUses: 2, used: 0 });
+    const before = ((await (await call(60, '/api/me')).json()) as any).profile;
+    const r = await call(60, '/api/redeem', { code: ' welcome1 ' });
+    expect(r.status).toBe(200);
+    const j = await r.json() as any;
+    expect(j.redeemed).toMatchObject({ coins: 500, gems: 7, cardId: 'peri' });
+    expect(j.profile.coins).toBe(before.coins + 500);
+    expect(j.profile.gems).toBe(before.gems + 7);
+    expect(j.profile.cards.find((c: any) => c.id === 'peri')).toMatchObject({ copies: 1 });
+    expect(j.profile.boxes.some((b: any) => b.type === 'silver')).toBe(true);
+    expect(j.profile.deck.length).toBe(5);                                                // ترکیب پر بود: کارت تازه وارد ترکیب نشد
+    expect((await call(60, '/api/redeem', { code: 'WELCOME1' })).status).toBe(400);      // دوباره نه
+    expect((await call(61, '/api/redeem', { code: 'WELCOME1' })).status).toBe(200);
+    const third = await call(62, '/api/redeem', { code: 'WELCOME1' });                    // ظرفیت ۲ نفر
+    expect(third.status).toBe(400);
+    expect(((await third.json()) as any).error).toMatch(/ظرفیت/);
+    expect((await call(62, '/api/redeem', { code: 'NOPE' })).status).toBe(400);
+    const del = await call(42, '/api/admin/codes/delete', { code: 'WELCOME1' });
+    expect(((await del.json()) as any).codes).toHaveLength(0);
+    expect((await call(63, '/api/redeem', { code: 'WELCOME1' })).status).toBe(400);
   });
 });

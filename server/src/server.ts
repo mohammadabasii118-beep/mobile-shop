@@ -25,7 +25,7 @@ export interface ServerOptions {
   saveCfg?: (cfg: GameConfig) => void;
 }
 
-interface Conn { ws: WebSocket; userId: number; name: string; battle: Battle | null; queued: boolean }
+interface Conn { ws: WebSocket; tgId: number; userId: number; name: string; battle: Battle | null; queued: boolean }
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
@@ -140,6 +140,7 @@ export function createGameServer(opt: ServerOptions) {
   };
 
   function handleMsg(c: Conn, m: ClientMsg) {
+    if (cfg.ui?.maintenanceOn && !isAdmin(c.tgId) && (m.t === 'queue' || m.t === 'solo' || m.t === 'invite')) return send(c, { t: 'error', message: 'بازی در حال بروزرسانی است' });
     switch (m.t) {
       case 'invite': {
         const to = Number(m.to);
@@ -257,7 +258,7 @@ export function createGameServer(opt: ServerOptions) {
           try { userId = game.upsertUser(u); } catch (e) { ws.send(JSON.stringify({ t: 'error', message: (e as Error).message })); return ws.close(); }
           const old = conns.get(userId);
           if (old && old.ws !== ws) { console.log(`[ws] ${u.name} (${userId}): اتصال قبلی بسته شد چون همین حساب جای دیگری باز شد`); old.ws.close(4001, 'replaced'); } // اتصال قبلی → اگه وسط مبارزه بود می‌بازه
-          conn = { ws, userId, name: u.name, battle: null, queued: false };
+          conn = { ws, tgId: u.tgId, userId, name: u.name, battle: null, queued: false };
           conns.set(userId, conn);
           return send(conn, { t: 'ready', profile: game.profile(userId) });
         }
@@ -316,7 +317,7 @@ export function createGameServer(opt: ServerOptions) {
   };
 
   /** عکس‌های ظاهر (بنر صفحه‌ی اصلی و پس‌زمینه‌ی بازی) */
-  const SLOTS = { banner: 3_000_000, background: 4_000_000 } as const;
+  const SLOTS = { banner: 3_000_000, background: 4_000_000, maintenance: 4_000_000 } as const;
   type Slot = keyof typeof SLOTS;
   const removeSlot = (kind: Slot) => {
     for (const ext of ['png', 'jpg', 'webp']) { try { unlinkSync(join(uploadsRoot, `${kind}.${ext}`)); } catch { /* نبود */ } }
@@ -376,8 +377,9 @@ export function createGameServer(opt: ServerOptions) {
         return json(res, 200, cfg);
       }
       case '/api/admin/banner':
-      case '/api/admin/background': {
-        const kind = path.endsWith('background') ? 'background' : 'banner';
+      case '/api/admin/background':
+      case '/api/admin/maintenance': {
+        const kind: Slot = path.endsWith('background') ? 'background' : path.endsWith('maintenance') ? 'maintenance' : 'banner';
         const next = clone();
         const buf = await readRaw(req, SLOTS[kind]);
         if (!buf) throw new GameError(`حجم عکس بیشتر از ${SLOTS[kind] / 1_000_000} مگابایت است`);
@@ -391,13 +393,17 @@ export function createGameServer(opt: ServerOptions) {
         return json(res, 200, cfg);
       }
       case '/api/admin/banner/delete':
-      case '/api/admin/background/delete': {
-        const kind = path.includes('background') ? 'background' : 'banner';
+      case '/api/admin/background/delete':
+      case '/api/admin/maintenance/delete': {
+        const kind: Slot = path.includes('background') ? 'background' : path.includes('maintenance') ? 'maintenance' : 'banner';
         const next = clone();
-        if (next.ui) delete next.ui[kind];
+        if (next.ui) { delete next.ui[kind]; if (kind === 'maintenance') delete next.ui.maintenanceOn; }
         removeSlot(kind); commitConfig(next);
         return json(res, 200, cfg);
       }
+      case '/api/admin/codes': return json(res, 200, { codes: game.adminCodes() });
+      case '/api/admin/codes/save': { const b = await readBody(req); game.adminSaveCode(b.code, b.rewards, b.maxUses); return json(res, 200, { codes: game.adminCodes() }); }
+      case '/api/admin/codes/delete': { const b = await readBody(req); game.adminDeleteCode(b.code); return json(res, 200, { codes: game.adminCodes() }); }
       case '/api/admin/users':
         return json(res, 200, { users: game.adminUsers(url.searchParams.get('q') ?? '') });
       case '/api/admin/user':
@@ -441,6 +447,8 @@ export function createGameServer(opt: ServerOptions) {
     if (!u) return json(res, 401, { error: 'احراز هویت ناموفق' });
     let userId: number;
     try { userId = game.upsertUser(u); } catch (e) { return json(res, 403, { error: (e as Error).message }); }
+    // حالت بروزرسانی: همه جز ادمین‌ها فقط می‌توانند پروفایلشان را بگیرند (برای فهمیدن ادمین‌بودن)؛ بقیه‌ی بازی بسته است
+    if (cfg.ui?.maintenanceOn && !isAdmin(u.tgId) && path !== '/api/me') return json(res, 503, { error: 'بازی در حال بروزرسانی است؛ کمی صبر کن', code: 'maintenance' });
     if (path.startsWith('/api/admin/')) {
       if (!isAdmin(u.tgId)) return json(res, 403, { error: 'دسترسی ادمین نداری' });
       try { return await admin(req, res, path, new URL(req.url ?? '/', 'http://x')); } catch (e) {
@@ -467,6 +475,7 @@ export function createGameServer(opt: ServerOptions) {
       let extra: object = {};
       switch (path) {
         case '/api/me': break;
+        case '/api/redeem': { const r = game.redeemCode(userId, body.code); extra = { redeemed: r.rewards, boxGiven: r.boxGiven }; break; }
         case '/api/deck': game.setDeck(userId, body.cards); break;
         case '/api/upgrade': extra = { upgrade: game.upgradeCard(userId, String(body.cardId)) }; break;
         case '/api/shop/state': extra = { shop: game.shopState(userId) }; break;
@@ -540,7 +549,7 @@ export function createGameServer(opt: ServerOptions) {
     const path = new URL(req.url ?? '/', 'http://x').pathname;
     if (path === '/health') return json(res, 200, { ok: true });
     if (path.startsWith('/api/')) return void api(req, res, path);
-    if (/^\/uploads\/(banner|background)\.(png|jpg|webp)$/.test(path)) {
+    if (/^\/uploads\/(banner|background|maintenance)\.(png|jpg|webp)$/.test(path)) {
       const f = join(uploadsRoot, path.slice('/uploads/'.length));
       if (!existsSync(f)) { res.writeHead(404); return res.end(); }
       res.writeHead(200, { 'content-type': MIME[extname(f)] ?? 'application/octet-stream', 'cache-control': 'public, max-age=31536000, immutable', 'x-content-type-options': 'nosniff' });

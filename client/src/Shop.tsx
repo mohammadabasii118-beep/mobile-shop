@@ -3,7 +3,7 @@ import { resolveCard } from '@game/shared';
 import type { Ctx } from './App';
 import { call } from './net';
 import { openInvoice, openLink } from './telegram';
-import { CardTile, Gem, Icon, Modal, fa, fmtTime } from './ui';
+import { CardTile, Gem, Icon, Modal, fa, fmtLong } from './ui';
 
 interface ShopState { bought: number[]; resetInMs: number; orders: { id: number; gems: number; coins: number; toman: number; stars: number; method: string; status: string; createdAt: number }[] }
 const STATUS_FA: Record<string, string> = { pending: 'در انتظار تأیید', delivered: 'تحویل شد', canceled: 'لغو شد' };
@@ -76,8 +76,8 @@ export function Shop({ ctx }: { ctx: Ctx }) {
     <div className="shop">
       <section className="shopsec">
         <header className="shophd">
-          <h2>پیشنهاد روزانه</h2>
-          {st && <span className="reset">تا تغییر: <b className="num">{fmtTime(left)}</b></span>}
+          <h2>پیشنهاد هفتگی</h2>
+          {st && <span className="reset">تا تغییر: <b className="num">{fmtLong(left)}</b></span>}
         </header>
         <div className="offers">
           {offers.map(({ o, slot }) => {
@@ -101,7 +101,7 @@ export function Shop({ ctx }: { ctx: Ctx }) {
               </div>
             );
           })}
-          {offers.length === 0 && <p className="shopempty">امروز پیشنهادی نیست.</p>}
+          {offers.length === 0 && <p className="shopempty">این هفته پیشنهادی نیست.</p>}
         </div>
       </section>
 

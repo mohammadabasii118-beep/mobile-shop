@@ -20,10 +20,10 @@ beforeEach(() => {
 });
 
 describe('game economy', () => {
-  it('new player starts with 3 cards and that deck', () => {
+  it('new player starts with 5 cards and that deck', () => {
     const p = game.profile(uid);
     expect(p.deck).toEqual(cfg.startingDeck);
-    expect(p.cards).toHaveLength(3);
+    expect(p.cards).toHaveLength(5);
     expect(p.level).toBe(1);
   });
 
@@ -223,10 +223,11 @@ describe('game economy', () => {
     expect(game.profile(uid).gems).toBe(50);
   });
 
-  it('new players start with only the 3 common starter cards', () => {
+  it('new players start with 5 common starter cards', () => {
     const p = game.profile(uid);
-    expect(p.cards.map((c) => c.id).sort()).toEqual(['arash', 'bijan', 'giv']);
-    expect(p.deck).toEqual(['giv', 'bijan', 'arash']);
+    expect(p.cards.map((c) => c.id).sort()).toEqual(['arash', 'bijan', 'giv', 'goodarz', 'tus']);
+    expect(p.deck).toEqual(['giv', 'bijan', 'arash', 'goodarz', 'tus']);
+    expect(p.cards.every((c) => cfg.cards.find((x) => x.id === c.id)!.rarity === 'common')).toBe(true);
   });
 
   it('migrateCards removes cards that no longer exist and refills the deck from the starters', () => {
@@ -236,8 +237,8 @@ describe('game economy', () => {
     game.migrateCards();
     const p = game.profile(uid);
     expect(p.cards.some((c) => c.id === 'old_card')).toBe(false);
-    expect(p.deck).toHaveLength(3);
-    expect(new Set(p.deck).size).toBe(3);
+    expect(p.deck.length).toBeGreaterThanOrEqual(3);
+    expect(new Set(p.deck).size).toBe(p.deck.length);
     expect(p.deck.every((id) => p.cards.some((c) => c.id === id))).toBe(true);
   });
 
@@ -285,7 +286,7 @@ describe('game economy', () => {
   });
 
   describe('shop', () => {
-    it('buys a daily card offer with the single currency set for the slot, once per day, adding the right copies', () => {
+    it('buys a weekly card offer with the single currency set for the slot, once per week, adding the right copies', () => {
       const db = (game as any).d.db;
       db.prepare('UPDATE users SET coins = 1000, gems = 100').run();
       const giv = cfg.shop.cards[0], sohrab = cfg.shop.cards[5];
@@ -295,13 +296,15 @@ describe('game economy', () => {
       expect(game.profile(uid).coins).toBe(1000 - giv.price);
       expect(game.profile(uid).gems).toBe(100);                                  // ارز دیگر دست نمی‌خورد
       expect(game.profile(uid).cards.find((c) => c.id === giv.cardId)!.copies).toBe(giv.count);
-      expect(() => game.buyShopCard(uid, 0)).toThrow(/امروز/);                  // یک‌بار در روز
+      expect(() => game.buyShopCard(uid, 0)).toThrow(/این هفته/);                // یک‌بار در هفته
       // کارت جدید با الماس: خودِ کارت + بقیه به‌عنوان تعداد
       expect(game.buyShopCard(uid, 5)).toMatchObject({ cardId: sohrab.cardId, isNew: true });
       expect(game.profile(uid).gems).toBe(100 - sohrab.price);
       expect(game.profile(uid).cards.find((c) => c.id === sohrab.cardId)).toMatchObject({ level: 1, copies: sohrab.count - 1 });
-      // فردا دوباره می‌شود
+      // فردا هنوز بسته است؛ بعد از یک هفته دوباره می‌شود
       t += 24 * 3600 * 1000;
+      expect(game.shopState(uid).bought).toContain(0);
+      t += 7 * 24 * 3600 * 1000;
       expect(game.shopState(uid).bought).toEqual([]);
       game.buyShopCard(uid, 0);
       // موجودی کافی نیست

@@ -2,7 +2,9 @@ import { boxSpeedupCost, type FriendBase, resolveCard, type BattleReward, type B
 import type { Db } from './db';
 import type { TgUser } from './auth';
 
+export interface CodeRewards { coins?: number; gems?: number; xp?: number; cardId?: string; cardCount?: number; box?: BoxType }
 export class GameError extends Error {}
+const WEEK_MS = 7 * 86_400_000;
 
 export interface Deps { db: Db; cfg: GameConfig; now: () => number; rng: () => number; isAdmin?: (tgId: number) => boolean; channelRequired?: (tgId: number) => boolean }
 
@@ -371,9 +373,9 @@ export class Game {
   }
 
   // ---------- فروشگاه ----------
-  /** شماره‌ی روز به وقت تهران (نیمه‌شب ۰۰:۰۰ عوض می‌شود): پیشنهادهای کارت هر روز دوباره قابل خرید است */
-  shopDay(): number { return Math.floor((this.d.now() + 12_600_000) / 86_400_000); }
-  shopNextResetMs(): number { return (this.shopDay() + 1) * 86_400_000 - 12_600_000 - this.d.now(); }
+  /** شماره‌ی هفته به وقت تهران (شنبه ۰۰:۰۰ عوض می‌شود): پیشنهادهای کارت هر هفته دوباره قابل خرید است */
+  shopDay(): number { return Math.floor((this.d.now() + 12_600_000 - 2 * 86_400_000) / WEEK_MS); }
+  shopNextResetMs(): number { return (this.shopDay() + 1) * WEEK_MS + 2 * 86_400_000 - 12_600_000 - this.d.now(); }
   private offerSig(o: { cardId: string; count: number; currency: string; price: number }) { return `${o.cardId}|${o.count}|${o.currency}|${o.price}`; }
 
   /** وضعیت فروشگاه برای یک بازیکن: کدام پیشنهادهای امروز را خریده، تا بازنشانی چقدر مانده، سفارش‌های اخیرش */
@@ -396,7 +398,7 @@ export class Game {
     if (!Number.isInteger(slot) || !o || !o.cardId) throw new GameError('این پیشنهاد وجود ندارد');
     const { currency, price } = o;
     const day = this.shopDay(), sig = this.offerSig(o);
-    if (db.prepare('SELECT 1 FROM shop_buys WHERE user_id = ? AND slot = ? AND day = ? AND sig = ?').get(userId, slot, day, sig)) throw new GameError('این پیشنهاد را امروز خریده‌ای');
+    if (db.prepare('SELECT 1 FROM shop_buys WHERE user_id = ? AND slot = ? AND day = ? AND sig = ?').get(userId, slot, day, sig)) throw new GameError('این پیشنهاد را این هفته خریده‌ای');
     const paid = Number(db.prepare(`UPDATE users SET ${currency} = ${currency} - ? WHERE id = ? AND ${currency} >= ?`).run(price, userId, price).changes);
     if (paid !== 1) throw new GameError(currency === 'coins' ? 'سکه‌ی کافی نداری' : 'الماس کافی نداری');
     db.prepare('INSERT INTO shop_buys (user_id, slot, day, sig) VALUES (?,?,?,?)').run(userId, slot, day, sig);
@@ -525,10 +527,75 @@ export class Game {
     if (int(g.xp) > 0) this.addXp(userId, int(g.xp));
     if (g.cardId) {
       if (!cfg.cards.some((c) => c.id === g.cardId)) throw new GameError('کارت ناشناخته');
-      const has = db.prepare('SELECT 1 FROM user_cards WHERE user_id = ? AND card_id = ?').get(userId, g.cardId);
-      if (has) db.prepare('UPDATE user_cards SET copies = copies + 1 WHERE user_id = ? AND card_id = ?').run(userId, g.cardId);
-      else { db.prepare('INSERT INTO user_cards (user_id, card_id) VALUES (?,?)').run(userId, g.cardId); this.addToDeckIfRoom(userId, g.cardId); }
+      this.giveCard(userId, g.cardId, 1);
     }
+  }
+
+  /** یک کارت (یا چند نسخه‌ی آن) به بازیکن می‌دهد؛ کارت تازه اگر جا باشد خودکار در ترکیب می‌نشیند */
+  private giveCard(userId: number, cardId: string, count = 1) {
+    const { db } = this.d;
+    const has = db.prepare('SELECT 1 FROM user_cards WHERE user_id = ? AND card_id = ?').get(userId, cardId);
+    if (has) db.prepare('UPDATE user_cards SET copies = copies + ? WHERE user_id = ? AND card_id = ?').run(count, userId, cardId);
+    else { db.prepare('INSERT INTO user_cards (user_id, card_id, copies) VALUES (?,?,?)').run(userId, cardId, count - 1); this.addToDeckIfRoom(userId, cardId); }
+  }
+
+  // ---------- کد جایزه ----------
+  private cleanRewards(r: any): CodeRewards {
+    const int = (v: unknown, max = 1_000_000) => (Number.isInteger(v) && (v as number) > 0 && (v as number) <= max ? (v as number) : 0);
+    const out: CodeRewards = {};
+    if (int(r?.coins)) out.coins = int(r.coins);
+    if (int(r?.gems)) out.gems = int(r.gems, 100_000);
+    if (int(r?.xp)) out.xp = int(r.xp);
+    if (r?.cardId) {
+      if (!this.d.cfg.cards.some((c) => c.id === r.cardId)) throw new GameError('کارت ناشناخته');
+      out.cardId = String(r.cardId); out.cardCount = int(r.cardCount, 999) || 1;
+    }
+    if (r?.box) {
+      if (!['bronze', 'silver', 'gold'].includes(r.box)) throw new GameError('نوع جعبه نامعتبر است');
+      out.box = r.box as BoxType;
+    }
+    if (!Object.keys(out).length) throw new GameError('حداقل یک جایزه انتخاب کن');
+    return out;
+  }
+  adminCodes() {
+    return (this.d.db.prepare('SELECT code, rewards, max_uses, used, created_at FROM redeem_codes ORDER BY created_at DESC').all() as any[])
+      .map((r) => ({ code: r.code as string, rewards: JSON.parse(r.rewards) as CodeRewards, maxUses: r.max_uses as number, used: r.used as number, createdAt: r.created_at as number }));
+  }
+  adminSaveCode(code: unknown, rewards: unknown, maxUses: unknown) {
+    const c = String(code ?? '').trim().toUpperCase();
+    if (!/^[A-Z0-9_-]{3,24}$/.test(c)) throw new GameError('کد باید ۳ تا ۲۴ حرف انگلیسی، عدد، _ یا - باشد');
+    const r = this.cleanRewards(rewards);
+    const mu = Number.isInteger(maxUses) && (maxUses as number) >= 0 && (maxUses as number) <= 1_000_000 ? (maxUses as number) : 0;
+    const { db } = this.d;
+    if (db.prepare('SELECT 1 FROM redeem_codes WHERE code = ?').get(c)) db.prepare('UPDATE redeem_codes SET rewards = ?, max_uses = ? WHERE code = ?').run(JSON.stringify(r), mu, c);
+    else db.prepare('INSERT INTO redeem_codes (code, rewards, max_uses, used, created_at) VALUES (?,?,?,0,?)').run(c, JSON.stringify(r), mu, this.d.now());
+  }
+  adminDeleteCode(code: unknown) {
+    const c = String(code ?? '').trim().toUpperCase();
+    this.d.db.prepare('DELETE FROM redeem_codes WHERE code = ?').run(c);
+    this.d.db.prepare('DELETE FROM redeem_uses WHERE code = ?').run(c);
+  }
+  /** بازیکن کد را وارد می‌کند: جایزه‌ها داده می‌شود (هر کد برای هر نفر یک‌بار). جعبه اگر اسلات خالی نباشد داده نمی‌شود. */
+  redeemCode(userId: number, code: unknown): { rewards: CodeRewards; boxGiven: boolean | null } {
+    const { db } = this.d;
+    const c = String(code ?? '').trim().toUpperCase();
+    const row = db.prepare('SELECT rewards, max_uses, used FROM redeem_codes WHERE code = ?').get(c) as any;
+    if (!row) throw new GameError('این کد وجود ندارد یا منقضی شده');
+    if (row.max_uses > 0 && row.used >= row.max_uses) throw new GameError('ظرفیت این کد تمام شده');
+    if (db.prepare('SELECT 1 FROM redeem_uses WHERE code = ? AND user_id = ?').get(c, userId)) throw new GameError('این کد را قبلاً استفاده کرده‌ای');
+    const r = JSON.parse(row.rewards) as CodeRewards;
+    if (r.box && (db.prepare('SELECT COUNT(*) AS n FROM boxes WHERE user_id = ?').get(userId) as any).n >= this.d.cfg.box.slots) {
+      throw new GameError('اسلات‌های جعبه‌ات پر است؛ اول یک جعبه را باز کن و دوباره کد را بزن');
+    }
+    db.prepare('INSERT INTO redeem_uses (code, user_id, at) VALUES (?,?,?)').run(c, userId, this.d.now());
+    db.prepare('UPDATE redeem_codes SET used = used + 1 WHERE code = ?').run(c);
+    if (r.coins) db.prepare('UPDATE users SET coins = coins + ? WHERE id = ?').run(r.coins, userId);
+    if (r.gems) db.prepare('UPDATE users SET gems = gems + ? WHERE id = ?').run(r.gems, userId);
+    if (r.xp) this.addXp(userId, r.xp);
+    if (r.cardId && this.d.cfg.cards.some((x) => x.id === r.cardId)) this.giveCard(userId, r.cardId, r.cardCount ?? 1);
+    let boxGiven: boolean | null = null;
+    if (r.box) boxGiven = this.grantBox(userId, r.box, 'multi').box !== null;
+    return { rewards: r, boxGiven };
   }
 
   /** پروفایل کامل یک بازیکن برای پنل مدیریت */

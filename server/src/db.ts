@@ -81,5 +81,10 @@ export function openDb(path = ':memory:'): Db {
   )`);
   // دعوت با لینک رفرال: اگر کاربر هنوز وارد بازی نشده، تا اولین ورود نگه داشته می‌شود
   db.exec('CREATE TABLE IF NOT EXISTS referrals (tg_id INTEGER PRIMARY KEY, referrer INTEGER NOT NULL)');
+  // کدهای جایزه: rewards = JSON ({coins,gems,xp,cardId,cardCount,box}); هر بازیکن هر کد را فقط یک‌بار می‌تواند بزند
+  db.exec(`CREATE TABLE IF NOT EXISTS redeem_codes (
+    code TEXT PRIMARY KEY, rewards TEXT NOT NULL, max_uses INTEGER NOT NULL DEFAULT 0, used INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS redeem_uses (code TEXT NOT NULL, user_id INTEGER NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (code, user_id));`);
   return db;
 }

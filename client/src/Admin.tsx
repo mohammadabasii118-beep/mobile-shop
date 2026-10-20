@@ -6,7 +6,7 @@ import { call, loadConfig } from './net';
 import { initData } from './telegram';
 import { CardTile, Icon, Modal, RARITY_FA, fa } from './ui';
 
-type Tab = 'cards' | 'eco' | 'shop' | 'solo' | 'look' | 'chat' | 'players' | 'json';
+type Tab = 'cards' | 'eco' | 'shop' | 'solo' | 'look' | 'chat' | 'codes' | 'players' | 'json';
 interface Stats { users: number; battles: number; pendingBoxes: number; coins: number; banned: number }
 interface AdminUser { id: number; tg_id: number; name: string; avatar: string | null; level: number; coins: number; gems: number; wins: number; losses: number; banned: number }
 
@@ -53,7 +53,7 @@ export function Admin({ ctx, onExit }: { ctx: Ctx; onExit: () => void }) {
         </div>
       )}
       <div className="tabs" role="tablist">
-        {([['cards', 'کارت‌ها و عکس‌ها'], ['eco', 'جعبه و اقتصاد'], ['shop', 'فروشگاه'], ['solo', 'تک‌نفره (گودال‌ها)'], ['look', 'ظاهر و بنر'], ['chat', 'چت'], ['players', 'بازیکن‌ها'], ['json', 'پیشرفته']] as [Tab, string][]).map(([k, l]) => (
+        {([['cards', 'کارت‌ها و عکس‌ها'], ['eco', 'جعبه و اقتصاد'], ['shop', 'فروشگاه'], ['solo', 'تک‌نفره (گودال‌ها)'], ['look', 'ظاهر و بنر'], ['chat', 'چت'], ['codes', 'کد جایزه'], ['players', 'بازیکن‌ها'], ['json', 'پیشرفته']] as [Tab, string][]).map(([k, l]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{l}</button>
         ))}
       </div>
@@ -61,6 +61,7 @@ export function Admin({ ctx, onExit }: { ctx: Ctx; onExit: () => void }) {
       {tab === 'eco' && <EcoTab cfg={cfg} refresh={refresh} run={run} />}
       {tab === 'shop' && <ShopTab cfg={cfg} refresh={refresh} run={run} />}
       {tab === 'solo' && <SoloTab cfg={cfg} refresh={refresh} run={run} />}
+      {tab === 'codes' && <CodesTab cfg={cfg} run={run} />}
       {tab === 'chat' && <ChatTab cfg={cfg} refresh={refresh} run={run} />}
       {tab === 'look' && <LookTab cfg={cfg} refresh={refresh} run={run} />}
       {tab === 'players' && <PlayersTab cfg={cfg} run={run} />}
@@ -299,7 +300,7 @@ function EcoTab({ cfg, refresh, run }: TabProps) {
 interface AdminOrder { id: number; userId: number; tgId: number; name: string; avatar: string | null; gems: number; coins: number; toman: number; stars: number; method: string; note: string | null; status: string; createdAt: number; doneAt: number | null }
 const ORDER_FA: Record<string, string> = { pending: 'در انتظار', delivered: 'تحویل شد', canceled: 'لغو شد' };
 
-/** فروشگاه: ۶ پیشنهاد کارت روزانه، بسته‌های سکه (با الماس) و الماس (با تومان)، آدرس درگاه، و سفارش‌ها */
+/** فروشگاه: ۶ پیشنهاد کارت هفتگی (هر شنبه ۰۰:۰۰ به وقت تهران دوباره قابل خرید)، بسته‌های سکه (با الماس) و الماس (با تومان)، آدرس درگاه، و سفارش‌ها */
 function ShopTab({ cfg, refresh, run }: TabProps) {
   const [d, setD] = useState<GameConfig>(() => JSON.parse(JSON.stringify(cfg)));
   const [orders, setOrders] = useState<AdminOrder[]>([]);
@@ -317,8 +318,8 @@ function ShopTab({ cfg, refresh, run }: TabProps) {
   return (
     <div className="cols">
       <div className="box">
-        <h3>پیشنهاد روزانه (۶ کارت)</h3>
-        <small className="hint" style={{ textAlign: 'start' }}>هر اسلات: کارت، تعداد، و فقط یک قیمت (اول ارز را انتخاب کن: الماس یا سکه؛ فقط همان در فروشگاه نمایش داده می‌شود). هر بازیکن هر پیشنهاد را روزی یک‌بار می‌تواند بخرد (بازنشانی نیمه‌شب تهران). با عوض‌کردن اسلات، همان لحظه دوباره قابل خرید می‌شود. اسلات «خاموش» نمایش داده نمی‌شود.</small>
+        <h3>پیشنهاد هفتگی (۶ کارت)</h3>
+        <small className="hint" style={{ textAlign: 'start' }}>هر اسلات: کارت، تعداد، و فقط یک قیمت (اول ارز را انتخاب کن: الماس یا سکه؛ فقط همان در فروشگاه نمایش داده می‌شود). هر بازیکن هر پیشنهاد را هفته‌ای یک‌بار می‌تواند بخرد (بازنشانی هر شنبه ساعت ۰۰:۰۰ به وقت تهران). با عوض‌کردن اسلات، همان لحظه دوباره قابل خرید می‌شود. اسلات «خاموش» نمایش داده نمی‌شود.</small>
         {d.shop.cards.map((o, i) => (
           <div key={i} className="giftbox">
             <b>اسلات {fa(i + 1)}</b>
@@ -480,6 +481,22 @@ function LookTab({ cfg, refresh, run }: TabProps) {
     }, 'پس‌زمینه عوض شد');
     if (bgRef.current) bgRef.current.value = '';
   };
+  const mRef = useRef<HTMLInputElement>(null);
+  const uploadM = async (f: File | undefined) => {
+    if (!f) return;
+    await run(async () => {
+      const blob = await shrink(f, 1600);
+      const r = await fetch('/api/admin/maintenance', { method: 'POST', headers: { 'x-init-data': initData, 'content-type': blob.type }, body: blob });
+      const j = await r.json(); if (!r.ok) throw new Error(j.error); refresh(j as GameConfig);
+    }, 'عکس بروزرسانی عوض شد');
+    if (mRef.current) mRef.current.value = '';
+  };
+  const setMaint = (on: boolean) => run(async () => {
+    const ui: NonNullable<GameConfig['ui']> = { ...cfg.ui };
+    if (on) ui.maintenanceOn = true; else delete ui.maintenanceOn;
+    const next = { ...cfg, ui };
+    refresh((await call('/api/admin/config', { config: next })) as GameConfig);
+  }, on ? 'حالت بروزرسانی روشن شد: بازیکن‌ها (غیر از ادمین‌ها) عکس را می‌بینند و نمی‌توانند بازی کنند' : 'حالت بروزرسانی خاموش شد؛ بازی برای همه باز است');
   const [welcome, setWelcome] = useState(cfg.ui?.welcome ?? '');
   const [chUser, setChUser] = useState(cfg.channel?.username ?? 'MirasGame');
   const [chReq, setChReq] = useState(cfg.channel?.required ?? true);
@@ -517,6 +534,20 @@ function LookTab({ cfg, refresh, run }: TabProps) {
       <div className="btns">
         <button className="btn" onClick={() => bgRef.current?.click()}>{cfg.ui?.background ? 'تغییر پس‌زمینه' : 'آپلود پس‌زمینه'}</button>
         {cfg.ui?.background && <button className="btn ghost" onClick={() => run(async () => refresh(await call('/api/admin/background/delete', {})), 'پس‌زمینه‌ی پیش‌فرض برگشت')}>حذف (برگشت به پیش‌فرض)</button>}
+      </div>
+      <h3>عکس بروزرسانی (بستن موقت بازی)</h3>
+      <small className="hint" style={{ textAlign: 'start' }}>وقتی «فعال» باشد، همه‌ی بازیکن‌ها به‌جز ادمین‌ها موقع ورود فقط این عکس را می‌بینند و نمی‌توانند بازی کنند؛ ادمین‌ها عادی بازی می‌کنند تا تغییرات را اعمال کنی. بعد از «غیرفعال» کردن، بازیکن‌ها (حداکثر ۱۵ ثانیه بعد) خودکار وارد بازی می‌شوند. عکس عمودی یا مربعی، مثلاً ۱۰۸۰×۱۴۰۰.</small>
+      <div className="bgprev" style={cfg.ui?.maintenance ? { backgroundImage: `url(${cfg.ui.maintenance})`, backgroundSize: 'contain', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' } : undefined}>{cfg.ui?.maintenance ? '' : 'عکسی نیست'}</div>
+      <input ref={mRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => void uploadM(e.target.files?.[0])} />
+      <div className="btns">
+        <button className="btn" onClick={() => mRef.current?.click()}>{cfg.ui?.maintenance ? 'تغییر عکس' : 'آپلود عکس'}</button>
+        {cfg.ui?.maintenance && <button className="btn ghost" disabled={!!cfg.ui?.maintenanceOn} onClick={() => run(async () => refresh(await call('/api/admin/maintenance/delete', {})), 'عکس بروزرسانی حذف شد')}>حذف عکس</button>}
+      </div>
+      <div className="btns">
+        {cfg.ui?.maintenanceOn
+          ? <button className="btn" onClick={() => void setMaint(false)}>🟢 غیرفعال کن (بازی را باز کن)</button>
+          : <button className="btn" disabled={!cfg.ui?.maintenance} onClick={() => { if (confirm('همه‌ی بازیکن‌ها (غیر از ادمین‌ها) از بازی بیرون می‌روند و فقط عکس بروزرسانی را می‌بینند. فعال شود؟')) void setMaint(true); }}>🔴 فعال کن (بازی بسته شود)</button>}
+        <span className={`maintst ${cfg.ui?.maintenanceOn ? 'on' : ''}`}>{cfg.ui?.maintenanceOn ? 'الان فعال است: فقط ادمین‌ها بازی می‌کنند' : 'الان غیرفعال است'}</span>
       </div>
       <h3>عضویت اجباری کانال</h3>
       <small className="hint" style={{ textAlign: 'start' }}>بازیکن قبل از بازی باید عضو این کانال باشد (فقط یک‌بار بررسی می‌شود). ربات باید ادمین کانال باشد. ادمین‌های بازی از این شرط معافند.</small>
@@ -584,6 +615,65 @@ function ChatTab({ cfg, refresh, run }: TabProps) {
         <button className="btn" disabled={bad} onClick={save}>ذخیره و اعمال</button>
       </div>
       {bad && <small className="hint">هر پیام باید خالی نباشد و حداکثر ۲۴ نویسه باشد.</small>}
+    </div>
+  );
+}
+
+/** کدهای جایزه: ساختن (با انتخاب جایزه)، سقف تعداد استفاده، و حذف */
+function CodesTab({ cfg, run }: { cfg: GameConfig; run: Run }) {
+  type Row = { code: string; rewards: { coins?: number; gems?: number; xp?: number; cardId?: string; cardCount?: number; box?: string }; maxUses: number; used: number; createdAt: number };
+  const [rows, setRows] = useState<Row[]>([]);
+  const load = () => run(async () => { setRows((await call('/api/admin/codes')).codes); });
+  useEffect(() => { void load(); }, []);
+  const [code, setCode] = useState('');
+  const [coins, setCoins] = useState(0), [gems, setGems] = useState(0), [xp, setXp] = useState(0);
+  const [cardId, setCardId] = useState(''), [cardCount, setCardCount] = useState(1), [box, setBox] = useState('');
+  const [maxUses, setMaxUses] = useState(0);
+  const n = (v: string) => (v === '' ? 0 : Math.max(0, Math.floor(Number(v))));
+  const rnd = () => setCode(Array.from({ length: 8 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join(''));
+  const summary = (r: Row['rewards']) => [r.coins && `${fa(r.coins)} سکه`, r.gems && `${fa(r.gems)} الماس`, r.xp && `${fa(r.xp)} XP`, r.cardId && `${fa(r.cardCount ?? 1)}× ${cfg.cards.find((c) => c.id === r.cardId)?.name ?? r.cardId}`, r.box && `جعبه‌ی ${cfg.box.types[r.box as 'bronze']?.name ?? r.box}`].filter(Boolean).join(' + ');
+  const save = () => run(async () => {
+    const rewards = { ...(coins ? { coins } : {}), ...(gems ? { gems } : {}), ...(xp ? { xp } : {}), ...(cardId ? { cardId, cardCount: cardCount || 1 } : {}), ...(box ? { box } : {}) };
+    setRows((await call('/api/admin/codes/save', { code, rewards, maxUses })).codes);
+    setCode(''); setCoins(0); setGems(0); setXp(0); setCardId(''); setCardCount(1); setBox(''); setMaxUses(0);
+  }, 'کد ذخیره شد');
+  return (
+    <div className="box">
+      <h3>ساختن کد جایزه</h3>
+      <small className="hint" style={{ textAlign: 'start' }}>بازیکن کد را از منوی بازی ← «کد جایزه» وارد می‌کند. هر نفر هر کد را یک‌بار می‌تواند بزند. اگر کدی با همین اسم باشد، جایزه‌هایش عوض می‌شود. جعبه فقط وقتی داده می‌شود که اسلات خالی داشته باشد.</small>
+      <div className="fgrid">
+        <label className="field">کد (انگلیسی/عدد، ۳ تا ۲۴ نویسه)<input dir="ltr" value={code} onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))} /></label>
+        <label className="field">سقف تعداد نفرات (۰ = نامحدود)<input type="number" min={0} value={maxUses} onChange={(e) => setMaxUses(n(e.target.value))} /></label>
+        <label className="field">سکه<input type="number" min={0} value={coins} onChange={(e) => setCoins(n(e.target.value))} /></label>
+        <label className="field">الماس<input type="number" min={0} value={gems} onChange={(e) => setGems(n(e.target.value))} /></label>
+        <label className="field">XP<input type="number" min={0} value={xp} onChange={(e) => setXp(n(e.target.value))} /></label>
+        <label className="field">جعبه
+          <select value={box} onChange={(e) => setBox(e.target.value)}><option value="">بدون جعبه</option>{(['bronze', 'silver', 'gold'] as const).map((b) => <option key={b} value={b}>{cfg.box.types[b].name}</option>)}</select>
+        </label>
+        <label className="field">کارت
+          <select value={cardId} onChange={(e) => setCardId(e.target.value)}><option value="">بدون کارت</option>{cfg.cards.map((c) => <option key={c.id} value={c.id}>{c.name} ({RARITY_FA[c.rarity]})</option>)}</select>
+        </label>
+        {cardId && <label className="field">تعداد کارت<input type="number" min={1} value={cardCount} onChange={(e) => setCardCount(Math.max(1, n(e.target.value)))} /></label>}
+      </div>
+      <div className="btns">
+        <button className="btn" disabled={code.length < 3 || !(coins || gems || xp || cardId || box)} onClick={() => void save()}>ذخیره‌ی کد</button>
+        <button className="btn ghost" onClick={rnd}>کد تصادفی</button>
+      </div>
+      <h3>کدهای فعلی ({fa(rows.length)})</h3>
+      {rows.length === 0 && <p className="hint">هنوز کدی نساخته‌ای.</p>}
+      <div className="list">
+        {rows.map((r) => (
+          <div key={r.code} className="giftbox">
+            <b dir="ltr" style={{ letterSpacing: 2 }}>{r.code}</b>
+            <small>{summary(r.rewards)}</small>
+            <small>استفاده: {fa(r.used)}{r.maxUses ? ` از ${fa(r.maxUses)}` : ' (نامحدود)'}</small>
+            <div className="btns">
+              <button className="btn ghost" onClick={() => { setCode(r.code); setCoins(r.rewards.coins ?? 0); setGems(r.rewards.gems ?? 0); setXp(r.rewards.xp ?? 0); setCardId(r.rewards.cardId ?? ''); setCardCount(r.rewards.cardCount ?? 1); setBox(r.rewards.box ?? ''); setMaxUses(r.maxUses); }}>ویرایش</button>
+              <button className="btn ghost" onClick={() => { if (confirm(`کد ${r.code} حذف شود؟`)) void run(async () => setRows((await call('/api/admin/codes/delete', { code: r.code })).codes), 'کد حذف شد'); }}>🗑 حذف</button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

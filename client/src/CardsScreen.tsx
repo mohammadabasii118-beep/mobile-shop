@@ -78,7 +78,7 @@ function Detail({ flash, locked, def, level, copies, cfg, coins, deck, deckSize,
   const can = !!need && copies >= need.copies && coins >= need.coins;
   const d = (a: number, b?: number) => (b !== undefined && b !== a ? <em> ← {fa(b)}</em> : null);
   return (
-    <Modal onClose={onClose}>
+    <Modal onClose={onClose} closeX>
       <div className="detail">
         <CardTile def={def} level={level} maxLevel={cfg.upgrade.maxLevel} className={flash ? 'evolve' : ''} hp={s.hp} atk={s.atk} shield={s.shield} />
         <div className="dinfo">

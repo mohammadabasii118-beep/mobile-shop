@@ -27,7 +27,7 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
     setLb('loading');
     try { const j = await call('/api/leaderboard'); setLb({ rows: j.leaders, myRank: j.myRank }); } catch { setLb('error'); }
   };
-  const [page, setPage] = useState<'about' | 'news' | 'settings' | null>(null);
+  const [page, setPage] = useState<'about' | 'news' | 'settings' | 'redeem' | null>(null);
 
   return (
     <>
@@ -67,6 +67,9 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
             </button>
             <button onClick={() => { setMenuOpen(false); setPage('settings'); }}>
               <svg className="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.600 5.600l2.100 2.100M16.300 16.300l2.100 2.100M18.400 5.600l-2.100 2.100M7.700 16.300l-2.100 2.100" /></svg><span>تنظیمات</span><em>‹</em>
+            </button>
+            <button onClick={() => { setMenuOpen(false); setPage('redeem'); }}>
+              <svg className="i" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="12" rx="2" /><path d="M12 8v12M3 12h18M12 8c-2-4-6-3-5 0 .6 1.600 3.200 1.500 5 0zM12 8c2-4 6-3 5 0-.6 1.600-3.200 1.500-5 0z" /></svg><span>کد جایزه</span><em>‹</em>
             </button>
             <button onClick={() => { setMenuOpen(false); setPage('news'); }}>
               <svg className="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M8 9h8M8 13h8M8 17h4" /></svg><span>خبرگزاری</span><b className="soon">به‌زودی</b><em>‹</em>
@@ -190,6 +193,7 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
           </div>
         </Modal>
       )}
+      {page === 'redeem' && <RedeemModal ctx={ctx} onClose={() => setPage(null)} />}
       {page === 'settings' && (
         <Modal onClose={() => setPage(null)}>
           <div className="settings">
@@ -378,4 +382,41 @@ function VolumeRow({ ch, label }: { ch: Channel; label: string }) {
 /** جام کوچک برای کنار عدد کاپ */
 function Cup() {
   return <svg className="cupi" viewBox="0 0 24 24" aria-hidden><path d="M7 3.500h10v6a5 5 0 0 1-10 0z" fill="#f3c969" /><path d="M7 5.500H4.200v2.300A3.200 3.200 0 0 0 7.300 11M17 5.500h2.800v2.300a3.200 3.200 0 0 1-3.100 3.200" fill="none" stroke="#f3c969" strokeWidth="1.700" strokeLinecap="round" /><path d="M12 14.500v3M9 17.500h6l.8 3H8.200z" fill="#f3c969" /></svg>;
+}
+
+/** وارد کردن کد جایزه */
+function RedeemModal({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) {
+  const { cfg, setProfile } = ctx;
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const submit = async () => {
+    if (!code.trim() || busy) return;
+    setBusy(true); setMsg(null);
+    try {
+      const j = await call('/api/redeem', { code });
+      setProfile(j.profile);
+      const r = j.redeemed as { coins?: number; gems?: number; xp?: number; cardId?: string; cardCount?: number; box?: string };
+      const parts: string[] = [];
+      if (r.coins) parts.push(`${fa(r.coins)} سکه`);
+      if (r.gems) parts.push(`${fa(r.gems)} الماس`);
+      if (r.xp) parts.push(`${fa(r.xp)} XP`);
+      if (r.cardId) parts.push(`${fa(r.cardCount ?? 1)} کارت ${cfg.cards.find((c) => c.id === r.cardId)?.name ?? ''}`);
+      if (r.box) parts.push(`یک جعبه‌ی ${cfg.box.types[r.box as 'bronze']?.name ?? ''}`);
+      setMsg({ ok: true, text: `🎁 دریافت کردی: ${parts.join('، ')}` });
+      setCode('');
+    } catch (e) { setMsg({ ok: false, text: (e as Error).message }); }
+    setBusy(false);
+  };
+  return (
+    <Modal onClose={onClose} closeX>
+      <div className="settings">
+        <h3>کد جایزه</h3>
+        <small className="hint">کدی که از ما گرفته‌ای را بنویس و جایزه‌ات را بگیر. هر کد را هر نفر فقط یک‌بار می‌تواند بزند.</small>
+        <input className="codeinp" dir="ltr" autoCapitalize="characters" placeholder="CODE" value={code} onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))} onKeyDown={(e) => e.key === 'Enter' && void submit()} />
+        {msg && <p className={`rdmsg ${msg.ok ? 'ok' : 'bad'}`}>{msg.text}</p>}
+        <button className="btn" disabled={busy || !code.trim()} onClick={() => void submit()}>دریافت جایزه</button>
+      </div>
+    </Modal>
+  );
 }

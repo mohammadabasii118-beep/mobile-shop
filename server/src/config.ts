@@ -91,6 +91,9 @@ export function validateConfig(cfg: GameConfig): GameConfig {
   }
   if (cfg.ui?.banner !== undefined && !/^\/uploads\/banner\.(png|jpg|webp)(\?v=\d+)?$/.test(cfg.ui.banner)) bad('آدرس بنر نامعتبر است');
   if (cfg.ui?.background !== undefined && !/^\/uploads\/background\.(png|jpg|webp)(\?v=\d+)?$/.test(cfg.ui.background)) bad('آدرس پس‌زمینه نامعتبر است');
+  if (cfg.ui?.maintenance !== undefined && !/^\/uploads\/maintenance\.(png|jpg|webp)(\?v=\d+)?$/.test(cfg.ui.maintenance)) bad('آدرس عکس بروزرسانی نامعتبر است');
+  if (cfg.ui?.maintenanceOn !== undefined && typeof cfg.ui.maintenanceOn !== 'boolean') bad('وضعیت حالت بروزرسانی نامعتبر است');
+  if (cfg.ui?.maintenanceOn && !cfg.ui.maintenance) bad('اول یک عکس برای حالت بروزرسانی آپلود کن');
   if (cfg.ui?.welcome !== undefined && (typeof cfg.ui.welcome !== 'string' || cfg.ui.welcome.length > 3500)) bad('متن پیام اول باید حداکثر ۳۵۰۰ نویسه باشد');
   if (!cfg.solo || !Array.isArray(cfg.solo.pits) || cfg.solo.pits.length < 1) bad('حداقل یک گودال سولو لازم است');
   for (const pit of cfg.solo.pits) {

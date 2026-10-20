@@ -133,7 +133,7 @@ button.card:not(:disabled):active { transform: scale(.96); }
 /* شیت‌ها */
 .overlay { position: fixed; inset: 0; background: rgba(5,10,18,.72); display: flex; align-items: flex-end; justify-content: center; z-index: 10; animation: fade .2s; }
 @keyframes fade { from { opacity: 0; } }
-.sheet { width: 100%; max-width: 520px; background: var(--panel); border-radius: 24px 24px 0 0; padding: 18px; display: flex; flex-direction: column; gap: 12px; max-height: 92%; overflow-y: auto; animation: up .25s; }
+.sheet { position: relative; width: 100%; max-width: 520px; background: var(--panel); border-radius: 24px 24px 0 0; padding: 18px; display: flex; flex-direction: column; gap: 12px; max-height: 92%; overflow-y: auto; animation: up .25s; }
 @keyframes up { from { transform: translateY(50px); } }
 .detail { display: flex; gap: 14px; align-items: center; }
 .detail .cardwrap { width: 128px; flex: none; }
@@ -640,3 +640,15 @@ html, body, #root, .app, .screen, .battle, .admin { overscroll-behavior: none; }
 .flist .btn { padding: 6px 10px; font-size: 13px; }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: #666; flex: none; }
 .dot.on { background: #3ddc84; box-shadow: 0 0 6px #3ddc84; } .dot.busy { background: #ffb020; }
+
+.sheet .mx { position: absolute; top: 10px; left: 12px; z-index: 3; width: 34px; height: 34px; border-radius: 50%; font-size: 17px; line-height: 1; color: #fff; background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); }
+
+.searchtxt { animation: rise-in .3s ease-out; min-height: 28px; }
+.maint { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 16px; background: #060a14; }
+.maint img { max-width: 100%; max-height: 80vh; object-fit: contain; border-radius: 14px; }
+.maint p { color: #c9d4ee; text-align: center; font-size: 14px; }
+
+.codeinp { width: 100%; padding: 12px; border-radius: 12px; text-align: center; font-size: 20px; letter-spacing: 3px; font-weight: 800; border: 1px solid rgba(255,255,255,.2); background: rgba(0,0,0,.3); color: #fff; }
+.rdmsg { text-align: center; font-weight: 700; } .rdmsg.ok { color: var(--green); } .rdmsg.bad { color: #ff8a8a; }
+
+.maintst { font-size: 12px; color: var(--muted); align-self: center; } .maintst.on { color: #ff9a9a; font-weight: 800; }
