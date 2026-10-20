@@ -113,7 +113,7 @@ def test_agent_renderers():
 
 
 ALL = ["vless", "vless_raw", "vless_tcp", "vmess_tcp", "vless_ws", "vless_grpc", "vmess_ws", "trojan", "trojan_ws", "ss", "hy2", "tuic",
-       "wg", "ovpn", "l2tp", "ikev2", "anyc", "dnstt"]
+       "wg", "ovpn", "l2tp", "ikev2", "anyc", "dnstt", "mtproto"]
 
 
 def test_all_protocols_have_entries_and_node_config():
@@ -1428,3 +1428,19 @@ def test_sub_page_and_qr():
         assert svg.status_code == 200 and svg.text.lstrip().startswith(("<svg", "<?xml")) and "image/svg+xml" in svg.headers["content-type"]
         assert c.get("/sub/nope/qr.svg").status_code == 404
         assert c.get(f"{u['sub_url'].replace('https://panel.test','')}/qr.svg?i=9999").status_code == 404
+
+
+def test_mtproto_telegram_proxy():
+    from app.subscription import mtproto_secret
+    sec = mtproto_secret("k1", "www.apple.com")
+    assert sec == agent.mtproto_secret("k1", "www.apple.com") and sec.startswith("ee") and sec.endswith("www.apple.com".encode().hex())
+    assert 'bind-to = "0.0.0.0:8883"' in agent.mtg_config(8883, sec) and sec in agent.mtg_config(8883, sec)
+    assert agent.port_conflicts({"protocols": {"mtproto": 8883}}, {("tcp", 8883): "nginx"})[0] == {8883}
+    with TestClient(app) as c:
+        h = admin(c)
+        n = c.post("/api/nodes", headers=h, json={"name": "TG", "cc": "tr", "address": "tg.example.com"}).json()
+        assert c.put(f"/api/nodes/{n['id']}/protocols/mtproto", headers=h, json={"enabled": True}).status_code == 200
+        u = c.post("/api/users", headers=h, json={"name": "tg_user", "protos": ["mtproto"]}).json()
+        page = c.get(u["sub_url"].replace("https://panel.test", ""), headers={"accept": "text/html"}).text
+        assert "tg://proxy?server=tg.example.com&amp;port=" in page
+        assert c.get(u["sub_url"].replace("https://panel.test", "") + "/qr.svg?i=0").status_code == 200

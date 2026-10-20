@@ -125,8 +125,8 @@ def set_conf_value(text, key, value):
                   text, flags=re.M)
 
 
-OURS = {"xray", "sing-box", "openvpn", "ocserv", "ocserv-main", "ocserv-worker", "charon", "xl2tpd", "dnstt-server"}
-TCP_PROTOS = {"vless", "vless_tcp", "vless_raw", "vless_ws", "vless_grpc", "vmess_ws", "vmess_tcp", "trojan", "trojan_ws", "ss", "anyc"}
+OURS = {"xray", "sing-box", "openvpn", "ocserv", "ocserv-main", "ocserv-worker", "charon", "xl2tpd", "dnstt-server", "mtg"}
+TCP_PROTOS = {"vless", "vless_tcp", "vless_raw", "vless_ws", "vless_grpc", "vmess_ws", "vmess_tcp", "trojan", "trojan_ws", "ss", "anyc", "mtproto"}
 UDP_PROTOS = {"hy2", "tuic", "wg", "ovpn", "anyc", "dnstt"}
 
 
@@ -859,6 +859,93 @@ def apply_dnstt(cfg, errors, udp_busy=frozenset()):
     return out
 
 
+# ---------- Telegram proxy (MTProto, FakeTLS) via mtg ----------
+MTG_BIN = "/usr/local/bin/mtg"
+MTG_CONF = "/etc/mtg.toml"
+MTG_UNIT = "/etc/systemd/system/mtg.service"
+MTG_INSTALL = r"""set -e
+d=$(mktemp -d); trap 'rm -rf "$d"' EXIT
+case "$(uname -m)" in x86_64) ga=amd64;; aarch64|arm64) ga=arm64;; *) echo "unsupported CPU $(uname -m)"; exit 1;; esac
+for ver in 2.1.7 2.1.6; do
+  if curl -fsSL --connect-timeout 20 "https://github.com/9seconds/mtg/releases/download/v$ver/mtg-$ver-linux-$ga.tar.gz" -o "$d/mtg.tgz" \
+     && tar -C "$d" -xzf "$d/mtg.tgz" && f=$(find "$d" -type f -name mtg | head -1) && [ -n "$f" ]; then
+    install -m 755 "$f" /usr/local/bin/mtg; echo "mtg $ver installed"; exit 0
+  fi
+done
+echo "could not download mtg from GitHub releases"; exit 1
+"""
+
+
+def mtproto_secret(ss_key, domain):
+    """Mirrored in panel/app/subscription.py."""
+    return "ee" + hashlib.sha256((ss_key + "mtproto").encode()).digest()[:16].hex() + domain.encode().hex()
+
+
+def mtg_config(port, secret):
+    return f'secret = "{secret}"\nbind-to = "0.0.0.0:{port}"\n'
+
+
+def mtg_unit():
+    return f"""[Unit]
+Description=Telegram MTProto proxy (mtg)
+After=network-online.target
+
+[Service]
+ExecStart={MTG_BIN} run {MTG_CONF}
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+
+_mtg_install = {"thread": None, "failed_at": 0, "why": ""}
+
+
+def ensure_mtg_binary(errors, run=None, now=time.time):
+    """Download mtg in the background and retry at most hourly. True once it is installed."""
+    import shutil
+    import threading
+    if os.path.exists(MTG_BIN):
+        return True
+    st = _mtg_install
+    if st["thread"] and st["thread"].is_alive():
+        return False
+    if st["failed_at"] and now() - st["failed_at"] < 3600:
+        errors.append("mtg install failed: " + st["why"])
+        return False
+
+    def work():
+        r = (run or sh)("bash", "-c", MTG_INSTALL)
+        if r.returncode != 0:
+            st["failed_at"], st["why"] = now(), ((r.stderr or r.stdout).strip().splitlines() or ["unknown error"])[-1][-200:]
+    st["failed_at"] = 0
+    st["thread"] = threading.Thread(target=work, daemon=True)
+    st["thread"].start()
+    return False
+
+
+def apply_mtproto(cfg, errors, tcp_busy=frozenset()):
+    port = cfg["protocols"].get("mtproto")
+    if not port:
+        if os.path.exists(MTG_UNIT):   # it was set up here before: undo it
+            sh("systemctl", "disable", "--now", "mtg")
+        return
+    if port in tcp_busy or not ensure_mtg_binary(errors):
+        return
+    n = cfg["node"]
+    write_if_changed(MTG_CONF, mtg_config(port, mtproto_secret(n["ss_key"], n["reality_sni"])), 0o600)
+    if write_if_changed(MTG_UNIT, mtg_unit(), 0o644):
+        sh("systemctl", "daemon-reload")
+        sh("systemctl", "enable", "mtg")
+    restart_on_config_change("mtg", [MTG_UNIT, MTG_CONF])
+    if sh("systemctl", "is-active", "mtg").stdout.strip() != "active":
+        last = (sh("journalctl", "-u", "mtg", "-n", "1", "--no-pager", "-o", "cat").stdout or "").strip()
+        errors.append("mtg is not running: " + last[-160:])
+
+
 def apply(cfg, reality, tls, wg):
     """Write configs and restart what changed. Returns the port conflicts found."""
     tcp_busy, udp_busy, conflicts = port_conflicts(cfg, foreign_listeners(sh("ss", "-H", "-ltnup").stdout))
@@ -881,6 +968,7 @@ def apply(cfg, reality, tls, wg):
         else:
             sh("systemctl", "restart", "wg-quick@wg0")
     dnstt = apply_dnstt(cfg, errors, udp_busy)
+    apply_mtproto(cfg, errors, tcp_busy)
     ensure_forwarding()
     fix_ppp_options()
     restart_on_config_change("strongswan-starter", ["/etc/ipsec.conf"])

@@ -34,6 +34,7 @@ PROTOCOLS = {
     "l2tp": _p("L2TP/IPsec", "strongSwan + xl2tpd", 1701, "داخلی در iOS، اندروید و ویندوز", uri=False, fixed=True),
     "ikev2": _p("IKEv2/IPsec", "strongSwan", 500, "پایدار روی موبایل؛ نیاز به گواهی معتبر", uri=False, fixed=True, counted=False),
     "dnstt": _p("DNSTT (تونل DNS)", "dnstt-server", 5300, "خیلی کند؛ فقط وقتی همه‌چیز بسته است و DNS کار می‌کند", uri=False),
+    "mtproto": _p("پروکسی تلگرام (MTProto)", "mtg", 8883, "فقط برای تلگرام؛ لینک یک‌کلیکی؛ حجم کاربر مصرف نمی‌شود", uri=False, counted=False),
     "anyc": _p("Cisco AnyConnect", "ocserv", 4443, "سازگار با کلاینت‌های AnyConnect/OpenConnect", uri=False),
 }
 

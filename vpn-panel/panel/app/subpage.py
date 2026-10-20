@@ -14,7 +14,7 @@ STATUS_HINT = {"disabled": "این اشتراک غیرفعال شده است. ب
                "quota": "حجم این اشتراک تمام شده است. برای تمدید یا افزایش حجم با پشتیبانی تماس بگیرید."}
 FIELD_LABELS = {"server": "سرور", "username": "نام کاربری", "password": "رمز", "psk": "کلید اشتراکی (PSK)", "remote_id": "Remote ID",
                 "address": "آدرس داخلی", "domain": "دامنه‌ی تونل", "public_key": "کلید عمومی", "uuid": "UUID", "local_port": "پورت محلی",
-                "ssh_user": "نام کاربری SSH", "ssh_password": "رمز SSH", "dns": "DNS"}
+                "port": "پورت", "secret": "Secret", "ssh_user": "نام کاربری SSH", "ssh_password": "رمز SSH", "dns": "DNS"}
 ICONS = {
     "copy": '<rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
     "qr": '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v3M14 20h3M20 20h1"/>',
@@ -22,6 +22,7 @@ ICONS = {
     "info": '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
     "moon": '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>',
     "shield": '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
+    "send": '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
     "headset": '<path d="M3 14v-2a9 9 0 0 1 18 0v2"/><path d="M21 15a2 2 0 0 1-2 2h-1v-5h1a2 2 0 0 1 2 2zM3 15a2 2 0 0 0 2 2h1v-5H5a2 2 0 0 0-2 2z"/>',
 }
 
@@ -43,6 +44,8 @@ def qr_text(entry: dict) -> str | None:
     """What a QR code of this config should hold: its share link, or the WireGuard file; nothing for the rest."""
     if entry.get("link"):
         return entry["link"]
+    if entry.get("proto") == "mtproto":
+        return entry.get("copy")
     if entry.get("proto") == "wg":
         return (entry.get("details") or {}).get("config")
     return None
@@ -61,6 +64,8 @@ def _detail_rows(entry: dict) -> str:
 def _entry_row(e: dict, idx: int, sub_url: str) -> str:
     text = e.get("link") or e.get("copy") or ""
     acts = [f'<button class="ib" data-copy="{escape(text, quote=True)}" aria-label="کپی">{_i("copy")}</button>']
+    if e.get("open"):
+        acts.insert(0, f'<a class="ib" href="{escape(e["open"], quote=True)}" aria-label="باز کردن در تلگرام">{_i("send")}</a>')
     if qr_text(e):
         acts.append(f'<button class="ib" data-qr="{idx}" data-title="{escape(e["label"], quote=True)}" aria-label="QR">{_i("qr")}</button>')
     if e.get("file_ext"):

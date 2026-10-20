@@ -15,6 +15,11 @@ def user_ss_key(user_uuid: str) -> str:
     return base64.b64encode(hashlib.sha256((user_uuid + "ss").encode()).digest()[:16]).decode()
 
 
+def mtproto_secret(ss_key: str, domain: str) -> str:
+    """FakeTLS secret of a node's Telegram proxy (shared by its users); the node agent derives the same one."""
+    return "ee" + hashlib.sha256((ss_key + "mtproto").encode()).digest()[:16].hex() + domain.encode().hex()
+
+
 def new_wg_keypair() -> tuple[str, str]:
     key = X25519PrivateKey.generate()
     raw = serialization.Encoding.Raw, serialization.PrivateFormat.Raw, serialization.NoEncryption()
@@ -128,6 +133,12 @@ def build_entry(user: User, node: Node, proto: str, port: int, cdn: bool = False
     elif proto == "ikev2":
         _manual(e, {"server": host, "remote_id": host, "username": user.name, "password": user.password})
         e["summary"] = f"{host} | {user.name} | {user.password}" + (" | گواهی خودامضا: ابتدا CA را نصب کنید" if insecure else "")
+    elif proto == "mtproto":
+        secret = mtproto_secret(node.ss_key, node.reality_sni or REALITY_SNI)
+        link = f"tg://proxy?server={srv}&port={port}&secret={secret}"
+        _manual(e, {"server": srv, "port": port, "secret": secret}, link)
+        e["summary"] = f"برای افزودن در تلگرام لینک را باز کنید ({srv}:{port})"
+        e["open"] = link
     elif proto == "anyc":
         _manual(e, {"server": f"{srv}:{port}", "username": user.name, "password": user.password})
         e["summary"] = f"{srv}:{port} | {user.name} | {user.password}"
