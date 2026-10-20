@@ -1360,3 +1360,15 @@ def test_names_ports_addresses_and_extra_copies_of_a_protocol_per_location():
         left = c.delete(f"/api/node-protocols/{copy['id']}", headers=h).json()
         assert not any(p["extra"] for p in left["protocols"])
         c.delete(f"/api/nodes/{nid}", headers=h)
+
+
+def test_loopback_ports_are_never_handed_out_and_app_js_is_cache_busted():
+    import re
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "RsvN", "cc": "tr", "address": "9.9.9.2"}).json()
+        vless = next(p for p in node["protocols"] if p["proto"] == "vless")
+        for port in (2222, 18466):                                   # the loopback sshd and the DNSTT inner inbound
+            assert c.patch(f"/api/node-protocols/{vless['id']}", headers=h, json={"port": port}).status_code == 422
+        assert re.search(r'<script src="/app\.js\?v=\d+">', c.get("/").text)
+        c.delete(f"/api/nodes/{node['id']}", headers=h)

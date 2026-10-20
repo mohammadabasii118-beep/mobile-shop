@@ -31,7 +31,7 @@ from .subscription import info_entries, new_wg_keypair, subscription_body, user_
 BASE = Path(__file__).resolve().parent
 ROOT = BASE.parent.parent  # vpn-panel/
 GB = 1024 ** 3
-RESERVED_PORTS = {22, 53, 80, 500, 1701, 4500, 10085}  # SSH, DNS, HTTP, IPsec/L2TP, Xray stats API
+RESERVED_PORTS = {22, 53, 80, 500, 1701, 2222, 4500, 10085, 18466}  # SSH, DNS, HTTP, IPsec/L2TP, loopback sshd and DNSTT inbound, Xray stats API
 
 
 def _port_range() -> tuple[int, int]:
@@ -1212,6 +1212,8 @@ def index_page(db: Session = Depends(get_db)):
         html = re.sub(r'(<div class="brand" id="brand">)<span class="logo">.*?</span>(<span>)',
                       lambda m: f'{m.group(1)}<span class="logo img"><img src="{escape(brand["logo"], quote=True)}" alt=""></span>{m.group(2)}', html, count=1, flags=re.S)
     html = re.sub(r'(<div class="brand" id="brand">.*?<span>)پنل چندلوکیشن(<small>)', lambda m: f"{m.group(1)}{name}{m.group(2)}", html, count=1, flags=re.S)
+    # a changed app.js is fetched at once after an update (no hard refresh needed): its mtime is in the URL
+    html = html.replace('<script src="/app.js">', f'<script src="/app.js?v={int((BASE / "static" / "app.js").stat().st_mtime)}">', 1)
     return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
 
