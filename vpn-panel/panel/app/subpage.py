@@ -36,7 +36,7 @@ def app_links(sub_url: str, name: str) -> list[tuple[str, str, str]]:
     enc, nm = quote(sub_url, safe=""), quote(name, safe="")
     b64 = base64.b64encode(sub_url.encode()).decode()
     return [("Hiddify", f"hiddify://import/{sub_url}#{nm}", "iOS · Android"),
-            ("V2Box", f"v2box://install-sub?url={enc}&name={nm}", "iOS"),
+            ("V2Box", f"v2box://install-sub?url={enc}&name={nm}", "iOS · Android"),
             ("v2rayNG", f"v2rayng://install-sub?url={enc}&name={nm}", "Android"),
             ("Streisand", f"streisand://import/{sub_url}#{nm}", "iOS"),
             ("Shadowrocket", f"shadowrocket://add/sub://{b64}?remark={nm}", "iOS"),
