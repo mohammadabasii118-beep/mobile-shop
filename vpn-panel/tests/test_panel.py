@@ -1275,3 +1275,20 @@ def test_dnstt_remote_check_script_is_valid_shell():
     assert subprocess.run(["bash", "-n", str(p)], capture_output=True).returncode == 0
     text = p.read_text()
     assert "| OUT=/usr/local/bin/dnstt-client bash" in text and "Permission denied" in text and '-udp "$RESOLVER:53"' in text
+
+
+def test_first_paint_already_carries_the_panels_brand():
+    import base64 as b64
+    png = "data:image/png;base64," + b64.b64encode(b"\x89PNG\r\n\x1a\n" + b"1" * 30).decode()
+    with TestClient(app) as c:
+        h = admin(c)
+        c.put("/api/branding", headers=h, json={"name": "Speed <VPN>", "color": "#7c3aed", "logo": png})
+        page = c.get("/").text
+        assert "<title>Speed &lt;VPN&gt;</title>" in page                       # name, escaped, in the HTML itself
+        assert "--accent:#7c3aed" in page.split("<head>")[0] + page[:600] and 'style="--accent:#7c3aed' in page
+        assert f'<span class="logo img"><img src="{png}"' in page and f'<link rel="icon" href="{png}">' in page
+        assert "Speed &lt;VPN&gt;<small>" in page and "پنل چندلوکیشن<small>" not in page
+        assert c.get("/").headers["cache-control"] == "no-store" and c.get("/index.html").text == page
+        c.put("/api/branding", headers=h, json={"name": "پنل چندلوکیشن", "logo": "", "color": ""})   # defaults again for later tests
+        plain = c.get("/").text
+        assert "<title>پنل چندلوکیشن</title>" in plain and 'dir="rtl" style=""' in plain and "پنل چندلوکیشن<small>" in plain

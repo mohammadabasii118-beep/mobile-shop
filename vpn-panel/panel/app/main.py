@@ -1111,4 +1111,32 @@ def _404():
     raise HTTPException(404, "پیدا نشد")
 
 
+def _accent_style(hex_color: str) -> str:
+    """The same inline CSS variables app.js sets, so the first paint already has the panel's colour."""
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", hex_color or ""):
+        return ""
+    r, g, b = (int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
+    fg = "#06121a" if 0.299 * r + 0.587 * g + 0.114 * b > 150 else "#ffffff"
+    return (f"--accent:{hex_color};--accent2:color-mix(in srgb, {hex_color} 62%, #0ea5e9);"
+            f"--accent-soft:color-mix(in srgb, {hex_color} 14%, transparent);--glow1:rgba({r},{g},{b},.13);--accent-fg:{fg}")
+
+
+@app.get("/", include_in_schema=False)
+@app.get("/index.html", include_in_schema=False)
+def index_page(db: Session = Depends(get_db)):
+    """The page with the panel's own name, logo and colour already in it: no flash of the defaults while the script loads."""
+    from html import escape
+    brand = get_brand(db)
+    html = (BASE / "static" / "index.html").read_text(encoding="utf-8")
+    name = escape(brand["name"])
+    html = html.replace("<title>پنل چندلوکیشن</title>", f"<title>{name}</title>", 1)
+    html = html.replace('<html lang="fa" dir="rtl">', f'<html lang="fa" dir="rtl" style="{escape(_accent_style(brand["color"]), quote=True)}">', 1)
+    if brand["logo"]:
+        html = html.replace('<link rel="icon" href="data:,">', f'<link rel="icon" href="{escape(brand["logo"], quote=True)}">', 1)
+        html = re.sub(r'(<div class="brand" id="brand">)<span class="logo">.*?</span>(<span>)',
+                      lambda m: f'{m.group(1)}<span class="logo img"><img src="{escape(brand["logo"], quote=True)}" alt=""></span>{m.group(2)}', html, count=1, flags=re.S)
+    html = re.sub(r'(<div class="brand" id="brand">.*?<span>)پنل چندلوکیشن(<small>)', lambda m: f"{m.group(1)}{name}{m.group(2)}", html, count=1, flags=re.S)
+    return HTMLResponse(html, headers={"Cache-Control": "no-store"})
+
+
 app.mount("/", StaticFiles(directory=BASE / "static", html=True), name="static")
