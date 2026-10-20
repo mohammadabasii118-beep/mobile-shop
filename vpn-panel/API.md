@@ -35,3 +35,7 @@ Users with the `dnstt` protocol get one config entry (domain, public key, UUID, 
 Each location lists its protocols as entries. `PATCH /api/node-protocols/{id}` changes one entry: `label` (the name users see), `host` (address in the link, empty = the location's), `port` or `random_port: true`, `enabled`.
 `POST /api/nodes/{id}/protocols/{proto}/instances` adds another copy of an Xray protocol (random free port, up to 8 per location); `DELETE /api/node-protocols/{id}` removes a copy (the main one can only be switched off).
 Users that have a protocol get one config entry per running copy, named as the admin named it. A copy's Xray inbound tag is `<proto>_x<id>` and can be used in routing rules.
+
+### Admin pool, allowed lists, usage
+On `/api/admins`: `max_total_gb` (pool for the sum of the volume of all the admin's users; 0 = none; with a pool a user cannot be unlimited), `allowed_protos` and `allowed_nodes` (empty = all). The server enforces them on `/api/me/users` (403/422) and `/api/me/options` only lists the allowed ones; an empty location choice then means "all allowed locations".
+`GET /api/admins` also returns `active_users`, `allocated_gb` and `used_gb` per admin.

@@ -932,6 +932,9 @@ class AdminIn(BaseModel):
     max_users: int = Field(ge=0, le=100000, default=0)
     max_quota_gb: float = Field(ge=0, le=1000000, default=0)
     max_days: int = Field(ge=0, le=3650, default=0)
+    max_total_gb: float = Field(ge=0, le=100000000, default=0)
+    allowed_protos: list[str] = []
+    allowed_nodes: list[int] = []
     can_delete: bool = False
     can_edit: bool = False
 
@@ -942,14 +945,27 @@ class AdminPatch(BaseModel):
     max_users: int | None = Field(default=None, ge=0, le=100000)
     max_quota_gb: float | None = Field(default=None, ge=0, le=1000000)
     max_days: int | None = Field(default=None, ge=0, le=3650)
+    max_total_gb: float | None = Field(default=None, ge=0, le=100000000)
+    allowed_protos: list[str] | None = None
+    allowed_nodes: list[int] | None = None
     can_delete: bool | None = None
     can_edit: bool | None = None
 
 
+def check_allowed(db: Session, protos: list[str] | None, nodes: list[int] | None) -> None:
+    if protos and (bad := [p for p in protos if p not in PROTOCOLS]):
+        raise HTTPException(422, f"پروتکل ناشناخته: {bad[0]}")
+    if nodes and (bad := [i for i in nodes if i not in set(db.scalars(select(Node.id)))]):
+        raise HTTPException(422, f"لوکیشن ناشناخته: {bad[0]}")
+
+
 def admin_out(a: Admin, db: Session) -> dict:
-    n = len(list(db.scalars(select(User.id).where(User.owner_id == a.id))))
+    mine = list(db.scalars(select(User).where(User.owner_id == a.id)))
     return {"id": a.id, "username": a.username, "enabled": a.enabled, "max_users": a.max_users,
-            "max_quota_gb": a.max_quota_gb, "max_days": a.max_days, "users": n,
+            "max_quota_gb": a.max_quota_gb, "max_days": a.max_days, "users": len(mine),
+            "max_total_gb": a.max_total_gb, "allowed_protos": a.allowed_protos or [], "allowed_nodes": a.allowed_nodes or [],
+            "active_users": sum(1 for u in mine if u.status() == "active"),
+            "allocated_gb": round(sum(u.quota_bytes for u in mine) / GB, 2), "used_gb": round(sum(u.used_bytes for u in mine) / GB, 2),
             "can_delete": a.can_delete, "can_edit": a.can_edit}
 
 
@@ -962,8 +978,10 @@ def list_admins(db: Session = Depends(get_db)):
 def create_admin(body: AdminIn, db: Session = Depends(get_db)):
     if db.scalar(select(Admin).where(Admin.username == body.username)):
         raise HTTPException(409, "این نام کاربری ادمین وجود دارد")
+    check_allowed(db, body.allowed_protos, body.allowed_nodes)
     a = Admin(username=body.username, pw_hash=hash_pw(body.password), max_users=body.max_users,
-              max_quota_gb=body.max_quota_gb, max_days=body.max_days, can_delete=body.can_delete, can_edit=body.can_edit)
+              max_quota_gb=body.max_quota_gb, max_days=body.max_days, can_delete=body.can_delete, can_edit=body.can_edit,
+              max_total_gb=body.max_total_gb, allowed_protos=body.allowed_protos, allowed_nodes=body.allowed_nodes)
     db.add(a)
     db.commit()
     return admin_out(a, db)
@@ -974,7 +992,8 @@ def patch_admin(admin_id: int, body: AdminPatch, db: Session = Depends(get_db)):
     a = db.get(Admin, admin_id) or _404()
     if body.enabled is not None:
         a.enabled = body.enabled
-    for f in ("max_users", "max_quota_gb", "max_days", "can_delete", "can_edit"):
+    check_allowed(db, body.allowed_protos, body.allowed_nodes)
+    for f in ("max_users", "max_quota_gb", "max_days", "max_total_gb", "allowed_protos", "allowed_nodes", "can_delete", "can_edit"):
         if getattr(body, f) is not None:
             setattr(a, f, getattr(body, f))
     if body.password is not None:
@@ -1002,13 +1021,15 @@ def me(authorization: str | None = Header(None), db: Session = Depends(get_db)):
     if _is_api_key(token) or (parse_token(token) or ("",))[0] == "sudo":
         return {"role": "sudo"}
     a = require_reseller(authorization, db)
-    return {"role": "reseller", "username": a.username, **{k: v for k, v in admin_out(a, db).items() if k in ("max_users", "max_quota_gb", "max_days", "users", "can_delete", "can_edit")}}
+    return {"role": "reseller", "username": a.username, **{k: v for k, v in admin_out(a, db).items() if k in ("max_users", "max_quota_gb", "max_days", "users", "can_delete", "can_edit", "max_total_gb", "allocated_gb", "allowed_protos", "allowed_nodes")}}
 
 
 @app.get("/api/me/options")
 def me_options(admin: Admin = Depends(require_reseller), db: Session = Depends(get_db)):
-    return {"protocols": [{"id": k, "label": v["label"], "counted": v["counted"]} for k, v in PROTOCOLS.items()],
-            "nodes": [{"id": n.id, "cc": n.cc, "name": n.name} for n in db.scalars(select(Node).order_by(Node.id))]}
+    return {"protocols": [{"id": k, "label": v["label"], "counted": v["counted"]} for k, v in PROTOCOLS.items()
+                          if not admin.allowed_protos or k in admin.allowed_protos],
+            "nodes": [{"id": n.id, "cc": n.cc, "name": n.name} for n in db.scalars(select(Node).order_by(Node.id))
+                      if not admin.allowed_nodes or n.id in admin.allowed_nodes]}
 
 
 @app.get("/api/me/users")
@@ -1024,9 +1045,26 @@ def me_create_user(body: "UserIn", request: Request, admin: Admin = Depends(requ
         raise HTTPException(422, f"حجم باید بیشتر از صفر و حداکثر {admin.max_quota_gb:g} گیگابایت باشد")
     if admin.max_days and not 0 < body.days <= admin.max_days:
         raise HTTPException(422, f"مدت باید بیشتر از صفر و حداکثر {admin.max_days} روز باشد")
+    if admin.allowed_protos and (bad := [p for p in body.protos if p not in admin.allowed_protos]):
+        raise HTTPException(403, f"این پروتکل برای شما مجاز نیست: {bad[0]}")
     known = set(db.scalars(select(Node.id)))
     body.node_ids = [i for i in body.node_ids if i in known]
+    if admin.allowed_nodes:
+        if bad := [i for i in body.node_ids if i not in admin.allowed_nodes]:
+            raise HTTPException(403, "این لوکیشن برای شما مجاز نیست")
+        body.node_ids = body.node_ids or list(admin.allowed_nodes)   # "all locations" means all the ones they may use
+    if admin.max_total_gb:
+        if body.quota_gb <= 0:
+            raise HTTPException(422, "با سقف کل حجم، کاربر بدون محدودیت حجم نمی‌شود ساخت")
+        left = admin.max_total_gb - allocated_gb(db, admin)
+        if body.quota_gb > left + 1e-9:
+            raise HTTPException(403, f"سقف کل حجم شما کم است؛ {max(0, left):.2f} گیگابایت باقی مانده")
     return user_out(new_user(db, body, admin), request)
+
+
+def allocated_gb(db: Session, admin: Admin) -> float:
+    """Volume already handed to the admin's users (what counts against their pool)."""
+    return sum(u.quota_bytes for u in db.scalars(select(User).where(User.owner_id == admin.id))) / GB
 
 
 def own_user(db: Session, admin: Admin, user_id: int) -> User:
@@ -1052,6 +1090,12 @@ def me_patch_user(user_id: int, body: MeUserPatch, request: Request, admin: Admi
     user = own_user(db, admin, user_id)
     if admin.max_quota_gb and body.quota_gb is not None and not 0 < body.quota_gb <= admin.max_quota_gb:
         raise HTTPException(422, f"حجم باید بیشتر از صفر و حداکثر {admin.max_quota_gb:g} گیگابایت باشد")
+    if admin.max_total_gb and body.quota_gb is not None:
+        if body.quota_gb <= 0:
+            raise HTTPException(422, "با سقف کل حجم، کاربر بدون محدودیت حجم نمی‌شود")
+        left = admin.max_total_gb - allocated_gb(db, admin) + user.quota_bytes / GB    # the user's own volume is handed back first
+        if body.quota_gb > left + 1e-9:
+            raise HTTPException(403, f"سقف کل حجم شما کم است؛ برای این کاربر حداکثر {max(0, left):.2f} گیگابایت می‌شود")
     if admin.max_days:
         if body.days is not None and not 0 < body.days <= admin.max_days:
             raise HTTPException(422, f"مدت باید بیشتر از صفر و حداکثر {admin.max_days} روز باشد")

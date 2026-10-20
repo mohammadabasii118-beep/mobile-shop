@@ -99,6 +99,9 @@ class Admin(Base):
     max_users: Mapped[int] = mapped_column(default=0)          # 0 = no cap
     max_quota_gb: Mapped[float] = mapped_column(default=0)     # per user; 0 = no cap
     max_days: Mapped[int] = mapped_column(default=0)           # per user; 0 = no cap
+    max_total_gb: Mapped[float] = mapped_column(default=0)     # pool: sum of the volume of all their users; 0 = no cap
+    allowed_protos: Mapped[list] = mapped_column(JSON, default=list)   # protocols they may give users; empty = all
+    allowed_nodes: Mapped[list] = mapped_column(JSON, default=list)    # locations they may give users; empty = all
     can_delete: Mapped[bool] = mapped_column(default=False)    # may delete the users they created
     can_edit: Mapped[bool] = mapped_column(default=False)      # may renew, change volume/time, enable/disable their users
     token_ver: Mapped[int] = mapped_column(default=0)          # bumped on password change: older sessions die

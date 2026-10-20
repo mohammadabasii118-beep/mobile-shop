@@ -1,6 +1,6 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: [], brand: {name: 'پنل چندلوکیشن', logo: '', color: ''}, dnstt: null};
+const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: [], brand: {name: 'پنل چندلوکیشن', logo: '', color: ''}, dnstt: null, owner: ''};
 const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', routing: 'مسیریابی', users: 'کاربران', admins: 'ادمین‌ها', look: 'ظاهر پنل'};
 const STATUS = {active: ['good', 'فعال'], disabled: ['bad', 'غیرفعال'], expired: ['bad', 'منقضی'], quota: ['bad', 'حجم تمام شده']};
 
@@ -147,7 +147,8 @@ const views = {
         </tbody></table></div></div>`;
   },
   users() {
-    const q = S.q.trim().toLowerCase(), rows = S.users.filter(u => !q || u.name.toLowerCase().includes(q)), rs = isReseller();
+    const q = S.q.trim().toLowerCase(), rs = isReseller(), own = S.owner;
+    const rows = S.users.filter(u => (!q || u.name.toLowerCase().includes(q)) && (!own || (own === 'main' ? !u.owner_id : u.owner_id === +own)));
     const allOn = rows.length && rows.every(u => S.sel.has(u.id));
     const owner = u => u.owner_id ? ((S.admins.find(a => a.id === u.owner_id) || {}).username || '؟') : '';
     const bar = !rs && S.sel.size ? `<div class="panel" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${S.sel.size} کاربر انتخاب شده</b>
@@ -155,8 +156,9 @@ const views = {
       <button class="btn sm" id="bulkDel" style="color:var(--bad)">حذف انتخاب‌شده‌ها</button>
       <button class="btn sm" id="selClear">لغو انتخاب</button></div>` : '';
     const limits = rs ? `<div class="note">شما ${S.me.users} کاربر ساخته‌اید${S.me.max_users ? ` از حداکثر ${S.me.max_users}` : ''}.
-      ${S.me.max_quota_gb ? ` حجم هر کاربر تا ${S.me.max_quota_gb} گیگابایت.` : ''}${S.me.max_days ? ` مدت هر کاربر تا ${S.me.max_days} روز.` : ''}</div>` : '';
+      ${S.me.max_total_gb ? ` سقف کل حجم شما ${fmtGB(S.me.max_total_gb)} گیگابایت است و ${fmtGB(S.me.allocated_gb)} را واگذار کرده‌اید (${fmtGB(Math.max(0, S.me.max_total_gb - S.me.allocated_gb))} باقی مانده).` : ''}${S.me.max_quota_gb ? ` حجم هر کاربر تا ${S.me.max_quota_gb} گیگابایت.` : ''}${S.me.max_days ? ` مدت هر کاربر تا ${S.me.max_days} روز.` : ''}</div>` : '';
     return `${limits}<div class="panel" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="search" id="uq" placeholder="جست‌وجوی نام کاربر…" value="${esc(S.q)}" style="max-width:260px" dir="ltr">
+        ${!rs && S.admins.length ? `<select id="uo" style="max-width:220px"><option value="">همه‌ی کاربران</option><option value="main" ${own === 'main' ? 'selected' : ''}>ساخته‌ی مدیر اصلی</option>${S.admins.map(a => `<option value="${a.id}" ${own === String(a.id) ? 'selected' : ''}>ساخته‌ی ${esc(a.username)}</option>`).join('')}</select>` : ''}
         <span class="muted">${rows.length} از ${S.users.length} کاربر</span></div>${bar}
       <div class="panel scroll"><table><thead><tr>${rs ? '' : `<th><input type="checkbox" id="selAll" ${allOn ? 'checked' : ''} aria-label="انتخاب همه‌ی نتیجه‌ها"></th>`}<th>کاربر</th><th>مصرف</th><th>انقضا</th><th>پروتکل‌ها</th><th>وضعیت</th>${rs || !S.admins.length ? '' : '<th>ساخته‌شده توسط</th>'}<th></th></tr></thead><tbody>
       ${rows.map(u => { const pc = u.quota_gb ? Math.min(100, u.used_gb / u.quota_gb * 100) : 0; const st = STATUS[u.status];
@@ -185,12 +187,16 @@ const views = {
   admins() {
     const pill = a => a.enabled ? '<span class="pill good">فعال</span>' : '<span class="pill bad">غیرفعال</span>';
     return `<div class="note">ادمین فرعی (همکار) با نام کاربری و رمز خودش وارد می‌شود و به‌صورت پیش‌فرض <b>فقط می‌تواند کاربر بسازد</b> و کاربران خودش را ببیند و لینک و کانفیگشان را بردارد. حذف و ویرایش را برای هر ادمین جدا می‌توانید اجازه بدهید. به لوکیشن‌ها، تنظیمات و کاربران دیگران دسترسی ندارد.</div>
-      <div class="panel scroll"><table><thead><tr><th>نام کاربری</th><th>کاربران</th><th>حداکثر حجم هر کاربر</th><th>حداکثر مدت</th><th>دسترسی‌ها</th><th>وضعیت</th><th></th></tr></thead><tbody>
+      <div class="panel scroll"><table><thead><tr><th>نام کاربری</th><th>کاربران (فعال / کل)</th><th>حجم واگذارشده</th><th>مصرف‌شده</th><th>سقف هر کاربر</th><th>دسترسی‌ها</th><th>وضعیت</th><th></th></tr></thead><tbody>
       ${S.admins.map(a => `<tr><td><div class="who"><span class="av">${esc(a.username.charAt(0))}</span><span class="mono">${esc(a.username)}</span></div></td>
-        <td>${num(a.users + ' / ' + (a.max_users || '∞'))}</td><td>${a.max_quota_gb ? num(a.max_quota_gb + ' GB') : 'بدون سقف'}</td><td>${a.max_days ? a.max_days + ' روز' : 'بدون سقف'}</td>
-        <td><span class="pill acc">ساخت</span> ${a.can_edit ? '<span class="pill acc">ویرایش و تمدید</span> ' : ''}${a.can_delete ? '<span class="pill warn">حذف</span>' : ''}</td><td>${pill(a)}</td>
+        <td>${num(a.active_users + ' / ' + a.users + (a.max_users ? ' (سقف ' + a.max_users + ')' : ''))}</td>
+        <td><div style="display:flex;gap:8px;align-items:center"><div class="bar"><i class="${loadCls(a.max_total_gb ? a.allocated_gb / a.max_total_gb * 100 : 0)}" style="width:${a.max_total_gb ? Math.min(100, a.allocated_gb / a.max_total_gb * 100) : 0}%"></i></div><span class="muted">${num(fmtGB(a.allocated_gb) + ' / ' + (a.max_total_gb ? fmtGB(a.max_total_gb) : '∞') + ' GB')}</span></div></td>
+        <td>${num(fmtGB(a.used_gb) + ' GB')}</td>
+        <td>${a.max_quota_gb ? num(a.max_quota_gb + ' GB') : 'بدون سقف'}${a.max_days ? ' · ' + a.max_days + ' روز' : ''}</td>
+        <td><span class="pill acc">ساخت</span> ${a.can_edit ? '<span class="pill acc">ویرایش و تمدید</span> ' : ''}${a.can_delete ? '<span class="pill warn">حذف</span> ' : ''}
+          ${a.allowed_protos.length ? `<span class="pill" title="${esc(a.allowed_protos.map(protoLabel).join('، '))}">${a.allowed_protos.length} پروتکل</span> ` : ''}${a.allowed_nodes.length ? `<span class="pill" title="${esc(a.allowed_nodes.map(i => (nodeBy(i) || {name: i}).name).join('، '))}">${a.allowed_nodes.length} لوکیشن</span>` : ''}</td><td>${pill(a)}</td>
         <td><div class="chips" style="flex-wrap:nowrap"><button class="btn sm" data-editadmin="${a.id}">ویرایش</button><button class="btn sm" data-toggleadmin="${a.id}">${a.enabled ? 'غیرفعال' : 'فعال'}</button><button class="btn sm danger" data-deladmin="${a.id}">حذف</button></div></td></tr>`).join('')
-        || '<tr><td colspan="7" class="muted">هنوز ادمین فرعی نساخته‌اید.</td></tr>'}</tbody></table></div>`;
+        || '<tr><td colspan="8" class="muted">هنوز ادمین فرعی نساخته‌اید.</td></tr>'}</tbody></table></div>`;
   },
 };
 
@@ -377,7 +383,12 @@ function adminForm(a) {
     ${a ? '' : '<label class="f">نام کاربری<input type="text" id="adUser" dir="ltr" placeholder="sara"></label>'}
     <label class="f">${a ? 'رمز جدید (خالی = بدون تغییر)' : 'رمز (حداقل ۸ کاراکتر)'}<input type="text" id="adPass" dir="ltr" autocomplete="off"></label></div>
     <div class="form">${n('adMax', 'حداکثر تعداد کاربر', a ? a.max_users : 20, 'صفر = بدون سقف')}${n('adQuota', 'حداکثر حجم هر کاربر (GB)', a ? a.max_quota_gb : 50, 'صفر = بدون سقف؛ اگر سقف بگذارید، کاربر نامحدود نمی‌سازد')}
-    ${n('adDays', 'حداکثر مدت هر کاربر (روز)', a ? a.max_days : 60, 'صفر = بدون سقف')}</div>
+    ${n('adDays', 'حداکثر مدت هر کاربر (روز)', a ? a.max_days : 60, 'صفر = بدون سقف')}
+    ${n('adTotal', 'سقف کل حجم همه‌ی کاربرانش (GB)', a ? a.max_total_gb : 0, 'صفر = بدون سقف؛ مجموع حجمِ کاربرانی که می‌سازد از این سقف کم می‌شود')}</div>
+    <div><div class="muted" style="margin-bottom:6px">پروتکل‌هایی که می‌تواند به کاربر بدهد (هیچ‌کدام = همه)</div><div class="chips" id="adProtos">
+      ${S.protos.map(x => `<label><input type="checkbox" value="${x.id}" ${a && a.allowed_protos.includes(x.id) ? 'checked' : ''}>${esc(x.label)}</label>`).join('')}</div></div>
+    <div><div class="muted" style="margin-bottom:6px">لوکیشن‌هایی که می‌تواند به کاربر بدهد (هیچ‌کدام = همه)</div><div class="chips" id="adNodes">
+      ${S.nodes.map(x => `<label><input type="checkbox" value="${x.id}" ${a && a.allowed_nodes.includes(x.id) ? 'checked' : ''}>${esc(x.cc)} ${esc(x.name)}</label>`).join('')}</div></div>
     <div><div class="muted" style="margin-bottom:6px">دسترسی‌ها (ساخت و دیدن کاربران خودش همیشه هست)</div><div class="chips">
       <label><input type="checkbox" id="adEdit" ${a && a.can_edit ? 'checked' : ''}>ویرایش و تمدید کاربران خودش</label>
       <label><input type="checkbox" id="adDel" ${a && a.can_delete ? 'checked' : ''}>حذف کاربران خودش</label></div></div>
@@ -462,7 +473,9 @@ document.addEventListener('click', async e => {
     else if (d.editadmin) adminForm(S.admins.find(x => x.id === +d.editadmin));
     else if (t.id === 'adSave') {
       const v = id => $('#' + id).value.trim(), body = {max_users: +v('adMax') || 0, max_quota_gb: +v('adQuota') || 0, max_days: +v('adDays') || 0,
-        can_edit: $('#adEdit').checked, can_delete: $('#adDel').checked};
+        max_total_gb: +v('adTotal') || 0, can_edit: $('#adEdit').checked, can_delete: $('#adDel').checked,
+        allowed_protos: [...document.querySelectorAll('#adProtos input:checked')].map(x => x.value),
+        allowed_nodes: [...document.querySelectorAll('#adNodes input:checked')].map(x => +x.value)};
       if (d.id) { if (v('adPass')) body.password = v('adPass'); await api('PATCH', '/admins/' + d.id, body); }
       else await api('POST', '/admins', {...body, username: v('adUser'), password: v('adPass')});
       closeModal(); await refresh(); toast('ذخیره شد');
@@ -563,6 +576,7 @@ document.addEventListener('change', async e => {
     catch (err) { toast(err.message); }
     return;
   }
+  if (e.target.id === 'uo') { S.owner = e.target.value; render(); return; }
   if (e.target.dataset.sel) { const id = +e.target.dataset.sel; e.target.checked ? S.sel.add(id) : S.sel.delete(id); render(); return; }
   if (e.target.id === 'selAll') {
     const q = S.q.trim().toLowerCase();

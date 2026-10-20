@@ -1372,3 +1372,45 @@ def test_loopback_ports_are_never_handed_out_and_app_js_is_cache_busted():
             assert c.patch(f"/api/node-protocols/{vless['id']}", headers=h, json={"port": port}).status_code == 422
         assert re.search(r'<script src="/app\.js\?v=\d+">', c.get("/").text)
         c.delete(f"/api/nodes/{node['id']}", headers=h)
+
+
+def test_sub_admin_pool_allowed_protocols_locations_and_usage_stats():
+    with TestClient(app) as c:
+        h = admin(c)
+        n1 = c.post("/api/nodes", headers=h, json={"name": "PoolA", "cc": "tr", "address": "9.8.0.1"}).json()
+        n2 = c.post("/api/nodes", headers=h, json={"name": "PoolB", "cc": "fr", "address": "9.8.0.2"}).json()
+        assert c.post("/api/admins", headers=h, json={"username": "badp", "password": "longpass1", "allowed_protos": ["nope"]}).status_code == 422
+        assert c.post("/api/admins", headers=h, json={"username": "badn", "password": "longpass1", "allowed_nodes": [999999]}).status_code == 422
+        a = c.post("/api/admins", headers=h, json={"username": "pooly", "password": "longpass1", "max_total_gb": 100, "can_edit": True,
+                                                    "allowed_protos": ["vless", "hy2"], "allowed_nodes": [n1["id"]]}).json()
+        sh = {"Authorization": "Bearer " + c.post("/api/login", json={"username": "pooly", "password": "longpass1"}).json()["token"]}
+        opts = c.get("/api/me/options", headers=sh).json()
+        assert {p["id"] for p in opts["protocols"]} == {"vless", "hy2"} and [n["id"] for n in opts["nodes"]] == [n1["id"]]
+        mk = lambda name, **kw: c.post("/api/me/users", headers=sh, json={"name": name, "protos": ["vless"], "quota_gb": 40, "days": 30, **kw})
+        # allowed lists are enforced by the server, not only hidden in the form
+        assert mk("pool_bad1", protos=["trojan"]).status_code == 403
+        assert mk("pool_bad2", node_ids=[n2["id"]]).status_code == 403
+        r = mk("pool_u1")
+        assert r.status_code == 200 and r.json()["node_ids"] == [n1["id"]]            # "all locations" = the ones they may use
+        assert mk("pool_bad3", quota_gb=0).status_code == 422                           # no unlimited volume inside a pool
+        assert mk("pool_u2").status_code == 200                                         # 80 of 100 handed out
+        too = mk("pool_u3")
+        assert too.status_code == 403 and "20.00" in too.text                           # only 20 GB are left
+        assert mk("pool_u3", quota_gb=20).status_code == 200                            # exactly the rest fits
+        mine = {u["name"]: u for u in c.get("/api/me/users", headers=sh).json()}
+        me = c.get("/api/me", headers=sh).json()
+        assert me["allocated_gb"] == 100 and me["max_total_gb"] == 100
+        # editing: raising a user needs room; lowering gives it back
+        assert c.patch(f"/api/me/users/{mine['pool_u1']['id']}", headers=sh, json={"quota_gb": 41}).status_code == 403
+        assert c.patch(f"/api/me/users/{mine['pool_u1']['id']}", headers=sh, json={"quota_gb": 10}).status_code == 200
+        assert c.patch(f"/api/me/users/{mine['pool_u3']['id']}", headers=sh, json={"quota_gb": 50}).status_code == 200
+        # the main admin sees per-admin numbers
+        row = next(x for x in c.get("/api/admins", headers=h).json() if x["id"] == a["id"])
+        assert (row["users"], row["active_users"], row["allocated_gb"], row["max_total_gb"]) == (3, 3, 100.0, 100)
+        assert row["allowed_protos"] == ["vless", "hy2"] and row["allowed_nodes"] == [n1["id"]] and row["used_gb"] == 0
+        # lifting the restrictions again
+        c.patch(f"/api/admins/{a['id']}", headers=h, json={"allowed_protos": [], "allowed_nodes": [], "max_total_gb": 0})
+        assert len(c.get("/api/me/options", headers=sh).json()["nodes"]) >= 2
+        assert mk("pool_free", protos=["trojan"], quota_gb=0).status_code == 200
+        for n in (n1, n2):
+            c.delete(f"/api/nodes/{n['id']}", headers=h)
