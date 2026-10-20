@@ -31,13 +31,21 @@ def _i(name: str) -> str:
     return f'<svg class="i" viewBox="0 0 24 24" aria-hidden="true">{ICONS[name]}</svg>'
 
 
-def app_links(sub_url: str, name: str) -> list[tuple[str, str]]:
-    """One-tap import links of the common client apps (they all accept the subscription URL)."""
+def app_links(sub_url: str, name: str) -> list[tuple[str, str, str]]:
+    """One-tap import links (app, url, platforms) of the common client apps; they all accept the subscription URL."""
     enc, nm = quote(sub_url, safe=""), quote(name, safe="")
     b64 = base64.b64encode(sub_url.encode()).decode()
-    return [("Hiddify", f"hiddify://import/{sub_url}#{nm}"), ("v2rayNG", f"v2rayng://install-sub?url={enc}&name={nm}"),
-            ("Streisand", f"streisand://import/{sub_url}#{nm}"), ("Shadowrocket", f"shadowrocket://add/sub://{b64}?remark={nm}"),
-            ("sing-box", f"sing-box://import-remote-profile?url={enc}#{nm}")]
+    return [("Hiddify", f"hiddify://import/{sub_url}#{nm}", "iOS · Android"),
+            ("V2Box", f"v2box://install-sub?url={enc}&name={nm}", "iOS"),
+            ("v2rayNG", f"v2rayng://install-sub?url={enc}&name={nm}", "Android"),
+            ("Streisand", f"streisand://import/{sub_url}#{nm}", "iOS"),
+            ("Shadowrocket", f"shadowrocket://add/sub://{b64}?remark={nm}", "iOS"),
+            ("sing-box", f"sing-box://import-remote-profile?url={enc}#{nm}", "iOS · Android"),
+            ("NekoBox", f"sn://subscription?url={enc}&name={nm}", "Android"),
+            ("Happ", f"happ://add/{sub_url}", "iOS · Android"),
+            ("V2RayTun", f"v2raytun://import/{sub_url}", "iOS · Android"),
+            ("Karing", f"karing://install-config?url={enc}&name={nm}", "iOS · Android"),
+            ("Clash / FlClash", f"clash://install-config?url={enc}&name={nm}", "Android · PC")]
 
 
 def qr_text(entry: dict) -> str | None:
@@ -99,7 +107,7 @@ def render_sub_page(user: User, entries: list[dict], days_left: int | None, sub_
         for name, items in groups.items())
     if not cards:
         cards = f'<p class="muted empty">{escape(STATUS_HINT.get(status, "فعلاً کانفیگی برای نمایش نیست."))}</p>'
-    apps = "".join(f'<a class="chip" href="{escape(u, quote=True)}">{escape(n)}</a>' for n, u in app_links(sub_url, user.name)) if status == "active" else ""
+    apps = "".join(f'<a class="chip" href="{escape(u, quote=True)}">{escape(n)}<small>{pl}</small></a>' for n, u, pl in app_links(sub_url, user.name)) if status == "active" else ""
     logo = (f'<img src="{escape(brand["logo"], quote=True)}" alt="" class="blogo">' if brand["logo"]
             else f'<span class="blogo mark">{_i("shield")}</span>')
     brand_name = escape(brand["name"]) if brand["name"] else ""
@@ -114,7 +122,7 @@ def render_sub_page(user: User, entries: list[dict], days_left: int | None, sub_
     ring_txt = "∞" if not quota else f"{pct:.0f}%"
     ring_sub = "نامحدود" if not quota else "مصرف شده"
     quota_txt = f"{quota_gb:.2f} GB" if quota else "نامحدود"
-    app_row = f'<div class="row2"><span class="muted">افزودن با یک لمس:</span>{apps}</div>' if apps else ""
+    app_row = f'<div class="row2"><span class="muted" style="width:100%">افزودن با یک لمس (برنامه را از قبل نصب کرده باشید):</span>{apps}</div>' if apps else ""
     return f"""<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>{title}</title>
 <link rel="icon" href="{icon}"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap" media="print" onload="this.media='all'">
@@ -158,7 +166,7 @@ code{{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;direction
 .btn.pri{{background:var(--grad);color:#fff;border-color:transparent;font-weight:700}}
 .btn:focus-visible,.ib:focus-visible,.chip:focus-visible,.theme:focus-visible{{outline:2px solid var(--acc);outline-offset:2px}}
 .ib{{all:unset;cursor:pointer;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:var(--muted);flex:none}}.ib:hover{{background:var(--card);color:var(--acc)}}
-.row2{{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}}.chip{{text-decoration:none;color:var(--fg);padding:5px 13px;border-radius:99px;background:var(--soft);border:1px solid transparent;font-size:13px}}.chip:hover{{border-color:var(--acc)}}
+.row2{{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}}.chip{{text-decoration:none;color:var(--fg);padding:5px 13px;border-radius:99px;background:var(--soft);border:1px solid transparent;font-size:13px}}.chip small{{display:block;font-size:10.5px;color:var(--muted);line-height:1.3}}.chip:hover{{border-color:var(--acc)}}
 .grp{{margin-top:14px}}.grp:first-of-type{{margin-top:0}}.ghead{{display:flex;align-items:center;gap:8px;padding:0 2px 2px}}
 .cc{{font:11px ui-monospace,monospace;background:var(--soft);padding:1px 7px;border-radius:6px;color:var(--muted)}}
 .entry{{background:var(--soft);border-radius:14px;padding:6px 10px;margin-top:6px}}
