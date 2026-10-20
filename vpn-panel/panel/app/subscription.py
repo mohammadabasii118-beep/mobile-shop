@@ -47,11 +47,11 @@ def _manual(entry: dict, fields: dict, text: str | None = None) -> dict:
     return entry
 
 
-def build_entry(user: User, node: Node, proto: str, port: int, cdn: bool = False, conn_host: str = "") -> dict | None:
+def build_entry(user: User, node: Node, proto: str, port: int, cdn: bool = False, conn_host: str = "", name: str = "") -> dict | None:
     """One config entry for (user, node, proto). `link` is a share URI. Protocols entered by
     hand or imported from a file have link=None and carry `summary` (one line) and `copy` (full text)."""
     meta = PROTOCOLS[proto]
-    label = meta["label"] + (" · Cloudflare" if cdn else "")
+    label = (name or meta["label"]) + (" · Cloudflare" if cdn else "")
     tag = quote(f"{node.name}-{label}")
     if cdn:  # connect to the CDN (or a clean IP); the domain is the TLS name and Host header
         conn, host, insecure = node.cf_address or node.cf_domain, node.cf_domain, False
@@ -176,6 +176,11 @@ def dnstt_entry(user: User, node: Node, info: dict) -> dict:
     return e
 
 
+def _entry_name(np) -> str:
+    """The admin's own name for the entry; an additional copy without one is told apart by its port."""
+    return np.label or (f"{PROTOCOLS[np.proto]['label']} ({np.port})" if np.extra else "")
+
+
 def user_entries(user: User, nodes: list[Node], dnstt: dict | None = None) -> list[dict]:
     out, dnstt_done = [], False
     for node in nodes:
@@ -188,11 +193,11 @@ def user_entries(user: User, nodes: list[Node], dnstt: dict | None = None) -> li
                     dnstt_done = True
                 continue
             if np.enabled and np.proto in user.protos:
-                e = build_entry(user, node, np.proto, np.port, conn_host=np.host)
+                e = build_entry(user, node, np.proto, np.port, conn_host=np.host, name=_entry_name(np))
                 if e:
                     out.append(e)
                 if node.cf_domain and np.proto in CF_PROTOS and np.port in CF_PORTS:
-                    out.append(build_entry(user, node, np.proto, np.port, cdn=True))
+                    out.append(build_entry(user, node, np.proto, np.port, cdn=True, name=_entry_name(np)))
     return out
 
 

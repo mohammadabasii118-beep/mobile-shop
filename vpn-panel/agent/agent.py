@@ -20,6 +20,7 @@ XRAY_API = "127.0.0.1:10085"
 WS_PATHS = {"vmess_ws": "/ws", "vless_ws": "/vless", "trojan_ws": "/trojan"}
 GRPC_SERVICE = "grpc"
 DNSTT_UPSTREAM_PORT = 18466   # loopback VLESS inbound behind dnstt-server
+XRAY_PROTOS = ["vless", "vless_tcp", "vless_raw", "vless_ws", "vless_grpc", "vmess_ws", "vmess_tcp", "trojan", "trojan_ws", "ss"]
 
 
 def users_for(cfg, proto):
@@ -36,11 +37,6 @@ def render_xray(cfg, reality, tls, busy=frozenset()):
     def tls_stream(network, **extra):
         return {"network": network, "security": "tls", "tlsSettings": {"certificates": certs}, **extra}
 
-    def add(proto, protocol, clients, stream, **settings):
-        if proto in ports and clients:
-            inbounds.append({"tag": proto, "port": ports[proto], "protocol": protocol,
-                             "settings": {"clients": clients, **settings}, "streamSettings": stream})
-
     if cfg.get("dnstt") and cfg["dnstt"].get("inner", "ssh") == "vless" and users_for(cfg, "dnstt"):
         # DNSTT hands every tunnelled stream to this loopback-only inbound, which tells the users apart (and meters them)
         inbounds.append({"tag": "dnstt", "listen": "127.0.0.1", "port": DNSTT_UPSTREAM_PORT, "protocol": "vless",
@@ -48,35 +44,51 @@ def render_xray(cfg, reality, tls, busy=frozenset()):
                                       "decryption": "none"},
                          "streamSettings": {"network": "tcp", "security": "none"}})
     sni = cfg["node"]["reality_sni"]
-    add("vless", "vless",
-        [{"id": u["uuid"], "email": u["name"], "flow": "xtls-rprx-vision"} for u in users_for(cfg, "vless")],
-        {"network": "tcp", "security": "reality", "realitySettings": {
-            "dest": sni + ":443", "serverNames": [sni],
-            "privateKey": reality["private"], "shortIds": [reality["short_id"]]}},
-        decryption="none")
-    vless_plain = lambda p: [{"id": u["uuid"], "email": u["name"]} for u in users_for(cfg, p)]
-    add("vless_tcp", "vless", vless_plain("vless_tcp"), tls_stream("tcp"), decryption="none")
-    add("vless_raw", "vless", vless_plain("vless_raw"), {"network": "tcp", "security": "none"}, decryption="none")
-    add("vless_ws", "vless", vless_plain("vless_ws"),
-        tls_stream("ws", wsSettings={"path": WS_PATHS["vless_ws"]}), decryption="none")
-    add("vless_grpc", "vless", vless_plain("vless_grpc"),
-        tls_stream("grpc", grpcSettings={"serviceName": GRPC_SERVICE}), decryption="none")
-    add("vmess_ws", "vmess",
-        [{"id": u["uuid"], "email": u["name"], "alterId": 0} for u in users_for(cfg, "vmess_ws")],
-        tls_stream("ws", wsSettings={"path": WS_PATHS["vmess_ws"]}))
-    add("vmess_tcp", "vmess",
-        [{"id": u["uuid"], "email": u["name"], "alterId": 0} for u in users_for(cfg, "vmess_tcp")],
-        tls_stream("tcp"))
-    trojan = lambda p: [{"password": u["password"], "email": u["name"]} for u in users_for(cfg, p)]
-    add("trojan", "trojan", trojan("trojan"), tls_stream("tcp"))
-    add("trojan_ws", "trojan", trojan("trojan_ws"),
-        tls_stream("ws", wsSettings={"path": WS_PATHS["trojan_ws"]}))
-    if "ss" in ports and users_for(cfg, "ss"):
-        inbounds.append({
-            "tag": "ss", "port": ports["ss"], "protocol": "shadowsocks",
-            "settings": {"method": cfg["node"]["ss_method"], "password": cfg["node"]["ss_key"],
-                         "network": "tcp,udp",
-                         "clients": [{"password": u["ss_key"], "email": u["name"]} for u in users_for(cfg, "ss")]}})
+
+    def inbound_for(proto, port, tag):
+        """The Xray inbound of one copy of `proto` (the main one is tagged `proto`, additional copies `proto_x<id>`),
+        or None when no user has the protocol."""
+        users = users_for(cfg, proto)
+        if not users:
+            return None
+        plain = [{"id": u["uuid"], "email": u["name"]} for u in users]
+
+        def make(protocol, clients, stream, **settings):
+            return {"tag": tag, "port": port, "protocol": protocol, "settings": {"clients": clients, **settings},
+                    "streamSettings": stream}
+        if proto == "vless":
+            return make("vless", [{"id": u["uuid"], "email": u["name"], "flow": "xtls-rprx-vision"} for u in users],
+                        {"network": "tcp", "security": "reality", "realitySettings": {
+                            "dest": sni + ":443", "serverNames": [sni],
+                            "privateKey": reality["private"], "shortIds": [reality["short_id"]]}}, decryption="none")
+        if proto == "vless_tcp":
+            return make("vless", plain, tls_stream("tcp"), decryption="none")
+        if proto == "vless_raw":
+            return make("vless", plain, {"network": "tcp", "security": "none"}, decryption="none")
+        if proto == "vless_ws":
+            return make("vless", plain, tls_stream("ws", wsSettings={"path": WS_PATHS["vless_ws"]}), decryption="none")
+        if proto == "vless_grpc":
+            return make("vless", plain, tls_stream("grpc", grpcSettings={"serviceName": GRPC_SERVICE}), decryption="none")
+        if proto == "vmess_ws":
+            return make("vmess", [{**c, "alterId": 0} for c in plain], tls_stream("ws", wsSettings={"path": WS_PATHS["vmess_ws"]}))
+        if proto == "vmess_tcp":
+            return make("vmess", [{**c, "alterId": 0} for c in plain], tls_stream("tcp"))
+        if proto in ("trojan", "trojan_ws"):
+            clients = [{"password": u["password"], "email": u["name"]} for u in users]
+            return make("trojan", clients, tls_stream("ws", wsSettings={"path": WS_PATHS["trojan_ws"]}) if proto == "trojan_ws" else tls_stream("tcp"))
+        if proto == "ss":
+            return {"tag": tag, "port": port, "protocol": "shadowsocks",
+                    "settings": {"method": cfg["node"]["ss_method"], "password": cfg["node"]["ss_key"], "network": "tcp,udp",
+                                 "clients": [{"password": u["ss_key"], "email": u["name"]} for u in users]}}
+        return None
+
+    copies = [(p, ports[p], p) for p in XRAY_PROTOS if p in ports]
+    copies += [(e["proto"], e["port"], e["tag"]) for e in cfg.get("extra", [])
+               if e["proto"] in XRAY_PROTOS and e["port"] not in busy]
+    for proto, port, tag in copies:
+        ib = inbound_for(proto, port, tag)
+        if ib:
+            inbounds.append(ib)
     return {
         "log": {"loglevel": "warning"},
         "stats": {},
@@ -140,6 +152,10 @@ def port_conflicts(cfg, foreign):
             if proto in group and (kind, port) in foreign:
                 bag.add(port)
                 notes.append(f"{kind}/{port} {foreign[(kind, port)]} ({proto})")
+    for e in cfg.get("extra", []):   # additional copies of Xray protocols are TCP listeners too
+        if ("tcp", e["port"]) in foreign:
+            tcp.add(e["port"])
+            notes.append(f"tcp/{e['port']} {foreign[('tcp', e['port'])]} ({e['tag']})")
     return tcp, udp, sorted(set(notes))
 
 

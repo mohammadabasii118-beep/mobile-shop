@@ -30,3 +30,8 @@ Users with the `dnstt` protocol get one config entry (domain, public key, UUID, 
 
 ### DNSTT inner protocol
 `inner` on `PUT /api/dnstt` is `ssh` (default; what NetMod's "DNSTT + SSH" speaks) or `vless`. In `ssh` mode each node runs a loopback-only sshd (`127.0.0.1:2222`, its own config, unit `vpn-node-sshd`) and manages accounts `vs_<name>` (group `vpnssh`, shell `nologin`, password = the panel user's password); expired or disabled users are removed and their sessions killed. SSH traffic is **not** counted against the user's volume. In `vless` mode a loopback Xray inbound is used and the traffic is counted.
+
+## Entry names, ports, addresses and extra copies
+Each location lists its protocols as entries. `PATCH /api/node-protocols/{id}` changes one entry: `label` (the name users see), `host` (address in the link, empty = the location's), `port` or `random_port: true`, `enabled`.
+`POST /api/nodes/{id}/protocols/{proto}/instances` adds another copy of an Xray protocol (random free port, up to 8 per location); `DELETE /api/node-protocols/{id}` removes a copy (the main one can only be switched off).
+Users that have a protocol get one config entry per running copy, named as the admin named it. A copy's Xray inbound tag is `<proto>_x<id>` and can be used in routing rules.

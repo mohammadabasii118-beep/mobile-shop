@@ -1292,3 +1292,71 @@ def test_first_paint_already_carries_the_panels_brand():
         c.put("/api/branding", headers=h, json={"name": "پنل چندلوکیشن", "logo": "", "color": ""})   # defaults again for later tests
         plain = c.get("/").text
         assert "<title>پنل چندلوکیشن</title>" in plain and 'dir="rtl" style=""' in plain and "پنل چندلوکیشن<small>" in plain
+
+
+def test_agent_renders_additional_copies_of_xray_protocols():
+    cfg = {"node": {"reality_sni": "x", "ss_method": "m", "ss_key": "k"}, "protocols": {"vless": 443, "vless_raw": 80},
+           "extra": [{"proto": "vless", "port": 8445, "tag": "vless_x7"}, {"proto": "vless_raw", "port": 8081, "tag": "vless_raw_x8"},
+                     {"proto": "vless_ws", "port": 9000, "tag": "vless_ws_x9"}, {"proto": "hy2", "port": 9100, "tag": "hy2_x1"}],
+           "users": [{"name": "a", "uuid": "u-a", "password": "p", "ss_key": "s", "protos": ["vless", "vless_raw"]}]}
+    reality = {"private": "P", "public": "Q", "short_id": "ab"}
+    tls = {"cert": "/c", "key": "/k"}
+    x = {i["tag"]: i for i in agent.render_xray(cfg, reality, tls)["inbounds"]}
+    assert {t for t in x} == {"api", "vless", "vless_raw", "vless_x7", "vless_raw_x8"}       # no users for ws, hy2 is not an Xray copy
+    assert (x["vless_x7"]["port"], x["vless_raw_x8"]["port"]) == (8445, 8081)
+    assert x["vless_x7"]["streamSettings"]["security"] == "reality" and x["vless_x7"]["settings"]["clients"] == x["vless"]["settings"]["clients"]
+    # a busy port drops only that copy
+    x2 = {i["tag"] for i in agent.render_xray(cfg, reality, tls, busy={8445})["inbounds"]}
+    assert "vless_x7" not in x2 and "vless_raw_x8" in x2 and "vless" in x2
+    # conflicts are reported for copies too
+    _, _, notes = agent.port_conflicts(cfg, {("tcp", 8081): "nginx"})
+    assert notes == ["tcp/8081 nginx (vless_raw_x8)"]
+
+
+def test_names_ports_addresses_and_extra_copies_of_a_protocol_per_location():
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "VarN", "cc": "tr", "address": "9.9.9.1"}).json()
+        nid = node["id"]
+        nh = {"Authorization": "Bearer " + node["install_command"].split("--token ")[1].split()[0]}
+        c.post("/api/node/report", headers=nh, json={"reality_pub": "PUB", "reality_sid": "ab"})
+        prim = {p["proto"]: p for p in node["protocols"]}
+        # rename the main copy + address + port, in one call
+        r = c.patch(f"/api/node-protocols/{prim['vless']['id']}", headers=h, json={"label": "همه‌ی نت‌ها", "host": "Tunnel.Example.com", "port": 8443 - 1}).json()
+        main = next(p for p in r["protocols"] if p["id"] == prim["vless"]["id"])
+        assert (main["label"], main["host"], main["port"]) == ("همه‌ی نت‌ها", "tunnel.example.com", 8442)
+        # an additional copy: own port, name and address
+        r = c.post(f"/api/nodes/{nid}/protocols/vless/instances", headers=h).json()
+        copy = next(p for p in r["protocols"] if p["extra"])
+        assert copy["proto"] == "vless" and 10000 <= copy["port"] <= 60000 and copy["label"] == ""
+        c.patch(f"/api/node-protocols/{copy['id']}", headers=h, json={"label": "ایرانسل", "port": 8450, "host": "irancell.example.com"})
+        assert c.patch(f"/api/node-protocols/{copy['id']}", headers=h, json={"port": 8442}).status_code == 409   # taken by the main copy
+        assert c.patch(f"/api/node-protocols/{copy['id']}", headers=h, json={"port": 22}).status_code == 422     # reserved
+        assert c.post(f"/api/nodes/{nid}/protocols/wg/instances", headers=h).status_code == 422                   # not an Xray protocol
+        # the node is told about both copies, and users with the protocol are served
+        u = c.post("/api/users", headers=h, json={"name": "varu", "protos": ["vless"], "node_ids": [nid]}).json()
+        cfg = c.get("/api/node/config", headers=nh).json()
+        assert cfg["protocols"]["vless"] == 8442 and cfg["extra"] == [{"proto": "vless", "port": 8450, "tag": f"vless_x{copy['id']}"}]
+        assert any(x["name"] == "varu" for x in cfg["users"])
+        # users get one entry per copy, named as the admin named them
+        rows = [e for e in c.get(f"/api/users/{u['id']}/configs", headers=h).json() if e["proto"] == "vless"]
+        assert sorted(e["label"] for e in rows) == ["ایرانسل", "همه‌ی نت‌ها"]
+        links = {e["label"]: e["link"] for e in rows}
+        assert "@tunnel.example.com:8442?" in links["همه‌ی نت‌ها"] and "@irancell.example.com:8450?" in links["ایرانسل"]
+        assert links["ایرانسل"].endswith("#" + __import__("urllib.parse").parse.quote("VarN-ایرانسل"))
+        # an unnamed copy is told apart by its port; switching a copy off removes its entry and its inbound
+        c.patch(f"/api/node-protocols/{copy['id']}", headers=h, json={"label": ""})
+        assert any(e["label"] == "VLESS + Reality (8450)" for e in c.get(f"/api/users/{u['id']}/configs", headers=h).json())
+        c.patch(f"/api/node-protocols/{copy['id']}", headers=h, json={"enabled": False})
+        assert c.get("/api/node/config", headers=nh).json()["extra"] == []
+        assert len([e for e in c.get(f"/api/users/{u['id']}/configs", headers=h).json() if e["proto"] == "vless"]) == 1
+        # routing can target a running copy; the main copy cannot be deleted, a copy can
+        c.patch(f"/api/node-protocols/{copy['id']}", headers=h, json={"enabled": True, "label": "ایرانسل"})
+        out = c.post(f"/api/nodes/{nid}/outbounds", headers=h, json={"name": "blk", "kind": "socks", "address": "1.2.3.4", "port": 1080}).json()
+        ids = {i["id"]: i["label"] for i in c.get(f"/api/nodes/{nid}/routing", headers=h).json()["inbound_ids"]}
+        assert ids[f"vless_x{copy['id']}"] == "ایرانسل"
+        assert c.post(f"/api/nodes/{nid}/rules", headers=h, json={"inbounds": [f"vless_x{copy['id']}"], "outbound": "block"}).status_code == 200
+        assert c.delete(f"/api/node-protocols/{prim['vless']['id']}", headers=h).status_code == 422
+        left = c.delete(f"/api/node-protocols/{copy['id']}", headers=h).json()
+        assert not any(p["extra"] for p in left["protocols"])
+        c.delete(f"/api/nodes/{nid}", headers=h)

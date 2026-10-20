@@ -198,7 +198,7 @@ def backup():
 
 # ---------- helpers ----------
 def ensure_protocols(node: Node) -> None:
-    have = {p.proto for p in node.protocols}
+    have = {p.proto for p in node.protocols if not p.extra}
     node.protocols += [NodeProtocol(proto=k, port=v["port"], enabled=k != "dnstt")   # DNSTT needs a domain and builds software: opt-in
                        for k, v in PROTOCOLS.items() if k not in have]
 
@@ -218,8 +218,9 @@ def node_out(node: Node, request: Request) -> dict:
         "reality_sni": node.reality_sni or REALITY_SNI, "cf_domain": node.cf_domain, "cf_address": node.cf_address, "raw_host": node.raw_host, "conflicts": node.conflicts or [], "errors": node.errors or [], "port_range": list(PORT_RANGE),
         "online": is_online(node), "load": node.load, "reality_ready": bool(node.reality_pub),
         "last_seen": node.last_seen.isoformat() + "Z" if node.last_seen else None,
-        "protocols": [{"proto": p.proto, "enabled": p.enabled, "port": p.port, "host": p.host,
-                       "fixed": PROTOCOLS[p.proto]["fixed_port"]} for p in node.protocols],
+        "protocols": [{"id": p.id, "proto": p.proto, "enabled": p.enabled, "port": p.port, "host": p.host,
+                       "label": p.label, "extra": p.extra, "fixed": PROTOCOLS[p.proto]["fixed_port"]}
+                      for p in sorted(node.protocols, key=lambda x: (x.extra, x.id))],
         "install_command": f"bash <(curl -sL {url}/node-install.sh) --token {node.token} --address {node.address}"
                            + ("" if node.address.replace(".", "").isdigit() else " --letsencrypt"),
     }
@@ -339,7 +340,7 @@ class ProtoToggle(BaseModel):
 @app.put("/api/nodes/{node_id}/protocols/{proto}", dependencies=[Depends(require_admin)])
 def toggle_protocol(node_id: int, proto: str, body: ProtoToggle, db: Session = Depends(get_db)):
     node = db.get(Node, node_id) or _404()
-    np = next((p for p in node.protocols if p.proto == proto), None) or _404()
+    np = primary_of(node, proto)
     np.enabled = body.enabled
     db.commit()
     out = {"ok": True}
@@ -361,31 +362,102 @@ def set_proto_host(node_id: int, proto: str, body: HostIn, request: Request, db:
     """Domain or IP that clients of this protocol connect to (a relay, an alias domain, a clean IP). Links only:
     nothing changes on the node."""
     node = db.get(Node, node_id) or _404()
-    np = next((p for p in node.protocols if p.proto == proto), None) or _404()
+    np = primary_of(node, proto)
     np.host = body.host.lower()
     db.commit()
     return node_out(node, request)
 
 
-@app.put("/api/nodes/{node_id}/protocols/{proto}/port", dependencies=[Depends(require_admin)])
-def set_port(node_id: int, proto: str, body: PortIn, request: Request, db: Session = Depends(get_db)):
-    node = db.get(Node, node_id) or _404()
-    np = next((p for p in node.protocols if p.proto == proto), None) or _404()
-    if PROTOCOLS[proto]["fixed_port"]:
+XRAY_PROTOS = [k for k, v in PROTOCOLS.items() if v["engine"] == "xray"]   # only these can have additional copies
+MAX_EXTRA = 8
+
+
+def primary_of(node: Node, proto: str) -> NodeProtocol:
+    return next((p for p in node.protocols if p.proto == proto and not p.extra), None) or _404()
+
+
+def inst_tag(np: NodeProtocol) -> str:
+    """Xray inbound tag: the protocol id for the main copy, `<proto>_x<id>` for additional ones."""
+    return f"{np.proto}_x{np.id}" if np.extra else np.proto
+
+
+def pick_port(node: Node, np: NodeProtocol, wanted: int | None) -> int:
+    """A valid port for this copy: the wanted one, or (None) a random free one in the panel's range."""
+    if PROTOCOLS[np.proto]["fixed_port"]:
         raise HTTPException(422, "پورت این پروتکل طبق استاندارد ثابت است")
     used = {p.port for p in node.protocols if p is not np}
-    if body.port is None:
+    if wanted is None:
         free = [x for x in range(PORT_RANGE[0], PORT_RANGE[1] + 1) if x not in used and x not in RESERVED_PORTS]
         if not free:
             raise HTTPException(409, "پورت آزادی در بازه نمانده است")
-        port = secrets.choice(free)
-    else:
-        port = body.port
-        if port in RESERVED_PORTS and not (proto == "vless_raw" and port == 80):   # plain VLESS may take 80 like x-ui did
-            raise HTTPException(422, f"پورت {port} رزرو است")
-        if port in used:
-            raise HTTPException(409, f"پورت {port} را پروتکل دیگری در این نود استفاده می‌کند")
-    np.port = port
+        return secrets.choice(free)
+    if wanted in RESERVED_PORTS and not (np.proto == "vless_raw" and wanted == 80):   # plain VLESS may take 80 like x-ui did
+        raise HTTPException(422, f"پورت {wanted} رزرو است")
+    if wanted in used:
+        raise HTTPException(409, f"پورت {wanted} را ورودی دیگری در این نود استفاده می‌کند")
+    return wanted
+
+
+@app.put("/api/nodes/{node_id}/protocols/{proto}/port", dependencies=[Depends(require_admin)])
+def set_port(node_id: int, proto: str, body: PortIn, request: Request, db: Session = Depends(get_db)):
+    node = db.get(Node, node_id) or _404()
+    np = primary_of(node, proto)
+    np.port = pick_port(node, np, body.port)
+    db.commit()
+    return node_out(node, request)
+
+
+class NpPatch(BaseModel):
+    label: str | None = Field(default=None, max_length=40)           # the name users see (emoji welcome)
+    enabled: bool | None = None
+    port: int | None = Field(default=None, ge=1, le=65535)
+    random_port: bool = False
+    host: str | None = Field(default=None, pattern=r"^[A-Za-z0-9.\-]{0,253}$")   # "" = the location's address
+
+
+@app.patch("/api/node-protocols/{np_id}", dependencies=[Depends(require_admin)])
+def patch_node_protocol(np_id: int, body: NpPatch, request: Request, db: Session = Depends(get_db)):
+    """Name, port, address and on/off of one entry of a location (the main copy of a protocol or an additional one)."""
+    np = db.get(NodeProtocol, np_id) or _404()
+    node = db.get(Node, np.node_id)
+    if body.label is not None:
+        np.label = body.label.strip()
+    if body.host is not None:
+        np.host = body.host.lower()
+    if body.port is not None or body.random_port:
+        np.port = pick_port(node, np, None if body.random_port else body.port)
+    if body.enabled is not None:
+        np.enabled = body.enabled
+    db.commit()
+    out = node_out(node, request)
+    if np.proto == "dnstt" and body.enabled is not None and dnstt_conf(db)["token"]:
+        out["dns"] = run_dns_sync(db)
+    return out
+
+
+@app.post("/api/nodes/{node_id}/protocols/{proto}/instances", dependencies=[Depends(require_admin)])
+def add_instance(node_id: int, proto: str, request: Request, db: Session = Depends(get_db)):
+    """An additional copy of an Xray protocol on this location: its own random free port, to be named and addressed."""
+    node = db.get(Node, node_id) or _404()
+    if proto not in XRAY_PROTOS:
+        raise HTTPException(422, "فقط پروتکل‌های Xray نسخه‌ی اضافه می‌گیرند")
+    if sum(1 for p in node.protocols if p.extra) >= MAX_EXTRA:
+        raise HTTPException(409, f"حداکثر {MAX_EXTRA} نسخه‌ی اضافه برای هر لوکیشن")
+    np = NodeProtocol(proto=proto, port=0, extra=True)
+    node.protocols.append(np)
+    np.port = pick_port(node, np, None)
+    db.commit()
+    return node_out(node, request)
+
+
+@app.delete("/api/node-protocols/{np_id}", dependencies=[Depends(require_admin)])
+def delete_instance(np_id: int, request: Request, db: Session = Depends(get_db)):
+    np = db.get(NodeProtocol, np_id) or _404()
+    if not np.extra:
+        raise HTTPException(422, "نسخه‌ی اصلی حذف نمی‌شود؛ آن را خاموش کنید")
+    node = db.get(Node, np.node_id)
+    node.protocols.remove(np)
+    db.delete(np)
     db.commit()
     return node_out(node, request)
 
@@ -416,7 +488,9 @@ class RuleIn(BaseModel):
 
 
 def routing_out(node: Node) -> dict:
-    return {"inbound_ids": [{"id": i, "label": PROTOCOLS[i]["label"]} for i in routing.INBOUND_IDS],
+    return {"inbound_ids": [{"id": i, "label": PROTOCOLS[i]["label"]} for i in routing.INBOUND_IDS]
+                           + [{"id": inst_tag(p), "label": p.label or f"{PROTOCOLS[p.proto]['label']} (پورت {p.port})"}
+                              for p in node.protocols if p.extra and p.enabled],
             "outbounds": [{"id": o.id, "name": o.name, "kind": o.kind, "summary": o.data.get("summary", "")}
                           for o in node.outbounds],
             "rules": [{"id": r.id, "enabled": r.enabled, "inbounds": r.inbounds, "ports": r.ports,
@@ -1040,13 +1114,15 @@ def subscription_file(token: str, node_id: int, proto: str, db: Session = Depend
 # ---------- node agent API ----------
 @app.get("/api/node/config")
 def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db)):
-    enabled = {p.proto: p.port for p in node.protocols if p.enabled}
+    enabled = {p.proto: p.port for p in node.protocols if p.enabled and not p.extra}
+    served = {p.proto for p in node.protocols if p.enabled}   # a user needs an account while any copy of the protocol runs
+    extra = [{"proto": p.proto, "port": p.port, "tag": inst_tag(p)} for p in node.protocols if p.enabled and p.extra]
     dc = dnstt_conf(db)
     users = []
     for u in db.scalars(select(User).order_by(User.id)):
         if u.status() != "active" or (u.node_ids and node.id not in u.node_ids):
             continue
-        protos = [p for p in u.protos if p in enabled]
+        protos = [p for p in u.protos if p in served]
         if protos:
             users.append({"name": u.name, "uuid": u.uuid, "password": u.password,
                           "ss_key": user_ss_key(u.uuid), "wg_pub": u.wg_public,
@@ -1056,7 +1132,7 @@ def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db
     return {"agent_sha256": agent_sha, "outbounds": outbounds, "rules": rules,
             "node": {"name": node.name, "reality_sni": node.reality_sni or REALITY_SNI, "ss_method": SS_METHOD,
                      "ss_key": node.ss_key, "l2tp_psk": node.l2tp_psk},
-            "protocols": enabled, "users": users,
+            "protocols": enabled, "extra": extra, "users": users,
             "dnstt": ({"domain": dc["domain"], "privkey": dc["priv"], "inner": dc["inner"]} if "dnstt" in enabled and dc["domain"] else None)}
 
 

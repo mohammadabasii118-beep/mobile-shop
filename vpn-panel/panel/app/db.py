@@ -78,6 +78,8 @@ class NodeProtocol(Base):
     enabled: Mapped[bool] = mapped_column(default=True)
     port: Mapped[int]
     host: Mapped[str] = mapped_column(default="")   # address in this protocol's links; empty = the node address
+    label: Mapped[str] = mapped_column(default="")  # name shown to users and in the link's remark; empty = the protocol's own name
+    extra: Mapped[bool] = mapped_column(default=False)   # an additional copy of the protocol (own port, address, name)
 
 
 class Setting(Base):

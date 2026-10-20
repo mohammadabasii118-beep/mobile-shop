@@ -214,20 +214,25 @@ function dnsttPanel() {
         <td>${cell((st[n.id] || {}).a)}</td><td>${cell((st[n.id] || {}).ns)}</td></tr>`).join('')}</tbody></table></div>
     <div class="note" style="margin-top:10px">${d.pubkey ? `کلید عمومی (برای کلاینت): <span class="mono" style="word-break:break-all">${esc(d.pubkey)}</span>` : 'کلید عمومی بعد از اینکه اولین نود DNSTT را راه انداخت (چند دقیقه، چون برنامه ساخته می‌شود) اینجا می‌آید.'}</div></div>`;
 }
+const XRAY_COPYABLE = ['vless', 'vless_tcp', 'vless_raw', 'vless_ws', 'vless_grpc', 'vmess_ws', 'vmess_tcp', 'trojan', 'trojan_ws', 'ss'];
 function portPanel() {
   if (!S.nodes.length) return '';
   const n = nodeBy(S.portNode) || S.nodes[0], [lo, hi] = n.port_range;
-  return `<div class="panel"><h2>پورت‌ها</h2>
-    <div class="form" style="margin-bottom:10px"><label class="f">لوکیشن<select id="portNode">${S.nodes.map(x => `<option value="${x.id}" ${x.id === n.id ? 'selected' : ''}>${esc(x.cc)} ${esc(x.name)}</option>`).join('')}</select></label></div>
-    <div class="scroll"><table><thead><tr><th>پروتکل</th><th>پورت</th><th></th><th>آدرس در لینک‌ها (دامنه یا IP)</th></tr></thead><tbody>
-    ${n.protocols.map(np => { const p = S.protos.find(x => x.id === np.proto);
-      return `<tr><td>${esc(p.label)}</td><td>${np.fixed ? `<span class="mono">${np.port}</span> <span class="pill">ثابت</span>`
-        : `<input type="number" min="1" max="65535" value="${np.port}" id="port-${np.proto}" style="width:110px" dir="ltr">`}</td>
-        <td>${np.fixed ? '' : `<button class="btn sm" data-setport="${np.proto}" data-nid="${n.id}">ذخیره</button> <button class="btn sm" data-randport="${np.proto}" data-nid="${n.id}">رندوم</button>`}</td>
-        <td><div style="display:flex;gap:6px;align-items:center"><input type="text" id="host-${np.proto}" value="${esc(np.host || '')}" placeholder="خودکار: ${esc(n.address)}" dir="ltr" style="width:200px">
-          <button class="btn sm" data-sethost="${np.proto}" data-nid="${n.id}">ذخیره</button></div></td></tr>`; }).join('')}
+  const base = np => (S.protos.find(x => x.id === np.proto) || {label: np.proto}).label;
+  return `<div class="panel"><h2>${ic('pin')}ورودی‌ها: اسم، پورت و آدرس</h2>
+    <div class="note">هر ردیف یک ورودی از این لوکیشن است. <b>اسمی</b> که می‌نویسید به کاربر نشان داده می‌شود (مثلاً «ایرانسل»، «وای‌فای»، «تانل»)، <b>آدرس</b> دامنه یا IP ای است که لینک به آن وصل می‌شود (خالی = آدرس لوکیشن). با «+ نسخه» از همان پروتکل یک ورودی دیگر با پورت و اسم و آدرس جدا می‌سازید. کاربرانی که آن پروتکل را دارند همه‌ی نسخه‌ها را در اشتراکشان می‌بینند.</div>
+    <div class="form" style="margin:10px 0"><label class="f">لوکیشن<select id="portNode">${S.nodes.map(x => `<option value="${x.id}" ${x.id === n.id ? 'selected' : ''}>${esc(x.cc)} ${esc(x.name)}</option>`).join('')}</select></label></div>
+    <div class="scroll"><table><thead><tr><th>پروتکل</th><th>اسم برای کاربر</th><th>پورت</th><th>آدرس در لینک</th><th></th></tr></thead><tbody>
+    ${n.protocols.map(np => `<tr><td>${esc(base(np))}${np.extra ? ' <span class="pill acc">نسخه‌ی اضافه</span>' : ''}</td>
+      <td><input type="text" id="npl-${np.id}" value="${esc(np.label)}" placeholder="${esc(np.extra ? base(np) + ' (' + np.port + ')' : base(np))}" maxlength="40" style="width:170px"></td>
+      <td>${np.fixed ? `<span class="mono">${np.port}</span> <span class="pill">ثابت</span>` : `<input type="number" min="1" max="65535" value="${np.port}" id="npp-${np.id}" style="width:100px" dir="ltr">`}</td>
+      <td><input type="text" id="nph-${np.id}" value="${esc(np.host || '')}" placeholder="خودکار: ${esc(n.address)}" dir="ltr" style="width:190px"></td>
+      <td><div class="chips" style="flex-wrap:nowrap"><button class="btn sm pri" data-npsave="${np.id}">ذخیره</button>
+        ${np.fixed ? '' : `<button class="btn sm" data-nprand="${np.id}">رندوم</button>`}
+        ${!np.extra && XRAY_COPYABLE.includes(np.proto) ? `<button class="btn sm" data-npadd="${np.proto}" data-nid="${n.id}">+ نسخه</button>` : ''}
+        ${np.extra ? `<label style="display:flex;gap:4px;align-items:center"><input type="checkbox" data-npon="${np.id}" ${np.enabled ? 'checked' : ''}>روشن</label><button class="btn sm danger" data-npdel="${np.id}">حذف</button>` : ''}</div></td></tr>`).join('')}
     </tbody></table></div>
-    <div class="note" style="margin-top:10px">آدرس خالی یعنی خودکار (آدرس خود لوکیشن)؛ با پر کردن آن، لینک همین پروتکل به دامنه یا IP دیگری وصل می‌شود، مثلاً دامنه‌ی تونل یا IP تمیز. رندوم از بازه‌ی ${lo} تا ${hi} انتخاب می‌شود. پورت جدید را در فایروال سرویس‌دهنده باز کنید (بهتر است کل این بازه را از قبل باز بگذارید). لینک‌های قبلی کاربران با پورت قدیمی کار نمی‌کنند؛ کاربران باید اشتراک را به‌روز کنند.</div></div>`;
+    <div class="note" style="margin-top:10px">پورت رندوم از بازه‌ی ${lo} تا ${hi} انتخاب می‌شود؛ پورت‌های جدید را در فایروال سرویس‌دهنده باز کنید (بهتر است کل این بازه را از قبل باز بگذارید). تغییر اسم و آدرس فقط لینک‌ها را عوض می‌کند و روی نود تغییری لازم ندارد؛ تغییر پورت ظرف ۳۰ ثانیه روی نود اعمال می‌شود. لینک‌های قبلیِ پورت قدیمی کار نمی‌کنند و کاربران باید اشتراک را به‌روز کنند.</div></div>`;
 }
 
 function render() {
@@ -413,15 +418,19 @@ document.addEventListener('click', async e => {
       const n = await api('POST', '/nodes', {name: $('#nName').value.trim(), cc: $('#nCc').value.trim(), address: $('#nAddr').value.trim()});
       await refresh(); installDialog(n);
     }
-    else if (d.sethost) {
-      await api('PUT', `/nodes/${d.nid}/protocols/${d.sethost}/host`, {host: $('#host-' + d.sethost).value.trim()});
-      await refresh(); toast('آدرس ذخیره شد؛ اشتراک را در برنامه به‌روز کنید (روی نود تغییری لازم نیست)');
+    else if (d.npsave) {
+      const id = d.npsave, body = {label: $('#npl-' + id).value.trim(), host: $('#nph-' + id).value.trim()}, pe = $('#npp-' + id);
+      if (pe) body.port = +pe.value;
+      await api('PATCH', '/node-protocols/' + id, body); await refresh(); toast('ذخیره شد؛ اشتراک را در برنامه به‌روز کنید');
     }
-    else if (d.setport || d.randport) {
-      const proto = d.setport || d.randport;
-      const port = d.setport ? +$('#port-' + proto).value : null;
-      await api('PUT', `/nodes/${d.nid}/protocols/${proto}/port`, {port}); await refresh(); toast(port ? 'پورت ذخیره شد' : 'پورت رندوم ساخته شد');
+    else if (d.nprand) { await api('PATCH', '/node-protocols/' + d.nprand, {random_port: true}); await refresh(); toast('پورت رندوم ساخته شد'); }
+    else if (d.npadd) { await api('POST', `/nodes/${d.nid}/protocols/${d.npadd}/instances`); await refresh(); toast('نسخه‌ی جدید ساخته شد؛ اسم و آدرسش را بنویسید و ذخیره بزنید'); }
+    else if (d.npdel) {
+      const np = S.nodes.flatMap(x => x.protocols).find(x => x.id === +d.npdel);
+      openModal(`<h2>حذف این نسخه؟</h2><div class="note">«${esc(np.label || 'بدون اسم')}» (پورت ${np.port}) از اشتراک همه‌ی کاربران برداشته می‌شود.</div>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="npDelGo" data-id="${np.id}" style="background:var(--bad)">حذف</button></div>`);
     }
+    else if (t.id === 'npDelGo') { await api('DELETE', '/node-protocols/' + d.id); closeModal(); await refresh(); toast('نسخه حذف شد'); }
     else if (d.editnode) editNodeDialog(nodeBy(+d.editnode));
     else if ('addflag' in d) { const i = $('#enName'), f = flagOf($('#enCc').value); if (f && !i.value.startsWith(f)) i.value = f + ' ' + i.value.replace(/^\p{RI}{2}\s*/u, ''); }
     else if (d.addemoji) { const i = $('#enName'); i.value = (i.value.trimEnd() + ' ' + d.addemoji).slice(0, 60); }
@@ -565,6 +574,10 @@ document.addEventListener('change', async e => {
   if (e.target.dataset.rtToggle) {
     try { S.routing.data = await api('PATCH', '/rules/' + e.target.dataset.rtToggle, {enabled: e.target.checked}); render(); toast(e.target.checked ? 'قانون روشن شد' : 'قانون خاموش شد'); }
     catch (err) { toast(err.message); }
+    return;
+  }
+  if (e.target.dataset.npon) {
+    try { await api('PATCH', '/node-protocols/' + e.target.dataset.npon, {enabled: e.target.checked}); await refresh(); } catch (err) { toast(err.message); }
     return;
   }
   const d = e.target.dataset; if (!d.proto) return;

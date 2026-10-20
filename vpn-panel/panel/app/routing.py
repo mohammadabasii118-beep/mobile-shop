@@ -67,7 +67,7 @@ def build_outbound(kind: str, d: dict) -> tuple[dict, str]:
 def validate_rule(inbounds, ports, domains, ips) -> None:
     if not (inbounds or ports or domains or ips):
         raise ValueError("حداقل یک شرط لازم است (ورودی، پورت، دامنه یا آی‌پی)")
-    if bad := [i for i in inbounds if i not in INBOUND_IDS]:
+    if bad := [i for i in inbounds if i not in INBOUND_IDS and not re.fullmatch(r"[a-z_]+_x\d+", i)]:   # `<proto>_x<id>` = an additional copy
         raise ValueError(f"ورودی ناشناخته: {bad[0]}")
     if ports:
         if not PORTS.match(ports) or any(not 1 <= int(p) <= 65535 for p in re.findall(r"\d+", ports)):
