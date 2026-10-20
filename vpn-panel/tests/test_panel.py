@@ -1414,3 +1414,17 @@ def test_sub_admin_pool_allowed_protocols_locations_and_usage_stats():
         assert mk("pool_free", protos=["trojan"], quota_gb=0).status_code == 200
         for n in (n1, n2):
             c.delete(f"/api/nodes/{n['id']}", headers=h)
+
+
+def test_sub_page_and_qr():
+    with TestClient(app) as c:
+        h = admin(c)
+        c.post("/api/nodes", headers=h, json={"name": "Zürich <b>", "cc": "ch", "address": "ch.example.com"})
+        u = c.post("/api/users", headers=h, json={"name": "qr_user", "quota_gb": 5, "days": 30, "protos": ["vless"]}).json()
+        page = c.get(f"{u['sub_url'].replace('https://panel.test','')}", headers={"accept": "text/html"}).text
+        assert "qr_user" in page and "hiddify://import/" in page
+        assert "<b>user" not in page
+        svg = c.get(f"{u['sub_url'].replace('https://panel.test','')}/qr.svg")
+        assert svg.status_code == 200 and svg.text.lstrip().startswith(("<svg", "<?xml")) and "image/svg+xml" in svg.headers["content-type"]
+        assert c.get("/sub/nope/qr.svg").status_code == 404
+        assert c.get(f"{u['sub_url'].replace('https://panel.test','')}/qr.svg?i=9999").status_code == 404

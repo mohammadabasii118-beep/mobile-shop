@@ -25,7 +25,7 @@ from .catalog import PROTOCOLS, REALITY_SNI, SS_METHOD
 from .db import Admin, Setting, Node, NodeProtocol, Outbound, Rule, User, engine, get_db, init_db, utcnow
 from . import dns as cfdns
 from . import routing
-from .subpage import render_sub_page
+from .subpage import qr_text, render_sub_page
 from .subscription import info_entries, new_wg_keypair, subscription_body, user_entries, user_ss_key, wg_ip
 
 BASE = Path(__file__).resolve().parent
@@ -1128,7 +1128,8 @@ def subscription(token: str, request: Request, db: Session = Depends(get_db)):
     entries = user_entries(user, list(db.scalars(select(Node))), dnstt_info(db)) if user.status() == "active" else []
     days_left = max(0, (user.expire_at - utcnow()).days) if user.expire_at else None
     if "text/html" in request.headers.get("accept", ""):  # a person in a browser, not a client app
-        return HTMLResponse(render_sub_page(user, entries, days_left, f"{public_url(request)}/sub/{token}", get_brand(db)))
+        return HTMLResponse(render_sub_page(user, entries, days_left, f"{public_url(request)}/sub/{token}", get_brand(db),
+                                         os.environ.get("PANEL_SUPPORT_URL", "")))
     info = info_entries(user, days_left) if os.environ.get("PANEL_SUB_INFO", "1") != "0" else []
     headers = {"subscription-userinfo": f"upload=0; download={user.used_bytes}; total={user.quota_bytes}; "
                f"expire={int(user.expire_at.timestamp()) if user.expire_at else 0}",
@@ -1138,6 +1139,23 @@ def subscription(token: str, request: Request, db: Session = Depends(get_db)):
         headers["support-url"] = url
     links = info + [e["link"] for e in entries if e["link"]]
     return PlainTextResponse(base64.b64encode("\n".join(links).encode()).decode(), headers=headers)
+
+
+@app.get("/sub/{token}/qr.svg")
+def subscription_qr(token: str, i: int = -1, request: Request = None, db: Session = Depends(get_db)):
+    """QR code (SVG) of the subscription link (i=-1) or of the i-th config on the user's page."""
+    import segno
+    user = db.scalar(select(User).where(User.sub_token == token)) or _404()
+    if user.status() != "active":
+        _404()
+    text = f"{public_url(request)}/sub/{token}"
+    if i >= 0:
+        entries = user_entries(user, list(db.scalars(select(Node))), dnstt_info(db))
+        text = qr_text(entries[i]) if i < len(entries) else None
+        if not text:
+            _404()
+    svg = segno.make(text, error="l").svg_inline(scale=4, border=2, dark="#000", light="#fff")
+    return Response(svg, media_type="image/svg+xml", headers={"Cache-Control": "private, max-age=300"})
 
 
 @app.get("/sub/{token}/file/{node_id}/{proto}")
