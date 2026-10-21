@@ -16,6 +16,7 @@ import { SETTING_DEFAULTS, SettingKey, allSettings, setSetting } from '../module
 import { flushPending } from '../modules/notifications/service';
 import { AUDIENCES, AudienceKey, audienceCounts, cancelBroadcast, createBroadcast, getBroadcast, listBroadcasts, sendTestBroadcast } from '../modules/broadcast/service';
 import { PartnerFilter, validatePartnerSetting, approvePartner, getPartnerById, listPartners, partnerCounts, partnerStats, rejectPartner, setPartnerPercent, setPartnerSuspended } from '../modules/partners/service';
+import { parseTehranTime } from '../modules/sale/service';
 import { decryptSecret } from '../utils/secrets';
 import { PanelView, probePanel, createPanel, deletePanel, listPanelInbounds, listPanels, panelHealth, setPanelActive, testPanel, updatePanel } from '../modules/panels/service';
 import { categoryTree, createCategory, deleteCategory, moveCategory, updateCategory } from '../modules/categories/service';
@@ -59,6 +60,9 @@ export const SETTING_RULES: Partial<Record<SettingKey, z.ZodType<string>>> = {
   'provisioning.maxRetries': int(0, 20),
   'provisioning.backoffSeconds': csvInts,
   'notify.expiryDays': csvInts,
+  'sale.percent': int(0, 90),
+  'sale.endsAt': z.string().trim().refine((v) => v === '' || parseTehranTime(v) !== null, 'تاریخ را به این شکل بنویسید: 2026-10-30 23:59').refine((v) => v === '' || parseTehranTime(v)!.getTime() > Date.now(), 'زمان پایان باید در آینده باشد'),
+  'sale.title': z.string().trim().max(40),
   'delivery.directConfig': bool,
   'notify.trafficPercent': csvInts,
   'orders.expireMinutes': int(10, 10080),

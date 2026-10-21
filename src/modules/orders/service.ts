@@ -46,7 +46,10 @@ export async function createOrder(input: CreateOrderInput): Promise<{ order: Ord
     orderBy: { createdAt: 'desc' },
   });
   // Reuse only if the price would still be the same (a user who became a partner meanwhile must get the new price).
-  if (existing && !input.couponCode && existing.partnerDiscountAmount === (await quote(input.userId, product.price, undefined)).partnerDiscount) return { order: existing, reused: true };
+  if (existing && !input.couponCode) {
+    const q0 = await quote(input.userId, product.price, undefined);
+    if (existing.partnerDiscountAmount === q0.partnerDiscount && existing.finalAmount === q0.final) return { order: existing, reused: true }; // price changed (sale started/ended)? make a fresh order
+  }
 
   for (let attempt = 0; attempt < 5; attempt++) {
     try {

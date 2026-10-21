@@ -12,6 +12,7 @@ import { serviceLabel } from '../utils/names';
 import { createTicket, getTicketForUser, listUserTickets, userReply } from '../modules/support/service';
 import { quote } from '../modules/orders/pricing';
 import { applyBlockReason, applyForPartner, effectivePercent, getPartner, partnerEnabled, partnerStats } from '../modules/partners/service';
+import { getSale, saleAmount } from '../modules/sale/service';
 import { getBool, getSetting } from '../modules/settings/service';
 import { serviceCard } from '../modules/notifications/templates';
 import { Button } from '../modules/notifications/service';
@@ -108,12 +109,14 @@ export function userHandlers(fetchFile: FileFetcher) {
     for (let k = 0; k < lvl.children.length; k += 2) {
       rows.push(lvl.children.slice(k, k + 2).map((c) => ({ text: `${c.icon ?? '📁'} ${c.name}`, data: `bc:${c.id}` })));
     }
-    rows.push(...lvl.products.map((p): Button[] => [{ text: `🛒 ${p.name}\u200f · ${money(p.price, p.currency)}`, data: `buy:${p.id}`, style: (p.buttonStyle as any) ?? undefined }]));
+    const sale = await getSale();
+    rows.push(...lvl.products.map((p): Button[] => [{ text: `🛒 ${p.name}\u200f · ${money(p.price - saleAmount(sale, p.price), p.currency)}${sale.active ? ` 🔥${fa(sale.percent)}٪` : ''}`, data: `buy:${p.id}`, style: (p.buttonStyle as any) ?? undefined }]));
     rows.push(parentBack ? back(parentBack) : nav());
     const T = await loadTexts();
     const desc = lvl.here?.description ? `\n${i(lvl.here.description)}` : '';
     const intro = !lvl.here && T.plain('buy.intro') ? `\n${T.html('buy.intro')}` : '';
-    await show(ctx, `${header('🛒', title)}${desc}${intro}\n${T.html('buy.prompt')}`, rows, H);
+    const saleLine = sale.active ? `\n${b(esc(sale.title))}: ${fa(sale.percent)}٪ تخفیف روی همه‌ی پلن‌ها${sale.endsAt ? ` — تا ${jdatetime(sale.endsAt)}` : ''}` : '';
+    await show(ctx, `${header('🛒', title)}${desc}${intro}${saleLine}\n${T.html('buy.prompt')}`, rows, H);
   }
 
   async function orderSummary(ctx: Ctx, productId: string) {
@@ -138,8 +141,9 @@ export function userHandlers(fetchFile: FileFetcher) {
       `📊 حجم: ${fa(p.trafficGB)} GB`,
       RULE,
       `💰 قیمت اصلی: ${money(p.price, p.currency)}`,
+      ...(q.saleDiscount ? [`🔥 تخفیف ویژه (${fa(q.salePercent)}٪): ${money(q.saleDiscount, p.currency)}`] : []),
       ...(q.partnerDiscount ? [`🤝 تخفیف همکاری (${fa(q.partnerPercent)}٪): ${money(q.partnerDiscount, p.currency)}`] : []),
-      ...(q.couponDiscount || !q.partnerDiscount ? [`🎁 تخفیف: ${q.couponDiscount ? money(q.couponDiscount, p.currency) : '—'}`] : []),
+      ...(q.couponDiscount || (!q.partnerDiscount && !q.saleDiscount) ? [`🎁 تخفیف: ${q.couponDiscount ? money(q.couponDiscount, p.currency) : '—'}`] : []),
       `✅ مبلغ نهایی: ${b(money(q.final, p.currency))}`,
       couponNote ? `\n${couponNote}` : '',
       '',

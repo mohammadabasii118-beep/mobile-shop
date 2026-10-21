@@ -22,6 +22,9 @@ export const SETTING_DEFAULTS = {
   'provisioning.backoffSeconds': () => '60,300,900,1800,3600',
   'provisioning.processingTimeoutSeconds': () => '300',
   'notify.expiryDays': () => '3,1',
+  'sale.percent': () => '0', // store-wide sale: % off every plan (0 = no sale)
+  'sale.endsAt': () => '', // "YYYY-MM-DD HH:mm" Tehran time; empty = until switched off
+  'sale.title': () => '🔥 تخفیف ویژه',
   'delivery.directConfig': () => 'false', // also send/offer the direct config next to the subscription link (default: subscription link + QR only)
   'ui.buttons': () => '{}', // per-button colour / premium emoji overrides (edited from the web panel)
   'notify.trafficPercent': () => '80,95', // warn when this % of the data is used (the "finished" notice is always sent)
