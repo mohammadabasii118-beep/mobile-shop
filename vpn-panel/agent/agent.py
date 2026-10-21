@@ -20,7 +20,7 @@ XRAY_API = "127.0.0.1:10085"
 WS_PATHS = {"vmess_ws": "/ws", "vless_ws": "/vless", "trojan_ws": "/trojan"}
 GRPC_SERVICE = "grpc"
 DNSTT_UPSTREAM_PORT = 18466   # loopback VLESS inbound behind dnstt-server
-XRAY_PROTOS = ["vless", "vless_tcp", "vless_raw", "vless_ws", "vless_grpc", "vmess_ws", "vmess_tcp", "trojan", "trojan_ws", "ss"]
+XRAY_PROTOS = ["vless", "vless_tcp", "vless_raw", "vless_ws", "vless_grpc", "vmess_ws", "vmess_tcp", "trojan", "trojan_ws", "ss", "tg_socks"]
 
 
 def users_for(cfg, proto):
@@ -80,6 +80,10 @@ def render_xray(cfg, reality, tls, busy=frozenset()):
             return {"tag": tag, "port": port, "protocol": "shadowsocks",
                     "settings": {"method": cfg["node"]["ss_method"], "password": cfg["node"]["ss_key"], "network": "tcp,udp",
                                  "clients": [{"password": u["ss_key"], "email": u["name"]} for u in users]}}
+        if proto == "tg_socks":   # Telegram's SOCKS5 proxy: per-user login, so Xray meters each user
+            return {"tag": tag, "listen": "0.0.0.0", "port": port, "protocol": "socks",
+                    "settings": {"auth": "password", "udp": False,
+                                 "accounts": [{"user": u["name"], "pass": u["password"]} for u in users]}}
         return None
 
     copies = [(p, ports[p], p) for p in XRAY_PROTOS if p in ports]
@@ -126,7 +130,7 @@ def set_conf_value(text, key, value):
 
 
 OURS = {"xray", "sing-box", "openvpn", "ocserv", "ocserv-main", "ocserv-worker", "charon", "xl2tpd", "dnstt-server", "mtg"}
-TCP_PROTOS = {"vless", "vless_tcp", "vless_raw", "vless_ws", "vless_grpc", "vmess_ws", "vmess_tcp", "trojan", "trojan_ws", "ss", "anyc", "mtproto"}
+TCP_PROTOS = {"vless", "vless_tcp", "vless_raw", "vless_ws", "vless_grpc", "vmess_ws", "vmess_tcp", "trojan", "trojan_ws", "ss", "anyc", "mtproto", "tg_socks"}
 UDP_PROTOS = {"hy2", "tuic", "wg", "ovpn", "anyc", "dnstt"}
 
 

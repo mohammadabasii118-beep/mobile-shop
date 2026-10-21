@@ -52,7 +52,7 @@ def qr_text(entry: dict) -> str | None:
     """What a QR code of this config should hold: its share link, or the WireGuard file; nothing for the rest."""
     if entry.get("link"):
         return entry["link"]
-    if entry.get("proto") == "mtproto":
+    if entry.get("open"):   # Telegram proxies: the tg:// link
         return entry.get("copy")
     if entry.get("proto") == "wg":
         return (entry.get("details") or {}).get("config")

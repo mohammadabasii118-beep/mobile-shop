@@ -35,6 +35,7 @@ PROTOCOLS = {
     "ikev2": _p("IKEv2/IPsec", "strongSwan", 500, "پایدار روی موبایل؛ نیاز به گواهی معتبر", uri=False, fixed=True, counted=False),
     "dnstt": _p("DNSTT (تونل DNS)", "dnstt-server", 5300, "خیلی کند؛ فقط وقتی همه‌چیز بسته است و DNS کار می‌کند", uri=False),
     "mtproto": _p("پروکسی تلگرام (MTProto)", "mtg", 8883, "فقط برای تلگرام؛ لینک یک‌کلیکی؛ حجم کاربر مصرف نمی‌شود", uri=False, counted=False),
+    "tg_socks": _p("پروکسی تلگرام (SOCKS5، حجم‌دار)", "xray", 1080, "فقط برای تلگرام؛ هر کاربر نام و رمز خودش را دارد و حجمش حساب می‌شود", uri=False),
     "anyc": _p("Cisco AnyConnect", "ocserv", 4443, "سازگار با کلاینت‌های AnyConnect/OpenConnect", uri=False),
 }
 

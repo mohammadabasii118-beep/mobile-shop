@@ -113,7 +113,7 @@ def test_agent_renderers():
 
 
 ALL = ["vless", "vless_raw", "vless_tcp", "vmess_tcp", "vless_ws", "vless_grpc", "vmess_ws", "trojan", "trojan_ws", "ss", "hy2", "tuic",
-       "wg", "ovpn", "l2tp", "ikev2", "anyc", "dnstt", "mtproto"]
+       "wg", "ovpn", "l2tp", "ikev2", "anyc", "dnstt", "mtproto", "tg_socks"]
 
 
 def test_all_protocols_have_entries_and_node_config():
@@ -1457,3 +1457,17 @@ def test_online_users():
         rows = {u["name"]: u for u in c.get("/api/users", headers=h).json()}
         assert rows["on_a"]["online"] is True and rows["on_a"]["last_seen"]
         assert rows["on_b"]["online"] is False and rows["on_b"]["last_seen"] is None   # keep-alive noise is not a connection
+
+
+def test_telegram_socks_proxy_is_metered_per_user():
+    cfg = {"protocols": {"tg_socks": 1080}, "extra": [], "node": {"reality_sni": "x", "ss_method": "m", "ss_key": "k"},
+           "users": [{"name": "tg_a", "uuid": "u", "password": "pw", "ss_key": "s", "protos": ["tg_socks"]}]}
+    ib = next(i for i in agent.render_xray(cfg, {"private": "P", "short_id": "ab"}, {"cert": "/c", "key": "/k"}, frozenset())["inbounds"] if i["tag"] == "tg_socks")
+    assert ib["protocol"] == "socks" and ib["settings"]["accounts"] == [{"user": "tg_a", "pass": "pw"}]
+    with TestClient(app) as c:
+        h = admin(c)
+        n = c.post("/api/nodes", headers=h, json={"name": "TS", "cc": "tr", "address": "ts.example.com"}).json()
+        c.put(f"/api/nodes/{n['id']}/protocols/tg_socks", headers=h, json={"enabled": True})
+        u = c.post("/api/users", headers=h, json={"name": "tg_sock", "protos": ["tg_socks"]}).json()
+        es = [e for e in c.get(f"/api/users/{u['id']}/configs", headers=h).json() if e["node"] == "TS"]
+        assert es[0]["copy"].startswith("tg://socks?server=ts.example.com&port=") and "user=tg_sock" in es[0]["copy"]

@@ -139,6 +139,11 @@ def build_entry(user: User, node: Node, proto: str, port: int, cdn: bool = False
         _manual(e, {"server": srv, "port": port, "secret": secret}, link)
         e["summary"] = f"برای افزودن در تلگرام لینک را باز کنید ({srv}:{port})"
         e["open"] = link
+    elif proto == "tg_socks":
+        link = f"tg://socks?server={srv}&port={port}&user={quote(user.name)}&pass={quote(user.password)}"
+        _manual(e, {"server": srv, "port": port, "username": user.name, "password": user.password}, link)
+        e["summary"] = f"برای افزودن در تلگرام لینک را باز کنید ({srv}:{port})"
+        e["open"] = link
     elif proto == "anyc":
         _manual(e, {"server": f"{srv}:{port}", "username": user.name, "password": user.password})
         e["summary"] = f"{srv}:{port} | {user.name} | {user.password}"
