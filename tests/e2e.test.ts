@@ -107,11 +107,14 @@ describe('E2E: Telegram → order → card-to-card → verification → X-UI →
     expect(svc.config).toContain('pbk=PUBKEY123');
     expect(svc.subscriptionUrl).toBe(`https://sub.example.com:2096/sub/${svc.subId}`);
 
-    const delivery = api.find((c) => c.method === 'sendMessage' && c.payload.chat_id === USER && String(c.payload.text).includes('سرویس شما آماده است') && String(c.payload.text).includes('vless://'));
+    // delivery = one photo (the QR) whose caption carries the subscription link; the direct config is not sent by default
+    const delivery = api.find((c) => c.method === 'sendPhoto' && c.payload.chat_id === USER && String(c.payload.caption).includes('سرویس شما آماده است'));
     expect(delivery).toBeTruthy();
     expect(delivery!.payload.parse_mode).toBe('HTML');
-    expect(unesc(String(delivery!.payload.text))).toContain(svc.config!);
+    expect(unesc(String(delivery!.payload.caption))).toContain(svc.subscriptionUrl!);
+    expect(String(delivery!.payload.caption)).not.toContain('vless://');
     expect(JSON.stringify(delivery!.payload.reply_markup)).toContain('sv:qr:');
+    expect(JSON.stringify(delivery!.payload.reply_markup)).not.toContain('sv:cfg:');
 
     // QR for the real config, my services, link
     api = [];
@@ -176,7 +179,7 @@ describe('E2E: Telegram → order → card-to-card → verification → X-UI →
     panel.failNext = 0;
     await tap(ADMIN, `av:retry:${order.id}`);
     expect(panel.clientCount()).toBe(1);
-    expect(api.some((c) => c.payload.chat_id === USER && String(c.payload.text).includes('vless://'))).toBe(true);
+    expect(api.some((c) => c.payload.chat_id === USER && String(c.payload.text ?? c.payload.caption).includes('سرویس شما آماده است'))).toBe(true);
   });
 
   it('timeout after panel created the client => retry adopts it (no 2nd client)', async () => {

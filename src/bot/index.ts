@@ -1,5 +1,6 @@
 import { loadButtonLooks } from '../modules/ui/buttons';
-import { Bot, session } from 'grammy';
+import { Bot, InputFile, session } from 'grammy';
+import QRCode from 'qrcode';
 import { prisma } from '../db/client';
 import { RateLimiter } from '../utils/ratelimit';
 import { logger } from '../utils/logger';
@@ -60,11 +61,17 @@ export function createBot(token: string, opts: { fetchFile?: FileFetcher; botInf
   bot.use(userHandlers(opts.fetchFile ?? telegramFileFetcher(token)));
 
   setSender(async (m) => {
-    await bot.api.sendMessage(Number(m.chatId), m.text.slice(0, 4000), {
-      reply_markup: m.buttons ? toKb(m.buttons) : undefined,
-      link_preview_options: { is_disabled: true },
-      ...(m.html ? { parse_mode: 'HTML' as const } : {}),
-    });
+    const reply_markup = m.buttons ? toKb(m.buttons) : undefined;
+    const parse_mode = m.html ? ('HTML' as const) : undefined;
+    let png: Buffer | undefined;
+    if (m.qr) { try { png = await QRCode.toBuffer(m.qr, { width: 512, margin: 2 }); } catch (e: any) { logger.warn({ err: String(e?.message) }, 'qr generation failed'); } }
+    // One message when the text fits a photo caption; otherwise the text first, then the QR. A failing QR never re-sends the text.
+    if (png && m.text.length <= 1000) {
+      await bot.api.sendPhoto(Number(m.chatId), new InputFile(png, 'qr.png'), { caption: m.text, parse_mode, reply_markup });
+      return;
+    }
+    await bot.api.sendMessage(Number(m.chatId), m.text.slice(0, 4000), { reply_markup, link_preview_options: { is_disabled: true }, ...(parse_mode ? { parse_mode } : {}) });
+    if (png) await bot.api.sendPhoto(Number(m.chatId), new InputFile(png, 'qr.png')).catch((e: any) => logger.warn({ err: String(e?.message) }, 'qr send failed'));
   });
   setBroadcastSender(async (m) => {
     const reply_markup = m.button ? toKb([[{ text: m.button.text, url: m.button.url }]]) : undefined;

@@ -58,6 +58,7 @@ export const SETTING_RULES: Partial<Record<SettingKey, z.ZodType<string>>> = {
   'provisioning.maxRetries': int(0, 20),
   'provisioning.backoffSeconds': csvInts,
   'notify.expiryDays': csvInts,
+  'delivery.directConfig': bool,
   'notify.trafficPercent': csvInts,
   'orders.expireMinutes': int(10, 10080),
   'notify.newUser': bool,

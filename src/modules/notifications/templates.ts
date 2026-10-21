@@ -9,11 +9,11 @@ export const paymentReview = async (orderNumber: string) => (await loadTexts()).
 export const paymentVerified = async (orderNumber: string) => (await loadTexts()).html('msg.verified', { order: orderNumber });
 export const paymentRejected = async (orderNumber: string, reason: string) => (await loadTexts()).html('msg.rejected', { order: orderNumber, reason });
 
-export async function delivery(s: VpnService, p: Product, kind: 'created' | 'renewed'): Promise<string> {
+export async function delivery(s: VpnService, p: Product, kind: 'created' | 'renewed', direct = false): Promise<string> {
   const X = await loadTexts();
   const lines = [
     kind === 'created' ? `🎉 ${b('سرویس شما آماده است')}` : `🔄 ${b('تمدید سرویس با موفقیت انجام شد')}`,
-    kind === 'created' ? `از همین‌جا لینک، کانفیگ و QR را دریافت کنید.` : `سرویس شما تمدید شد و همان لینک قبلی فعال است.`,
+    kind === 'created' ? `از همین‌جا لینک اشتراک و QR را دریافت کنید.` : `سرویس شما تمدید شد و همان لینک قبلی فعال است.`,
     RULE,
     `📛 ${b('نام')}: ${esc(serviceLabel(s.displayName, s.externalId))}`,
     `📦 ${b('سرویس')}: ${esc(p.name)}`,
@@ -23,7 +23,7 @@ export async function delivery(s: VpnService, p: Product, kind: 'created' | 'ren
   ];
   if (s.subscriptionUrl) {
     lines.push(RULE, `📡 ${b('لینک اشتراک (Subscription) — پیشنهادی')}`, code(s.subscriptionUrl), ...(X.plain('delivery.sub_hint') ? [i(X.plain('delivery.sub_hint'))] : []));
-    if (s.config) lines.push('', `⚙️ ${b('کانفیگ مستقیم (جایگزین)')}`, code(s.config));
+    if (s.config && direct) lines.push('', `⚙️ ${b('کانفیگ مستقیم (جایگزین)')}`, code(s.config));
   } else if (s.config) {
     lines.push(RULE, `🔗 ${b('لینک اتصال')} ${esc('(برای کپی، روی لینک بزنید)')}`, code(s.config));
   }

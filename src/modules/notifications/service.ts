@@ -4,7 +4,7 @@ import { logger } from '../../utils/logger';
 import { env } from '../../config/env';
 
 export interface Button { text: string; data?: string; url?: string; style?: 'primary' | 'success' | 'danger' }
-export interface OutMessage { chatId: bigint; text: string; buttons?: Button[][]; html?: boolean }
+export interface OutMessage { chatId: bigint; text: string; buttons?: Button[][]; html?: boolean; qr?: string /* text to encode as a QR photo sent with the message */ }
 export type Sender = (msg: OutMessage) => Promise<void>;
 
 let sender: Sender | undefined;
@@ -19,6 +19,7 @@ export interface NotifyInput {
   dedupeKey?: string;
   audience?: 'USER' | 'ADMIN';
   html?: boolean; // text is Telegram HTML (all dynamic parts already escaped)
+  qr?: string;
 }
 
 /** Persist then try to deliver; undelivered rows are retried by flushPending(). */
@@ -31,7 +32,7 @@ export async function notify(input: NotifyInput) {
         chatId: input.chatId,
         type: input.type,
         text: input.text,
-        meta: input.buttons || input.html ? ({ buttons: input.buttons, html: input.html } as unknown as Prisma.InputJsonValue) : undefined,
+        meta: input.buttons || input.html || input.qr ? ({ buttons: input.buttons, html: input.html, qr: input.qr } as unknown as Prisma.InputJsonValue) : undefined,
         dedupeKey: input.dedupeKey,
       },
     });
@@ -49,7 +50,7 @@ async function deliver(id: string) {
   if (!sender) return;
   try {
     const meta = n.meta as any;
-    await sender({ chatId: n.chatId, text: n.text, buttons: meta?.buttons as Button[][] | undefined, html: !!meta?.html });
+    await sender({ chatId: n.chatId, text: n.text, buttons: meta?.buttons as Button[][] | undefined, html: !!meta?.html, qr: typeof meta?.qr === 'string' ? meta.qr : undefined });
     await prisma.notification.update({ where: { id }, data: { status: 'SENT', sentAt: new Date(), attempts: { increment: 1 } } });
   } catch (e: any) {
     logger.warn({ id, err: String(e?.message) }, 'notification delivery failed');
@@ -86,7 +87,7 @@ export async function notifyAdmins(type: string, text: string, opts: { roles?: s
   }
 }
 
-export async function notifyUser(userId: string, type: string, text: string, opts: { buttons?: Button[][]; dedupeKey?: string; html?: boolean } = {}) {
+export async function notifyUser(userId: string, type: string, text: string, opts: { buttons?: Button[][]; dedupeKey?: string; html?: boolean; qr?: string } = {}) {
   const u = await prisma.user.findUnique({ where: { id: userId } });
   if (!u) return;
   return notify({ chatId: u.telegramId, userId, type, text, ...opts });

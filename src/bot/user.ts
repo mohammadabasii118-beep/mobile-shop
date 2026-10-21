@@ -12,7 +12,7 @@ import { serviceLabel } from '../utils/names';
 import { createTicket, getTicketForUser, listUserTickets, userReply } from '../modules/support/service';
 import { quote } from '../modules/orders/pricing';
 import { applyBlockReason, applyForPartner, effectivePercent, getPartner, partnerEnabled, partnerStats } from '../modules/partners/service';
-import { getSetting } from '../modules/settings/service';
+import { getBool, getSetting } from '../modules/settings/service';
 import { serviceCard } from '../modules/notifications/templates';
 import { Button } from '../modules/notifications/service';
 import { Ctx, back, mainMenuRows, nav, show } from './ui';
@@ -357,7 +357,7 @@ export function userHandlers(fetchFile: FileFetcher) {
     if (a === 'rot2') {
       const n = await rotateServiceLink(ctx.dbUser.id, s.id);
       const link = n.subscriptionUrl ?? n.config ?? '';
-      return show(ctx, `${ok('لینک جدید ساخته شد')}\n${i('لینک‌های قبلی دیگر کار نمی‌کنند.')}\n\n${link ? `${n.subscriptionUrl ? '📡' : '🔗'} ${b(n.subscriptionUrl ? 'لینک اشتراک جدید' : 'لینک جدید')}\n${code(link)}\n${i('برای کپی روی لینک بزنید.')}` : ''}`, [...deliveryButtons(n), nav('menu:services')], H);
+      return show(ctx, `${ok('لینک جدید ساخته شد')}\n${i('لینک‌های قبلی دیگر کار نمی‌کنند.')}\n\n${link ? `${n.subscriptionUrl ? '📡' : '🔗'} ${b(n.subscriptionUrl ? 'لینک اشتراک جدید' : 'لینک جدید')}\n${code(link)}\n${i('برای کپی روی لینک بزنید.')}` : ''}`, [...deliveryButtons(n, await getBool('delivery.directConfig')), nav('menu:services')], H);
     }
     if (a === 'del') {
       return show(ctx, `${header('🗑', 'حذف سرویس', serviceLabel(s.displayName, s.externalId))}\n⚠️ ${b('این کار قابل بازگشت نیست.')}\nسرویس برای همیشه حذف می‌شود و حجم و زمان باقی‌مانده سوخته می‌شود؛ ${b('وجهی بازگردانده نمی‌شود')}.\n\nمطمئن هستید؟`, [

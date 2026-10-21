@@ -4,7 +4,7 @@ import { prisma } from '../../db/client';
 import { logger } from '../../utils/logger';
 import { addDays, gbToBytes } from '../../utils/misc';
 import { audit } from '../admin/audit';
-import { getNumber, getNumberList } from '../settings/service';
+import { getBool, getNumber, getNumberList } from '../settings/service';
 import { notifyAdmins, notifyUser } from '../notifications/service';
 import { vpnFor } from '../../providers/vpn';
 import { ProviderError, ServiceRef } from '../../providers/vpn/types';
@@ -113,21 +113,28 @@ async function doCreate(order: Order, product: Product, telegramId: bigint) {
     await audit({ actor: 'system', action: 'vpn.provision.success', target: 'VpnService', targetId: s.id, metadata: { orderId: order.id, adopted, inboundId: s.inboundId } }, tx);
     return s;
   });
-  await notifyUser(order.userId, 'vpn_created', await T.delivery(updated, product, 'created'), {
+  const direct = await getBool('delivery.directConfig');
+  await notifyUser(order.userId, 'vpn_created', await T.delivery(updated, product, 'created', direct), {
     html: true,
-    buttons: deliveryButtons(updated),
+    qr: updated.subscriptionUrl ?? updated.config ?? undefined,
+    buttons: deliveryButtons(updated, direct),
     dedupeKey: `delivery:${updated.id}`,
   });
 }
 
 /** Subscription link is the primary action when the panel provides one; the direct config stays available. */
-export const deliveryButtons = (s: Pick<VpnService, 'id' | 'subscriptionUrl'>) => [
-  s.subscriptionUrl
-    ? [{ text: '📡 لینک اشتراک', data: `sv:link:${s.id}` }, { text: '⚙️ کانفیگ مستقیم', data: `sv:cfg:${s.id}` }]
-    : [{ text: '🔗 دریافت لینک', data: `sv:link:${s.id}` }, { text: '📋 دریافت کانفیگ', data: `sv:cfg:${s.id}` }],
-  [{ text: '📱 QR Code', data: `sv:qr:${s.id}` }, { text: '✏️ نام سرویس', data: `nm:s:${s.id}` }],
-  [{ text: '📦 سرویس‌های من', data: 'menu:services' }],
-];
+export const deliveryButtons = (s: Pick<VpnService, 'id' | 'subscriptionUrl'>, direct = false) => s.subscriptionUrl && !direct
+  ? [
+    [{ text: '📡 لینک اشتراک', data: `sv:link:${s.id}` }, { text: '📱 QR Code', data: `sv:qr:${s.id}` }],
+    [{ text: '✏️ نام سرویس', data: `nm:s:${s.id}` }, { text: '📦 سرویس‌های من', data: 'menu:services' }],
+  ]
+  : [
+    s.subscriptionUrl
+      ? [{ text: '📡 لینک اشتراک', data: `sv:link:${s.id}` }, { text: '⚙️ کانفیگ مستقیم', data: `sv:cfg:${s.id}` }]
+      : [{ text: '🔗 دریافت لینک', data: `sv:link:${s.id}` }, { text: '📋 دریافت کانفیگ', data: `sv:cfg:${s.id}` }],
+    [{ text: '📱 QR Code', data: `sv:qr:${s.id}` }, { text: '✏️ نام سرویس', data: `nm:s:${s.id}` }],
+    [{ text: '📦 سرویس‌های من', data: 'menu:services' }],
+  ];
 
 async function doRenew(taskId: string, order: Order, product: Product) {
   const t = await prisma.provisioningTask.findUniqueOrThrow({ where: { id: taskId } });
@@ -152,7 +159,8 @@ async function doRenew(taskId: string, order: Order, product: Product) {
     await audit({ actor: 'system', action: 'vpn.renew.success', target: 'VpnService', targetId: s.id, metadata: { orderId: order.id, expiresAt: targetExpiry } }, tx);
     return s;
   });
-  await notifyUser(order.userId, 'vpn_renewed', await T.delivery(updated, product, 'renewed'), { html: true, buttons: deliveryButtons(updated), dedupeKey: `renew:${order.id}` });
+  const directR = await getBool('delivery.directConfig');
+  await notifyUser(order.userId, 'vpn_renewed', await T.delivery(updated, product, 'renewed', directR), { html: true, buttons: deliveryButtons(updated, directR), dedupeKey: `renew:${order.id}` });
 }
 
 async function onFailure(taskId: string, orderId: string, attempts: number, e: unknown) {

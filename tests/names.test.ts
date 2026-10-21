@@ -69,11 +69,20 @@ describe('customer service names', () => {
   it('subscription link is presented first, the direct config second; buttons adapt', async () => {
     await paidWithName('Ali');
     const msg = ctx.sent.find((m) => m.text.includes('سرویس شما آماده است'))!;
-    const iSub = msg.text.indexOf('لینک اشتراک'), iCfg = msg.text.indexOf('کانفیگ مستقیم');
-    expect(iSub).toBeGreaterThan(-1); expect(iCfg).toBeGreaterThan(iSub);
+    expect(msg.text.indexOf('لینک اشتراک')).toBeGreaterThan(-1);
     expect(msg.text).toContain('https://sub.example.com/sub/');
+    expect(msg.text).not.toContain('کانفیگ مستقیم'); // default: subscription link + QR only
+    expect(typeof msg.qr).toBe('string');
     const labels = JSON.stringify(msg.buttons);
-    expect(labels).toContain('📡 لینک اشتراک'); expect(labels).toContain('✏️ نام سرویس');
+    expect(labels).toContain('📡 لینک اشتراک'); expect(labels).toContain('📱 QR'); expect(labels).toContain('✏️ نام سرویس'); expect(labels).not.toContain('⚙️ کانفیگ مستقیم');
+  });
+  it('delivery.directConfig=true also shows the direct config and its button', async () => {
+    const { setSetting } = await import('../src/modules/settings/service');
+    await setSetting('delivery.directConfig', 'true');
+    await paidWithName('Ali');
+    const msg = ctx.sent.filter((m) => m.text.includes('سرویس شما آماده است')).at(-1)!;
+    expect(msg.text).toContain('کانفیگ مستقیم');
+    expect(JSON.stringify(msg.buttons)).toContain('⚙️ کانفیگ مستقیم');
   });
   it('rename: DB name + link remark change, client email/uuid never change; reset to automatic; ownership enforced', async () => {
     const { u, svc } = await paidWithName('Old');
