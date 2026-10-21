@@ -1444,3 +1444,16 @@ def test_mtproto_telegram_proxy():
         page = c.get(u["sub_url"].replace("https://panel.test", ""), headers={"accept": "text/html"}).text
         assert "tg://proxy?server=tg.example.com&amp;port=" in page
         assert c.get(u["sub_url"].replace("https://panel.test", "") + "/qr.svg?i=0").status_code == 200
+
+
+def test_online_users():
+    with TestClient(app) as c:
+        h = admin(c)
+        n = c.post("/api/nodes", headers=h, json={"name": "On", "cc": "tr", "address": "on.example.com"}).json()
+        nh = {"Authorization": "Bearer " + n["install_command"].split("--token ")[1].split()[0]}
+        c.post("/api/users", headers=h, json={"name": "on_a", "protos": ["vless"]})
+        c.post("/api/users", headers=h, json={"name": "on_b", "protos": ["vless"]})
+        c.post("/api/node/report", headers=nh, json={"usage": {"on_a": 50000, "on_b": 10}})
+        rows = {u["name"]: u for u in c.get("/api/users", headers=h).json()}
+        assert rows["on_a"]["online"] is True and rows["on_a"]["last_seen"]
+        assert rows["on_b"]["online"] is False and rows["on_b"]["last_seen"] is None   # keep-alive noise is not a connection

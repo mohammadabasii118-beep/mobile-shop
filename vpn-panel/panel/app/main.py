@@ -227,6 +227,10 @@ def node_out(node: Node, request: Request) -> dict:
     }
 
 
+USER_ONLINE_WINDOW = timedelta(minutes=3)   # a user counts as online if a node saw real traffic this recently
+ONLINE_MIN_BYTES = 1024                # keep-alive chatter alone does not count
+
+
 def user_out(user: User, request: Request) -> dict:
     days_left = None
     if user.expire_at:
@@ -235,6 +239,8 @@ def user_out(user: User, request: Request) -> dict:
         "id": user.id, "name": user.name, "status": user.status(), "enabled": user.enabled,
         "used_gb": round(user.used_bytes / GB, 2), "quota_gb": round(user.quota_bytes / GB, 2),
         "days_left": days_left, "expire_at": user.expire_at.isoformat() + "Z" if user.expire_at else None, "protos": user.protos, "node_ids": user.node_ids, "owner_id": user.owner_id,
+        "last_seen": user.last_seen.isoformat() + "Z" if user.last_seen else None,
+        "online": bool(user.last_seen and utcnow() - user.last_seen < USER_ONLINE_WINDOW),
         "sub_url": f"{public_url(request)}/sub/{user.sub_token}",
     }
 
@@ -1231,6 +1237,8 @@ def node_report(body: Report, node: Node = Depends(require_node), db: Session = 
     if body.usage:
         for u in db.scalars(select(User).where(User.name.in_(body.usage))):
             u.used_bytes += max(0, body.usage[u.name])
+            if body.usage[u.name] >= ONLINE_MIN_BYTES:
+                u.last_seen = utcnow()
     db.commit()
     return {"ok": True}
 

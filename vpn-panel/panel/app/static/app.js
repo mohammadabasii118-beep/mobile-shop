@@ -1,6 +1,7 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: [], brand: {name: 'پنل چندلوکیشن', logo: '', color: ''}, dnstt: null, owner: ''};
+function ago(iso) { const m = Math.max(1, Math.round((Date.now() - new Date(iso)) / 60000)); return m < 60 ? m + ' دقیقه پیش' : m < 1440 ? Math.round(m / 60) + ' ساعت پیش' : Math.round(m / 1440) + ' روز پیش'; }
+const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: [], brand: {name: 'پنل چندلوکیشن', logo: '', color: ''}, dnstt: null, owner: '', onlineOnly: false};
 const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', routing: 'مسیریابی', users: 'کاربران', admins: 'ادمین‌ها', look: 'ظاهر پنل'};
 const STATUS = {active: ['good', 'فعال'], disabled: ['bad', 'غیرفعال'], expired: ['bad', 'منقضی'], quota: ['bad', 'حجم تمام شده']};
 
@@ -88,7 +89,7 @@ const views = {
     const segs = [['good', 'فعال', active, 'var(--good)'], ['quota', 'حجم تمام', count('quota'), 'var(--warn)'], ['expired', 'منقضی', count('expired'), 'var(--bad)'], ['disabled', 'غیرفعال', count('disabled'), 'var(--muted)']];
     return `<div class="stats">
       ${stat('', 'server', 'لوکیشن آنلاین', `${num(on + ' / ' + S.nodes.length)}`)}
-      ${stat('blue', 'users', 'کاربر فعال', `${num(active + ' / ' + S.users.length)}`)}
+      ${stat('blue', 'users', 'کاربر فعال', `${num(active + ' / ' + S.users.length)}`, S.users.some(u => u.online) ? `${S.users.filter(u => u.online).length} آنلاین` : '')}
       ${stat('blue', 'activity', 'مصرف کل', num(fmtGB(used)), 'GB')}
       ${stat(blocked || S.nodes.some(n => n.conflicts.length) ? 'warn' : '', 'alert', 'نیازمند توجه', num(blocked + S.nodes.filter(n => n.conflicts.length || (n.errors || []).length).length), 'مورد')}</div>
       <div class="panel"><h2>${ic('pin')}لوکیشن‌ها</h2>${S.nodes.length ? `<div class="nodes">${S.nodes.map(n => `
@@ -148,7 +149,7 @@ const views = {
   },
   users() {
     const q = S.q.trim().toLowerCase(), rs = isReseller(), own = S.owner;
-    const rows = S.users.filter(u => (!q || u.name.toLowerCase().includes(q)) && (!own || (own === 'main' ? !u.owner_id : u.owner_id === +own)));
+    const rows = S.users.filter(u => (!q || u.name.toLowerCase().includes(q)) && (!own || (own === 'main' ? !u.owner_id : u.owner_id === +own)) && (!S.onlineOnly || u.online));
     const allOn = rows.length && rows.every(u => S.sel.has(u.id));
     const owner = u => u.owner_id ? ((S.admins.find(a => a.id === u.owner_id) || {}).username || '؟') : '';
     const bar = !rs && S.sel.size ? `<div class="panel" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${S.sel.size} کاربر انتخاب شده</b>
@@ -159,10 +160,11 @@ const views = {
       ${S.me.max_total_gb ? ` سقف کل حجم شما ${fmtGB(S.me.max_total_gb)} گیگابایت است و ${fmtGB(S.me.allocated_gb)} را واگذار کرده‌اید (${fmtGB(Math.max(0, S.me.max_total_gb - S.me.allocated_gb))} باقی مانده).` : ''}${S.me.max_quota_gb ? ` حجم هر کاربر تا ${S.me.max_quota_gb} گیگابایت.` : ''}${S.me.max_days ? ` مدت هر کاربر تا ${S.me.max_days} روز.` : ''}</div>` : '';
     return `${limits}<div class="panel" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="search" id="uq" placeholder="جست‌وجوی نام کاربر…" value="${esc(S.q)}" style="max-width:260px" dir="ltr">
         ${!rs && S.admins.length ? `<select id="uo" style="max-width:220px"><option value="">همه‌ی کاربران</option><option value="main" ${own === 'main' ? 'selected' : ''}>ساخته‌ی مدیر اصلی</option>${S.admins.map(a => `<option value="${a.id}" ${own === String(a.id) ? 'selected' : ''}>ساخته‌ی ${esc(a.username)}</option>`).join('')}</select>` : ''}
-        <span class="muted">${rows.length} از ${S.users.length} کاربر</span></div>${bar}
+        <label class="chips" style="gap:6px;align-items:center"><input type="checkbox" id="uOnline" ${S.onlineOnly ? 'checked' : ''}> فقط آنلاین‌ها</label>
+        <span class="muted">${rows.length} از ${S.users.length} کاربر · <b style="color:var(--good)">${S.users.filter(u => u.online).length} آنلاین</b></span></div>${bar}
       <div class="panel scroll"><table><thead><tr>${rs ? '' : `<th><input type="checkbox" id="selAll" ${allOn ? 'checked' : ''} aria-label="انتخاب همه‌ی نتیجه‌ها"></th>`}<th>کاربر</th><th>مصرف</th><th>انقضا</th><th>پروتکل‌ها</th><th>وضعیت</th>${rs || !S.admins.length ? '' : '<th>ساخته‌شده توسط</th>'}<th></th></tr></thead><tbody>
       ${rows.map(u => { const pc = u.quota_gb ? Math.min(100, u.used_gb / u.quota_gb * 100) : 0; const st = STATUS[u.status];
-        return `<tr>${rs ? '' : `<td><input type="checkbox" data-sel="${u.id}" ${S.sel.has(u.id) ? 'checked' : ''} aria-label="انتخاب ${esc(u.name)}"></td>`}<td><div class="who"><span class="av">${esc(u.name.replace(/^[^A-Za-z0-9]+/, '').charAt(0) || '?')}</span><span class="mono">${esc(u.name)}</span></div></td>
+        return `<tr>${rs ? '' : `<td><input type="checkbox" data-sel="${u.id}" ${S.sel.has(u.id) ? 'checked' : ''} aria-label="انتخاب ${esc(u.name)}"></td>`}<td><div class="who"><span class="av">${esc(u.name.replace(/^[^A-Za-z0-9]+/, '').charAt(0) || '?')}</span><span class="mono">${esc(u.name)}</span>${u.online ? '<span class="pill good">آنلاین</span>' : (u.last_seen ? `<span class="muted" style="font-size:11px">${ago(u.last_seen)}</span>` : '')}</div></td>
         <td><div style="display:flex;gap:8px;align-items:center"><div class="bar"><i class="${loadCls(pc)}" style="width:${pc}%"></i></div><span class="muted">${num(fmtGB(u.used_gb) + ' / ' + (u.quota_gb ? fmtGB(u.quota_gb) : '∞') + ' GB')}</span></div></td>
         <td>${u.days_left === null ? 'نامحدود' : u.days_left + ' روز'}</td><td class="pc">${u.protos.map(p => `<span class="cc">${esc(protoLabel(p))}</span>`).join('')}</td>
         <td><span class="pill ${st[0]}">${st[1]}</span></td>${rs || !S.admins.length ? '' : `<td>${owner(u) ? `<span class="pill acc">${esc(owner(u))}</span>` : '<span class="muted">مدیر اصلی</span>'}</td>`}
@@ -576,6 +578,7 @@ document.addEventListener('change', async e => {
     catch (err) { toast(err.message); }
     return;
   }
+  if (e.target.id === 'uOnline') { S.onlineOnly = e.target.checked; render(); return; }
   if (e.target.id === 'uo') { S.owner = e.target.value; render(); return; }
   if (e.target.dataset.sel) { const id = +e.target.dataset.sel; e.target.checked ? S.sel.add(id) : S.sel.delete(id); render(); return; }
   if (e.target.id === 'selAll') {

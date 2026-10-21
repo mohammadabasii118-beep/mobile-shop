@@ -124,6 +124,7 @@ class User(Base):
     protos: Mapped[list] = mapped_column(JSON, default=list)
     node_ids: Mapped[list] = mapped_column(JSON, default=list)  # empty = all nodes
     owner_id: Mapped[int | None] = mapped_column(default=None)  # sub-admin that created the user; None = main admin
+    last_seen: Mapped[datetime | None] = mapped_column(default=None)  # last time a node reported traffic for this user
 
     def status(self) -> str:
         if not self.enabled:
