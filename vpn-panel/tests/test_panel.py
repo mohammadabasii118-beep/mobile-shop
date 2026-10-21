@@ -1588,3 +1588,31 @@ def test_relay_install_keeps_one_agent_per_tunnel():
         sh = c.get("/relay-install.sh").text
         assert "/etc/vtunnel/agent-$ID.json" in sh and "vtunnel-agent-$ID.service" in sh
         assert 'cat > /etc/vtunnel/agent.json' not in sh      # no fixed file that a second tunnel would overwrite
+
+
+def test_replacement_server_takes_over_the_keys_of_the_old_one():
+    with TestClient(app) as c:
+        h = admin(c)
+        n = c.post("/api/nodes", headers=h, json={"name": "Swap", "cc": "fr", "address": "old.example.com"}).json()
+        nh = {"Authorization": "Bearer " + n["install_command"].split("--token ")[1].split()[0]}
+        old = {"reality": {"private": "OLDPRIV", "public": "OLDPUB", "short_id": "aabb"}, "wg": {"private": "WGPRIV", "public": "WGPUB"}}
+        c.post("/api/node/report", headers=nh, json={"reality_pub": "OLDPUB", "reality_sid": "aabb", "keys": old})
+        assert c.get("/api/node/config", headers=nh).json()["keys"] == old
+        # the address changes and a new server (fresh keys) reports with the same token: the panel keeps the first keys
+        assert c.patch(f"/api/nodes/{n['id']}", headers=h, json={"address": "new.example.com"}).status_code == 200
+        c.post("/api/node/report", headers=nh, json={"reality_pub": "NEWPUB", "reality_sid": "ccdd",
+                                                      "keys": {"reality": {"private": "NEWPRIV", "public": "NEWPUB", "short_id": "ccdd"}}})
+        assert c.get("/api/node/config", headers=nh).json()["keys"] == old
+        # bad shapes are ignored
+        c.post("/api/node/report", headers=nh, json={"keys": {"reality": {"private": "x"}, "other": {"a": "b"}}})
+        assert c.get("/api/node/config", headers=nh).json()["keys"] == old
+
+
+def test_agent_adopts_kept_keys(tmp_path):
+    reality, wg = {"private": "NEWPRIV", "public": "NEWPUB", "short_id": "ccdd"}, {"private": "WN", "public": "WP"}
+    agent.STATE_DIR = str(tmp_path)
+    agent.adopt_keys({"reality": {"private": "OLDPRIV", "public": "OLDPUB", "short_id": "aabb"}, "wg": {"private": "WGPRIV", "public": "WGPUB"}}, reality, wg)
+    assert reality == {"private": "OLDPRIV", "public": "OLDPUB", "short_id": "aabb"} and wg["public"] == "WGPUB"
+    assert json.loads((tmp_path / "reality.json").read_text())["public"] == "OLDPUB"
+    agent.adopt_keys({}, reality, None)                       # nothing kept, or no WireGuard here: nothing changes
+    agent.adopt_keys({"wg": {"private": "A", "public": "B"}}, reality, None)

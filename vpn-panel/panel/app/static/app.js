@@ -502,8 +502,17 @@ document.addEventListener('click', async e => {
     else if ('addflag' in d) { const i = $('#enName'), f = flagOf($('#enCc').value); if (f && !i.value.startsWith(f)) i.value = f + ' ' + i.value.replace(/^\p{RI}{2}\s*/u, ''); }
     else if (d.addemoji) { const i = $('#enName'); i.value = (i.value.trimEnd() + ' ' + d.addemoji).slice(0, 60); }
     else if (t.id === 'enSave') {
-      await api('PATCH', '/nodes/' + d.id, {name: $('#enName').value.trim(), cc: $('#enCc').value.trim(), address: $('#enAddr').value.trim()});
+      const old = nodeBy(+d.id), addr = $('#enAddr').value.trim();
+      await api('PATCH', '/nodes/' + d.id, {name: $('#enName').value.trim(), cc: $('#enCc').value.trim(), address: addr});
       closeModal(); await refresh(); toast('لوکیشن ذخیره شد');
+      if (old && addr !== old.address) {   // a new address usually means a new server: show what to run on it
+        const n = nodeBy(+d.id);
+        openModal(`<h2>جایگزین کردن سرور ${esc(n.name)}</h2>
+          <p class="muted" style="margin:0">آدرس عوض شد. اگر این یک <b>سرور جدید</b> است، این دستور را روی آن (اوبونتو، root) اجرا کن. سرور جدید جای قبلی را می‌گیرد: کاربران، پروتکل‌ها، پورت‌ها و کلیدهای Reality و WireGuard همان می‌مانند.</p>
+          <pre>${esc(n.install_command)}</pre>
+          <div class="note">اگر کانفیگ‌های کاربران با <b>دامنه</b> ساخته شده، رکورد DNS دامنه را هم به IP جدید ببر. سرور قدیمی را بعد از آنلاین شدن جدید خاموش کن.</div>
+          <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-copy="${esc(n.install_command)}">کپی دستور</button><button class="btn pri" data-close>بستن</button></div>`);
+      }
     }
     else if (d.install) installDialog(nodeBy(+d.install));
     else if (d.cf) cfDialog(nodeBy(+d.cf));

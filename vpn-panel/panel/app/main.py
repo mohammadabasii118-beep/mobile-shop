@@ -1395,6 +1395,7 @@ def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db
             "node": {"name": node.name, "reality_sni": node.reality_sni or REALITY_SNI, "ss_method": SS_METHOD,
                      "ss_key": node.ss_key, "l2tp_psk": node.l2tp_psk},
             "protocols": enabled, "extra": extra, "users": users, "tunnels": tunnels,
+            "keys": node.keys if isinstance(node.keys, dict) else {},
             "vtunnel_sha256": _sha(ROOT / "agent" / "vtunnel.py"),
             "dnstt": ({"domain": dc["domain"], "privkey": dc["priv"], "inner": dc["inner"]} if "dnstt" in enabled and dc["domain"] else None)}
 
@@ -1410,9 +1411,13 @@ class Report(BaseModel):
     ovpn_ca: str = ""
     conflicts: list[str] = Field(default=[], max_length=50)
     errors: list[str] = Field(default=[], max_length=20)
+    keys: dict[str, dict[str, str]] = Field(default={}, max_length=4)   # {"reality": {private, public, short_id}, "wg": {private, public}}
     tunnels: dict[str, dict] = Field(default={}, max_length=100)   # tunnel id -> {"active": bool, "down": [ports], "errors": [..]}
     dnstt_priv: str = Field(default="", max_length=200, pattern=r"^[0-9a-fA-F]*$")   # set only by the node that generated the key pair
     dnstt_pub: str = Field(default="", max_length=200, pattern=r"^[0-9a-fA-F]*$")
+
+
+KEY_FIELDS = {"reality": {"private", "public", "short_id"}, "wg": {"private", "public"}}
 
 
 @app.post("/api/node/report")
@@ -1425,6 +1430,12 @@ def node_report(body: Report, node: Node = Depends(require_node), db: Session = 
     if body.reality_pub:
         node.reality_pub, node.reality_sid = body.reality_pub, body.reality_sid
     node.wg_pub, node.ovpn_ca = body.wg_pub or node.wg_pub, body.ovpn_ca or node.ovpn_ca
+    kept = dict(node.keys) if isinstance(node.keys, dict) else {}
+    for name, fields in body.keys.items():      # the first key pair of each kind wins; a replacement server adopts it
+        if name in KEY_FIELDS and name not in kept and set(fields) == KEY_FIELDS[name] and all(0 < len(v) <= 200 for v in fields.values()):
+            kept[name] = fields
+    if kept != node.keys:
+        node.keys = kept
     if body.dnstt_priv and body.dnstt_pub and not get_setting(db, "dnstt_priv"):   # the first key pair wins; nodes then adopt it
         put_setting(db, "dnstt_priv", body.dnstt_priv)
         put_setting(db, "dnstt_pub", body.dnstt_pub)

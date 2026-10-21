@@ -1118,6 +1118,22 @@ def read_text(path):
         return ""
 
 
+def adopt_keys(stored, reality, wg):
+    """A replacement server takes over the key pairs the panel kept from the server before it, so the configs users
+    already have (Reality public key, WireGuard server key) stay valid. Updates the dicts in place and the files."""
+    for name, local, path in (("reality", reality, f"{STATE_DIR}/reality.json"), ("wg", wg, f"{STATE_DIR}/wg.json")):
+        want = stored.get(name)
+        if not want or local is None or not all(want.get(k) for k in local if k in want):
+            continue
+        if any(local.get(k) != v for k, v in want.items()):
+            local.update(want)
+            with open(path + ".new", "w") as f:
+                json.dump(local, f)
+            os.chmod(path + ".new", 0o600)
+            os.replace(path + ".new", path)
+            print(f"adopted the {name} keys kept by the panel", flush=True)
+
+
 def main():
     conf = load_json(CONF)
     if not conf:
@@ -1130,6 +1146,7 @@ def main():
         try:
             cfg = api(conf, "GET", "/api/node/config")
             self_update(conf, cfg.get("agent_sha256"))
+            adopt_keys(cfg.get("keys") or {}, reality, wg)
             conflicts, errors, dnstt = apply(cfg, reality, tls, wg)
             for src in (xray_usage(), wg_usage(cfg) if wg else {}, session_usage()):
                 for k, v in src.items():
@@ -1137,7 +1154,8 @@ def main():
             api(conf, "POST", "/api/node/report", {
                 "load": cpu_load_percent(), "usage": pending, "reality_pub": reality["public"],
                 "reality_sid": reality["short_id"], "tls_self_signed": conf.get("tls_self_signed", True), "tls_pin": cert_sha256(tls["cert"]),
-                "conflicts": conflicts, "errors": errors, "wg_pub": wg["public"] if wg else "", "ovpn_ca": read_text(f"{STATE_DIR}/ovpn/ca.crt"), "tunnels": tunnel_state, **dnstt})
+                "conflicts": conflicts, "errors": errors, "wg_pub": wg["public"] if wg else "", "ovpn_ca": read_text(f"{STATE_DIR}/ovpn/ca.crt"), "tunnels": tunnel_state,
+                "keys": {k: v for k, v in (("reality", reality), ("wg", wg)) if v and all(v.values())}, **dnstt})
             pending = {}  # kept in memory until the panel accepted the report
         except Exception as e:  # keep running; the panel may be briefly unreachable
             print("agent error:", e, file=sys.stderr, flush=True)
