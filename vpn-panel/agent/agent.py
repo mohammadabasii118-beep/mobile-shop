@@ -964,7 +964,7 @@ After=network-online.target
 
 [Service]
 EnvironmentFile=/etc/vpn-node/{VTUNNEL_PREFIX}{t['id']}.env
-ExecStart=/usr/bin/python3 {VTUNNEL_BIN} client --server {t['server']} --pool {t.get('pool', 8)}
+ExecStart=/usr/bin/python3 {VTUNNEL_BIN} client --server {t['server']} --pool {t.get('pool', 8)} --encrypt {t.get('encrypt', 'off')}
 Restart=always
 RestartSec=2
 LimitNOFILE=1048576
@@ -993,6 +993,16 @@ def ensure_vtunnel_script(cfg):
     os.chmod(VTUNNEL_BIN + ".new", 0o755)
     os.replace(VTUNNEL_BIN + ".new", VTUNNEL_BIN)
     return True
+
+
+def ensure_crypto(errors):
+    if sh("/usr/bin/python3", "-c", "import cryptography").returncode == 0:
+        return True
+    sh("apt-get", "install", "-y", "python3-cryptography")
+    if sh("/usr/bin/python3", "-c", "import cryptography").returncode == 0:
+        return True
+    errors.append("python3-cryptography is missing and apt could not install it (needed for tunnel encryption)")
+    return False
 
 
 def tcp_listening(port):
@@ -1029,7 +1039,7 @@ def apply_tunnels(cfg):
         service = f"{VTUNNEL_PREFIX}{tid}"
         st = {"active": False, "down": [p for p in t.get("targets", []) if not tcp_listening(p)], "errors": list(errors)}
         tunnel_state[tid] = st
-        if not ok:
+        if not ok or (t.get("encrypt", "off") != "off" and not ensure_crypto(st["errors"])):
             continue
         env = f"/etc/vpn-node/{service}.env"
         unit = f"{unit_dir}/{service}.service"

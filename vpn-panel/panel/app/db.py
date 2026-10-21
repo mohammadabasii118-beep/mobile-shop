@@ -94,6 +94,7 @@ class Tunnel(Base):
     relay_token: Mapped[str] = mapped_column(unique=True)    # what the agent on the Iran server signs in with
     forwards: Mapped[list] = mapped_column(JSON, default=list)   # [{"proto": "tcp", "listen": 80, "target": 80}]
     enabled: Mapped[bool] = mapped_column(default=True)
+    encrypt: Mapped[str] = mapped_column(default="off")      # off | tcp | all: what the tunnel encrypts between the two servers
     publish: Mapped[bool] = mapped_column(default=False)     # also give users a copy of each matching config that goes through Iran
     relay_seen: Mapped[datetime | None] = mapped_column(default=None)
     relay_state: Mapped[dict] = mapped_column(JSON, default=dict)    # last report of the Iran side

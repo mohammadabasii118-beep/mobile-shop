@@ -1562,3 +1562,22 @@ def test_tunnel_gives_users_a_via_iran_copy_of_matching_configs():
 
 def base_sub(c, path):
     return base64.b64decode(c.get(path).text).decode()
+
+
+def test_tunnel_encryption_setting_reaches_both_ends():
+    with TestClient(app) as c:
+        h = admin(c)
+        n = c.post("/api/nodes", headers=h, json={"name": "EncDE", "cc": "de", "address": "enc.example.com"}).json()
+        nh = {"Authorization": "Bearer " + n["install_command"].split("--token ")[1].split()[0]}
+        t = c.post("/api/tunnels", headers=h, json={"name": "e", "iran_host": "7.7.7.7", "node_id": n["id"], "ports": "443", "encrypt": "tcp"}).json()
+        rh = {"Authorization": "Bearer " + t["install_command"].split("--token ")[1]}
+        assert t["encrypt"] == "tcp" and c.get("/api/relay/config", headers=rh).json()["tunnel"]["encrypt"] == "tcp"
+        assert next(x for x in c.get("/api/node/config", headers=nh).json()["tunnels"] if x["id"] == t["id"])["encrypt"] == "tcp"
+        assert c.patch(f"/api/tunnels/{t['id']}", headers=h, json={"encrypt": "all"}).json()["encrypt"] == "all"
+        assert c.patch(f"/api/tunnels/{t['id']}", headers=h, json={"encrypt": "bogus"}).status_code == 422
+        ra_spec = importlib.util.spec_from_file_location("relay_agent2", ROOT / "agent" / "relay_agent.py")
+        ra = importlib.util.module_from_spec(ra_spec)
+        ra_spec.loader.exec_module(ra)
+        assert "--encrypt all" in ra.unit_text({"id": 1, "name": "x", "ctl_port": 7777, "forwards": [], "encrypt": "all"}, "/s", "/e")
+        assert "--encrypt tcp" in agent.vtunnel_unit({"id": 1, "server": "1.1.1.1:7777", "encrypt": "tcp"})
+        c.delete(f"/api/tunnels/{t['id']}", headers=h)

@@ -13,6 +13,7 @@ import uuid as uuidlib
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
@@ -1246,7 +1247,7 @@ def tunnel_out(t: Tunnel, db: Session, request: Request) -> dict:
         problems.append("روی سرور خارج چیزی روی این پورت‌ها گوش نمی‌دهد: " + ", ".join(map(str, cs["down"])))
     problems += list(cs.get("errors", [])) if client_on else []
     return {"id": t.id, "name": t.name, "iran_host": t.iran_host, "node_id": t.node_id, "node_name": node.name if node else "؟",
-            "ctl_port": t.ctl_port, "forwards": t.forwards, "ports": forwards_text(t.forwards), "enabled": t.enabled, "publish": t.publish,
+            "ctl_port": t.ctl_port, "forwards": t.forwards, "ports": forwards_text(t.forwards), "enabled": t.enabled, "publish": t.publish, "encrypt": t.encrypt,
             "status": status, "pool": pool, "iran_online": relay_on, "node_online": client_on, "problems": problems,
             "install_command": f"bash <(curl -fsSL {public_url(request)}/relay-install.sh) --token {t.relay_token}"}
 
@@ -1257,6 +1258,7 @@ class TunnelIn(BaseModel):
     node_id: int
     ports: str = Field(max_length=4000)
     publish: bool = True
+    encrypt: Literal["off", "tcp", "all"] = "off"
 
 
 class TunnelPatch(BaseModel):
@@ -1265,6 +1267,7 @@ class TunnelPatch(BaseModel):
     ports: str | None = Field(default=None, max_length=4000)
     enabled: bool | None = None
     publish: bool | None = None
+    encrypt: Literal["off", "tcp", "all"] | None = None
 
 
 def clean_host(host: str) -> str:
@@ -1288,7 +1291,7 @@ def create_tunnel(body: TunnelIn, request: Request, db: Session = Depends(get_db
     taken = {f["listen"] for f in forwards}
     ctl = next(p for p in range(7777, 7977) if p not in used and p not in taken)
     t = Tunnel(name=body.name.strip(), iran_host=host, node_id=body.node_id, ctl_port=ctl, forwards=forwards,
-               token=secrets.token_hex(16), relay_token=secrets.token_urlsafe(24), publish=body.publish)
+               token=secrets.token_hex(16), relay_token=secrets.token_urlsafe(24), publish=body.publish, encrypt=body.encrypt)
     db.add(t)
     db.commit()
     return tunnel_out(t, db, request)
@@ -1309,6 +1312,8 @@ def patch_tunnel(tunnel_id: int, body: TunnelPatch, request: Request, db: Sessio
         t.enabled = body.enabled
     if body.publish is not None:
         t.publish = body.publish
+    if body.encrypt is not None:
+        t.encrypt = body.encrypt
     db.commit()
     return tunnel_out(t, db, request)
 
@@ -1334,7 +1339,7 @@ def _sha(path: Path) -> str:
 
 @app.get("/api/relay/config")
 def relay_config(t: Tunnel = Depends(require_relay)):
-    return {"tunnel": {"id": t.id, "name": t.name, "enabled": t.enabled, "ctl_port": t.ctl_port, "token": t.token, "forwards": t.forwards},
+    return {"tunnel": {"id": t.id, "name": t.name, "enabled": t.enabled, "ctl_port": t.ctl_port, "token": t.token, "forwards": t.forwards, "encrypt": t.encrypt},
             "vtunnel_sha256": _sha(ROOT / "agent" / "vtunnel.py"), "agent_sha256": _sha(ROOT / "agent" / "relay_agent.py")}
 
 
@@ -1372,7 +1377,7 @@ def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db
     served = {p.proto for p in node.protocols if p.enabled}   # a user needs an account while any copy of the protocol runs
     extra = [{"proto": p.proto, "port": p.port, "tag": inst_tag(p)} for p in node.protocols if p.enabled and p.extra]
     dc = dnstt_conf(db)
-    tunnels = [{"id": t.id, "server": f"{t.iran_host}:{t.ctl_port}", "token": t.token, "pool": 8,
+    tunnels = [{"id": t.id, "server": f"{t.iran_host}:{t.ctl_port}", "token": t.token, "pool": 8, "encrypt": t.encrypt,
                 "targets": sorted({f["target"] for f in t.forwards if f["proto"] == "tcp"})}
                for t in db.scalars(select(Tunnel).where(Tunnel.node_id == node.id, Tunnel.enabled == True))]  # noqa: E712
     users = []

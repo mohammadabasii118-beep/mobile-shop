@@ -76,7 +76,7 @@ After=network-online.target
 
 [Service]
 EnvironmentFile={env_file}
-ExecStart=/usr/bin/python3 {VTUNNEL} server --listen 0.0.0.0:{t['ctl_port']} --status-file {status_file} {forward_args(t['forwards'])}
+ExecStart=/usr/bin/python3 {VTUNNEL} server --listen 0.0.0.0:{t['ctl_port']} --status-file {status_file} --encrypt {t.get('encrypt', 'off')} {forward_args(t['forwards'])}
 Restart=always
 RestartSec=2
 LimitNOFILE=1048576
@@ -84,6 +84,17 @@ LimitNOFILE=1048576
 [Install]
 WantedBy=multi-user.target
 """
+
+
+def ensure_crypto(errors):
+    """Encryption needs python3-cryptography; install it from the distribution when it is missing."""
+    if sh("/usr/bin/python3", "-c", "import cryptography").returncode == 0:
+        return True
+    sh("apt-get", "install", "-y", "python3-cryptography")
+    if sh("/usr/bin/python3", "-c", "import cryptography").returncode == 0:
+        return True
+    errors.append("python3-cryptography is missing and apt could not install it (needed for encryption)")
+    return False
 
 
 def apply(conf, cfg, errors):
@@ -97,6 +108,8 @@ def apply(conf, cfg, errors):
     if not t["enabled"]:
         if os.path.exists(unit):
             sh("systemctl", "disable", "--now", service)
+        return service, status_file
+    if t.get("encrypt", "off") != "off" and not ensure_crypto(errors):
         return service, status_file
     changed = fetch(conf, "/vtunnel.py", VTUNNEL, cfg["vtunnel_sha256"])
     changed |= write_if_changed(env_file, f"VTUNNEL_TOKEN={t['token']}\n", 0o600)

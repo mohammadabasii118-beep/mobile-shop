@@ -12,7 +12,8 @@ the client machine (TARGET defaults to LISTEN).
 
 TCP: the client keeps --pool connections to the server already open and authenticated, so a user connection is handed one
 at once (no handshake across the tunnel on the first packet). UDP: datagrams travel as datagrams (no TCP head-of-line
-blocking), which is what games need. The tunnel itself is not encrypted: run encrypted protocols (VLESS/Reality, ...) inside."""
+blocking), which is what games need. By default the tunnel is not encrypted: run encrypted protocols (VLESS/Reality, ...) inside,
+or add --encrypt tcp|all on both ends (ChaCha20-Poly1305; the handshake is random bytes, so the tunnel has no fixed fingerprint)."""
 import argparse
 import asyncio
 import hashlib
@@ -100,6 +101,135 @@ def try_send(sock, data, addr=None):
         pass   # UDP: a dropped datagram is normal
 
 
+# ---- optional encryption (ChaCha20-Poly1305, keys derived from the token; needs python3-cryptography) ----
+def _crypto():
+    try:
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.ciphers.aead import ChaCha20Poly1305
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+    except ImportError:
+        sys.exit("encryption needs the python3-cryptography package (apt install python3-cryptography)")
+    return hashes, ChaCha20Poly1305, HKDF
+
+
+def derive(token, salt, info):
+    hashes, _, HKDF = _crypto()
+    return HKDF(algorithm=hashes.SHA256(), length=32, salt=salt, info=info).derive(token.encode())
+
+
+class EncReader:
+    """Reads the AEAD records of the other side as a plain byte stream: [18 B sealed length][length + 16 B sealed data]."""
+    def __init__(self, reader, key):
+        self.r, self.aead, self.ctr, self.buf = reader, _crypto()[1](key), 0, b""
+
+    def _nonce(self):
+        n = self.ctr.to_bytes(12, "little")
+        self.ctr += 1
+        return n
+
+    async def _fill(self):
+        try:
+            hdr = await self.r.readexactly(18)
+        except asyncio.IncompleteReadError as e:
+            if e.partial:
+                raise ConnectionError("truncated record")
+            return False                                     # clean end of stream
+        try:
+            ln = int.from_bytes(self.aead.decrypt(self._nonce(), hdr, None), "big")
+            self.buf += self.aead.decrypt(self._nonce(), await self.r.readexactly(ln + 16), None)
+        except asyncio.IncompleteReadError:
+            raise ConnectionError("truncated record")
+        except Exception as e:
+            raise ConnectionError("bad record (wrong token or not a vtunnel peer)") from e
+        return True
+
+    async def read(self, n=-1):
+        if not self.buf and not await self._fill():
+            return b""
+        n = len(self.buf) if n < 0 else n
+        out, self.buf = self.buf[:n], self.buf[n:]
+        return out
+
+    async def readexactly(self, n):
+        while len(self.buf) < n:
+            if not await self._fill():
+                raise asyncio.IncompleteReadError(self.buf, n)
+        out, self.buf = self.buf[:n], self.buf[n:]
+        return out
+
+
+class EncWriter:
+    def __init__(self, writer, key):
+        self.w, self.aead, self.ctr = writer, _crypto()[1](key), 0
+
+    def _nonce(self):
+        n = self.ctr.to_bytes(12, "little")
+        self.ctr += 1
+        return n
+
+    def write(self, data):
+        for i in range(0, len(data), 16384):
+            chunk = data[i:i + 16384]
+            hdr = self.aead.encrypt(self._nonce(), len(chunk).to_bytes(2, "big"), None)
+            self.w.write(hdr + self.aead.encrypt(self._nonce(), chunk, None))
+
+    async def drain(self):
+        await self.w.drain()
+
+    def close(self):
+        self.w.close()
+
+    def get_extra_info(self, name, default=None):
+        return self.w.get_extra_info(name, default)
+
+
+async def secure_server(r, w, token):
+    """Server side of the encrypted handshake: salts are random bytes, so nothing on the wire looks like a protocol."""
+    cs = await asyncio.wait_for(r.readexactly(16), 5)
+    ss = os.urandom(16)
+    w.write(ss)
+    await w.drain()
+    er = EncReader(r, derive(token, cs + ss, b"vt-c2s"))
+    ew = EncWriter(w, derive(token, cs + ss, b"vt-s2c"))
+    if await asyncio.wait_for(er.readexactly(3), 5) != MAGIC:
+        raise ConnectionError("bad hello")
+    ew.write(b"K")
+    await w.drain()
+    return er, ew
+
+
+async def secure_client(r, w, token):
+    cs = os.urandom(16)
+    w.write(cs)
+    await w.drain()
+    ss = await asyncio.wait_for(r.readexactly(16), 8)
+    er = EncReader(r, derive(token, cs + ss, b"vt-s2c"))
+    ew = EncWriter(w, derive(token, cs + ss, b"vt-c2s"))
+    ew.write(MAGIC)
+    await w.drain()
+    if await asyncio.wait_for(er.readexactly(1), 8) != b"K":
+        raise ConnectionError("rejected")
+    return er, ew
+
+
+class UdpBox:
+    """Seals each tunnel datagram on its own: random 12-byte nonce + ChaCha20-Poly1305."""
+    def __init__(self, token, role):
+        chacha = _crypto()[1]
+        c2s, s2c = derive(token, b"vtunnel-udp", b"udp-c2s"), derive(token, b"vtunnel-udp", b"udp-s2c")
+        self.tx, self.rx = (chacha(c2s), chacha(s2c)) if role == "client" else (chacha(s2c), chacha(c2s))
+
+    def seal(self, data):
+        nonce = os.urandom(12)
+        return nonce + self.tx.encrypt(nonce, data, None)
+
+    def open(self, data):
+        try:
+            return self.rx.decrypt(data[:12], data[12:], None)
+        except Exception:
+            return None
+
+
 class Idle:
     """An authenticated connection from the client that waits for a user."""
     def __init__(self, r, w):
@@ -113,8 +243,10 @@ class Idle:
 
 
 class Server:
-    def __init__(self, token, host, port, forwards, status_file=""):
+    def __init__(self, token, host, port, forwards, status_file="", encrypt="off"):
         self.token, self.host, self.port, self.status_file = token, host, port, status_file
+        self.encrypt = encrypt
+        self.ubox = UdpBox(token, "server") if encrypt == "all" else None
         self.failed = []        # forwarded ports that could not be opened (taken by another program)
         self.tcp = [(l, t) for p, l, t in forwards if p == "tcp"]
         self.udp = [(l, t) for p, l, t in forwards if p == "udp"]
@@ -129,19 +261,24 @@ class Server:
     # ---- TCP ----
     async def on_tunnel(self, r, w):
         tune(w)
+        raw = w
         try:
-            nonce = os.urandom(16)
-            w.write(MAGIC + nonce)
-            await w.drain()
-            resp = await asyncio.wait_for(r.readexactly(32), 5)
-            if not hmac.compare_digest(resp, mac(self.token, nonce)):
-                LOG.warning("tunnel connection from %s rejected (wrong token)", w.get_extra_info("peername"))
-                w.close()
-                return
-            w.write(b"K")
-            await w.drain()
-        except Exception:
-            w.close()
+            if self.encrypt != "off":
+                r, w = await secure_server(r, w, self.token)
+            else:
+                nonce = os.urandom(16)
+                w.write(MAGIC + nonce)
+                await w.drain()
+                resp = await asyncio.wait_for(r.readexactly(32), 5)
+                if not hmac.compare_digest(resp, mac(self.token, nonce)):
+                    LOG.warning("tunnel connection from %s rejected (wrong token)", raw.get_extra_info("peername"))
+                    w.close()
+                    return
+                w.write(b"K")
+                await w.drain()
+        except Exception as e:
+            LOG.warning("tunnel connection from %s rejected (%s)", raw.get_extra_info("peername"), e.__class__.__name__)
+            raw.close()
             return
         e = Idle(r, w)
         self.pool.append(e)
@@ -196,6 +333,10 @@ class Server:
             data, addr = self.tsock.recvfrom(65535)
         except (BlockingIOError, OSError):
             return
+        if self.ubox:
+            data = self.ubox.open(data)
+            if data is None:
+                return
         kind = data[:1]
         if kind == b"R" and len(data) == 25:
             ts = data[1:9]
@@ -223,7 +364,8 @@ class Server:
             self.by_user[key] = sid
             self.sessions[sid] = [sock, addr, time.monotonic(), key]
         self.sessions[sid][2] = time.monotonic()
-        try_send(self.tsock, b"D" + struct.pack("!IH", sid, port) + data, self.client_addr)
+        frame = b"D" + struct.pack("!IH", sid, port) + data
+        try_send(self.tsock, self.ubox.seal(frame) if self.ubox else frame, self.client_addr)
 
     async def sweep(self):
         while True:
@@ -276,8 +418,10 @@ class Server:
 
 
 class Client:
-    def __init__(self, token, host, port, pool):
+    def __init__(self, token, host, port, pool, encrypt="off"):
         self.token, self.host, self.port, self.pool = token, host, port, pool
+        self.encrypt = encrypt
+        self.ubox = UdpBox(token, "client") if encrypt == "all" else None
         self.usock = None
         self.sessions = {}      # id -> [local socket, last seen]
         self.server_udp = None
@@ -289,13 +433,16 @@ class Client:
             try:
                 r, w = await asyncio.wait_for(asyncio.open_connection(self.host, self.port), 8)
                 tune(w)
-                hdr = await asyncio.wait_for(r.readexactly(19), 8)
-                if hdr[:3] != MAGIC:
-                    raise ConnectionError("not a vtunnel server")
-                w.write(mac(self.token, hdr[3:]))
-                await w.drain()
-                if await asyncio.wait_for(r.readexactly(1), 8) != b"K":
-                    raise ConnectionError("rejected")
+                if self.encrypt != "off":
+                    r, w = await secure_client(r, w, self.token)
+                else:
+                    hdr = await asyncio.wait_for(r.readexactly(19), 8)
+                    if hdr[:3] != MAGIC:
+                        raise ConnectionError("not a vtunnel server")
+                    w.write(mac(self.token, hdr[3:]))
+                    await w.drain()
+                    if await asyncio.wait_for(r.readexactly(1), 8) != b"K":
+                        raise ConnectionError("rejected")
                 backoff = 1
                 frame = await r.readexactly(3)       # idle until a user arrives; TCP keepalive notices a dead server
             except Exception as e:
@@ -325,6 +472,10 @@ class Client:
             data, _ = self.usock.recvfrom(65535)
         except (BlockingIOError, OSError):
             return
+        if self.ubox:
+            data = self.ubox.open(data)
+            if data is None:
+                return
         if data[:1] != b"D" or len(data) < 7:
             return
         sid, port = struct.unpack("!IH", data[1:7])
@@ -338,12 +489,15 @@ class Client:
         s[1] = time.monotonic()
         try_send(s[0], data[7:])
 
+    def send(self, frame):
+        try_send(self.usock, self.ubox.seal(frame) if self.ubox else frame, self.server_udp)
+
     def reply(self, sid, sock):
         try:
             data = sock.recv(65535)
         except (BlockingIOError, OSError):
             return
-        try_send(self.usock, b"D" + struct.pack("!I", sid) + data, self.server_udp)
+        self.send(b"D" + struct.pack("!I", sid) + data)
 
     async def udp_loop(self):
         loop = asyncio.get_running_loop()
@@ -352,7 +506,7 @@ class Client:
         loop.add_reader(self.usock.fileno(), self.readable)
         while True:
             ts = struct.pack("!Q", int(time.time()))
-            try_send(self.usock, b"R" + ts + mac(self.token, ts)[:16], self.server_udp)
+            self.send(b"R" + ts + mac(self.token, ts)[:16])
             now = time.monotonic()
             for sid in [i for i, s in self.sessions.items() if now - s[1] > UDP_IDLE]:
                 sock = self.sessions.pop(sid)[0]
@@ -378,6 +532,8 @@ def main(argv=None):
     cl.add_argument("--pool", type=int, default=8)
     for p in (sv, cl):
         p.add_argument("--token", default=os.environ.get("VTUNNEL_TOKEN", ""))
+        p.add_argument("--encrypt", choices=["off", "tcp", "all"], default="off",
+                       help="tcp: encrypt the TCP connections; all: also the UDP datagrams (both ends must use the same value)")
     a = ap.parse_args(argv)
     if len(a.token) < 8:
         sys.exit("--token (or VTUNNEL_TOKEN) must be at least 8 characters")
@@ -386,10 +542,10 @@ def main(argv=None):
         host, _, port = a.listen.rpartition(":")
         if not a.forward:
             sys.exit("give at least one --forward")
-        job = Server(a.token, host or "0.0.0.0", int(port), [parse_forward(f) for f in a.forward], a.status_file).run()
+        job = Server(a.token, host or "0.0.0.0", int(port), [parse_forward(f) for f in a.forward], a.status_file, a.encrypt).run()
     else:
         host, _, port = a.server.rpartition(":")
-        job = Client(a.token, host, int(port), max(1, a.pool)).run()
+        job = Client(a.token, host, int(port), max(1, a.pool), a.encrypt).run()
     try:
         asyncio.run(job)
     except KeyboardInterrupt:

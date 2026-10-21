@@ -157,3 +157,64 @@ def test_busy_port_does_not_take_the_others_down_and_status_file_reports_it(tmp_
     finally:
         srv.kill()
         busy.close()
+
+
+def _run_modes(srv_mode, cl_mode, token_c="enc-token-12345", expect_ok=True):
+    ctl, user_tcp, user_udp, tgt_tcp, tgt_udp = free_port(), free_port(), free_port(socket.SOCK_DGRAM), free_port(), free_port(socket.SOCK_DGRAM)
+    tcp_echo(tgt_tcp)
+    udp_echo(tgt_udp)
+    srv = launch("server", "--listen", f"127.0.0.1:{ctl}", "--token", "enc-token-12345", "--encrypt", srv_mode,
+                 "--forward", f"{user_tcp}={tgt_tcp}", "--forward", f"udp:{user_udp}={tgt_udp}")
+    try:
+        assert wait_port(user_tcp)
+        cl = launch("client", "--server", f"127.0.0.1:{ctl}", "--token", token_c, "--encrypt", cl_mode, "--pool", "2")
+        try:
+            time.sleep(1.5)
+            if not expect_ok:
+                try:
+                    got = tcp_roundtrip(user_tcp, b"nope", timeout=4)
+                except OSError:
+                    got = b""
+                assert got != b"nope"
+                return
+            assert tcp_roundtrip(user_tcp, b"z" * 200000) == b"z" * 200000
+            assert tcp_roundtrip(user_tcp, b"hi") == b"hi"
+            u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            u.settimeout(3)
+            u.sendto(b"game-packet", ("127.0.0.1", user_udp))
+            assert u.recvfrom(100)[0] == b"game-packet"
+        finally:
+            cl.kill()
+    finally:
+        srv.kill()
+
+
+def test_encrypted_tcp_only():
+    _run_modes("tcp", "tcp")
+
+
+def test_encrypted_tcp_and_udp():
+    _run_modes("all", "all")
+
+
+def test_encryption_mismatch_and_wrong_token_are_rejected():
+    _run_modes("tcp", "off", expect_ok=False)
+    _run_modes("off", "tcp", expect_ok=False)
+    _run_modes("tcp", "tcp", token_c="another-token-1", expect_ok=False)
+
+
+def test_encrypted_stream_has_no_plaintext_marker():
+    """What an observer sees on the tunnel port: no 'VT1' magic, only random-looking bytes."""
+    ctl, user_tcp, tgt = free_port(), free_port(), free_port()
+    tcp_echo(tgt)
+    srv = launch("server", "--listen", f"127.0.0.1:{ctl}", "--token", "enc-token-12345", "--encrypt", "tcp", "--forward", f"{user_tcp}={tgt}")
+    try:
+        assert wait_port(user_tcp)
+        c = socket.create_connection(("127.0.0.1", ctl), 3)
+        c.settimeout(3)
+        c.sendall(os.urandom(16))
+        reply = c.recv(100)
+        assert len(reply) == 16 and b"VT1" not in reply
+        c.close()
+    finally:
+        srv.kill()
