@@ -283,6 +283,8 @@ describe('Telegram + web admin', () => {
       expect(list.json.items[0]).toMatchObject({ kind: 'vpnpanel', profiles: [{ id: 1, name: 'اصلی' }] });
       expect(JSON.stringify(list.json)).not.toContain(fake.apiKey);
       expect((await call(c, 'PATCH', `/panels/${made.json.id}`, { profiles: [{ id: 1, name: 'اصلی', protos: ['vless', 'trojan'], nodeIds: [1] }] })).status).toBe(200);
+      const stored = await call(c, 'POST', '/panels/probe', { panelId: made.json.id }); // editing: stored token is used
+      expect(stored.status).toBe(200); expect(stored.json.nodes).toHaveLength(2);
       expect((await call(c, 'PATCH', `/panels/${made.json.id}`, { profiles: [{ id: 1, name: 'x', protos: ['hy2'], nodeIds: [] }] })).status).toBe(400);
     });
   });

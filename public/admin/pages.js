@@ -718,7 +718,7 @@ function panelForm(p, done) {
     const v = (n) => form.querySelector(`[name=${n}]`).value.trim();
     probeOut.textContent = 'در حال اتصال…';
     try {
-      const r = await api('/panels/probe', { method: 'POST', body: { baseUrl: v('baseUrl'), apiToken: v('apiToken'), tlsInsecure: tls.getAttribute('aria-checked') === 'true' } });
+      const r = await api('/panels/probe', { method: 'POST', body: { baseUrl: v('baseUrl'), apiToken: v('apiToken'), panelId: p?.id, tlsInsecure: tls.getAttribute('aria-checked') === 'true' } });
       probeOut.textContent = `پروتکل‌های قابل فروش حجمی: ${r.protocols.filter((x) => x.counted).map((x) => x.id).join(', ') || '—'}`
         + (r.protocols.some((x) => !x.counted) ? ` | بدون شمارش حجم (غیرقابل فروش): ${r.protocols.filter((x) => !x.counted).map((x) => x.id).join(', ')}` : '')
         + ` | لوکیشن‌ها: ${r.nodes.map((n) => `${n.id}=${n.name}${n.online ? '' : ' (آفلاین)'}`).join(', ') || '—'}`;

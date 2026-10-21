@@ -16,6 +16,7 @@ import { SETTING_DEFAULTS, SettingKey, allSettings, setSetting } from '../module
 import { flushPending } from '../modules/notifications/service';
 import { AUDIENCES, AudienceKey, audienceCounts, cancelBroadcast, createBroadcast, getBroadcast, listBroadcasts, sendTestBroadcast } from '../modules/broadcast/service';
 import { PartnerFilter, validatePartnerSetting, approvePartner, getPartnerById, listPartners, partnerCounts, partnerStats, rejectPartner, setPartnerPercent, setPartnerSuspended } from '../modules/partners/service';
+import { decryptSecret } from '../utils/secrets';
 import { PanelView, probePanel, createPanel, deletePanel, listPanelInbounds, listPanels, panelHealth, setPanelActive, testPanel, updatePanel } from '../modules/panels/service';
 import { categoryTree, createCategory, deleteCategory, moveCategory, updateCategory } from '../modules/categories/service';
 import { isTextKey, listTexts, previewText, resetText, setText } from '../modules/texts/service';
@@ -280,7 +281,15 @@ export const routes: Route[] = [
   { method: 'GET', re: /^\/panels\/options$/, perm: 'products.manage', run: async () => ({ items: (await listPanels()).filter((p) => p.isActive).map((p: PanelView) => ({ code: p.code, name: p.name })) }) },
   { method: 'POST', re: /^\/panels$/, perm: 'panels.manage', run: async (c) => { const r = await createPanel(actor(c), panelBody.parse(c.body) as any); return { id: r.id, code: r.code }; } },
   { method: 'PATCH', re: /^\/panels\/([\w-]+)$/, perm: 'panels.manage', run: async (c) => { await updatePanel(actor(c), c.params[0], panelBody.partial().parse(c.body) as any); return { ok: true }; } },
-  { method: 'POST', re: /^\/panels\/probe$/, perm: 'panels.manage', run: async (c) => probePanel(z.object({ baseUrl: z.string().max(300), apiToken: z.string().max(400), tlsInsecure: z.boolean().optional() }).parse(c.body)) },
+  { method: 'POST', re: /^\/panels\/probe$/, perm: 'panels.manage', run: async (c) => {
+    const b = z.object({ baseUrl: z.string().max(300).optional(), apiToken: z.string().max(400).optional(), tlsInsecure: z.boolean().optional(), panelId: z.string().optional() }).parse(c.body);
+    if (b.panelId && !b.apiToken) { // editing: use the stored (encrypted) credentials
+      const row = await prisma.panel.findUnique({ where: { id: b.panelId } });
+      if (!row || row.kind !== 'vpnpanel' || !row.apiTokenEnc) throw new ValidationError('پنل اختصاصی پیدا نشد');
+      return probePanel({ baseUrl: b.baseUrl || row.baseUrl, apiToken: decryptSecret(row.apiTokenEnc), tlsInsecure: b.tlsInsecure ?? row.tlsInsecure });
+    }
+    return probePanel({ baseUrl: b.baseUrl ?? '', apiToken: b.apiToken ?? '', tlsInsecure: b.tlsInsecure });
+  } },
   { method: 'POST', re: /^\/panels\/([\w-]+)\/active$/, perm: 'panels.manage', run: async (c) => { await setPanelActive(actor(c), c.params[0], z.object({ isActive: z.boolean() }).parse(c.body).isActive); return { ok: true }; } },
   { method: 'DELETE', re: /^\/panels\/([\w-]+)$/, perm: 'panels.manage', run: async (c) => { await deletePanel(actor(c), c.params[0]); return { ok: true }; } },
   { method: 'POST', re: /^\/panels\/([\w-]+)\/test$/, perm: 'panels.manage', run: (c) => testPanel(c.params[0]) },
