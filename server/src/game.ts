@@ -93,6 +93,29 @@ export class Game {
   /** عضویت کانال تأیید شد؛ دیگر هیچ‌وقت نشان داده نمی‌شود */
   setChannelOk(userId: number) {
     this.d.db.prepare('UPDATE users SET channel_ok = 1 WHERE id = ?').run(userId);
+    this.countReferral(userId);
+  }
+  /** زیرمجموعه بعد از تأیید عضویت کانال (یا وقتی کانال اجباری نیست) برای دعوت‌کننده حساب می‌شود؛ بی‌خطر برای تکرار */
+  countReferral(userId: number) {
+    this.d.db.prepare('UPDATE referred SET counted = 1 WHERE user_id = ? AND counted = 0').run(userId);
+  }
+  /** تعداد زیرمجموعه‌ی تأییدشده (به‌علاوه‌ی تنظیم دستیِ ادمین) */
+  refCount(userId: number): number {
+    const { db } = this.d;
+    const real = (db.prepare('SELECT COUNT(*) AS n FROM referred r JOIN users u ON u.id = r.user_id WHERE r.referrer = ? AND r.counted = 1 AND u.banned = 0').get(userId) as any).n as number;
+    const bonus = ((db.prepare('SELECT ref_bonus FROM users WHERE id = ?').get(userId) as any)?.ref_bonus ?? 0) as number;
+    return Math.max(0, real + bonus);
+  }
+  /** ۱۰ نفر برتر زیرمجموعه (فقط کسانی که حداقل یک زیرمجموعه دارند) + جایگاه و تعداد خودِ بازیکن */
+  refLeaderboard(meId: number) {
+    const { db } = this.d;
+    const all = (db.prepare('SELECT id, name, avatar, level FROM users WHERE banned = 0').all() as any[])
+      .map((u) => ({ id: u.id as number, name: u.name as string, avatar: (u.avatar ?? null) as string | null, level: u.level as number, refs: this.refCount(u.id) }))
+      .filter((u) => u.refs > 0)
+      .sort((a, b) => b.refs - a.refs || a.id - b.id);
+    const myCount = this.refCount(meId);
+    const myIdx = all.findIndex((u) => u.id === meId);
+    return { rows: all.slice(0, 10).map((u, i) => ({ ...u, rank: i + 1, me: u.id === meId })), myRank: myIdx >= 0 ? myIdx + 1 : 0, myCount };
   }
 
   // ---------- هزینه‌ی ورود ----------
@@ -347,6 +370,8 @@ export class Game {
     const r = db.prepare('SELECT referrer FROM referrals WHERE tg_id = ?').get(tgId) as { referrer: number } | undefined;
     if (!r) return;
     db.prepare('DELETE FROM referrals WHERE tg_id = ?').run(tgId);
+    // فقط کاربرِ تازه (همین الان ساخته شده) زیرمجموعه حساب می‌شود؛ خودش را نمی‌شود دعوت کرد
+    if (r.referrer !== userId) db.prepare('INSERT OR IGNORE INTO referred (user_id, referrer, at, counted) VALUES (?,?,?,0)').run(userId, r.referrer, this.d.now());
     this.befriend(userId, r.referrer);
   }
   /** جستجو با شناسه‌ی عددی: بازیکن + رابطه‌ی فعلی با او */
@@ -602,16 +627,28 @@ export class Game {
   adminUser(userId: number) {
     const u = this.d.db.prepare('SELECT tg_id, banned, created_at FROM users WHERE id = ?').get(userId) as any;
     if (!u) throw new GameError('بازیکن پیدا نشد');
-    return { ...this.profile(userId), tgId: u.tg_id as number, banned: !!u.banned, createdAt: u.created_at as number };
+    return { ...this.profile(userId), tgId: u.tg_id as number, banned: !!u.banned, createdAt: u.created_at as number, refCount: this.refCount(userId) };
   }
 
   /** سکه یا الماس را کم/زیاد (delta) یا دقیق تنظیم (set) می‌کند؛ هیچ‌وقت زیر صفر نمی‌رود */
-  adminBalance(userId: number, currency: 'coins' | 'gems', o: { delta?: unknown; set?: unknown }) {
+  adminBalance(userId: number, currency: 'coins' | 'gems' | 'trophies' | 'refs', o: { delta?: unknown; set?: unknown }) {
     const { db } = this.d;
-    if (currency !== 'coins' && currency !== 'gems') throw new GameError('نوع دارایی نامعتبر است');
+    if (currency !== 'coins' && currency !== 'gems' && currency !== 'trophies' && currency !== 'refs') throw new GameError('نوع دارایی نامعتبر است');
     if (!db.prepare('SELECT 1 FROM users WHERE id = ?').get(userId)) throw new GameError('بازیکن پیدا نشد');
     const LIM = 10_000_000;
-    const name = currency === 'coins' ? 'سکه' : 'الماس';
+    const name = ({ coins: 'سکه', gems: 'الماس', trophies: 'جام', refs: 'زیرمجموعه' } as const)[currency];
+    if (currency === 'refs') {
+      // زیرمجموعه: عددِ نمایشی = تعداد واقعی + تنظیم ادمین؛ تنظیم دستی فقط اختلاف را ذخیره می‌کند
+      if (o.set !== undefined) {
+        if (!Number.isInteger(o.set) || (o.set as number) < 0 || (o.set as number) > 100_000) throw new GameError(`عدد ${name} نامعتبر است`);
+        const realOnly = (db.prepare('SELECT COUNT(*) AS n FROM referred r JOIN users u ON u.id = r.user_id WHERE r.referrer = ? AND r.counted = 1 AND u.banned = 0').get(userId) as any).n as number;
+        db.prepare('UPDATE users SET ref_bonus = ? WHERE id = ?').run((o.set as number) - realOnly, userId);
+      } else {
+        if (!Number.isInteger(o.delta) || Math.abs(o.delta as number) > 100_000) throw new GameError(`عدد ${name} نامعتبر است`);
+        db.prepare('UPDATE users SET ref_bonus = ref_bonus + ? WHERE id = ?').run(o.delta as number, userId);
+      }
+      return;
+    }
     if (o.set !== undefined) {
       if (!Number.isInteger(o.set) || (o.set as number) < 0 || (o.set as number) > LIM) throw new GameError(`عدد ${name} نامعتبر است`);
       db.prepare(`UPDATE users SET ${currency} = ? WHERE id = ?`).run(o.set as number, userId);

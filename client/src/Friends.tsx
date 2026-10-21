@@ -6,7 +6,7 @@ import { Avatar } from './Home';
 import { Modal, fa } from './ui';
 import { openLink } from './telegram';
 
-interface State { friends: FriendView[]; incoming: FriendBase[]; outgoing: FriendBase[]; code: number; refLink: string | null }
+interface State { friends: FriendView[]; incoming: FriendBase[]; outgoing: FriendBase[]; code: number; refLink: string | null; refs?: number }
 type Relation = 'self' | 'friend' | 'outgoing' | 'incoming' | 'none';
 const STATUS_TEXT: Record<string, string> = { declined: 'دعوتت رد شد', expired: 'جوابی نیامد؛ دعوت منقضی شد', busy: 'دوستت الان درگیر است', offline: 'دوستت آنلاین نیست', canceled: 'دعوت لغو شد' };
 
@@ -145,7 +145,7 @@ export function FriendsPanel({ ctx, onClose }: { ctx: Ctx; onClose: () => void }
             )}
             <div className="reflink">
               <b>لینک دعوت من</b>
-              <small>هر کس با این لینک وارد ربات شود، مستقیم دوست تو می‌شود.</small>
+              <small>هر کس با این لینک وارد ربات شود، مستقیم دوست تو می‌شود. اگر بازیکنِ تازه باشد و عضو کانال هم بشود، یک زیرمجموعه برایت حساب می‌شود (هر نفر فقط یک‌بار و فقط برای اولین دعوت‌کننده‌اش).</small>{st && <b>زیرمجموعه‌های تأییدشده‌ی تو: {fa(st.refs ?? 0)} 👥</b>}
               {st?.refLink ? (
                 <>
                   <input readOnly value={st.refLink} onFocus={(e) => e.currentTarget.select()} dir="ltr" />

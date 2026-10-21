@@ -576,7 +576,7 @@ function Av({ url, name, big }: { url: string | null; name: string; big?: boolea
   return url && !bad ? <img className={cls} src={url} alt="" onError={() => setBad(true)} referrerPolicy="no-referrer" /> : <span className={`${cls} ph`}>{[...name][0] ?? '؟'}</span>;
 }
 
-type Detail = Profile & { tgId: number; banned: boolean; createdAt: number };
+type Detail = Profile & { tgId: number; banned: boolean; createdAt: number; refCount: number };
 
 function soloText(cfg: GameConfig, cleared: number) {
   const total = cfg.solo.pits.reduce((t, p) => t + p.stages.length, 0);
@@ -683,7 +683,7 @@ function PlayersTab({ cfg, run }: { cfg: GameConfig; run: Run }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [d, setD] = useState<Detail | null>(null);
   const [amount, setAmount] = useState('');
-  const [cur, setCur] = useState<'coins' | 'gems'>('coins');
+  const [cur, setCur] = useState<'coins' | 'gems' | 'trophies' | 'refs'>('coins');
   const [g, setG] = useState({ xp: 0, cardId: '' });
   const load = () => run(async () => { setUsers((await call(`/api/admin/users?q=${encodeURIComponent(q)}`)).users); });
   useEffect(() => { void load(); /* eslint-disable-next-line */ }, []);
@@ -691,7 +691,7 @@ function PlayersTab({ cfg, run }: { cfg: GameConfig; run: Run }) {
   const change = (sign: 1 | -1) => d && run(async () => {
     const j = await call('/api/admin/balance', { userId: d.id, currency: cur, delta: sign * amt });
     setD(j.user); setAmount(''); await load();
-  }, `${fa(amt)} ${cur === 'coins' ? 'سکه' : 'الماس'} ${sign > 0 ? 'اضافه' : 'کم'} شد`);
+  }, `${fa(amt)} ${({ coins: 'سکه', gems: 'الماس', trophies: 'افتخار', refs: 'زیرمجموعه' })[cur]} ${sign > 0 ? 'اضافه' : 'کم'} شد`);
   const amt = Math.floor(Number(amount));
   const cardName = (id: string) => cfg.cards.find((c) => c.id === id)?.name ?? id;
   const when = (t: number) => new Date(t).toLocaleDateString('fa-IR');
@@ -742,9 +742,13 @@ function PlayersTab({ cfg, run }: { cfg: GameConfig; run: Run }) {
             <div className="coinbox">
               <div className="coinnow">سکه‌ی فعلی <b className="num">{fa(d.coins)}</b></div>
               <div className="coinnow">الماس سرخ فعلی <b className="num" style={{ color: '#ff8a98' }}>{fa(d.gems ?? 0)}</b></div>
+              <div className="coinnow">افتخار (جام) فعلی <b className="num" style={{ color: '#ffd76a' }}>{fa(d.trophies ?? 0)}</b></div>
+              <div className="coinnow">زیرمجموعه‌ی تأییدشده <b className="num" style={{ color: '#8fe0ff' }}>{fa(d.refCount ?? 0)}</b></div>
               <div className="tabs" role="tablist" aria-label="نوع دارایی">
                 <button role="tab" aria-selected={cur === 'coins'} onClick={() => setCur('coins')}><Icon n="coin" /> سکه</button>
                 <button role="tab" aria-selected={cur === 'gems'} onClick={() => setCur('gems')}>💎 الماس</button>
+                <button role="tab" aria-selected={cur === 'trophies'} onClick={() => setCur('trophies')}>🏆 افتخار</button>
+                <button role="tab" aria-selected={cur === 'refs'} onClick={() => setCur('refs')}>👥 زیرمجموعه</button>
               </div>
               <div className="searchrow">
                 <label className="field" style={{ flex: 1 }}>مقدار دلخواه

@@ -86,5 +86,9 @@ export function openDb(path = ':memory:'): Db {
     code TEXT PRIMARY KEY, rewards TEXT NOT NULL, max_uses INTEGER NOT NULL DEFAULT 0, used INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL
   );
   CREATE TABLE IF NOT EXISTS redeem_uses (code TEXT NOT NULL, user_id INTEGER NOT NULL, at INTEGER NOT NULL, PRIMARY KEY (code, user_id));`);
+  // زیرمجموعه: هر کاربر فقط یک‌بار و فقط وقتی «تازه» با لینک وارد شده یک ردیف می‌گیرد (کلید = خودِ کاربر، پس با حذف ربات/دوست یا ورود دوباره دوباره حساب نمی‌شود)؛ counted = بعد از تأیید عضویت کانال
+  db.exec('CREATE TABLE IF NOT EXISTS referred (user_id INTEGER PRIMARY KEY, referrer INTEGER NOT NULL, at INTEGER NOT NULL, counted INTEGER NOT NULL DEFAULT 0)');
+  db.exec('CREATE INDEX IF NOT EXISTS referred_by ON referred(referrer, counted)');
+  try { db.exec('ALTER TABLE users ADD COLUMN ref_bonus INTEGER NOT NULL DEFAULT 0'); } catch { /* ستون از قبل هست */ }
   return db;
 }

@@ -396,3 +396,51 @@ describe('game economy', () => {
     });
   });
 });
+
+describe('referrals (subordinates)', () => {
+  it('counts a new player once, only after channel confirmation; no double counting via re-join / unfriend; existing users never count; admin can adjust', () => {
+    const g = new Game({ db: openDb(), cfg, now: () => 1000, rng: () => 0.5 });
+    const inviter = g.upsertUser({ tgId: 9001, name: 'I', avatar: null });
+    g.refStart(9002, inviter);                                   // قبل از اولین ورود
+    const kid = g.upsertUser({ tgId: 9002, name: 'K', avatar: null });
+    expect(g.areFriends(inviter, kid)).toBe(true);
+    expect(g.refCount(inviter)).toBe(0);                         // هنوز عضو کانال تأیید نشده
+    g.setChannelOk(kid);
+    expect(g.refCount(inviter)).toBe(1);
+    g.setChannelOk(kid); g.countReferral(kid);                   // تکرار: همان ۱
+    expect(g.refCount(inviter)).toBe(1);
+    g.removeFriend(inviter, kid);                                // حذف دوست = بی‌اثر
+    g.refStart(9002, inviter);                                   // لینک دوباره‌ی همان کاربر (حالا کاربر قدیمی است)
+    g.upsertUser({ tgId: 9002, name: 'K', avatar: null });
+    expect(g.refCount(inviter)).toBe(1);
+    // کاربر قدیمی با لینک شخص دیگر: فقط دوست می‌شود، زیرمجموعه نیست
+    const other = g.upsertUser({ tgId: 9003, name: 'O', avatar: null });
+    g.refStart(9002, other);
+    expect(g.refCount(other)).toBe(0);
+    g.setChannelOk(kid);
+    expect(g.refCount(other)).toBe(0);
+    // اولین لینک برنده است
+    g.refStart(9004, inviter); g.refStart(9004, other);
+    const k2 = g.upsertUser({ tgId: 9004, name: 'K2', avatar: null });
+    g.setChannelOk(k2);
+    expect([g.refCount(inviter), g.refCount(other)]).toEqual([2, 0]);
+    // خودش را دعوت نکند
+    g.refStart(9005, 9999999);
+    // رتبه‌بندی
+    const lb = g.refLeaderboard(other);
+    expect(lb.rows.map((r) => [r.id, r.refs])).toEqual([[inviter, 2]]);
+    expect([lb.myRank, lb.myCount]).toEqual([0, 0]);
+    // ادمین: کم/زیاد و تنظیم دقیق
+    g.adminBalance(other, 'refs', { delta: 5 });
+    expect(g.refCount(other)).toBe(5);
+    g.adminBalance(inviter, 'refs', { set: 10 });
+    expect(g.refCount(inviter)).toBe(10);
+    g.adminBalance(inviter, 'refs', { delta: -100 });
+    expect(g.refCount(inviter)).toBe(0);
+    g.adminBalance(other, 'trophies', { delta: 12 });
+    expect(g.profile(other).trophies).toBe(12);
+    g.adminBalance(other, 'trophies', { set: 3 });
+    expect(g.profile(other).trophies).toBe(3);
+    expect(() => g.adminBalance(other, 'refs', { delta: 1.5 })).toThrow();
+  });
+});

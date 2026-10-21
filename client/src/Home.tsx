@@ -22,10 +22,12 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
   const [showFriends, setShowFriends] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [lb, setLb] = useState<{ rows: LeaderRow[]; myRank: number } | 'loading' | 'error' | null>(null);
+  const [lb, setLb] = useState<{ rows: LeaderRow[]; myRank: number; refs: { rows: (LeaderRow & { refs: number })[]; myRank: number; myCount: number } } | 'loading' | 'error' | null>(null);
+  const [lbTab, setLbTab] = useState<'trophies' | 'refs'>('trophies');
+  const [lbInfo, setLbInfo] = useState(false);
   const openLb = async () => {
     setLb('loading');
-    try { const j = await call('/api/leaderboard'); setLb({ rows: j.leaders, myRank: j.myRank }); } catch { setLb('error'); }
+    try { const j = await call('/api/leaderboard'); setLb({ rows: j.leaders, myRank: j.myRank, refs: j.refs }); } catch { setLb('error'); }
   };
   const [page, setPage] = useState<'about' | 'news' | 'settings' | 'redeem' | null>(null);
 
@@ -147,15 +149,30 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
       <Boxes ctx={ctx} />
 
       {lb && (
-        <div className="overlay glass" onClick={() => setLb(null)}>
-          <div className="lbpanel" role="dialog" aria-label="نفرات برتر" onClick={(e) => e.stopPropagation()}>
+        <div className="overlay glass" onClick={() => { setLb(null); setLbInfo(false); }}>
+          <div className="lbpanel" role="dialog" aria-label="رده‌بندی" onClick={(e) => e.stopPropagation()}>
             <header>
-              <button className="lbx" onClick={() => setLb(null)} aria-label="بستن">✕</button>
-              <h3>نفرات برتر</h3>
+              <button className="lbx" onClick={() => { setLb(null); setLbInfo(false); }} aria-label="بستن">✕</button>
+              <button className="lbinfo" onClick={() => setLbInfo((o) => !o)} aria-label="توضیح جوایز" aria-expanded={lbInfo}>!</button>
+              <h3>{lbTab === 'trophies' ? 'بیشترین افتخار' : 'بیشترین زیرمجموعه'}</h3>
             </header>
+            <div className="pits" role="tablist">
+              <button role="tab" className="pit" aria-selected={lbTab === 'trophies'} onClick={() => setLbTab('trophies')}>بیشترین افتخار</button>
+              <button role="tab" className="pit" aria-selected={lbTab === 'refs'} onClick={() => setLbTab('refs')}>بیشترین زیرمجموعه</button>
+            </div>
+            {lbInfo && (
+              <div className="lbprizes">
+                <b>جوایز نقدی آخر هر فصل پرداخت می‌شن</b>
+                <h4>نفرات برتر بر اساس افتخار</h4>
+                <p>نفر اول: ۵٬۰۰۰٬۰۰۰ تومان<br />نفر دوم: ۲٬۵۰۰٬۰۰۰ تومان<br />نفرات ۳ تا ۱۰: ۲۵٬۰۰۰ سکه + ۳ جعبه طلایی + ۱۰۰ الماس<br />نفرات ۱۱ تا ۵۰: ۱۰٬۰۰۰ سکه + ۳ جعبه طلایی</p>
+                <h4>نفرات برتر بر اساس زیرمجموعه‌ها</h4>
+                <p>نفر اول: ۱۰٬۰۰۰٬۰۰۰ تومان<br />نفر دوم: ۵٬۰۰۰٬۰۰۰ تومان<br />نفر سوم: ۲٬۵۰۰٬۰۰۰ تومان</p>
+                <small>کمترین افتخار برای دریافت جوایز ۵۰ و کمترین زیرمجموعه برای دریافت جوایز ۲۵ می‌باشد.</small>
+              </div>
+            )}
             {lb === 'loading' && <p className="lbmsg">در حال بارگذاری…</p>}
             {lb === 'error' && <p className="lbmsg">دریافت جدول ممکن نشد؛ دوباره امتحان کن.</p>}
-            {typeof lb === 'object' && (
+            {typeof lb === 'object' && lbTab === 'trophies' && (
               <>
                 <ol className="lblist">
                   {lb.rows.map((r) => (
@@ -168,7 +185,23 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
                   ))}
                   {lb.rows.length === 0 && <li className="lbmsg">هنوز کسی کاپ نگرفته.</li>}
                 </ol>
-                <footer>جایگاه تو: <b className="num">{fa(lb.myRank)}</b> · کاپ‌های تو: <b className="num">{fa(p.trophies ?? 0)}</b><Cup /></footer>
+                <footer>جایگاه تو: <b className="num">{fa(lb.myRank)}</b> · افتخارهای تو: <b className="num">{fa(p.trophies ?? 0)}</b><Cup /></footer>
+              </>
+            )}
+            {typeof lb === 'object' && lbTab === 'refs' && (
+              <>
+                <ol className="lblist">
+                  {lb.refs.rows.map((r) => (
+                    <li key={r.id} className={`${r.me ? 'me' : ''} ${r.rank <= 3 ? `top${r.rank}` : ''}`}>
+                      <b className="rk num">{r.rank <= 3 ? ['🥇', '🥈', '🥉'][r.rank - 1] : fa(r.rank)}</b>
+                      <Avatar url={r.avatar} name={r.name} />
+                      <span className="nm"><b>{r.name}</b><small>لول {fa(r.level)}</small></span>
+                      <span className="tr num">{fa(r.refs)} 👥</span>
+                    </li>
+                  ))}
+                  {lb.refs.rows.length === 0 && <li className="lbmsg">هنوز کسی زیرمجموعه نیاورده.</li>}
+                </ol>
+                <footer>{lb.refs.myRank ? <>جایگاه تو: <b className="num">{fa(lb.refs.myRank)}</b> · </> : null}زیرمجموعه‌های تو: <b className="num">{fa(lb.refs.myCount)}</b> 👥</footer>
               </>
             )}
           </div>

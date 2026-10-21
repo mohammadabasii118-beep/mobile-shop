@@ -416,7 +416,7 @@ export function createGameServer(opt: ServerOptions) {
       }
       case '/api/admin/balance': {
         const b = await readBody(req);
-        game.adminBalance(Number(b.userId), b.currency as 'coins' | 'gems', { delta: b.delta, set: b.set });
+        game.adminBalance(Number(b.userId), b.currency as 'coins' | 'gems' | 'trophies' | 'refs', { delta: b.delta, set: b.set });
         return json(res, 200, { user: game.adminUser(Number(b.userId)) });
       }
       case '/api/admin/coins': {
@@ -474,7 +474,7 @@ export function createGameServer(opt: ServerOptions) {
     try {
       let extra: object = {};
       switch (path) {
-        case '/api/me': break;
+        case '/api/me': if (!needsChannel(u.tgId)) game.countReferral(userId); break;
         case '/api/redeem': { const r = game.redeemCode(userId, body.code); extra = { redeemed: r.rewards, boxGiven: r.boxGiven }; break; }
         case '/api/deck': game.setDeck(userId, body.cards); break;
         case '/api/upgrade': extra = { upgrade: game.upgradeCard(userId, String(body.cardId)) }; break;
@@ -492,7 +492,7 @@ export function createGameServer(opt: ServerOptions) {
           try { extra = { order: o, url: await createStarsInvoice(o) }; } catch (e) { game.cancelOrder(o.id); console.error('[stars]', (e as Error).message); throw new GameError('ساخت فاکتور استار ممکن نشد؛ کمی بعد دوباره امتحان کن'); }
           break;
         }
-        case '/api/friends': extra = { ...decorateFriends(game.friendsState(userId)), code: userId, refLink: refLink(userId) }; break;
+        case '/api/friends': extra = { ...decorateFriends(game.friendsState(userId)), code: userId, refLink: refLink(userId), refs: game.refCount(userId) }; break;
         case '/api/friends/search': extra = game.searchPlayer(userId, body.code); break;
         case '/api/friends/add': {
           const r = game.addFriend(userId, body.code);
@@ -501,9 +501,9 @@ export function createGameServer(opt: ServerOptions) {
           extra = { ...decorateFriends(game.friendsState(userId)), code: userId, accepted: r.accepted };
           break;
         }
-        case '/api/friends/accept': game.acceptFriend(userId, Number(body.id)); extra = { ...decorateFriends(game.friendsState(userId)), code: userId, refLink: refLink(userId) }; break;
-        case '/api/friends/remove': game.removeFriend(userId, Number(body.id)); extra = { ...decorateFriends(game.friendsState(userId)), code: userId, refLink: refLink(userId) }; break;
-        case '/api/leaderboard': extra = { leaders: game.leaderboard(userId), myRank: game.trophyRank(userId) }; break;
+        case '/api/friends/accept': game.acceptFriend(userId, Number(body.id)); extra = { ...decorateFriends(game.friendsState(userId)), code: userId, refLink: refLink(userId), refs: game.refCount(userId) }; break;
+        case '/api/friends/remove': game.removeFriend(userId, Number(body.id)); extra = { ...decorateFriends(game.friendsState(userId)), code: userId, refLink: refLink(userId), refs: game.refCount(userId) }; break;
+        case '/api/leaderboard': extra = { leaders: game.leaderboard(userId), myRank: game.trophyRank(userId), refs: game.refLeaderboard(userId) }; break;
         case '/api/box/start': game.startBox(userId, Number(body.slot)); break;
         case '/api/box/open': extra = { reward: game.openBox(userId, Number(body.slot)) }; break;
         case '/api/box/speedup': extra = { speedup: game.speedupBox(userId, Number(body.slot)) }; break;

@@ -652,3 +652,8 @@ html, body, #root, .app, .screen, .battle, .admin { overscroll-behavior: none; }
 .rdmsg { text-align: center; font-weight: 700; } .rdmsg.ok { color: var(--green); } .rdmsg.bad { color: #ff8a8a; }
 
 .maintst { font-size: 12px; color: var(--muted); align-self: center; } .maintst.on { color: #ff9a9a; font-weight: 800; }
+
+.lbinfo { position: absolute; left: 14px; top: 14px; width: 24px; height: 24px; border-radius: 50%; font-size: 14px; font-weight: 900; line-height: 1; color: #f3c969; background: rgba(255,255,255,.08); border: 1.5px solid rgba(243,201,105,.7); }
+.lbpanel header { position: relative; }
+.lbprizes { margin: 6px 0 8px; padding: 10px 12px; border-radius: 14px; background: rgba(255,200,60,.14); border: 1px solid rgba(255,215,106,.45); font-size: 12.5px; line-height: 1.8; }
+.lbprizes h4 { margin: 8px 0 2px; color: #f3c969; font-size: 13px; } .lbprizes p { margin: 0; } .lbprizes small { display: block; margin-top: 8px; opacity: .8; }
