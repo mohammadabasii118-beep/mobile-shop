@@ -331,4 +331,19 @@ describe('button looks', () => {
     expect((await prisma.product.findUniqueOrThrow({ where: { id: pr.id } })).isActive).toBe(false);
     expect((await menuLevel(null)).products.map((x) => x.id)).not.toContain(pr.id);
   });
+
+  it('sale settings via the panel: bad dates give a clear 400 (never a 500); good ones save', async () => {
+    const c = await login();
+    const put = (key: string, value: string) => call(c, 'PUT', '/settings', { key, value });
+    const bad = await put('sale.endsAt', 'فردا');
+    expect(bad.status).toBe(400);
+    expect((await put('sale.endsAt', '2020-01-01 10:00')).status).toBe(400); // in the past
+    expect((await put('sale.percent', '95')).status).toBe(400);
+    const future = new Date(Date.now() + 48 * 3_600_000 + 3.5 * 3_600_000).toISOString().slice(0, 16).replace('T', ' ');
+    expect((await put('sale.endsAt', future)).status).toBe(200);
+    expect((await put('sale.percent', '15')).status).toBe(200);
+    const fa = future.replace(/\d/g, (d) => String.fromCharCode(0x06f0 + Number(d)));
+    expect((await put('sale.endsAt', fa)).status).toBe(200); // Persian digits are accepted
+    expect((await put('sale.endsAt', '')).status).toBe(200); // empty = no end
+  });
 });

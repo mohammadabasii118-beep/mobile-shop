@@ -61,7 +61,13 @@ export const SETTING_RULES: Partial<Record<SettingKey, z.ZodType<string>>> = {
   'provisioning.backoffSeconds': csvInts,
   'notify.expiryDays': csvInts,
   'sale.percent': int(0, 90),
-  'sale.endsAt': z.string().trim().refine((v) => v === '' || parseTehranTime(v) !== null, 'تاریخ را به این شکل بنویسید: 2026-10-30 23:59').refine((v) => v === '' || parseTehranTime(v)!.getTime() > Date.now(), 'زمان پایان باید در آینده باشد'),
+  'sale.endsAt': z.string().superRefine((raw, ctx) => {
+    const v = raw.trim();
+    if (v === '') return;
+    const d = parseTehranTime(v);
+    if (!d) ctx.addIssue({ code: 'custom', message: 'تاریخ را به این شکل بنویسید: 2026-10-30 23:59' });
+    else if (d.getTime() <= Date.now()) ctx.addIssue({ code: 'custom', message: 'زمان پایان باید در آینده باشد' });
+  }).transform((v) => v.trim().replace(/\s+/g, ' ')),
   'sale.title': z.string().trim().max(40),
   'delivery.directConfig': bool,
   'notify.trafficPercent': csvInts,
