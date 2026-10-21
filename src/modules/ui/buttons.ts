@@ -31,7 +31,8 @@ export const UI_BUTTONS: { key: string; label: string; group: string; style?: Bt
   { key: 'adm:products', label: 'مدیریت محصولات', group: 'پنل مدیریت (ربات)' },
   { key: 'pr:new', label: 'محصول جدید', group: 'پنل مدیریت (ربات)', style: 'success' },
   { key: 'pr:d', label: 'حذف محصول', group: 'پنل مدیریت (ربات)', style: 'danger' },
-  { key: 'menu:main', label: 'بازگشت به منوی اصلی', group: 'ناوبری' },
+  { key: '@back', label: 'دکمه‌ی «⬅️ بازگشت» (در همه‌ی صفحه‌ها)', group: 'ناوبری' },
+  { key: '@home', label: 'دکمه‌ی «🏠 منوی اصلی» (در همه‌ی صفحه‌ها)', group: 'ناوبری' },
   { key: 'sv:renew', label: 'تمدید سرویس', group: 'سرویس', style: 'success' },
   { key: 'sv:del', label: 'حذف سرویس', group: 'سرویس', style: 'danger' },
 ];
@@ -58,9 +59,10 @@ export async function loadButtonLooks(force = false) {
 }
 
 /** Sync lookup used when keyboards are built: admin override first, then the built-in default. */
-export function lookFor(data?: string): BtnLook {
+export function lookFor(data?: string, text?: string): BtnLook {
   if (!data) return {};
-  const hit = UI_BUTTONS.find((b) => data === b.key || data.startsWith(b.key + ':'));
+  const special = text === '⬅️ بازگشت' || text === '⬅️ بازگشت به منوی اصلی' ? '@back' : text?.startsWith('🏠 منو') ? '@home' : undefined; // navigation buttons share one look
+  const hit = special ? UI_BUTTONS.find((b) => b.key === special) : UI_BUTTONS.find((b) => data === b.key || data.startsWith(b.key + ':'));
   if (!hit) return {};
   const o = cache[hit.key];
   if (o) return { style: o.style, emoji: o.emoji };

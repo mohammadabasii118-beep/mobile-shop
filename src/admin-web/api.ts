@@ -166,7 +166,7 @@ export const routes: Route[] = [
 
   { method: 'GET', re: /^\/ui\/buttons$/, perm: 'settings.manage', run: async () => ({ items: await listButtonLooks() }) },
   { method: 'PUT', re: /^\/ui\/buttons$/, perm: 'settings.manage', run: async (c) => { const b = z.object({ key: z.string(), style: z.string().nullish(), emoji: z.string().nullish() }).parse(c.body); await setButtonLook(actor(c), b.key, b); return { ok: true }; } },
-  { method: 'DELETE', re: /^\/ui\/buttons\/([\w:]+)$/, perm: 'settings.manage', run: async (c) => { await resetButtonLook(actor(c), c.params[0]); return { ok: true }; } },
+  { method: 'DELETE', re: /^\/ui\/buttons\/([\w:@]+)$/, perm: 'settings.manage', run: async (c) => { await resetButtonLook(actor(c), c.params[0]); return { ok: true }; } },
   { method: 'GET', re: /^\/channels$/, perm: 'settings.manage', run: async () => ({ items: (await listChannels()).map((c) => ({ ...c, chatId: String(c.chatId) })) }) },
   {
     method: 'POST', re: /^\/channels$/, perm: 'settings.manage',

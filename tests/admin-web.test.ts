@@ -302,6 +302,10 @@ describe('button looks', () => {
     expect(first('sv:renew:abc').style).toBe('success');
     await setButtonLook('admin:1', 'menu:buy', { style: null, emoji: null }); // explicit "no colour"
     expect(first('menu:buy').style).toBeUndefined();
+    await setButtonLook('admin:1', '@back', { style: 'danger' });
+    const kbb = toKb([[{ text: '⬅️ بازگشت', data: 'bc:123' }, { text: '🏠 منوی اصلی', data: 'menu:main' }]]).inline_keyboard[0] as any[];
+    expect(kbb[0].style).toBe('danger'); expect(kbb[1].style).toBeUndefined();
+    await resetButtonLook('admin:1', '@back');
     await expect(setButtonLook('admin:1', 'menu:orders', { emoji: 'abc' })).rejects.toThrow();
     await expect(setButtonLook('admin:1', 'nope', {})).rejects.toThrow();
     expect((await listButtonLooks()).find((b) => b.key === 'menu:orders')?.style).toBe('danger');

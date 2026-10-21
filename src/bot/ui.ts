@@ -18,7 +18,7 @@ export function toKb(rows: Button[][]): InlineKeyboard {
   rows.forEach((row, i) => {
     row.forEach((b) => {
       if (b.url) kb.url(b.text, b.url); else kb.text(b.text, b.data ?? 'noop');
-      const look = lookFor(b.data);
+      const look = lookFor(b.data, b.text);
       const last = kb.inline_keyboard[kb.inline_keyboard.length - 1]?.at(-1) as any;
       const style = b.style ?? look.style;
       if (last && style) last.style = style;
