@@ -1249,6 +1249,12 @@ def agent_py():
     return FileResponse(ROOT / "agent" / "agent.py", media_type="text/x-python")
 
 
+@app.get("/vtunnel.py")
+def vtunnel_script():
+    """The standalone tunnel program (public, no secrets in it): curl it onto the two servers of a tunnel."""
+    return PlainTextResponse((ROOT / "agent" / "vtunnel.py").read_text())
+
+
 @app.get("/node-install.sh")
 def node_install(request: Request):
     script = (ROOT / "agent" / "install.sh").read_text().replace("__PANEL_URL__", public_url(request))

@@ -1471,3 +1471,9 @@ def test_telegram_socks_proxy_is_metered_per_user():
         u = c.post("/api/users", headers=h, json={"name": "tg_sock", "protos": ["tg_socks"]}).json()
         es = [e for e in c.get(f"/api/users/{u['id']}/configs", headers=h).json() if e["node"] == "TS"]
         assert es[0]["copy"].startswith("tg://socks?server=ts.example.com&port=") and "user=tg_sock" in es[0]["copy"]
+
+
+def test_vtunnel_script_is_served():
+    with TestClient(app) as c:
+        r = c.get("/vtunnel.py")
+        assert r.status_code == 200 and "reverse TCP/UDP tunnel" in r.text
