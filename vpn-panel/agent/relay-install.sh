@@ -22,16 +22,23 @@ mkdir -p /etc/vtunnel /opt/vtunnel /var/lib/vtunnel
 curl -fsSL "$PANEL_URL/relay/agent.py" -o /opt/vtunnel/relay_agent.py
 curl -fsSL "$PANEL_URL/vtunnel.py" -o /usr/local/bin/vtunnel.py
 chmod +x /usr/local/bin/vtunnel.py
-cat > /etc/vtunnel/agent.json <<JSON
+# older installs kept one agent per server (/etc/vtunnel/agent.json); an agent per tunnel replaces it for the same tunnel
+if [ -f /etc/vtunnel/agent.json ] && python3 -c "import json,sys;sys.exit(0 if json.load(open('/etc/vtunnel/agent.json')).get('id')==$ID else 1)"; then
+  systemctl disable --now vtunnel-agent 2>/dev/null || true
+  rm -f /etc/vtunnel/agent.json /etc/systemd/system/vtunnel-agent.service
+fi
+cat > /etc/vtunnel/agent-$ID.json <<JSON
 {"panel_url": "$PANEL_URL", "token": "$TOKEN", "id": $ID}
 JSON
-chmod 600 /etc/vtunnel/agent.json
-cat > /etc/systemd/system/vtunnel-agent.service <<UNIT
+chmod 600 /etc/vtunnel/agent-$ID.json
+cat > /etc/systemd/system/vtunnel-agent-$ID.service <<UNIT
 [Unit]
-Description=vtunnel agent
+Description=vtunnel agent (tunnel $ID)
 After=network-online.target
 
 [Service]
+Environment=VTUNNEL_RELAY_CONF=/etc/vtunnel/agent-$ID.json
+Environment=VTUNNEL_AGENT_SERVICE=vtunnel-agent-$ID
 ExecStart=/usr/bin/python3 /opt/vtunnel/relay_agent.py
 Restart=always
 RestartSec=5
@@ -40,6 +47,7 @@ RestartSec=5
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
-systemctl enable --now vtunnel-agent
+systemctl enable vtunnel-agent-$ID
+systemctl restart vtunnel-agent-$ID
 sleep 3
-echo "vtunnel agent: $(systemctl is-active vtunnel-agent). The panel now sets up the tunnel by itself; watch it under Tunnels."
+echo "vtunnel agent for tunnel $ID: $(systemctl is-active vtunnel-agent-$ID). The panel now sets up the tunnel by itself; watch it under Tunnels."

@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 
 CONF = os.environ.get("VTUNNEL_RELAY_CONF", "/etc/vtunnel/agent.json")
+AGENT_SERVICE = os.environ.get("VTUNNEL_AGENT_SERVICE", "vtunnel-agent")   # one agent per tunnel; older installs used this default
 VTUNNEL = "/usr/local/bin/vtunnel.py"
 STATE = "/var/lib/vtunnel"
 INTERVAL = 15
@@ -136,8 +137,8 @@ def remove_everything(conf, tunnel_id):
         except OSError:
             pass
     sh("systemctl", "daemon-reload")
-    sh("systemctl", "disable", "--now", "vtunnel-agent")
-    for path in ("/etc/systemd/system/vtunnel-agent.service", CONF):
+    sh("systemctl", "disable", "--now", AGENT_SERVICE)
+    for path in (f"/etc/systemd/system/{AGENT_SERVICE}.service", CONF):
         try:
             os.remove(path)
         except OSError:

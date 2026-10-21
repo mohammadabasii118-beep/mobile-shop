@@ -1581,3 +1581,10 @@ def test_tunnel_encryption_setting_reaches_both_ends():
         assert "--encrypt all" in ra.unit_text({"id": 1, "name": "x", "ctl_port": 7777, "forwards": [], "encrypt": "all"}, "/s", "/e")
         assert "--encrypt tcp" in agent.vtunnel_unit({"id": 1, "server": "1.1.1.1:7777", "encrypt": "tcp"})
         c.delete(f"/api/tunnels/{t['id']}", headers=h)
+
+
+def test_relay_install_keeps_one_agent_per_tunnel():
+    with TestClient(app) as c:
+        sh = c.get("/relay-install.sh").text
+        assert "/etc/vtunnel/agent-$ID.json" in sh and "vtunnel-agent-$ID.service" in sh
+        assert 'cat > /etc/vtunnel/agent.json' not in sh      # no fixed file that a second tunnel would overwrite
