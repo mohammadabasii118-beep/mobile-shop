@@ -39,3 +39,18 @@ Users that have a protocol get one config entry per running copy, named as the a
 ### Admin pool, allowed lists, usage
 On `/api/admins`: `max_total_gb` (pool for the sum of the volume of all the admin's users; 0 = none; with a pool a user cannot be unlimited), `allowed_protos` and `allowed_nodes` (empty = all). The server enforces them on `/api/me/users` (403/422) and `/api/me/options` only lists the allowed ones; an empty location choice then means "all allowed locations".
 `GET /api/admins` also returns `active_users`, `allocated_gb` and `used_gb` per admin.
+
+## Tunnels (admin only)
+
+A tunnel carries ports of a server in Iran to a foreign location (reverse tunnel, `agent/vtunnel.py`).
+
+| Method | Path | |
+|---|---|---|
+| GET | `/api/tunnels` | list with `status` (`up`, `wait_client`, `wait_iran`, `off`), `pool`, `problems`, `install_command` |
+| POST | `/api/tunnels` | `{name, iran_host, node_id, ports}`; `ports` is `"80, 81=80, udp:5000, 2000-2010"` |
+| PATCH | `/api/tunnels/{id}` | any of `name`, `iran_host`, `ports`, `enabled` |
+| DELETE | `/api/tunnels/{id}` | removes it from both servers |
+
+The Iran server runs `install_command` once; its agent (`/api/relay/config`, `/api/relay/report`, authenticated with the
+tunnel's own token) then keeps the vtunnel server running. The foreign side is set up by the node agent from `tunnels` in
+`/api/node/config`.

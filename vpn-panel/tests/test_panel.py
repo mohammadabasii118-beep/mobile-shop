@@ -1477,3 +1477,60 @@ def test_vtunnel_script_is_served():
     with TestClient(app) as c:
         r = c.get("/vtunnel.py")
         assert r.status_code == 200 and "reverse TCP/UDP tunnel" in r.text
+
+
+def test_tunnels_end_to_end():
+    from app.main import parse_forwards
+    assert [(f["proto"], f["listen"], f["target"]) for f in parse_forwards("80, 81=80 udp:5000 2000-2002")] == [
+        ("tcp", 80, 80), ("tcp", 81, 80), ("udp", 5000, 5000), ("tcp", 2000, 2000), ("tcp", 2001, 2001), ("tcp", 2002, 2002)]
+    for bad in ("", "abc", "70000", "80,80", "1-2=3"):
+        try:
+            parse_forwards(bad)
+            raise AssertionError(bad)
+        except Exception as e:
+            assert getattr(e, "status_code", None) == 422, bad
+    with TestClient(app) as c:
+        h = admin(c)
+        n = c.post("/api/nodes", headers=h, json={"name": "TunDE", "cc": "de", "address": "tun.example.com"}).json()
+        nh = {"Authorization": "Bearer " + n["install_command"].split("--token ")[1].split()[0]}
+        t = c.post("/api/tunnels", headers=h, json={"name": "t1", "iran_host": "1.2.3.4", "node_id": n["id"], "ports": "80, 81=80, udp:5000"}).json()
+        assert t["status"] == "wait_iran" and t["ctl_port"] == 7777 and "/relay-install.sh) --token " in t["install_command"]
+        assert c.post("/api/tunnels", headers=h, json={"name": "t", "iran_host": "bad host!", "node_id": n["id"], "ports": "80"}).status_code == 422
+        t2 = c.post("/api/tunnels", headers=h, json={"name": "t2", "iran_host": "1.2.3.4", "node_id": n["id"], "ports": "90"}).json()
+        assert t2["ctl_port"] == 7778                               # a second tunnel to the same Iran server gets its own control port
+        rh = {"Authorization": "Bearer " + t["install_command"].split("--token ")[1]}
+        rc = c.get("/api/relay/config", headers=rh).json()
+        assert rc["tunnel"]["ctl_port"] == 7777 and rc["tunnel"]["forwards"][1] == {"proto": "tcp", "listen": 81, "target": 80}
+        assert len(rc["vtunnel_sha256"]) == 64 and len(rc["agent_sha256"]) == 64
+        assert c.get("/api/relay/config", headers={"Authorization": "Bearer nope"}).status_code == 401
+        # the foreign node receives its end
+        cfg = c.get("/api/node/config", headers=nh).json()
+        mine = next(x for x in cfg["tunnels"] if x["id"] == t["id"])
+        assert mine["server"] == "1.2.3.4:7777" and mine["token"] == rc["tunnel"]["token"] and mine["targets"] == [80]
+        # status follows the reports of both ends
+        c.post("/api/relay/report", headers=rh, json={"pool": 0})
+        assert next(x for x in c.get("/api/tunnels", headers=h).json() if x["id"] == t["id"])["status"] == "wait_client"
+        c.post("/api/relay/report", headers=rh, json={"pool": 8, "failed": ["tcp/81"]})
+        c.post("/api/node/report", headers=nh, json={"tunnels": {str(t["id"]): {"active": True, "down": [80]}}})
+        row = next(x for x in c.get("/api/tunnels", headers=h).json() if x["id"] == t["id"])
+        assert row["status"] == "up" and row["pool"] == 8 and row["node_online"] and len(row["problems"]) == 2
+        c.patch(f"/api/tunnels/{t['id']}", headers=h, json={"ports": "443", "enabled": False})
+        assert c.get("/api/relay/config", headers=rh).json()["tunnel"]["enabled"] is False
+        assert all(x["id"] != t["id"] for x in c.get("/api/node/config", headers=nh).json()["tunnels"])
+        assert c.get("/relay-install.sh").text.count("https://panel.test") == 1
+        assert "relay" in c.get("/relay/agent.py").text
+        assert c.delete(f"/api/tunnels/{t['id']}", headers=h).status_code == 200
+        assert c.get("/api/relay/config", headers=rh).status_code == 401
+        c.delete(f"/api/tunnels/{t2['id']}", headers=h)
+
+
+def test_vtunnel_agent_units():
+    ra_spec = importlib.util.spec_from_file_location("relay_agent", ROOT / "agent" / "relay_agent.py")
+    ra = importlib.util.module_from_spec(ra_spec)
+    ra_spec.loader.exec_module(ra)
+    t = {"id": 3, "name": "x", "ctl_port": 7777, "forwards": [{"proto": "tcp", "listen": 81, "target": 80}, {"proto": "udp", "listen": 5000, "target": 5000}]}
+    unit = ra.unit_text(t, "/var/lib/vtunnel/3.json", "/etc/vtunnel/3.env")
+    assert "--forward 81=80 --forward udp:5000" in unit and "--listen 0.0.0.0:7777" in unit and "EnvironmentFile=/etc/vtunnel/3.env" in unit
+    assert "token" not in unit.lower()                                 # the secret lives in the 0600 env file, not in the unit
+    cu = agent.vtunnel_unit({"id": 3, "server": "1.2.3.4:7777", "pool": 8})
+    assert "client --server 1.2.3.4:7777 --pool 8" in cu and "vtunnel-client-3.env" in cu

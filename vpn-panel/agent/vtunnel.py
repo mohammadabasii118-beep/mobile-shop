@@ -113,8 +113,9 @@ class Idle:
 
 
 class Server:
-    def __init__(self, token, host, port, forwards):
-        self.token, self.host, self.port = token, host, port
+    def __init__(self, token, host, port, forwards, status_file=""):
+        self.token, self.host, self.port, self.status_file = token, host, port, status_file
+        self.failed = []        # forwarded ports that could not be opened (taken by another program)
         self.tcp = [(l, t) for p, l, t in forwards if p == "tcp"]
         self.udp = [(l, t) for p, l, t in forwards if p == "udp"]
         self.pool = deque()
@@ -231,20 +232,45 @@ class Server:
             for sid in [i for i, s in self.sessions.items() if now - s[2] > UDP_IDLE]:
                 self.by_user.pop(self.sessions.pop(sid)[3], None)
 
+    async def write_status(self):
+        """For the tool that supervises this server: how many client connections are ready, and what could not be opened."""
+        import json
+        while True:
+            self.pool = deque(e for e in self.pool if e.alive)
+            data = {"time": int(time.time()), "pool": len(self.pool), "udp_client": self.client_addr is not None, "failed": self.failed}
+            try:
+                with open(self.status_file + ".tmp", "w") as f:
+                    json.dump(data, f)
+                os.replace(self.status_file + ".tmp", self.status_file)
+            except OSError:
+                pass
+            await asyncio.sleep(5)
+
     async def run(self):
         loop = asyncio.get_running_loop()
         await asyncio.start_server(self.on_tunnel, self.host, self.port, reuse_address=True)
         for lport, tport in self.tcp:
-            await asyncio.start_server(lambda r, w, t=tport: self.on_user(r, w, t), self.host, lport, reuse_address=True)
-            LOG.info("tcp %s -> client:%s", lport, tport)
+            try:
+                await asyncio.start_server(lambda r, w, t=tport: self.on_user(r, w, t), self.host, lport, reuse_address=True)
+                LOG.info("tcp %s -> client:%s", lport, tport)
+            except OSError as e:     # one busy port must not take the others down
+                self.failed.append(f"tcp/{lport}")
+                LOG.error("cannot listen on tcp %s: %s", lport, e)
         if self.udp:
             self.tsock = udp_socket((self.host, self.port))
             loop.add_reader(self.tsock.fileno(), self.tunnel_readable)
             for lport, tport in self.udp:
-                s = udp_socket((self.host, lport))
+                try:
+                    s = udp_socket((self.host, lport))
+                except OSError as e:
+                    self.failed.append(f"udp/{lport}")
+                    LOG.error("cannot listen on udp %s: %s", lport, e)
+                    continue
                 loop.add_reader(s.fileno(), self.user_readable, s, tport)
                 LOG.info("udp %s -> client:%s", lport, tport)
             asyncio.ensure_future(self.sweep())
+        if self.status_file:
+            asyncio.ensure_future(self.write_status())
         LOG.info("server listening on %s:%s", self.host, self.port)
         await asyncio.Event().wait()
 
@@ -346,6 +372,7 @@ def main(argv=None):
     sv = sub.add_parser("server")
     sv.add_argument("--listen", default="0.0.0.0:7000")
     sv.add_argument("--forward", action="append", default=[], metavar="[tcp:|udp:]PORT[=TARGET]")
+    sv.add_argument("--status-file", default="", help="JSON file refreshed every 5 s with the pool size and failed ports")
     cl = sub.add_parser("client")
     cl.add_argument("--server", required=True, metavar="HOST:PORT")
     cl.add_argument("--pool", type=int, default=8)
@@ -359,7 +386,7 @@ def main(argv=None):
         host, _, port = a.listen.rpartition(":")
         if not a.forward:
             sys.exit("give at least one --forward")
-        job = Server(a.token, host or "0.0.0.0", int(port), [parse_forward(f) for f in a.forward]).run()
+        job = Server(a.token, host or "0.0.0.0", int(port), [parse_forward(f) for f in a.forward], a.status_file).run()
     else:
         host, _, port = a.server.rpartition(":")
         job = Client(a.token, host, int(port), max(1, a.pool)).run()

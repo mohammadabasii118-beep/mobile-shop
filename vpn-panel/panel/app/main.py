@@ -23,7 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .catalog import PROTOCOLS, REALITY_SNI, SS_METHOD
-from .db import Admin, Setting, Node, NodeProtocol, Outbound, Rule, User, engine, get_db, init_db, utcnow
+from .db import Admin, Setting, Node, NodeProtocol, Outbound, Rule, Tunnel, User, engine, get_db, init_db, utcnow
 from . import dns as cfdns
 from . import routing
 from .subpage import qr_text, render_sub_page
@@ -1181,6 +1181,181 @@ def subscription_file(token: str, node_id: int, proto: str, db: Session = Depend
     _404()
 
 
+# ---------- tunnels (Iran side <-> foreign node) ----------
+TUNNEL_FRESH = 120   # seconds: an end that reported this recently counts as online
+
+
+def parse_forwards(text: str) -> list[dict]:
+    """"80, 81=80, udp:5000, 2000-2005" -> [{"proto","listen","target"}]; 2000-2005 forwards each port to itself."""
+    out, seen = [], set()
+    for tok in re.split(r"[\s,;]+", text.strip()):
+        if not tok:
+            continue
+        m = re.fullmatch(r"(?:(tcp|udp):)?(\d{1,5})(?:-(\d{1,5}))?(?:=(\d{1,5}))?", tok)
+        if not m or (m.group(3) and m.group(4)):
+            raise HTTPException(422, f"پورت نامعتبر: {tok}  (نمونه: 80  یا  81=80  یا  udp:5000  یا  2000-2005)")
+        proto, lo = m.group(1) or "tcp", int(m.group(2))
+        hi = int(m.group(3) or lo)
+        if not (1 <= lo <= hi <= 65535) or hi - lo > 200:
+            raise HTTPException(422, f"بازه‌ی پورت نامعتبر: {tok}")
+        for port in range(lo, hi + 1):
+            target = int(m.group(4)) if m.group(4) else port
+            if not 1 <= target <= 65535:
+                raise HTTPException(422, f"پورت مقصد نامعتبر: {tok}")
+            if (proto, port) in seen:
+                raise HTTPException(422, f"پورت تکراری: {proto}:{port}")
+            seen.add((proto, port))
+            out.append({"proto": proto, "listen": port, "target": target})
+    if not out:
+        raise HTTPException(422, "حداقل یک پورت بدهید")
+    if len(out) > 300:
+        raise HTTPException(422, "حداکثر ۳۰۰ پورت")
+    return out
+
+
+def forwards_text(forwards: list[dict]) -> str:
+    return ", ".join(("udp:" if f["proto"] == "udp" else "") + str(f["listen"]) + (f"={f['target']}" if f["target"] != f["listen"] else "")
+                     for f in forwards)
+
+
+def fresh(ts) -> bool:
+    return bool(ts and (utcnow() - ts).total_seconds() < TUNNEL_FRESH)
+
+
+def tunnel_out(t: Tunnel, db: Session, request: Request) -> dict:
+    node = db.get(Node, t.node_id)
+    relay_on, client_on = fresh(t.relay_seen), fresh(t.client_seen)
+    rs, cs = (t.relay_state or {}), (t.client_state or {})
+    pool = int(rs.get("pool", 0)) if relay_on else 0
+    if not t.enabled:
+        status = "off"
+    elif not relay_on:
+        status = "wait_iran"
+    elif pool > 0:
+        status = "up"
+    else:
+        status = "wait_client"
+    problems = list(rs.get("errors", [])) if relay_on else []
+    problems += [f"روی سرور ایران باز نشد: {p}" for p in rs.get("failed", [])] if relay_on else []
+    if client_on and cs.get("down"):
+        problems.append("روی سرور خارج چیزی روی این پورت‌ها گوش نمی‌دهد: " + ", ".join(map(str, cs["down"])))
+    problems += list(cs.get("errors", [])) if client_on else []
+    return {"id": t.id, "name": t.name, "iran_host": t.iran_host, "node_id": t.node_id, "node_name": node.name if node else "؟",
+            "ctl_port": t.ctl_port, "forwards": t.forwards, "ports": forwards_text(t.forwards), "enabled": t.enabled,
+            "status": status, "pool": pool, "iran_online": relay_on, "node_online": client_on, "problems": problems,
+            "install_command": f"bash <(curl -fsSL {public_url(request)}/relay-install.sh) --token {t.relay_token}"}
+
+
+class TunnelIn(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+    iran_host: str = Field(min_length=1, max_length=253)
+    node_id: int
+    ports: str = Field(max_length=4000)
+
+
+class TunnelPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=60)
+    iran_host: str | None = Field(default=None, min_length=1, max_length=253)
+    ports: str | None = Field(default=None, max_length=4000)
+    enabled: bool | None = None
+
+
+def clean_host(host: str) -> str:
+    host = host.strip()
+    if not re.fullmatch(r"[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?", host):
+        raise HTTPException(422, "آدرس ایران باید IP یا دامنه باشد")
+    return host
+
+
+@app.get("/api/tunnels", dependencies=[Depends(require_admin)])
+def list_tunnels(request: Request, db: Session = Depends(get_db)):
+    return [tunnel_out(t, db, request) for t in db.scalars(select(Tunnel).order_by(Tunnel.id))]
+
+
+@app.post("/api/tunnels", dependencies=[Depends(require_admin)])
+def create_tunnel(body: TunnelIn, request: Request, db: Session = Depends(get_db)):
+    if not db.get(Node, body.node_id):
+        raise HTTPException(404, "لوکیشن خارج پیدا نشد")
+    host, forwards = clean_host(body.iran_host), parse_forwards(body.ports)
+    used = {t.ctl_port for t in db.scalars(select(Tunnel).where(Tunnel.iran_host == host))}
+    taken = {f["listen"] for f in forwards}
+    ctl = next(p for p in range(7777, 7977) if p not in used and p not in taken)
+    t = Tunnel(name=body.name.strip(), iran_host=host, node_id=body.node_id, ctl_port=ctl, forwards=forwards,
+               token=secrets.token_hex(16), relay_token=secrets.token_urlsafe(24))
+    db.add(t)
+    db.commit()
+    return tunnel_out(t, db, request)
+
+
+@app.patch("/api/tunnels/{tunnel_id}", dependencies=[Depends(require_admin)])
+def patch_tunnel(tunnel_id: int, body: TunnelPatch, request: Request, db: Session = Depends(get_db)):
+    t = db.get(Tunnel, tunnel_id) or _404()
+    if body.name is not None:
+        t.name = body.name.strip()
+    if body.iran_host is not None:
+        t.iran_host = clean_host(body.iran_host)
+    if body.ports is not None:
+        t.forwards = parse_forwards(body.ports)
+        if t.ctl_port in {f["listen"] for f in t.forwards}:
+            raise HTTPException(422, f"پورت {t.ctl_port} برای خود تونل رزرو است")
+    if body.enabled is not None:
+        t.enabled = body.enabled
+    db.commit()
+    return tunnel_out(t, db, request)
+
+
+@app.delete("/api/tunnels/{tunnel_id}", dependencies=[Depends(require_admin)])
+def delete_tunnel(tunnel_id: int, db: Session = Depends(get_db)):
+    db.delete(db.get(Tunnel, tunnel_id) or _404())
+    db.commit()
+    return {"ok": True}
+
+
+def require_relay(authorization: str | None = Header(None), db: Session = Depends(get_db)) -> Tunnel:
+    token = (authorization or "").removeprefix("Bearer ").strip()
+    t = db.scalar(select(Tunnel).where(Tunnel.relay_token == token)) if token else None
+    if not t:
+        raise HTTPException(401, "توکن تونل نامعتبر است")
+    return t
+
+
+def _sha(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+@app.get("/api/relay/config")
+def relay_config(t: Tunnel = Depends(require_relay)):
+    return {"tunnel": {"id": t.id, "name": t.name, "enabled": t.enabled, "ctl_port": t.ctl_port, "token": t.token, "forwards": t.forwards},
+            "vtunnel_sha256": _sha(ROOT / "agent" / "vtunnel.py"), "agent_sha256": _sha(ROOT / "agent" / "relay_agent.py")}
+
+
+class RelayReport(BaseModel):
+    pool: int = Field(default=0, ge=0, le=100000)
+    udp_client: bool = False
+    failed: list[str] = Field(default=[], max_length=300)
+    errors: list[str] = Field(default=[], max_length=20)
+
+
+@app.post("/api/relay/report")
+def relay_report(body: RelayReport, t: Tunnel = Depends(require_relay), db: Session = Depends(get_db)):
+    t.relay_seen = utcnow()
+    t.relay_state = {"pool": body.pool, "udp_client": body.udp_client, "failed": [f[:30] for f in body.failed],
+                     "errors": [e[:200] for e in body.errors]}
+    db.commit()
+    return {"ok": True}
+
+
+@app.get("/relay/agent.py")
+def relay_agent_script():
+    return PlainTextResponse((ROOT / "agent" / "relay_agent.py").read_text())
+
+
+@app.get("/relay-install.sh")
+def relay_install(request: Request):
+    script = (ROOT / "agent" / "relay-install.sh").read_text().replace("__PANEL_URL__", public_url(request))
+    return Response(script, media_type="text/x-shellscript")
+
+
 # ---------- node agent API ----------
 @app.get("/api/node/config")
 def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db)):
@@ -1188,6 +1363,9 @@ def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db
     served = {p.proto for p in node.protocols if p.enabled}   # a user needs an account while any copy of the protocol runs
     extra = [{"proto": p.proto, "port": p.port, "tag": inst_tag(p)} for p in node.protocols if p.enabled and p.extra]
     dc = dnstt_conf(db)
+    tunnels = [{"id": t.id, "server": f"{t.iran_host}:{t.ctl_port}", "token": t.token, "pool": 8,
+                "targets": sorted({f["target"] for f in t.forwards if f["proto"] == "tcp"})}
+               for t in db.scalars(select(Tunnel).where(Tunnel.node_id == node.id, Tunnel.enabled == True))]  # noqa: E712
     users = []
     for u in db.scalars(select(User).order_by(User.id)):
         if u.status() != "active" or (u.node_ids and node.id not in u.node_ids):
@@ -1202,7 +1380,8 @@ def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db
     return {"agent_sha256": agent_sha, "outbounds": outbounds, "rules": rules,
             "node": {"name": node.name, "reality_sni": node.reality_sni or REALITY_SNI, "ss_method": SS_METHOD,
                      "ss_key": node.ss_key, "l2tp_psk": node.l2tp_psk},
-            "protocols": enabled, "extra": extra, "users": users,
+            "protocols": enabled, "extra": extra, "users": users, "tunnels": tunnels,
+            "vtunnel_sha256": _sha(ROOT / "agent" / "vtunnel.py"),
             "dnstt": ({"domain": dc["domain"], "privkey": dc["priv"], "inner": dc["inner"]} if "dnstt" in enabled and dc["domain"] else None)}
 
 
@@ -1217,6 +1396,7 @@ class Report(BaseModel):
     ovpn_ca: str = ""
     conflicts: list[str] = Field(default=[], max_length=50)
     errors: list[str] = Field(default=[], max_length=20)
+    tunnels: dict[str, dict] = Field(default={}, max_length=100)   # tunnel id -> {"active": bool, "down": [ports], "errors": [..]}
     dnstt_priv: str = Field(default="", max_length=200, pattern=r"^[0-9a-fA-F]*$")   # set only by the node that generated the key pair
     dnstt_pub: str = Field(default="", max_length=200, pattern=r"^[0-9a-fA-F]*$")
 
@@ -1234,6 +1414,12 @@ def node_report(body: Report, node: Node = Depends(require_node), db: Session = 
     if body.dnstt_priv and body.dnstt_pub and not get_setting(db, "dnstt_priv"):   # the first key pair wins; nodes then adopt it
         put_setting(db, "dnstt_priv", body.dnstt_priv)
         put_setting(db, "dnstt_pub", body.dnstt_pub)
+    for tid, st in body.tunnels.items():
+        t = db.get(Tunnel, int(tid)) if tid.isdigit() else None
+        if t and t.node_id == node.id:
+            t.client_seen = utcnow()
+            t.client_state = {"active": bool(st.get("active")), "down": [int(p) for p in st.get("down", [])[:50] if isinstance(p, int)],
+                              "errors": [str(e)[:200] for e in st.get("errors", [])[:5]]}
     if body.usage:
         for u in db.scalars(select(User).where(User.name.in_(body.usage))):
             u.used_bytes += max(0, body.usage[u.name])

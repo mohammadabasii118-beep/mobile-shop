@@ -82,6 +82,25 @@ class NodeProtocol(Base):
     extra: Mapped[bool] = mapped_column(default=False)   # an additional copy of the protocol (own port, address, name)
 
 
+class Tunnel(Base):
+    """A reverse tunnel: users reach the ports of `iran_host`, which are carried to `node` (the foreign server)."""
+    __tablename__ = "tunnels"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    iran_host: Mapped[str]                                   # public address of the server users connect to
+    node_id: Mapped[int] = mapped_column(ForeignKey("nodes.id"))
+    ctl_port: Mapped[int] = mapped_column(default=7777)      # the port the foreign side dials on the Iran server
+    token: Mapped[str]                                       # shared secret of the two ends
+    relay_token: Mapped[str] = mapped_column(unique=True)    # what the agent on the Iran server signs in with
+    forwards: Mapped[list] = mapped_column(JSON, default=list)   # [{"proto": "tcp", "listen": 80, "target": 80}]
+    enabled: Mapped[bool] = mapped_column(default=True)
+    relay_seen: Mapped[datetime | None] = mapped_column(default=None)
+    relay_state: Mapped[dict] = mapped_column(JSON, default=dict)    # last report of the Iran side
+    client_seen: Mapped[datetime | None] = mapped_column(default=None)
+    client_state: Mapped[dict] = mapped_column(JSON, default=dict)   # last report of the foreign side
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
 class Setting(Base):
     """Small key/value store for panel-wide options (branding)."""
     __tablename__ = "settings"

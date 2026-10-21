@@ -123,3 +123,37 @@ def test_wrong_token_is_rejected():
             cl.kill()
     finally:
         srv.kill()
+
+
+def test_busy_port_does_not_take_the_others_down_and_status_file_reports_it(tmp_path):
+    import json
+    ctl, good, tgt = free_port(), free_port(), free_port()
+    busy = socket.socket()
+    busy.bind(("0.0.0.0", 0))
+    busy.listen(1)
+    busy_port = busy.getsockname()[1]
+    tcp_echo(tgt)
+    status = tmp_path / "s.json"
+    srv = launch("server", "--listen", f"127.0.0.1:{ctl}", "--token", "status-token-1", "--status-file", str(status),
+                 "--forward", str(busy_port), "--forward", f"{good}={tgt}")
+    try:
+        assert wait_port(good)
+        cl = launch("client", "--server", f"127.0.0.1:{ctl}", "--token", "status-token-1", "--pool", "2")
+        try:
+            end = time.time() + 12
+            st = {}
+            while time.time() < end:
+                try:
+                    st = json.loads(status.read_text())
+                    if st.get("pool", 0) >= 2:
+                        break
+                except (OSError, ValueError):
+                    pass
+                time.sleep(0.5)
+            assert st["failed"] == [f"tcp/{busy_port}"] and st["pool"] >= 2
+            assert tcp_roundtrip(good, b"still works") == b"still works"
+        finally:
+            cl.kill()
+    finally:
+        srv.kill()
+        busy.close()

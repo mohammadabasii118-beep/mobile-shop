@@ -5,6 +5,7 @@ reports load and per-user traffic back. Standard library only."""
 import hashlib
 import json
 import os
+import socket
 import subprocess
 import sys
 import time
@@ -950,6 +951,100 @@ def apply_mtproto(cfg, errors, tcp_busy=frozenset()):
         errors.append("mtg is not running: " + last[-160:])
 
 
+# ---------- vtunnel: the foreign end of a reverse tunnel to a server in Iran ----------
+VTUNNEL_BIN = "/usr/local/bin/vtunnel.py"
+VTUNNEL_PREFIX = "vtunnel-client-"
+tunnel_state = {}   # tunnel id -> {"active": bool, "down": [ports], "errors": [...]}; sent with the next report
+
+
+def vtunnel_unit(t):
+    return f"""[Unit]
+Description=vtunnel client {t['id']}
+After=network-online.target
+
+[Service]
+EnvironmentFile=/etc/vpn-node/{VTUNNEL_PREFIX}{t['id']}.env
+ExecStart=/usr/bin/python3 {VTUNNEL_BIN} client --server {t['server']} --pool {t.get('pool', 8)}
+Restart=always
+RestartSec=2
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+
+def ensure_vtunnel_script(cfg):
+    """Download vtunnel.py from the panel when it is missing or differs from the panel's copy."""
+    want = cfg.get("vtunnel_sha256")
+    try:
+        if hashlib.sha256(open(VTUNNEL_BIN, "rb").read()).hexdigest() == want:
+            return True
+    except FileNotFoundError:
+        pass
+    url = load_json(CONF)["panel_url"].rstrip("/") + "/vtunnel.py"
+    with urllib.request.urlopen(url, timeout=30) as r:
+        data = r.read()
+    if want and hashlib.sha256(data).hexdigest() != want:
+        return False
+    compile(data, VTUNNEL_BIN, "exec")
+    with open(VTUNNEL_BIN + ".new", "wb") as f:
+        f.write(data)
+    os.chmod(VTUNNEL_BIN + ".new", 0o755)
+    os.replace(VTUNNEL_BIN + ".new", VTUNNEL_BIN)
+    return True
+
+
+def tcp_listening(port):
+    try:
+        socket.create_connection(("127.0.0.1", port), 0.5).close()
+        return True
+    except OSError:
+        return False
+
+
+def apply_tunnels(cfg):
+    wanted = {str(t["id"]): t for t in cfg.get("tunnels", [])}
+    tunnel_state.clear()
+    unit_dir = "/etc/systemd/system"
+    for name in os.listdir(unit_dir) if os.path.isdir(unit_dir) else []:       # remove tunnels deleted or moved away
+        if name.startswith(VTUNNEL_PREFIX) and name.endswith(".service") and name[len(VTUNNEL_PREFIX):-8] not in wanted:
+            tid = name[len(VTUNNEL_PREFIX):-8]
+            sh("systemctl", "disable", "--now", name)
+            for path in (f"{unit_dir}/{name}", f"/etc/vpn-node/{VTUNNEL_PREFIX}{tid}.env"):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+            sh("systemctl", "daemon-reload")
+    if not wanted:
+        return
+    errors = []
+    try:
+        ok = ensure_vtunnel_script(cfg)
+    except Exception as e:
+        ok = False
+        errors.append("vtunnel.py download failed: " + str(e)[:120])
+    for tid, t in wanted.items():
+        service = f"{VTUNNEL_PREFIX}{tid}"
+        st = {"active": False, "down": [p for p in t.get("targets", []) if not tcp_listening(p)], "errors": list(errors)}
+        tunnel_state[tid] = st
+        if not ok:
+            continue
+        env = f"/etc/vpn-node/{service}.env"
+        unit = f"{unit_dir}/{service}.service"
+        write_if_changed(env, f"VTUNNEL_TOKEN={t['token']}\n", 0o600)
+        if write_if_changed(unit, vtunnel_unit(t), 0o644):
+            sh("systemctl", "daemon-reload")
+            sh("systemctl", "enable", service)
+        restart_on_config_change(service, [unit, env, VTUNNEL_BIN])
+        if sh("systemctl", "is-active", service).stdout.strip() != "active":
+            sh("systemctl", "restart", service)
+        st["active"] = sh("systemctl", "is-active", service).stdout.strip() == "active"
+        if not st["active"]:
+            st["errors"].append("vtunnel client is not running")
+
+
 def apply(cfg, reality, tls, wg):
     """Write configs and restart what changed. Returns the port conflicts found."""
     tcp_busy, udp_busy, conflicts = port_conflicts(cfg, foreign_listeners(sh("ss", "-H", "-ltnup").stdout))
@@ -973,6 +1068,7 @@ def apply(cfg, reality, tls, wg):
             sh("systemctl", "restart", "wg-quick@wg0")
     dnstt = apply_dnstt(cfg, errors, udp_busy)
     apply_mtproto(cfg, errors, tcp_busy)
+    apply_tunnels(cfg)
     ensure_forwarding()
     fix_ppp_options()
     restart_on_config_change("strongswan-starter", ["/etc/ipsec.conf"])
@@ -1031,7 +1127,7 @@ def main():
             api(conf, "POST", "/api/node/report", {
                 "load": cpu_load_percent(), "usage": pending, "reality_pub": reality["public"],
                 "reality_sid": reality["short_id"], "tls_self_signed": conf.get("tls_self_signed", True), "tls_pin": cert_sha256(tls["cert"]),
-                "conflicts": conflicts, "errors": errors, "wg_pub": wg["public"] if wg else "", "ovpn_ca": read_text(f"{STATE_DIR}/ovpn/ca.crt"), **dnstt})
+                "conflicts": conflicts, "errors": errors, "wg_pub": wg["public"] if wg else "", "ovpn_ca": read_text(f"{STATE_DIR}/ovpn/ca.crt"), "tunnels": tunnel_state, **dnstt})
             pending = {}  # kept in memory until the panel accepted the report
         except Exception as e:  # keep running; the panel may be briefly unreachable
             print("agent error:", e, file=sys.stderr, flush=True)

@@ -1,8 +1,8 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function ago(iso) { const m = Math.max(1, Math.round((Date.now() - new Date(iso)) / 60000)); return m < 60 ? m + ' دقیقه پیش' : m < 1440 ? Math.round(m / 60) + ' ساعت پیش' : Math.round(m / 1440) + ' روز پیش'; }
-const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: [], brand: {name: 'پنل چندلوکیشن', logo: '', color: ''}, dnstt: null, owner: '', onlineOnly: false};
-const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', routing: 'مسیریابی', users: 'کاربران', admins: 'ادمین‌ها', look: 'ظاهر پنل'};
+const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: [], brand: {name: 'پنل چندلوکیشن', logo: '', color: ''}, dnstt: null, tunnels: [], owner: '', onlineOnly: false};
+const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', routing: 'مسیریابی', users: 'کاربران', tunnels: 'تونل‌ها', admins: 'ادمین‌ها', look: 'ظاهر پنل'};
 const STATUS = {active: ['good', 'فعال'], disabled: ['bad', 'غیرفعال'], expired: ['bad', 'منقضی'], quota: ['bad', 'حجم تمام شده']};
 
 const ICO = {
@@ -71,7 +71,7 @@ async function refresh() {
     const [users, opts] = await Promise.all([api('GET', '/me/users'), api('GET', '/me/options')]);
     S.users = users; S.nodes = opts.nodes; S.protos = opts.protocols; S.admins = []; S.tab = 'users';
   } else {
-    [S.nodes, S.users, S.protos, S.admins, S.dnstt] = await Promise.all([api('GET', '/nodes'), api('GET', '/users'), api('GET', '/protocols'), api('GET', '/admins'), api('GET', '/dnstt')]);
+    [S.nodes, S.users, S.protos, S.admins, S.dnstt, S.tunnels] = await Promise.all([api('GET', '/nodes'), api('GET', '/users'), api('GET', '/protocols'), api('GET', '/admins'), api('GET', '/dnstt'), api('GET', '/tunnels')]);
   }
   const ids = new Set(S.users.map(u => u.id));
   S.sel = new Set([...S.sel].filter(i => ids.has(i)));   // a deleted user cannot stay selected
@@ -146,6 +146,19 @@ const views = {
           <td><button class="btn sm" data-rt-up="${r.id}" ${i === 0 ? 'disabled' : ''}>↑</button> <button class="btn sm" data-rt-down="${r.id}" ${i === R.rules.length - 1 ? 'disabled' : ''}>↓</button> <button class="btn sm" data-rt-delrule="${r.id}">حذف</button></td></tr>`).join('')
           || '<tr><td colspan="5" class="muted">قانونی نیست؛ همه‌ی ترافیک مستقیم می‌رود.</td></tr>'}
         </tbody></table></div></div>`;
+  },
+  tunnels() {
+    const ST = {up: ['good', 'برقرار'], wait_client: ['warn', 'ایران آماده؛ منتظر سرور خارج'], wait_iran: ['warn', 'منتظر نصب روی سرور ایران'], off: ['', 'خاموش']};
+    const note = `<div class="note">تونل: کاربران به پورت‌های <b>سرور ایران</b> وصل می‌شوند و ترافیک از طریق تونل به <b>لوکیشن خارج</b> می‌رسد. فقط IP ایران، لوکیشن خارج و پورت‌ها را بدهید؛ روی سرور ایران یک بار یک دستور اجرا می‌شود و بقیه خودکار است. تونل رمزنگاری ندارد؛ از پروتکل‌های رمزشده (مثل VLESS Reality) از داخلش رد کنید. مقصد هر پورت همان پورت روی لوکیشن خارج است (مثلاً <span class="mono" dir="ltr" style="unicode-bidi:isolate">81=80</span> یعنی پورت ۸۱ ایران به پورت ۸۰ خارج).</div>`;
+    if (!S.tunnels.length) return note + '<div class="panel muted">هنوز تونلی نساخته‌اید.</div>';
+    return note + S.tunnels.map(t => { const st = ST[t.status];
+      return `<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <div><b>${esc(t.name)}</b> <span class="pill ${st[0]}">${st[1]}</span>${t.status === 'up' ? ` <span class="muted">${num(t.pool + ' اتصال آماده')}</span>` : ''}</div>
+        <div class="chips"><button class="btn sm" data-tedit="${t.id}">پورت‌ها / ویرایش</button><button class="btn sm" data-ttoggle="${t.id}">${t.enabled ? 'خاموش' : 'روشن'}</button><button class="btn sm danger" data-tdel="${t.id}">حذف</button></div></div>
+        <div style="margin-top:8px" class="muted"><span class="mono" dir="ltr">${esc(t.iran_host)}</span> ← <b>${esc(t.node_name)}</b></div>
+        <div class="chips" style="margin-top:8px">${t.forwards.map(f => `<span class="cc" dir="ltr">${f.proto === 'udp' ? 'UDP ' : ''}${f.listen}${f.target !== f.listen ? ' → ' + f.target : ''}</span>`).join('')}</div>
+        ${t.problems.length ? `<div class="note" style="margin-top:8px;color:var(--bad)">${t.problems.map(esc).join('<br>')}</div>` : ''}
+        ${t.status === 'wait_iran' ? `<div style="margin-top:10px"><div class="muted">روی سرور ایران (با دسترسی root) این دستور را یک بار اجرا کنید:</div><pre>${esc(t.install_command)}</pre><button class="btn sm" data-copy="${esc(t.install_command)}">کپی دستور</button></div>` : ''}</div>`; }).join('');
   },
   users() {
     const q = S.q.trim().toLowerCase(), rs = isReseller(), own = S.owner;
@@ -248,11 +261,12 @@ function render() {
   document.querySelectorAll('[data-sudo]').forEach(b => b.hidden = isReseller());
   $('#actions').innerHTML = S.tab === 'users' ? (isReseller() ? '' : '<button class="btn" id="bulkBtn">عملیات گروهی</button> ') + '<button class="btn pri" id="addUser">+ کاربر جدید</button>'
     : S.tab === 'nodes' ? '<button class="btn pri" id="addNode">+ لوکیشن جدید</button>'
+    : S.tab === 'tunnels' ? '<button class="btn pri" id="addTunnel">+ تونل جدید</button>'
     : S.tab === 'admins' ? '<button class="btn pri" id="addAdmin">+ ادمین جدید</button>' : '';
   const typing = document.activeElement && document.activeElement.id === 'uq' ? document.activeElement.selectionStart : null;
   $('#view').innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">${views[S.tab]()}</div>`;
   if (typing !== null && $('#uq')) { $('#uq').focus(); $('#uq').setSelectionRange(typing, typing); }
-  $('#nNodes').textContent = S.nodes.length; $('#nUsers').textContent = S.users.length; $('#nAdmins').textContent = S.admins.length || '';
+  $('#nNodes').textContent = S.nodes.length; $('#nUsers').textContent = S.users.length; $('#nAdmins').textContent = S.admins.length || ''; $('#nTunnels').textContent = S.tunnels.length || '';
   document.querySelectorAll('nav [data-tab]').forEach(b => b.setAttribute('aria-current', b.dataset.tab === S.tab));
 }
 
@@ -427,6 +441,39 @@ document.addEventListener('click', async e => {
       closeModal(); await refresh();
     }
     else if (t.id === 'addNode') nodeForm();
+    else if (t.id === 'addTunnel') {
+      if (!S.nodes.length) { toast('اول یک لوکیشن خارج بسازید'); return; }
+      openModal(`<h2>تونل جدید</h2><div class="form">
+        <label class="f">نام<input type="text" id="tnName" placeholder="ایران - آلمان"></label>
+        <label class="f">آدرس سرور ایران (IP یا دامنه)<input type="text" id="tnHost" dir="ltr" placeholder="1.2.3.4"></label>
+        <label class="f">لوکیشن خارج<select id="tnNode">${S.nodes.map(n => `<option value="${n.id}">${esc(n.name)}</option>`).join('')}</select></label>
+        <label class="f">پورت‌ها<input type="text" id="tnPorts" dir="ltr" placeholder="80, 81=80, udp:5000, 2000-2010"></label></div>
+        <div class="note">با کاما جدا کنید. <span class="mono" dir="ltr" style="unicode-bidi:isolate">81=80</span>: پورت ۸۱ ایران به پورت ۸۰ خارج. <span class="mono" dir="ltr" style="unicode-bidi:isolate">udp:</span> برای UDP (بازی). بازه با خط تیره. پورت‌های ۷۷۷۷ به بعد برای خود تونل رزرو می‌شوند.</div>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="tnSave">ساخت</button></div>`);
+    }
+    else if (t.id === 'tnSave') {
+      const r = await api('POST', '/tunnels', {name: $('#tnName').value.trim(), iran_host: $('#tnHost').value.trim(), node_id: +$('#tnNode').value, ports: $('#tnPorts').value});
+      await refresh();
+      openModal(`<h2>تونل ساخته شد</h2><p class="muted" style="margin:0">روی <b>سرور ایران</b> (با دسترسی root) این دستور را اجرا کنید. بقیه‌ی کارها (نصب، تنظیم، راه‌اندازی دوباره و سمت خارج) خودکار است:</p>
+        <pre>${esc(r.install_command)}</pre><div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-copy="${esc(r.install_command)}">کپی دستور</button><button class="btn pri" data-close>بستن</button></div>`);
+    }
+    else if (d.tedit) {
+      const x = S.tunnels.find(q => q.id === +d.tedit);
+      openModal(`<h2>ویرایش ${esc(x.name)}</h2><div class="form">
+        <label class="f">نام<input type="text" id="teName" value="${esc(x.name)}"></label>
+        <label class="f">آدرس سرور ایران<input type="text" id="teHost" dir="ltr" value="${esc(x.iran_host)}"></label>
+        <label class="f">پورت‌ها<input type="text" id="tePorts" dir="ltr" value="${esc(x.ports)}"></label></div>
+        <div class="note">تغییر پورت‌ها ظرف حدود ۳۰ ثانیه روی هر دو سرور اعمال می‌شود. اگر آدرس ایران را عوض می‌کنید، دستور نصب را روی سرور جدید اجرا کنید.</div>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="teSave" data-id="${x.id}">ذخیره</button></div>`);
+    }
+    else if (t.id === 'teSave') { await api('PATCH', '/tunnels/' + d.id, {name: $('#teName').value.trim(), iran_host: $('#teHost').value.trim(), ports: $('#tePorts').value}); closeModal(); await refresh(); toast('ذخیره شد'); }
+    else if (d.ttoggle) { const x = S.tunnels.find(q => q.id === +d.ttoggle); await api('PATCH', '/tunnels/' + x.id, {enabled: !x.enabled}); await refresh(); }
+    else if (d.tdel) {
+      const x = S.tunnels.find(q => q.id === +d.tdel);
+      openModal(`<h2>حذف تونل ${esc(x.name)}؟</h2><div class="note">تونل از هر دو سرور برداشته می‌شود و پورت‌های ایران بسته می‌شوند. به کانفیگ‌ها و کاربران کاری ندارد.</div>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="tdGo" data-id="${x.id}" style="background:var(--bad)">حذف</button></div>`);
+    }
+    else if (t.id === 'tdGo') { await api('DELETE', '/tunnels/' + d.id); closeModal(); await refresh(); toast('تونل حذف شد'); }
     else if (t.id === 'nSave') {
       const n = await api('POST', '/nodes', {name: $('#nName').value.trim(), cc: $('#nCc').value.trim(), address: $('#nAddr').value.trim()});
       await refresh(); installDialog(n);
