@@ -1534,3 +1534,31 @@ def test_vtunnel_agent_units():
     assert "token" not in unit.lower()                                 # the secret lives in the 0600 env file, not in the unit
     cu = agent.vtunnel_unit({"id": 3, "server": "1.2.3.4:7777", "pool": 8})
     assert "client --server 1.2.3.4:7777 --pool 8" in cu and "vtunnel-client-3.env" in cu
+
+
+def test_tunnel_gives_users_a_via_iran_copy_of_matching_configs():
+    with TestClient(app) as c:
+        h = admin(c)
+        n = c.post("/api/nodes", headers=h, json={"name": "ViaDE", "cc": "de", "address": "via.example.com"}).json()
+        c.put(f"/api/nodes/{n['id']}/protocols/vless_raw", headers=h, json={"enabled": True})
+        c.put(f"/api/nodes/{n['id']}/protocols/hy2", headers=h, json={"enabled": True})
+        ports = {p["proto"]: p["port"] for p in c.get("/api/nodes", headers=h).json()[-1]["protocols"]}
+        u = c.post("/api/users", headers=h, json={"name": "via_user", "protos": ["vless_raw", "hy2"], "node_ids": [n["id"]]}).json()
+        sub = u["sub_url"].replace("https://panel.test", "")
+        base = [e for e in c.get(f"/api/users/{u['id']}/configs", headers=h).json()]
+        assert not any(e["cc"] == "IR" for e in base)
+        t = c.post("/api/tunnels", headers=h, json={"name": "IR", "iran_host": "9.9.9.9", "node_id": n["id"],
+                                                    "ports": f"8081={ports['vless_raw']}, udp:7000={ports['hy2']}, 9000", "publish": True}).json()
+        es = [e for e in c.get(f"/api/users/{u['id']}/configs", headers=h).json() if e["cc"] == "IR"]
+        assert {e["proto"] for e in es} == {"vless_raw", "hy2"}                  # 9000 matches nothing, so no entry for it
+        raw = next(e for e in es if e["proto"] == "vless_raw")
+        assert "@9.9.9.9:8081?" in raw["link"] and raw["label"].startswith("🇮🇷")
+        assert "@9.9.9.9:7000?" in next(e for e in es if e["proto"] == "hy2")["link"]
+        assert "9.9.9.9:8081" in base_sub(c, sub)
+        c.patch(f"/api/tunnels/{t['id']}", headers=h, json={"publish": False})
+        assert not any(e["cc"] == "IR" for e in c.get(f"/api/users/{u['id']}/configs", headers=h).json())
+        c.delete(f"/api/tunnels/{t['id']}", headers=h)
+
+
+def base_sub(c, path):
+    return base64.b64decode(c.get(path).text).decode()

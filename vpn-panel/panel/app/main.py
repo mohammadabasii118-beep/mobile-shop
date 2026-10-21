@@ -231,6 +231,11 @@ USER_ONLINE_WINDOW = timedelta(minutes=3)   # a user counts as online if a node 
 ONLINE_MIN_BYTES = 1024                # keep-alive chatter alone does not count
 
 
+def entries_for(user: User, db: Session) -> list[dict]:
+    return user_entries(user, list(db.scalars(select(Node).order_by(Node.id))), dnstt_info(db),
+                        list(db.scalars(select(Tunnel).where(Tunnel.publish == True))))  # noqa: E712
+
+
 def user_out(user: User, request: Request) -> dict:
     days_left = None
     if user.expire_at:
@@ -800,7 +805,7 @@ def user_by_name(name: str, request: Request, db: Session = Depends(get_db)):
 @app.get("/api/users/{user_id}/configs", dependencies=[Depends(require_admin)])
 def user_configs(user_id: int, db: Session = Depends(get_db)):
     user = db.get(User, user_id) or _404()
-    return user_entries(user, list(db.scalars(select(Node).order_by(Node.id))), dnstt_info(db))
+    return entries_for(user, db)
 
 
 # ---------- branding ----------
@@ -1125,14 +1130,14 @@ def me_delete_user(user_id: int, admin: Admin = Depends(require_reseller), db: S
 @app.get("/api/me/users/{user_id}/configs")
 def me_user_configs(user_id: int, admin: Admin = Depends(require_reseller), db: Session = Depends(get_db)):
     user = own_user(db, admin, user_id)
-    return user_entries(user, list(db.scalars(select(Node).order_by(Node.id))), dnstt_info(db))
+    return entries_for(user, db)
 
 
 # ---------- subscription (public, token in URL) ----------
 @app.get("/sub/{token}")
 def subscription(token: str, request: Request, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.sub_token == token)) or _404()
-    entries = user_entries(user, list(db.scalars(select(Node))), dnstt_info(db)) if user.status() == "active" else []
+    entries = entries_for(user, db) if user.status() == "active" else []
     days_left = max(0, (user.expire_at - utcnow()).days) if user.expire_at else None
     if "text/html" in request.headers.get("accept", ""):  # a person in a browser, not a client app
         return HTMLResponse(render_sub_page(user, entries, days_left, f"{public_url(request)}/sub/{token}", get_brand(db),
@@ -1157,7 +1162,7 @@ def subscription_qr(token: str, i: int = -1, request: Request = None, db: Sessio
         _404()
     text = f"{public_url(request)}/sub/{token}"
     if i >= 0:
-        entries = user_entries(user, list(db.scalars(select(Node))), dnstt_info(db))
+        entries = entries_for(user, db)
         text = qr_text(entries[i]) if i < len(entries) else None
         if not text:
             _404()
@@ -1171,7 +1176,7 @@ def subscription_file(token: str, node_id: int, proto: str, db: Session = Depend
     """The WireGuard .conf / OpenVPN .ovpn file for one location, for clients that import a file."""
     user = db.scalar(select(User).where(User.sub_token == token)) or _404()
     if user.status() == "active":
-        for e in user_entries(user, list(db.scalars(select(Node))), dnstt_info(db)):
+        for e in entries_for(user, db):
             text = (e["details"] or {}).get("config")
             if e["node_id"] == node_id and e["proto"] == proto and text and e["file_ext"]:
                 slug = re.sub(r"[^A-Za-z0-9]+", "-", e["node"]).strip("-") or f"node{node_id}"
@@ -1241,7 +1246,7 @@ def tunnel_out(t: Tunnel, db: Session, request: Request) -> dict:
         problems.append("روی سرور خارج چیزی روی این پورت‌ها گوش نمی‌دهد: " + ", ".join(map(str, cs["down"])))
     problems += list(cs.get("errors", [])) if client_on else []
     return {"id": t.id, "name": t.name, "iran_host": t.iran_host, "node_id": t.node_id, "node_name": node.name if node else "؟",
-            "ctl_port": t.ctl_port, "forwards": t.forwards, "ports": forwards_text(t.forwards), "enabled": t.enabled,
+            "ctl_port": t.ctl_port, "forwards": t.forwards, "ports": forwards_text(t.forwards), "enabled": t.enabled, "publish": t.publish,
             "status": status, "pool": pool, "iran_online": relay_on, "node_online": client_on, "problems": problems,
             "install_command": f"bash <(curl -fsSL {public_url(request)}/relay-install.sh) --token {t.relay_token}"}
 
@@ -1251,6 +1256,7 @@ class TunnelIn(BaseModel):
     iran_host: str = Field(min_length=1, max_length=253)
     node_id: int
     ports: str = Field(max_length=4000)
+    publish: bool = True
 
 
 class TunnelPatch(BaseModel):
@@ -1258,6 +1264,7 @@ class TunnelPatch(BaseModel):
     iran_host: str | None = Field(default=None, min_length=1, max_length=253)
     ports: str | None = Field(default=None, max_length=4000)
     enabled: bool | None = None
+    publish: bool | None = None
 
 
 def clean_host(host: str) -> str:
@@ -1281,7 +1288,7 @@ def create_tunnel(body: TunnelIn, request: Request, db: Session = Depends(get_db
     taken = {f["listen"] for f in forwards}
     ctl = next(p for p in range(7777, 7977) if p not in used and p not in taken)
     t = Tunnel(name=body.name.strip(), iran_host=host, node_id=body.node_id, ctl_port=ctl, forwards=forwards,
-               token=secrets.token_hex(16), relay_token=secrets.token_urlsafe(24))
+               token=secrets.token_hex(16), relay_token=secrets.token_urlsafe(24), publish=body.publish)
     db.add(t)
     db.commit()
     return tunnel_out(t, db, request)
@@ -1300,6 +1307,8 @@ def patch_tunnel(tunnel_id: int, body: TunnelPatch, request: Request, db: Sessio
             raise HTTPException(422, f"پورت {t.ctl_port} برای خود تونل رزرو است")
     if body.enabled is not None:
         t.enabled = body.enabled
+    if body.publish is not None:
+        t.publish = body.publish
     db.commit()
     return tunnel_out(t, db, request)
 

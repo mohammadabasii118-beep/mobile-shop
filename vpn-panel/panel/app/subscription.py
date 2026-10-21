@@ -197,7 +197,33 @@ def _entry_name(np) -> str:
     return np.label or (f"{PROTOCOLS[np.proto]['label']} ({np.port})" if np.extra else "")
 
 
-def user_entries(user: User, nodes: list[Node], dnstt: dict | None = None) -> list[dict]:
+UDP_VIA_TUNNEL = {"hy2", "tuic", "wg", "ovpn"}
+
+
+def tunnel_entries(user: User, nodes: list[Node], tunnels: list) -> list[dict]:
+    """For each tunnel forward that lands on a protocol the user has, a copy of that config pointing at the Iran server."""
+    out = []
+    by_id = {n.id: n for n in nodes}
+    for t in tunnels:
+        node = by_id.get(t.node_id)
+        if not (t.enabled and t.publish and node) or (user.node_ids and node.id not in user.node_ids):
+            continue
+        for f in t.forwards:
+            udp = f["proto"] == "udp"
+            for np in node.protocols:
+                if not np.enabled or np.proto not in user.protos or np.port != f["target"] or np.proto not in PROTOCOLS:
+                    continue
+                if (np.proto in UDP_VIA_TUNNEL) != udp or (not udp and PROTOCOLS[np.proto]["engine"] != "xray"):
+                    continue
+                name = f"🇮🇷 {np.label or PROTOCOLS[np.proto]['label']}"
+                e = build_entry(user, node, np.proto, f["listen"], conn_host=t.iran_host, name=name)
+                if e:
+                    e["node"], e["cc"] = f"{node.name} (از طریق ایران)", "IR"
+                    out.append(e)
+    return out
+
+
+def user_entries(user: User, nodes: list[Node], dnstt: dict | None = None, tunnels: list | None = None) -> list[dict]:
     out, dnstt_done = [], False
     for node in nodes:
         if user.node_ids and node.id not in user.node_ids:
@@ -214,6 +240,7 @@ def user_entries(user: User, nodes: list[Node], dnstt: dict | None = None) -> li
                     out.append(e)
                 if node.cf_domain and np.proto in CF_PROTOS and np.port in CF_PORTS:
                     out.append(build_entry(user, node, np.proto, np.port, cdn=True, name=_entry_name(np)))
+    out += tunnel_entries(user, nodes, tunnels or [])
     return out
 
 

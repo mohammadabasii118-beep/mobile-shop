@@ -157,6 +157,7 @@ const views = {
         <div class="chips"><button class="btn sm" data-tedit="${t.id}">پورت‌ها / ویرایش</button><button class="btn sm" data-ttoggle="${t.id}">${t.enabled ? 'خاموش' : 'روشن'}</button><button class="btn sm danger" data-tdel="${t.id}">حذف</button></div></div>
         <div style="margin-top:8px" class="muted"><span class="mono" dir="ltr">${esc(t.iran_host)}</span> ← <b>${esc(t.node_name)}</b></div>
         <div class="chips" style="margin-top:8px">${t.forwards.map(f => `<span class="cc" dir="ltr">${f.proto === 'udp' ? 'UDP ' : ''}${f.listen}${f.target !== f.listen ? ' → ' + f.target : ''}</span>`).join('')}</div>
+        ${t.publish ? '<div class="muted" style="margin-top:6px;font-size:12px">در اشتراک کاربران هم هست (کانفیگ‌های «🇮🇷 …»)</div>' : ''}
         ${t.problems.length ? `<div class="note" style="margin-top:8px;color:var(--bad)">${t.problems.map(esc).join('<br>')}</div>` : ''}
         ${t.status === 'wait_iran' ? `<div style="margin-top:10px"><div class="muted">روی سرور ایران (با دسترسی root) این دستور را یک بار اجرا کنید:</div><pre>${esc(t.install_command)}</pre><button class="btn sm" data-copy="${esc(t.install_command)}">کپی دستور</button></div>` : ''}</div>`; }).join('');
   },
@@ -447,12 +448,13 @@ document.addEventListener('click', async e => {
         <label class="f">نام<input type="text" id="tnName" placeholder="ایران - آلمان"></label>
         <label class="f">آدرس سرور ایران (IP یا دامنه)<input type="text" id="tnHost" dir="ltr" placeholder="1.2.3.4"></label>
         <label class="f">لوکیشن خارج<select id="tnNode">${S.nodes.map(n => `<option value="${n.id}">${esc(n.name)}</option>`).join('')}</select></label>
-        <label class="f">پورت‌ها<input type="text" id="tnPorts" dir="ltr" placeholder="80, 81=80, udp:5000, 2000-2010"></label></div>
+        <label class="f">پورت‌ها<input type="text" id="tnPorts" dir="ltr" placeholder="80, 81=80, udp:5000, 2000-2010"></label>
+        <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="tnPub" checked> به کاربران هم کانفیگِ «از طریق ایران» بده</label></div>
         <div class="note">با کاما جدا کنید. <span class="mono" dir="ltr" style="unicode-bidi:isolate">81=80</span>: پورت ۸۱ ایران به پورت ۸۰ خارج. <span class="mono" dir="ltr" style="unicode-bidi:isolate">udp:</span> برای UDP (بازی). بازه با خط تیره. پورت‌های ۷۷۷۷ به بعد برای خود تونل رزرو می‌شوند.</div>
         <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="tnSave">ساخت</button></div>`);
     }
     else if (t.id === 'tnSave') {
-      const r = await api('POST', '/tunnels', {name: $('#tnName').value.trim(), iran_host: $('#tnHost').value.trim(), node_id: +$('#tnNode').value, ports: $('#tnPorts').value});
+      const r = await api('POST', '/tunnels', {name: $('#tnName').value.trim(), iran_host: $('#tnHost').value.trim(), node_id: +$('#tnNode').value, ports: $('#tnPorts').value, publish: $('#tnPub').checked});
       await refresh();
       openModal(`<h2>تونل ساخته شد</h2><p class="muted" style="margin:0">روی <b>سرور ایران</b> (با دسترسی root) این دستور را اجرا کنید. بقیه‌ی کارها (نصب، تنظیم، راه‌اندازی دوباره و سمت خارج) خودکار است:</p>
         <pre>${esc(r.install_command)}</pre><div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-copy="${esc(r.install_command)}">کپی دستور</button><button class="btn pri" data-close>بستن</button></div>`);
@@ -462,11 +464,13 @@ document.addEventListener('click', async e => {
       openModal(`<h2>ویرایش ${esc(x.name)}</h2><div class="form">
         <label class="f">نام<input type="text" id="teName" value="${esc(x.name)}"></label>
         <label class="f">آدرس سرور ایران<input type="text" id="teHost" dir="ltr" value="${esc(x.iran_host)}"></label>
-        <label class="f">پورت‌ها<input type="text" id="tePorts" dir="ltr" value="${esc(x.ports)}"></label></div>
+        <label class="f">پورت‌ها<input type="text" id="tePorts" dir="ltr" value="${esc(x.ports)}"></label>
+        <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="tePub" ${x.publish ? 'checked' : ''}> به کاربران هم کانفیگِ «از طریق ایران» بده</label></div>
+        <div class="note">وقتی روشن باشد، برای هر پورتِ تونل که به یک پروتکل روشن همان لوکیشن می‌رسد (مثلاً مقصد ۸۰ برای «VLESS بدون TLS»، یا پورت UDP هیستریا)، در اشتراک کاربرانی که آن پروتکل را دارند یک کانفیگ «🇮🇷 …» با آدرس ایران اضافه می‌شود.</div>
         <div class="note">تغییر پورت‌ها ظرف حدود ۳۰ ثانیه روی هر دو سرور اعمال می‌شود. اگر آدرس ایران را عوض می‌کنید، دستور نصب را روی سرور جدید اجرا کنید.</div>
         <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="teSave" data-id="${x.id}">ذخیره</button></div>`);
     }
-    else if (t.id === 'teSave') { await api('PATCH', '/tunnels/' + d.id, {name: $('#teName').value.trim(), iran_host: $('#teHost').value.trim(), ports: $('#tePorts').value}); closeModal(); await refresh(); toast('ذخیره شد'); }
+    else if (t.id === 'teSave') { await api('PATCH', '/tunnels/' + d.id, {name: $('#teName').value.trim(), iran_host: $('#teHost').value.trim(), ports: $('#tePorts').value, publish: $('#tePub').checked}); closeModal(); await refresh(); toast('ذخیره شد'); }
     else if (d.ttoggle) { const x = S.tunnels.find(q => q.id === +d.ttoggle); await api('PATCH', '/tunnels/' + x.id, {enabled: !x.enabled}); await refresh(); }
     else if (d.tdel) {
       const x = S.tunnels.find(q => q.id === +d.tdel);
