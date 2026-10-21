@@ -1425,7 +1425,7 @@ def test_sub_page_and_qr():
         assert "qr_user" in page and "hiddify://import/" in page
         assert "<b>user" not in page
         svg = c.get(f"{u['sub_url'].replace('https://panel.test','')}/qr.svg")
-        assert svg.status_code == 200 and svg.text.lstrip().startswith(("<svg", "<?xml")) and "image/svg+xml" in svg.headers["content-type"]
+        assert svg.status_code == 200 and svg.text.startswith('<svg xmlns="http://www.w3.org/2000/svg"') and "image/svg+xml" in svg.headers["content-type"]
         assert c.get("/sub/nope/qr.svg").status_code == 404
         assert c.get(f"{u['sub_url'].replace('https://panel.test','')}/qr.svg?i=9999").status_code == 404
 

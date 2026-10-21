@@ -1,5 +1,6 @@
 import base64
 import hashlib
+import io
 import sqlite3
 import tempfile
 import hmac
@@ -1154,8 +1155,9 @@ def subscription_qr(token: str, i: int = -1, request: Request = None, db: Sessio
         text = qr_text(entries[i]) if i < len(entries) else None
         if not text:
             _404()
-    svg = segno.make(text, error="l").svg_inline(scale=4, border=2, dark="#000", light="#fff")
-    return Response(svg, media_type="image/svg+xml", headers={"Cache-Control": "private, max-age=300"})
+    buf = io.BytesIO()   # standalone SVG: it needs the xmlns, or <img> refuses to draw it
+    segno.make(text, error="l").save(buf, kind="svg", scale=4, border=2, dark="#000", light="#fff", xmldecl=False, svgns=True)
+    return Response(buf.getvalue(), media_type="image/svg+xml", headers={"Cache-Control": "private, max-age=300"})
 
 
 @app.get("/sub/{token}/file/{node_id}/{proto}")
