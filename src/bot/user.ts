@@ -110,7 +110,7 @@ export function userHandlers(fetchFile: FileFetcher) {
       rows.push(lvl.children.slice(k, k + 2).map((c) => ({ text: `${c.icon ?? '📁'} ${c.name}`, data: `bc:${c.id}` })));
     }
     const sale = await getSale();
-    rows.push(...lvl.products.map((p): Button[] => [{ text: `🛒 ${p.name}\u200f · ${money(p.price - saleAmount(sale, p.price), p.currency)}${sale.active ? ` 🔥${fa(sale.percent)}٪` : ''}`, data: `buy:${p.id}`, style: (p.buttonStyle as any) ?? undefined }]));
+    rows.push(...lvl.products.map((p): Button[] => [{ text: `🛒 ${p.name}\u200f · ${money(p.price - saleAmount(sale, p.price), p.currency)}${sale.active ? ` \u200f🔥 ${fa(sale.percent)} درصد\u200f` : ''}`, data: `buy:${p.id}`, style: (p.buttonStyle as any) ?? undefined }]));
     rows.push(parentBack ? back(parentBack) : nav());
     const T = await loadTexts();
     const desc = lvl.here?.description ? `\n${i(lvl.here.description)}` : '';
