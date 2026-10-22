@@ -36,12 +36,12 @@ function applyBrand(b) {
     r.setProperty('--accent-fg', (0.299 * R + 0.587 * G + 0.114 * B) > 150 ? '#06121a' : '#ffffff');   // readable text on the accent
   }
 }
-async function loadBrand() { try { applyBrand(await (await fetch('/api/branding')).json()); } catch (_) {} }
+async function loadBrand() { try { applyBrand(await (await fetch((window.BASE || '') + '/api/branding')).json()); } catch (_) {} }
 
 let token = ''; try { token = localStorage.getItem('tok') || ''; } catch (e) {}
 
 async function api(method, path, body) {
-  const r = await fetch('/api' + path, {method, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + token},
+  const r = await fetch((window.BASE || '') + '/api' + path, {method, headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + token},
     body: body === undefined ? undefined : JSON.stringify(body)});
   if (r.status === 401 && path !== '/login') { showLogin(); throw new Error('login'); }
   const data = await r.json().catch(() => ({}));
@@ -430,7 +430,7 @@ document.addEventListener('click', async e => {
     if (d.tab) { if (S.draft) { S.draft = null; loadBrand(); } S.tab = d.tab; render(); }   // unsaved branding preview is dropped
     else if (t.id === 'themeBtn') { const r = document.documentElement; r.dataset.theme = getComputedStyle(r).colorScheme.includes('dark') ? 'light' : 'dark'; }
     else if (t.id === 'backupBtn') {
-      const r = await fetch('/api/backup', {headers: {Authorization: 'Bearer ' + token}});
+      const r = await fetch((window.BASE || '') + '/api/backup', {headers: {Authorization: 'Bearer ' + token}});
       if (!r.ok) throw new Error('پشتیبان‌گیری ناموفق بود');
       const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob());
       a.download = (r.headers.get('content-disposition') || '').split('filename=')[1]?.replace(/"/g, '') || 'panel-backup.db';

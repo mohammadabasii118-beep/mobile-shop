@@ -1,6 +1,7 @@
 # Normally started by install-panel.sh. Manual: docker compose --env-file .env -f deploy/docker-compose.yml up -d
 # .env needs PANEL_URL (https://domain), PANEL_FROM (domain), PANEL_ADMIN_PASSWORD, PANEL_SECRET.
-# Caddy gets the HTTPS certificate for the domain automatically.
+# Optional: PANEL_ADMIN_PORT + PANEL_ADMIN_PATH put the login and admin pages on their own port under a secret path.
+# deploy/Caddyfile is written by install-panel.sh (deploy/make-caddyfile.sh). Caddy gets the HTTPS certificate automatically.
 services:
   panel:
     build: {context: .., dockerfile: deploy/Dockerfile}
@@ -10,11 +11,12 @@ services:
       PANEL_SECRET: ${PANEL_SECRET:?set it in .env}
       PANEL_API_KEY: ${PANEL_API_KEY:-}
       PANEL_PUBLIC_URL: ${PANEL_URL:?set it in .env}
+      PANEL_ADMIN_PATH: ${PANEL_ADMIN_PATH:-}
     volumes: [panel-data:/data]
   caddy:
     image: caddy:2
     restart: always
-    ports: ["80:80", "443:443"]
-    command: caddy reverse-proxy --from ${PANEL_FROM:?set it in .env} --to panel:8000
-    volumes: [caddy-data:/data]
+    ports: ["80:80", "443:443", "${PANEL_ADMIN_PORT:-65000}:${PANEL_ADMIN_PORT:-65000}"]
+    command: caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro", "caddy-data:/data"]
 volumes: {panel-data: {}, caddy-data: {}}

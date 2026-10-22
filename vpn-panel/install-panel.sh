@@ -7,12 +7,16 @@ set -euo pipefail
 REPO_URL="${REPO_URL:-https://github.com/mohammadabasii118-beep/mobile-shop.git}"
 BRANCH="${BRANCH:-claude/vpn-panel}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/vpn-panel}"
-DOMAIN=""; PASSWORD=""
+DOMAIN=""; PASSWORD=""; SECURE=""; ADMIN_PORT=""; ADMIN_PATH=""; OPEN_ADMIN=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --domain) DOMAIN="$2"; shift 2 ;;
     --password) PASSWORD="$2"; shift 2 ;;
+    --secure) SECURE=1; shift ;;                       # login page only on a random port, under a random secret path
+    --admin-port) ADMIN_PORT="$2"; SECURE=1; shift 2 ;;
+    --admin-path) ADMIN_PATH="$2"; SECURE=1; shift 2 ;;
+    --no-secure) OPEN_ADMIN=1; shift ;;                # back to the plain address
     --branch) BRANCH="$2"; shift 2 ;;
     --repo) REPO_URL="$2"; shift 2 ;;
     *) echo "unknown option: $1"; exit 1 ;;
@@ -77,13 +81,44 @@ if [ -f "$ENV_FILE" ] && [ -z "${NEW_INSTALL:-}" ] && [ -n "$DOMAIN" ]; then
   echo "Address changed to $PANEL_URL (admin password unchanged)."
 fi
 
+set_env() { grep -q "^$1=" "$ENV_FILE" && sed -i "s|^$1=.*|$1=$2|" "$ENV_FILE" || echo "$1=$2" >> "$ENV_FILE"; }
+unset_env() { sed -i "/^$1=/d" "$ENV_FILE"; }
+if [ -n "$OPEN_ADMIN" ]; then
+  unset_env PANEL_ADMIN_PORT; unset_env PANEL_ADMIN_PATH
+  echo "Secure admin address turned off: the panel is on its normal address again."
+elif [ -n "$SECURE" ]; then
+  [ -n "$ADMIN_PORT" ] || ADMIN_PORT=$(grep '^PANEL_ADMIN_PORT=' "$ENV_FILE" | cut -d= -f2- || true)
+  [ -n "$ADMIN_PORT" ] || ADMIN_PORT=$(shuf -i 20000-60000 -n 1)
+  [ -n "$ADMIN_PATH" ] || ADMIN_PATH=$(grep '^PANEL_ADMIN_PATH=' "$ENV_FILE" | cut -d= -f2- || true)
+  [ -n "$ADMIN_PATH" ] || ADMIN_PATH=$(openssl rand -hex 8)
+  set_env PANEL_ADMIN_PORT "$ADMIN_PORT"; set_env PANEL_ADMIN_PATH "$ADMIN_PATH"
+fi
+bash "$APP/deploy/make-caddyfile.sh" "$ENV_FILE" "$APP/deploy/Caddyfile.new"
 if [ -z "${SKIP_DOCKER:-}" ]; then
+  # a broken Caddyfile would take the panel down: check it first and keep the working one otherwise
+  if docker run --rm -v "$APP/deploy/Caddyfile.new:/etc/caddy/Caddyfile:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
+    mv "$APP/deploy/Caddyfile.new" "$APP/deploy/Caddyfile"
+  else
+    echo "The new Caddy settings did not validate; keeping the previous ones."
+    [ -f "$APP/deploy/Caddyfile" ] || { echo "no previous Caddyfile: stopping"; exit 1; }
+    rm -f "$APP/deploy/Caddyfile.new"
+  fi
   docker compose --env-file "$ENV_FILE" -f "$APP/deploy/docker-compose.yml" up -d --build
+else
+  mv "$APP/deploy/Caddyfile.new" "$APP/deploy/Caddyfile"
 fi
 
 URL=$(grep '^PANEL_URL=' "$ENV_FILE" | cut -d= -f2-)
 echo
-echo "Panel is up: $URL"
+AP=$(grep '^PANEL_ADMIN_PORT=' "$ENV_FILE" | cut -d= -f2- || true); APATH=$(grep '^PANEL_ADMIN_PATH=' "$ENV_FILE" | cut -d= -f2- || true)
+if [ -n "$AP" ] && [ -n "$APATH" ]; then
+  HOSTPART=$(echo "$URL" | sed 's|^\(https\?://\)\(.*\)$|\2|')
+  SCHEME=$(echo "$URL" | sed 's|^\(https\?://\).*$|\1|')
+  echo "Panel login (keep this address private): ${SCHEME}${HOSTPART}:${AP}/${APATH}/"
+  echo "Open TCP port $AP in the server's firewall. Nodes and subscription links keep using $URL."
+else
+  echo "Panel is up: $URL"
+fi
 if [ -n "${NEW_INSTALL:-}" ]; then
   echo "Admin password: $(grep '^PANEL_ADMIN_PASSWORD=' "$ENV_FILE" | cut -d= -f2-)   (saved in $ENV_FILE)"
 fi

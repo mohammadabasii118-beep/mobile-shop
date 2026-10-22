@@ -67,7 +67,22 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Multi-location VPN panel", lifespan=lifespan)
+app = FastAPI(title="Multi-location VPN panel", lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    resp = await call_next(request)
+    resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+    resp.headers.setdefault("X-Frame-Options", "DENY")
+    resp.headers.setdefault("Referrer-Policy", "no-referrer")
+    return resp
+
+
+def admin_base() -> str:
+    """"/secret" when the admin pages live under a secret path (set by the installer), else ""."""
+    p = os.environ.get("PANEL_ADMIN_PATH", "")
+    return "/" + p if re.fullmatch(r"[A-Za-z0-9_-]{6,64}", p) else ""
 
 
 # ---------- auth ----------
@@ -1539,7 +1554,8 @@ def index_page(db: Session = Depends(get_db)):
                       lambda m: f'{m.group(1)}<span class="logo img"><img src="{escape(brand["logo"], quote=True)}" alt=""></span>{m.group(2)}', html, count=1, flags=re.S)
     html = re.sub(r'(<div class="brand" id="brand">.*?<span>)پنل چندلوکیشن(<small>)', lambda m: f"{m.group(1)}{name}{m.group(2)}", html, count=1, flags=re.S)
     # a changed app.js is fetched at once after an update (no hard refresh needed): its mtime is in the URL
-    html = html.replace('<script src="/app.js">', f'<script src="/app.js?v={int((BASE / "static" / "app.js").stat().st_mtime)}">', 1)
+    base = admin_base()   # behind the secret path every URL the page uses carries it
+    html = html.replace('<script src="/app.js">', f'<script>window.BASE={json.dumps(base)}</script><script src="{base}/app.js?v={int((BASE / "static" / "app.js").stat().st_mtime)}">', 1)
     return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
 

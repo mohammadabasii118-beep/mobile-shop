@@ -1644,3 +1644,29 @@ def test_password_change_from_the_panel():
             if row:
                 db.delete(row)
                 db.commit()
+
+
+def test_secret_admin_path_docs_off_and_headers(monkeypatch, tmp_path):
+    import subprocess
+    with TestClient(app) as c:
+        assert c.get("/docs").status_code in (404, 405) and c.get("/openapi.json").status_code in (404, 405)
+        r = c.get("/")
+        assert r.headers["x-frame-options"] == "DENY" and r.headers["x-content-type-options"] == "nosniff"
+        assert 'window.BASE=""' in r.text and 'src="/app.js?v=' in r.text
+        monkeypatch.setenv("PANEL_ADMIN_PATH", "s3cretpath99")
+        r = c.get("/")
+        assert 'window.BASE="/s3cretpath99"' in r.text and 'src="/s3cretpath99/app.js?v=' in r.text
+        monkeypatch.setenv("PANEL_ADMIN_PATH", "bad path!")                 # an unsafe value is ignored, never echoed
+        assert 'window.BASE=""' in c.get("/").text
+    env = tmp_path / "e.env"
+    env.write_text("PANEL_FROM=panel.example.com\nPANEL_ADMIN_PORT=34567\nPANEL_ADMIN_PATH=abc123def456\n")
+    out = tmp_path / "Caddyfile"
+    subprocess.run(["bash", str(ROOT / "deploy" / "make-caddyfile.sh"), str(env), str(out)], check=True)
+    text = out.read_text()
+    assert "panel.example.com:34567 {" in text and "handle_path /abc123def456/*" in text and "respond 404" in text
+    assert "@public path /sub/* /api/node/* /api/relay/*" in text
+    env.write_text("PANEL_FROM=panel.example.com\n")
+    subprocess.run(["bash", str(ROOT / "deploy" / "make-caddyfile.sh"), str(env), str(out)], check=True)
+    assert "reverse_proxy panel:8000" in out.read_text() and "respond 404" not in out.read_text()
+    env.write_text("PANEL_FROM=panel.example.com\nPANEL_ADMIN_PORT=1\nPANEL_ADMIN_PATH=../x\n")
+    assert subprocess.run(["bash", str(ROOT / "deploy" / "make-caddyfile.sh"), str(env), str(out)], capture_output=True).returncode != 0
