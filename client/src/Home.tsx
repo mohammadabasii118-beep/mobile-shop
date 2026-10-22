@@ -156,9 +156,9 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
               <button className="lbinfo" onClick={() => setLbInfo((o) => !o)} aria-label="توضیح جوایز" aria-expanded={lbInfo}>!</button>
               <h3>{lbTab === 'trophies' ? 'بیشترین افتخار' : 'بیشترین زیرمجموعه'}</h3>
             </header>
-            <div className="pits" role="tablist">
-              <button role="tab" className="pit" aria-selected={lbTab === 'trophies'} onClick={() => setLbTab('trophies')}>بیشترین افتخار</button>
-              <button role="tab" className="pit" aria-selected={lbTab === 'refs'} onClick={() => setLbTab('refs')}>بیشترین زیرمجموعه</button>
+            <div className="seg" role="tablist">
+              <button role="tab" aria-selected={lbTab === 'trophies'} onClick={() => setLbTab('trophies')}>بیشترین افتخار</button>
+              <button role="tab" aria-selected={lbTab === 'refs'} onClick={() => setLbTab('refs')}>بیشترین زیرمجموعه</button>
             </div>
             {lbInfo && (
               <div className="lbprizes">

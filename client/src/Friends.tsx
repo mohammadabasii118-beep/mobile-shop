@@ -67,9 +67,9 @@ export function FriendsPanel({ ctx, onClose }: { ctx: Ctx; onClose: () => void }
           <button className="lbx" onClick={onClose} aria-label="بستن">✕</button>
           <h3>دوستان</h3>
         </header>
-        <div className="pits" role="tablist">
-          <button role="tab" className="pit" aria-selected={tab === 'list'} onClick={() => setTab('list')}>دوستان{reqCount ? ` (${fa(reqCount)} درخواست)` : ''}</button>
-          <button role="tab" className="pit" aria-selected={tab === 'search'} onClick={() => setTab('search')}>جستجو</button>
+        <div className="seg" role="tablist">
+          <button role="tab" aria-selected={tab === 'list'} onClick={() => setTab('list')}>دوستان{reqCount ? ` (${fa(reqCount)} درخواست)` : ''}</button>
+          <button role="tab" aria-selected={tab === 'search'} onClick={() => setTab('search')}>جستجو</button>
         </div>
 
         {tab === 'list' && (
