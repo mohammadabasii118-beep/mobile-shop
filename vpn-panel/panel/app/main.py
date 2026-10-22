@@ -128,12 +128,49 @@ def check_pw(pw: str, stored: str) -> bool:
     return hmac.compare_digest(hashlib.pbkdf2_hmac("sha256", pw.encode(), salt.encode(), 200_000).hex(), digest)
 
 
+def main_password_ok(db: Session, pw: str) -> bool:
+    """The password set in the panel, or the one in .env. The .env one always works: it is the way back in after a
+    forgotten password (whoever can read that file owns the server anyway)."""
+    stored = get_setting(db, "admin_pw_hash")
+    return (bool(stored) and check_pw(pw, stored)) or hmac.compare_digest(pw.encode(), admin_password().encode())
+
+
+class PasswordChange(BaseModel):
+    current: str = Field(max_length=200)
+    new: str = Field(min_length=8, max_length=200)
+
+
+@app.post("/api/password")
+def change_main_password(body: PasswordChange, authorization: str | None = Header(None), db: Session = Depends(get_db)):
+    """The main admin changes the panel password from the panel (the one in .env keeps working as the recovery password)."""
+    parsed = parse_token(_bearer(authorization))
+    if not parsed or parsed[0] != "sudo":
+        raise HTTPException(401, "نشست نامعتبر است")
+    if not main_password_ok(db, body.current):
+        time.sleep(1)
+        raise HTTPException(403, "رمز فعلی اشتباه است")
+    put_setting(db, "admin_pw_hash", hash_pw(body.new))
+    db.commit()
+    return {"ok": True}
+
+
 def require_reseller(authorization: str | None = Header(None), db: Session = Depends(get_db)) -> Admin:
     parsed = parse_token(_bearer(authorization))
     admin = db.get(Admin, parsed[1]) if parsed and parsed[0] == "reseller" else None
     if not admin or not admin.enabled or admin.token_ver != parsed[2]:
         raise HTTPException(401, "نشست نامعتبر است")
     return admin
+
+
+@app.post("/api/me/password")
+def change_my_password(body: PasswordChange, admin: Admin = Depends(require_reseller), db: Session = Depends(get_db)):
+    if not check_pw(body.current, admin.pw_hash):
+        time.sleep(1)
+        raise HTTPException(403, "رمز فعلی اشتباه است")
+    admin.pw_hash = hash_pw(body.new)
+    admin.token_ver += 1            # every other session of theirs ends; this one gets a fresh token
+    db.commit()
+    return {"ok": True, "token": make_token(admin)}
 
 
 def require_node(authorization: str | None = Header(None), db: Session = Depends(get_db)) -> Node:
@@ -171,7 +208,7 @@ def login(body: Login, request: Request, db: Session = Depends(get_db)):
         if not admin:
             check_pw(body.password, "00$00")   # same cost whether or not the name exists
     else:
-        ok = hmac.compare_digest(body.password, admin_password())
+        ok = main_password_ok(db, body.password)
     if not ok:
         if len(_login_fails) > 10000:  # bound memory
             _login_fails.clear()

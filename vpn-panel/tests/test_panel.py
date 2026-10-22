@@ -1616,3 +1616,31 @@ def test_agent_adopts_kept_keys(tmp_path):
     assert json.loads((tmp_path / "reality.json").read_text())["public"] == "OLDPUB"
     agent.adopt_keys({}, reality, None)                       # nothing kept, or no WireGuard here: nothing changes
     agent.adopt_keys({"wg": {"private": "A", "public": "B"}}, reality, None)
+
+
+def test_password_change_from_the_panel():
+    with TestClient(app) as c:
+        h = admin(c)
+        assert c.post("/api/password", headers=h, json={"current": "wrong", "new": "brand-new-pw1"}).status_code == 403
+        assert c.post("/api/password", headers=h, json={"current": "secret-pw", "new": "short"}).status_code == 422
+        assert c.post("/api/password", headers=h, json={"current": "secret-pw", "new": "brand-new-pw1"}).status_code == 200
+        assert c.post("/api/login", json={"password": "brand-new-pw1"}).status_code == 200
+        assert c.post("/api/login", json={"password": "secret-pw"}).status_code == 200     # .env password stays as the way back in
+        assert c.post("/api/login", json={"password": "nope-nope-nope"}).status_code == 401
+        # a sub-admin changes their own password and keeps a working session
+        c.post("/api/admins", headers=h, json={"username": "pwco", "password": "first-pass-1"})
+        t = c.post("/api/login", json={"username": "pwco", "password": "first-pass-1"}).json()["token"]
+        rh = {"Authorization": "Bearer " + t}
+        assert c.post("/api/me/password", headers=rh, json={"current": "bad", "new": "second-pass-2"}).status_code == 403
+        r = c.post("/api/me/password", headers=rh, json={"current": "first-pass-1", "new": "second-pass-2"}).json()
+        assert c.get("/api/me", headers=rh).status_code == 401                              # the old session ended
+        assert c.get("/api/me", headers={"Authorization": "Bearer " + r["token"]}).status_code == 200
+        assert c.post("/api/login", json={"username": "pwco", "password": "second-pass-2"}).status_code == 200
+        # put the shared test state back
+        from app.db import Setting, engine
+        from sqlalchemy.orm import Session
+        with Session(engine) as db:
+            row = db.get(Setting, "admin_pw_hash")
+            if row:
+                db.delete(row)
+                db.commit()

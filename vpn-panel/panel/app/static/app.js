@@ -436,6 +436,19 @@ document.addEventListener('click', async e => {
       a.download = (r.headers.get('content-disposition') || '').split('filename=')[1]?.replace(/"/g, '') || 'panel-backup.db';
       a.click(); URL.revokeObjectURL(a.href); toast('پشتیبان دانلود شد');
     }
+    else if (t.id === 'pwBtn') {
+      openModal(`<h2>تغییر رمز</h2><div class="form">
+        <label class="f">رمز فعلی<input type="password" id="pwCur" autocomplete="current-password" dir="ltr"></label>
+        <label class="f">رمز جدید (حداقل ۸ کاراکتر)<input type="password" id="pwNew" autocomplete="new-password" dir="ltr"></label>
+        <label class="f">تکرار رمز جدید<input type="password" id="pwNew2" autocomplete="new-password" dir="ltr"></label></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="pwSave">ذخیره</button></div>`);
+    }
+    else if (t.id === 'pwSave') {
+      if ($('#pwNew').value !== $('#pwNew2').value) { toast('تکرار رمز یکی نیست'); return; }
+      const r = await api('POST', isReseller() ? '/me/password' : '/password', {current: $('#pwCur').value, new: $('#pwNew').value});
+      if (r.token) { token = r.token; try { localStorage.setItem('tok', token); } catch (_) {} }
+      closeModal(); toast('رمز عوض شد');
+    }
     else if (t.id === 'logoutBtn') { token = ''; try { localStorage.removeItem('tok'); } catch (_) {} showLogin(); }
     else if (t.id === 'doLogin') {
       const r = await api('POST', '/login', {password: $('#pw').value, username: $('#un').value.trim()}); token = r.token;
