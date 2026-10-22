@@ -12,7 +12,7 @@ import sys
 
 PORT_RE, PATH_RE = re.compile(r"^[0-9]{2,5}$"), re.compile(r"^[A-Za-z0-9_-]{6,64}$")
 RESERVED = {22, 25, 53, 80, 443, 8000}   # taken by SSH, mail, DNS, the web itself and the panel behind Caddy
-PUBLIC_PATHS = "/sub/* /api/node/* /api/relay/* /node/* /relay/* /node-install.sh /relay-install.sh /vtunnel.py"
+PUBLIC_PATHS = "/sub/* /api/node/* /api/relay/* /node/* /relay/* /node-install.sh /relay-install.sh /vtunnel.py /backpack/*"
 UPSTREAM = "127.0.0.1:8000"
 HEADERS = """\theader {
 \t\tX-Content-Type-Options nosniff
