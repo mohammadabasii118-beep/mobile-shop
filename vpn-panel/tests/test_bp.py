@@ -178,3 +178,24 @@ def test_generated_configs_carry_real_traffic(transport, tmp_path):
     finally:
         srv.kill()
         cli.kill()
+
+
+def test_direct_status_uses_ping_but_falls_back_to_the_log_when_ping_is_missing(monkeypatch):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("vt_status", VT)
+    vt = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(vt)
+    log = "22-Oct [INFO] l3: dial up on pn7, gre over udp, mtu 1400\n22-Oct [INFO] l3: handshake complete with 1.2.3.4\n"
+
+    def fake(ping_rc):
+        def _sh(*cmd, timeout=30):
+            out = "active\n" if cmd[:2] == ("systemctl", "is-active") else log if cmd[0] == "journalctl" else ""
+            return subprocess.CompletedProcess(cmd, ping_rc if cmd[0] == "ping" else 0, out, "")
+        return _sh
+    monkeypatch.setattr(vt, "_sh", fake(1))
+    assert vt.bp_status("u", "", "10.20.7.2")["up"] is False                       # ping says the far end is not answering
+    monkeypatch.setattr(vt, "_sh", fake(0))
+    assert vt.bp_status("u", "", "10.20.7.2")["up"] is True
+    monkeypatch.setattr(vt, "_sh", fake(127))                                      # no ping binary on this server: the log decides
+    assert vt.bp_status("u", "", "10.20.7.2")["up"] is True
+    assert bp.render(mk(transport="kcp"), "iran", "h", "n").count("accept_udp = false") == 1

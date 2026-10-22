@@ -65,7 +65,7 @@ def net_addrs(n: int) -> tuple[str, str]:
 def render(t, side: str, iran_host: str, node_host: str) -> str:
     """TOML for one end. side = "iran" | "node". `t` is a BpTunnel (or anything with the same fields)."""
     maps = port_maps(t.forwards)
-    udp = bool(t.accept_udp or t.transport in ("udp", "kcp"))
+    udp = bool(t.accept_udp or t.transport == "udp")      # the plain UDP transport only makes sense with UDP ports
     fec = (t.fec_data, t.fec_parity) if t.fec_data and t.fec_parity else None
     if t.kind == "direct":
         iran_ip, node_ip = net_addrs(t.net_n)

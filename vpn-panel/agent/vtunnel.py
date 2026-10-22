@@ -833,14 +833,16 @@ def bp_status(unit, token="", ping=""):
     lines = [_ANSI.sub("", l) for l in _sh("journalctl", "-u", unit, "-n", "80", "--no-pager", "-o", "cat").stdout.splitlines()]
     verdict, last = None, ""
     for l in lines:
-        if re.search(r"transport \w+ is up|tunnel .{0,40}is up|control channel (successfully )?established", l, re.I) and "attempting" not in l:
+        if re.search(r"transport \w+ is up|tunnel .{0,40}is up|control channel (successfully )?established|l3: .*handshake (complete|completed|ok)", l, re.I) and "attempting" not in l:
             verdict = True
-        elif re.search(r"FATAL|failed to read from the control channel|was refused|invalid security token|connection refused|timed out|i/o timeout|control channel .*(lost|closed)", l, re.I):
+        elif re.search(r"FATAL|failed to read from the control channel|was refused|invalid security token|connection refused|timed out|i/o timeout|control channel .*(lost|closed)|handshake did not complete|layer-3 tunnel stopped", l, re.I):
             verdict = False
         if "[" in l:
             last = l
-    if ping:
-        verdict = _sh("ping", "-c", "1", "-W", "1", ping).returncode == 0
+    if ping:      # a direct tunnel is up when its far end answers; a server without `ping` falls back to the log
+        r = _sh("ping", "-c", "1", "-W", "1", ping)
+        if r.returncode != 127:
+            verdict = r.returncode == 0
     if token:
         last = last.replace(token, "***")
     return {"active": active, "up": bool(active and verdict), "line": last[-160:]}
