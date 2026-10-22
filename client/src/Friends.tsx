@@ -144,8 +144,7 @@ export function FriendsPanel({ ctx, onClose }: { ctx: Ctx; onClose: () => void }
               </ul>
             )}
             <div className="reflink">
-              <b>لینک دعوت من</b>
-              <small>هر کس با این لینک وارد ربات شود، مستقیم دوست تو می‌شود. اگر بازیکنِ تازه باشد و عضو کانال هم بشود، یک زیرمجموعه برایت حساب می‌شود (هر نفر فقط یک‌بار و فقط برای اولین دعوت‌کننده‌اش).</small>{st && <b>زیرمجموعه‌های تأییدشده‌ی تو: {fa(st.refs ?? 0)} 👥</b>}
+              <b>لینک زیرمجموعه‌گیری شما</b>
               {st?.refLink ? (
                 <>
                   <input readOnly value={st.refLink} onFocus={(e) => e.currentTarget.select()} dir="ltr" />
