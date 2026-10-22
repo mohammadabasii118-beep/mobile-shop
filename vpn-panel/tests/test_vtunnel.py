@@ -218,3 +218,18 @@ def test_encrypted_stream_has_no_plaintext_marker():
         c.close()
     finally:
         srv.kill()
+
+
+def test_probe_measures_both_directions_and_rejects_wrong_token():
+    import json
+    a, b = free_port(), free_port()
+    mk = lambda lp, pp, tok: subprocess.Popen([sys.executable, VT, "probe", "--peer", "127.0.0.1", "--port", str(pp), "--listen-port", str(lp),
+                                               "--token", tok, "--seconds", "26"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    pa, pb = mk(a, b, "probe-token-1"), mk(b, a, "probe-token-1")
+    ra, rb = json.loads(pa.communicate(timeout=60)[0]), json.loads(pb.communicate(timeout=60)[0])
+    for r in (ra, rb):
+        assert r["ok"] and r["rtt_ms"] < 50 and r["down_mbps"] > 5 and r["up_mbps"] > 5 and r["udp_loss_pct"] <= 10, r
+    pa, pb = mk(a, b, "probe-token-1"), mk(b, a, "another-token")          # the far side does not know the token: no data flows
+    ra = json.loads(pa.communicate(timeout=60)[0])
+    pb.communicate(timeout=60)
+    assert ra["ok"] is False

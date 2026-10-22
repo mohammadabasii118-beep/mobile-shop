@@ -245,15 +245,30 @@ const views = {
       <div class="note" style="margin-top:10px">رمز داخل فایل <span class="mono" dir="ltr" style="unicode-bidi:isolate">.env</span> سرور همیشه به‌عنوان رمز بازیابی کار می‌کند.</div></div>`;
   },
   tunnels() {
+    const num1 = v => v === undefined || v === null ? '—' : num(v);
+    const row = (label, r) => !r ? `<tr><td>${label}</td><td colspan="6" class="muted">منتظر نتیجه…</td></tr>`
+      : r.ok ? `<tr><td>${label}</td><td><span class="pill good">باز</span></td><td>${num1(r.connect_ms)} ms</td><td>${num1(r.rtt_ms)} ms</td><td>${num1(r.down_mbps)} / ${num1(r.up_mbps)} Mb/s</td><td>${r.udp_loss_pct === undefined ? '—' : num(r.udp_loss_pct + '٪')}</td><td>${num1(r.udp_rtt_ms)} ms</td></tr>`
+      : `<tr><td>${label}</td><td><span class="pill bad">بسته</span></td><td colspan="5" class="muted">${esc(r.error || '')}</td></tr>`;
+    const verdict = (a, b) => (!a || !b) ? '' : a.ok && b.ok ? 'هر دو جهت باز است؛ تونل معکوس (فعلی) و حالت مستقیم هر دو ممکن‌اند.'
+      : b.ok ? 'خارج به ایران وصل می‌شود ولی ایران به خارج نه؛ تونل معکوس (فعلی) درست کار می‌کند.'
+      : a.ok ? 'ایران به خارج وصل می‌شود ولی خارج به ایران نه؛ تونل معکوس (فعلی) کار نمی‌کند و باید ایران به خارج وصل شود.'
+      : 'هیچ جهتی جواب نداد؛ پورت تست را در فایروال هر دو سرور باز کن و دوباره تست کن.';
+    const testBox = t => { const x = t.test; if (!x) return '';
+      return `<div class="note" style="margin-top:10px"><b>تست اتصال</b> ${x.status === 'running' ? '<span class="pill warn">در حال انجام (حدود ۲ تا ۳ دقیقه)…</span>' : x.status === 'timeout' ? '<span class="pill bad">ناقص ماند</span>' : '<span class="pill good">تمام شد</span>'}
+        <div class="scroll"><table style="margin-top:8px"><thead><tr><th>جهت</th><th>نتیجه</th><th>اتصال</th><th>تأخیر</th><th>سرعت دانلود / آپلود</th><th>گمشدن UDP</th><th>تأخیر UDP</th></tr></thead><tbody>
+        ${row('ایران ← خارج (ایران وصل می‌شود)', x.iran)}${row('خارج ← ایران (خارج وصل می‌شود؛ مثل تونل فعلی)', x.node)}</tbody></table></div>
+        ${verdict(x.iran, x.node) ? `<div style="margin-top:8px"><b>${verdict(x.iran, x.node)}</b></div>` : ''}
+        <div class="muted" style="font-size:12px;margin-top:6px">پورت تست: <span class="mono">${x.port}</span> (TCP و UDP) روی هر دو سرور. نتیجه فقط برای همین لحظه و همین مسیر است.</div></div>`; };
     const ST = {up: ['good', 'برقرار'], wait_client: ['warn', 'ایران آماده؛ منتظر سرور خارج'], wait_iran: ['warn', 'منتظر نصب روی سرور ایران'], off: ['', 'خاموش']};
     const note = `<div class="note">تونل: کاربران به پورت‌های <b>سرور ایران</b> وصل می‌شوند و ترافیک از طریق تونل به <b>لوکیشن خارج</b> می‌رسد. فقط IP ایران، لوکیشن خارج و پورت‌ها را بدهید؛ روی سرور ایران یک بار یک دستور اجرا می‌شود و بقیه خودکار است. تونل رمزنگاری ندارد؛ از پروتکل‌های رمزشده (مثل VLESS Reality) از داخلش رد کنید. مقصد هر پورت همان پورت روی لوکیشن خارج است (مثلاً <span class="mono" dir="ltr" style="unicode-bidi:isolate">81=80</span> یعنی پورت ۸۱ ایران به پورت ۸۰ خارج).</div>`;
     if (!S.tunnels.length) return note + '<div class="panel muted">هنوز تونلی نساخته‌اید.</div>';
     return note + S.tunnels.map(t => { const st = ST[t.status];
       return `<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <div><b>${esc(t.name)}</b> <span class="pill ${st[0]}">${st[1]}</span>${t.status === 'up' ? ` <span class="muted">${num(t.pool + ' اتصال آماده')}</span>` : ''}</div>
-        <div class="chips"><button class="btn sm" data-tedit="${t.id}">پورت‌ها / ویرایش</button><button class="btn sm" data-ttoggle="${t.id}">${t.enabled ? 'خاموش' : 'روشن'}</button><button class="btn sm danger" data-tdel="${t.id}">حذف</button></div></div>
+        <div class="chips"><button class="btn sm" data-ttest="${t.id}" ${t.test && t.test.status === 'running' ? 'disabled' : ''}>تست اتصال</button><button class="btn sm" data-tedit="${t.id}">پورت‌ها / ویرایش</button><button class="btn sm" data-ttoggle="${t.id}">${t.enabled ? 'خاموش' : 'روشن'}</button><button class="btn sm danger" data-tdel="${t.id}">حذف</button></div></div>
         <div style="margin-top:8px" class="muted"><span class="mono" dir="ltr">${esc(t.iran_host)}</span> ← <b>${esc(t.node_name)}</b></div>
         <div class="chips" style="margin-top:8px">${t.forwards.map(f => `<span class="cc" dir="ltr">${f.proto === 'udp' ? 'UDP ' : ''}${f.listen}${f.target !== f.listen ? ' → ' + f.target : ''}</span>`).join('')}</div>
+        ${testBox(t)}
         ${t.encrypt !== 'off' ? `<div class="muted" style="margin-top:6px;font-size:12px">🔒 رمزنگاری: ${t.encrypt === 'all' ? 'TCP و UDP' : 'فقط TCP'}</div>` : ''}
         ${t.publish ? '<div class="muted" style="margin-top:6px;font-size:12px">در اشتراک کاربران هم هست (کانفیگ‌های «🇮🇷 …»)</div>' : ''}
         ${t.problems.length ? `<div class="note" style="margin-top:8px;color:var(--bad)">${t.problems.map(esc).join('<br>')}</div>` : ''}
@@ -592,6 +607,7 @@ document.addEventListener('click', async e => {
       openModal(`<h2>تونل ساخته شد</h2><p class="muted" style="margin:0">روی <b>سرور ایران</b> (با دسترسی root) این دستور را اجرا کنید. بقیه‌ی کارها (نصب، تنظیم، راه‌اندازی دوباره و سمت خارج) خودکار است:</p>
         <pre>${esc(r.install_command)}</pre><div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-copy="${esc(r.install_command)}">کپی دستور</button><button class="btn pri" data-close>بستن</button></div>`);
     }
+    else if (d.ttest) { await api('POST', `/tunnels/${d.ttest}/test`); await refresh(); toast('تست شروع شد؛ نتیجه حدود ۲ تا ۳ دقیقه‌ی دیگر می‌آید'); }
     else if (d.tedit) {
       const x = S.tunnels.find(q => q.id === +d.tedit);
       openModal(`<h2>ویرایش ${esc(x.name)}</h2><div class="form">
@@ -803,4 +819,4 @@ document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id
 (async () => { await loadBrand(); if (!token) return showLogin(); try { await refresh(); } catch (e) {} })();
 setInterval(() => { const a = document.activeElement, typing = a && ['INPUT', 'SELECT', 'TEXTAREA'].includes(a.tagName) && a.id !== 'uq' && $('#view').contains(a);
   if (token && $('#modal').hidden && S.tab !== 'look' && S.tab !== 'settings' && !typing) refresh().catch(() => {}); }, 20000);
-setInterval(() => { if (token && skin() === '3d' && S.tab === 'dash' && $('#modal').hidden) refresh().catch(() => {}); }, 6000);
+setInterval(() => { if (token && $('#modal').hidden && ((skin() === '3d' && S.tab === 'dash') || (S.tab === 'tunnels' && S.tunnels.some(t => t.test && t.test.status === 'running')))) refresh().catch(() => {}); }, 6000);

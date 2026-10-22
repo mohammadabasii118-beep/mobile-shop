@@ -6,6 +6,7 @@ import tempfile
 import hmac
 import json
 import os
+import random
 import re
 import secrets
 import time
@@ -1330,6 +1331,42 @@ def fresh(ts) -> bool:
     return bool(ts and (utcnow() - ts).total_seconds() < TUNNEL_FRESH)
 
 
+TEST_SECONDS, TEST_LEAD = 90, 50       # a connection test lasts this long and starts this many seconds after the request
+TEST_FIELDS = {"ok": bool, "error": str, "connect_ms": (int, float), "rtt_ms": (int, float), "down_mbps": (int, float),
+               "up_mbps": (int, float), "udp_loss_pct": (int, float), "udp_rtt_ms": (int, float)}
+
+
+def clean_result(res) -> dict:
+    return {k: (v[:80] if isinstance(v, str) else v) for k, v in (res or {}).items()
+            if k in TEST_FIELDS and isinstance(v, TEST_FIELDS[k]) and (k == "ok" or not isinstance(v, bool))} if isinstance(res, dict) else {}
+
+
+def test_state(t: Tunnel) -> dict | None:
+    tt = t.test or {}
+    if not tt.get("id"):
+        return None
+    now = time.time()
+    both = tt.get("iran") is not None and tt.get("node") is not None
+    status = "done" if both else "running" if now < tt["start_at"] + tt["seconds"] + 60 else "timeout"
+    return {"status": status, "port": tt["port"], "start_at": tt["start_at"], "iran": tt.get("iran"), "node": tt.get("node")}
+
+
+def test_job(t: Tunnel, side: str, peer: str) -> dict | None:
+    """What an agent on `side` ("iran" / "node") must run now, or None (no test, already reported, or too late)."""
+    tt = t.test or {}
+    now = time.time()
+    if not tt.get("id") or tt.get(side) is not None or not tt["start_at"] - 90 < now < tt["start_at"] + tt["seconds"] + 30:
+        return None
+    return {"id": tt["id"], "peer": peer, "port": tt["port"], "token": tt["token"], "start_at": tt["start_at"], "seconds": tt["seconds"]}
+
+
+def store_test_result(t: Tunnel, side: str, body) -> None:
+    tt = dict(t.test or {})
+    if isinstance(body, dict) and tt.get("id") and body.get("id") == tt["id"] and tt.get(side) is None:
+        tt[side] = clean_result(body.get("result")) or {"ok": False, "error": "no result"}
+        t.test = tt
+
+
 def tunnel_out(t: Tunnel, db: Session, request: Request) -> dict:
     node = db.get(Node, t.node_id)
     relay_on, client_on = fresh(t.relay_seen), fresh(t.client_seen)
@@ -1350,7 +1387,7 @@ def tunnel_out(t: Tunnel, db: Session, request: Request) -> dict:
     problems += list(cs.get("errors", [])) if client_on else []
     return {"id": t.id, "name": t.name, "iran_host": t.iran_host, "node_id": t.node_id, "node_name": node.name if node else "؟",
             "ctl_port": t.ctl_port, "forwards": t.forwards, "ports": forwards_text(t.forwards), "enabled": t.enabled, "publish": t.publish, "encrypt": t.encrypt,
-            "status": status, "pool": pool, "iran_online": relay_on, "node_online": client_on, "problems": problems,
+            "test": test_state(t), "status": status, "pool": pool, "iran_online": relay_on, "node_online": client_on, "problems": problems,
             "install_command": f"bash <(curl -fsSL {public_url(request)}/relay-install.sh) --token {t.relay_token}"}
 
 
@@ -1420,6 +1457,23 @@ def patch_tunnel(tunnel_id: int, body: TunnelPatch, request: Request, db: Sessio
     return tunnel_out(t, db, request)
 
 
+@app.post("/api/tunnels/{tunnel_id}/test", dependencies=[Depends(require_admin)])
+def start_tunnel_test(tunnel_id: int, request: Request, db: Session = Depends(get_db)):
+    """Both ends listen and dial on one test port for ~90 s; the result says which direction works, with delay and speed."""
+    t = db.get(Tunnel, tunnel_id) or _404()
+    cur = test_state(t)
+    if cur and cur["status"] == "running":
+        raise HTTPException(409, "یک تست در حال انجام است؛ چند دقیقه صبر کنید")
+    if not fresh(t.relay_seen):
+        raise HTTPException(409, "سرور ایران هنوز به پنل وصل نیست؛ اول دستور نصب را روی آن اجرا کنید")
+    taken = {f["listen"] for f in t.forwards} | {t.ctl_port}
+    port = next(p for p in random.sample(range(7900, 8000), 100) if p not in taken)
+    t.test = {"id": int(time.time()), "port": port, "token": secrets.token_hex(16), "start_at": int(time.time()) + TEST_LEAD,
+              "seconds": TEST_SECONDS, "iran": None, "node": None}
+    db.commit()
+    return tunnel_out(t, db, request)
+
+
 @app.delete("/api/tunnels/{tunnel_id}", dependencies=[Depends(require_admin)])
 def delete_tunnel(tunnel_id: int, db: Session = Depends(get_db)):
     db.delete(db.get(Tunnel, tunnel_id) or _404())
@@ -1440,8 +1494,10 @@ def _sha(path: Path) -> str:
 
 
 @app.get("/api/relay/config")
-def relay_config(t: Tunnel = Depends(require_relay)):
-    return {"tunnel": {"id": t.id, "name": t.name, "enabled": t.enabled, "ctl_port": t.ctl_port, "token": t.token, "forwards": t.forwards, "encrypt": t.encrypt},
+def relay_config(t: Tunnel = Depends(require_relay), db: Session = Depends(get_db)):
+    node = db.get(Node, t.node_id)
+    return {"test": test_job(t, "iran", node.address) if node else None,
+            "tunnel": {"id": t.id, "name": t.name, "enabled": t.enabled, "ctl_port": t.ctl_port, "token": t.token, "forwards": t.forwards, "encrypt": t.encrypt},
             "vtunnel_sha256": _sha(ROOT / "agent" / "vtunnel.py"), "agent_sha256": _sha(ROOT / "agent" / "relay_agent.py")}
 
 
@@ -1450,6 +1506,7 @@ class RelayReport(BaseModel):
     udp_client: bool = False
     failed: list[str] = Field(default=[], max_length=300)
     errors: list[str] = Field(default=[], max_length=20)
+    test: dict | None = None      # {"id": ..., "result": {...}} of a connection test this side ran
 
 
 @app.post("/api/relay/report")
@@ -1457,6 +1514,7 @@ def relay_report(body: RelayReport, t: Tunnel = Depends(require_relay), db: Sess
     t.relay_seen = utcnow()
     t.relay_state = {"pool": body.pool, "udp_client": body.udp_client, "failed": [f[:30] for f in body.failed],
                      "errors": [e[:200] for e in body.errors]}
+    store_test_result(t, "iran", body.test)
     db.commit()
     return {"ok": True}
 
@@ -1479,7 +1537,7 @@ def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db
     served = {p.proto for p in node.protocols if p.enabled}   # a user needs an account while any copy of the protocol runs
     extra = [{"proto": p.proto, "port": p.port, "tag": inst_tag(p)} for p in node.protocols if p.enabled and p.extra]
     dc = dnstt_conf(db)
-    tunnels = [{"id": t.id, "server": f"{t.iran_host}:{t.ctl_port}", "token": t.token, "pool": 8, "encrypt": t.encrypt,
+    tunnels = [{"id": t.id, "server": f"{t.iran_host}:{t.ctl_port}", "token": t.token, "pool": 8, "encrypt": t.encrypt, "test": test_job(t, "node", t.iran_host),
                 "targets": sorted({f["target"] for f in t.forwards if f["proto"] == "tcp"})}
                for t in db.scalars(select(Tunnel).where(Tunnel.node_id == node.id, Tunnel.enabled == True))]  # noqa: E712
     users = []
@@ -1545,6 +1603,7 @@ def node_report(body: Report, node: Node = Depends(require_node), db: Session = 
         t = db.get(Tunnel, int(tid)) if tid.isdigit() else None
         if t and t.node_id == node.id:
             t.client_seen = utcnow()
+            store_test_result(t, "node", st.get("test"))
             t.client_state = {"active": bool(st.get("active")), "down": [int(p) for p in st.get("down", [])[:50] if isinstance(p, int)],
                               "errors": [str(e)[:200] for e in st.get("errors", [])[:5]]}
     if body.usage:

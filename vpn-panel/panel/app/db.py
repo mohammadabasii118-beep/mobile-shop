@@ -101,6 +101,7 @@ class Tunnel(Base):
     relay_state: Mapped[dict] = mapped_column(JSON, default=dict)    # last report of the Iran side
     client_seen: Mapped[datetime | None] = mapped_column(default=None)
     client_state: Mapped[dict] = mapped_column(JSON, default=dict)   # last report of the foreign side
+    test: Mapped[dict] = mapped_column(JSON, default=dict)           # the last connection test: id, port, token, start_at, seconds, iran, node
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
 

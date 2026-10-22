@@ -1698,3 +1698,33 @@ def test_3d_skin_assets_are_served_and_default_look_is_unchanged():
         js = c.get("/app.js").text
         assert "function startGlobe" in js and "data-skin=" in js and "setSkin" in js
         assert 'dataset.skin' in html and 'data-skin="3d"' not in html.split("<body>")[1].split("<script")[0]   # off until chosen
+
+
+def test_tunnel_connection_test_flow():
+    import time as _t
+    from app.main import clean_result
+    assert clean_result({"ok": True, "rtt_ms": 12.5, "evil": "x", "down_mbps": True, "error": "e" * 200}) == {"ok": True, "rtt_ms": 12.5, "error": "e" * 80}
+    with TestClient(app) as c:
+        h = admin(c)
+        n = c.post("/api/nodes", headers=h, json={"name": "Probe", "cc": "de", "address": "probe.example.com"}).json()
+        nh = {"Authorization": "Bearer " + n["install_command"].split("--token ")[1].split()[0]}
+        t = c.post("/api/tunnels", headers=h, json={"name": "pt", "iran_host": "8.8.4.4", "node_id": n["id"], "ports": "443"}).json()
+        rh = {"Authorization": "Bearer " + t["install_command"].split("--token ")[1]}
+        assert c.post(f"/api/tunnels/{t['id']}/test", headers=h).status_code == 409                 # the Iran side has not reported yet
+        c.post("/api/relay/report", headers=rh, json={"pool": 0})
+        r = c.post(f"/api/tunnels/{t['id']}/test", headers=h).json()
+        assert r["test"]["status"] == "running" and 7900 <= r["test"]["port"] < 8000
+        assert c.post(f"/api/tunnels/{t['id']}/test", headers=h).status_code == 409                 # one at a time
+        job_i = c.get("/api/relay/config", headers=rh).json()["test"]
+        job_n = next(x for x in c.get("/api/node/config", headers=nh).json()["tunnels"] if x["id"] == t["id"])["test"]
+        assert job_i["peer"] == "probe.example.com" and job_n["peer"] == "8.8.4.4" and job_i["token"] == job_n["token"] and job_i["port"] == job_n["port"]
+        res = {"ok": True, "rtt_ms": 41.2, "down_mbps": 25.1, "up_mbps": 22.0, "udp_loss_pct": 0, "udp_rtt_ms": 40.0, "connect_ms": 42}
+        c.post("/api/relay/report", headers=rh, json={"pool": 0, "test": {"id": job_i["id"], "result": res}})
+        assert c.get("/api/relay/config", headers=rh).json()["test"] is None                        # reported: not asked again
+        row = next(x for x in c.get("/api/tunnels", headers=h).json() if x["id"] == t["id"])
+        assert row["test"]["status"] == "running" and row["test"]["iran"]["rtt_ms"] == 41.2 and row["test"]["node"] is None
+        c.post("/api/node/report", headers=nh, json={"tunnels": {str(t["id"]): {"active": True, "test": {"id": job_n["id"], "result": {"ok": False, "error": "timed out"}}}}})
+        row = next(x for x in c.get("/api/tunnels", headers=h).json() if x["id"] == t["id"])
+        assert row["test"]["status"] == "done" and row["test"]["node"] == {"ok": False, "error": "timed out"}
+        c.post("/api/relay/report", headers=rh, json={"pool": 0, "test": {"id": 1, "result": res}})   # a wrong test id changes nothing
+        c.delete(f"/api/tunnels/{t['id']}", headers=h)

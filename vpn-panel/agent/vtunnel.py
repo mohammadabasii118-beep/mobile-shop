@@ -18,9 +18,11 @@ import argparse
 import asyncio
 import hashlib
 import hmac
+import json
 import logging
 import os
 import socket
+import statistics
 import struct
 import sys
 import time
@@ -520,9 +522,153 @@ class Client:
         await asyncio.gather(*jobs)
 
 
+# ---- connection probe: both ends listen AND dial at the same time, so one run tells which direction(s) work ----
+PROBE_SECS = 4          # length of each throughput measurement
+
+
+def _pmac(token, data):
+    return hmac.new(token.encode(), data, hashlib.sha256).digest()[:16]
+
+
+async def _probe_conn(r, w, token):
+    """One authenticated probe connection: E = echo (RTT), D = send data for PROBE_SECS, U = receive data until EOF and report."""
+    try:
+        hdr = await asyncio.wait_for(r.readexactly(33), 6)
+        if not hmac.compare_digest(hdr[16:32], _pmac(token, hdr[:16])):
+            return
+        op = hdr[32:33]
+        if op == b"E":
+            while (b := await asyncio.wait_for(r.read(1), 30)):
+                w.write(b)
+                await w.drain()
+        elif op == b"D":
+            end, chunk = time.monotonic() + PROBE_SECS, b"\0" * 65536
+            while time.monotonic() < end:
+                w.write(chunk)
+                await w.drain()
+        elif op == b"U":
+            got, t0 = 0, time.monotonic()
+            while (d := await asyncio.wait_for(r.read(65536), 15)):
+                got += len(d)
+            w.write(json.dumps({"bytes": got, "secs": time.monotonic() - t0}).encode() + b"\n")
+            await w.drain()
+    except Exception:
+        pass
+    finally:
+        try:
+            w.close()
+        except Exception:
+            pass
+
+
+class _ProbeUdp(asyncio.DatagramProtocol):
+    def __init__(self, token):
+        self.token = token
+
+    def connection_made(self, transport):
+        self.t = transport
+
+    def datagram_received(self, data, addr):
+        if len(data) == 20 and hmac.compare_digest(data[4:], _pmac(self.token, data[:4])[:16]):
+            self.t.sendto(data, addr)
+
+
+async def _dial(host, port, token, op):
+    t0 = time.monotonic()
+    r, w = await asyncio.wait_for(asyncio.open_connection(host, port), 5)
+    connect_ms = (time.monotonic() - t0) * 1000
+    nonce = os.urandom(16)
+    w.write(nonce + _pmac(token, nonce) + op)
+    await w.drain()
+    return r, w, connect_ms
+
+
+async def _measure(host, port, token):
+    out = {}
+    samples = []
+    for _ in range(5):
+        r, w, ms = await _dial(host, port, token, b"E")
+        samples.append(ms)
+        if len(samples) == 5:
+            rtts = []
+            for _ in range(20):
+                t0 = time.monotonic()
+                w.write(b"x")
+                await w.drain()
+                await asyncio.wait_for(r.readexactly(1), 5)
+                rtts.append((time.monotonic() - t0) * 1000)
+            out["rtt_ms"] = round(statistics.median(rtts), 1)
+        w.close()
+    out["connect_ms"] = round(statistics.median(samples), 1)
+    r, w, _ = await _dial(host, port, token, b"D")          # download
+    got, t0 = 0, time.monotonic()
+    while (d := await asyncio.wait_for(r.read(65536), 10)):
+        got += len(d)
+    out["down_mbps"] = round(got * 8 / max(0.001, time.monotonic() - t0) / 1e6, 1)
+    w.close()
+    r, w, _ = await _dial(host, port, token, b"U")          # upload (the far side counts what arrived)
+    end, chunk = time.monotonic() + PROBE_SECS, b"\0" * 65536
+    while time.monotonic() < end:
+        w.write(chunk)
+        await w.drain()
+    w.write_eof()
+    rep = json.loads(await asyncio.wait_for(r.readline(), 15))
+    out["up_mbps"] = round(rep["bytes"] * 8 / max(0.001, rep["secs"]) / 1e6, 1)
+    w.close()
+    return out
+
+
+async def _udp_measure(host, port, token):
+    loop = asyncio.get_running_loop()
+    got = {}
+    class P(asyncio.DatagramProtocol):
+        def datagram_received(self, data, addr):
+            got[data[:4]] = time.monotonic()
+    t, _ = await loop.create_datagram_endpoint(P, remote_addr=(host, port))
+    sent = {}
+    for i in range(60):
+        seq = struct.pack("!I", i)
+        sent[seq] = time.monotonic()
+        t.sendto(seq + _pmac(token, seq)[:16], None)
+        await asyncio.sleep(0.03)
+    await asyncio.sleep(1.0)
+    t.close()
+    rtts = [(got[k] - sent[k]) * 1000 for k in got if k in sent]
+    return {"udp_loss_pct": round(100 * (60 - len(rtts)) / 60), "udp_rtt_ms": round(statistics.median(rtts), 1) if rtts else None}
+
+
+async def probe(peer, port, token, seconds, listen_port=None):
+    """Listens on `port` (TCP+UDP) for `seconds` and, meanwhile, dials `peer`:`port` until it answers. -> the result dict."""
+    loop = asyncio.get_running_loop()
+    lport = listen_port or port
+    srv = await asyncio.start_server(lambda r, w: _probe_conn(r, w, token), "0.0.0.0", lport, reuse_address=True)
+    udp, _ = await loop.create_datagram_endpoint(lambda: _ProbeUdp(token), local_addr=("0.0.0.0", lport))
+    result = {"ok": False, "error": "no answer from the other side"}
+    deadline = time.monotonic() + seconds - 20
+    try:
+        while time.monotonic() < deadline:
+            try:
+                result = {"ok": True, **(await _measure(peer, port, token))}
+                result.update(await _udp_measure(peer, port, token))
+                break
+            except Exception as e:
+                result = {"ok": False, "error": e.__class__.__name__ if not str(e) else str(e)[:80]}
+                await asyncio.sleep(2)
+        await asyncio.sleep(max(0, min(25, deadline + 20 - time.monotonic())))      # keep answering until the other side is done
+    finally:
+        srv.close()
+        udp.close()
+    return result
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = ap.add_subparsers(dest="mode", required=True)
+    pr = sub.add_parser("probe", help="connection test: listen and dial on one port, print a JSON result")
+    pr.add_argument("--peer", required=True)
+    pr.add_argument("--port", type=int, required=True)
+    pr.add_argument("--seconds", type=int, default=60)
+    pr.add_argument("--listen-port", type=int, default=0, help="listen here instead of on --port (tests on one machine)")
     sv = sub.add_parser("server")
     sv.add_argument("--listen", default="0.0.0.0:7000")
     sv.add_argument("--forward", action="append", default=[], metavar="[tcp:|udp:]PORT[=TARGET]")
@@ -530,14 +676,19 @@ def main(argv=None):
     cl = sub.add_parser("client")
     cl.add_argument("--server", required=True, metavar="HOST:PORT")
     cl.add_argument("--pool", type=int, default=8)
-    for p in (sv, cl):
+    for p in (sv, cl, pr):
         p.add_argument("--token", default=os.environ.get("VTUNNEL_TOKEN", ""))
         p.add_argument("--encrypt", choices=["off", "tcp", "all"], default="off",
                        help="tcp: encrypt the TCP connections; all: also the UDP datagrams (both ends must use the same value)")
     a = ap.parse_args(argv)
+    if a.mode == "probe":
+        a.token = a.token or os.environ.get("VTUNNEL_TOKEN", "")
     if len(a.token) < 8:
         sys.exit("--token (or VTUNNEL_TOKEN) must be at least 8 characters")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    if a.mode == "probe":
+        print(json.dumps(asyncio.run(probe(a.peer, a.port, a.token, a.seconds, a.listen_port or None))))
+        return
     if a.mode == "server":
         host, _, port = a.listen.rpartition(":")
         if not a.forward:

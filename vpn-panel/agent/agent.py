@@ -1013,6 +1013,27 @@ def tcp_listening(port):
         return False
 
 
+probe_runs = {}   # tunnel id -> {"id": test id, "result": dict|None}
+
+
+def start_tunnel_probe(tid, t):
+    """Connection test requested by the panel for this tunnel: run vtunnel's probe in the background at its start time."""
+    import threading
+    job = t.get("test")
+    if not job or time.time() < job["start_at"] - 2 or probe_runs.get(tid, {}).get("id") == job["id"]:
+        return
+    run = probe_runs[tid] = {"id": job["id"], "result": None}
+
+    def work():
+        try:
+            r = subprocess.run(["/usr/bin/python3", VTUNNEL_BIN, "probe", "--peer", job["peer"], "--port", str(job["port"]), "--seconds", str(job["seconds"])],
+                               capture_output=True, text=True, env={**os.environ, "VTUNNEL_TOKEN": job["token"]}, timeout=job["seconds"] + 40)
+            run["result"] = json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {"ok": False, "error": (r.stderr.strip().splitlines() or ["no output"])[-1][:80]}
+        except Exception as e:
+            run["result"] = {"ok": False, "error": str(e)[:80]}
+    threading.Thread(target=work, daemon=True).start()
+
+
 def apply_tunnels(cfg):
     wanted = {str(t["id"]): t for t in cfg.get("tunnels", [])}
     tunnel_state.clear()
@@ -1039,6 +1060,11 @@ def apply_tunnels(cfg):
         service = f"{VTUNNEL_PREFIX}{tid}"
         st = {"active": False, "down": [p for p in t.get("targets", []) if not tcp_listening(p)], "errors": list(errors)}
         tunnel_state[tid] = st
+        if ok:
+            start_tunnel_probe(tid, t)
+        run = probe_runs.get(tid)
+        if run and run["result"]:
+            st["test"] = {"id": run["id"], "result": run["result"]}
         if not ok or (t.get("encrypt", "off") != "off" and not ensure_crypto(st["errors"])):
             continue
         env = f"/etc/vpn-node/{service}.env"

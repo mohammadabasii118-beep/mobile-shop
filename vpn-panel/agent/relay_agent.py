@@ -127,6 +127,31 @@ def apply(conf, cfg, errors):
     return service, status_file
 
 
+probe_state = {"id": None, "result": None, "thread": None}
+
+
+def start_probe(conf, cfg):
+    """Connection test: run vtunnel's probe (listens and dials on the test port) in the background once its start time comes."""
+    import threading
+    t = cfg.get("test")
+    if not t or t["id"] == probe_state["id"] or time.time() < t["start_at"] - 2:
+        return
+    fetch(conf, "/vtunnel.py", VTUNNEL, cfg["vtunnel_sha256"])
+    probe_state.update(id=t["id"], result=None)
+
+    def work():
+        env = {**os.environ, "VTUNNEL_TOKEN": t["token"]}
+        try:
+            r = subprocess.run(["/usr/bin/python3", VTUNNEL, "probe", "--peer", t["peer"], "--port", str(t["port"]), "--seconds", str(t["seconds"])],
+                               capture_output=True, text=True, env=env, timeout=t["seconds"] + 40)
+            res = json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {"ok": False, "error": (r.stderr.strip().splitlines() or ["no output"])[-1][:80]}
+        except Exception as e:
+            res = {"ok": False, "error": str(e)[:80]}
+        probe_state["result"] = res
+    probe_state["thread"] = threading.Thread(target=work, daemon=True)
+    probe_state["thread"].start()
+
+
 def remove_everything(conf, tunnel_id):
     """The tunnel was deleted in the panel: stop and remove what this agent created on the server."""
     service = f"vtunnel-server-{tunnel_id}"
@@ -171,8 +196,10 @@ def main():
                     st = {}
             except (OSError, ValueError):
                 st = {}
+            start_probe(conf, cfg)
             api(conf, "POST", "/api/relay/report", {"pool": st.get("pool", 0), "udp_client": st.get("udp_client", False),
-                                                    "failed": st.get("failed", []), "errors": errors})
+                                                    "failed": st.get("failed", []), "errors": errors,
+                                                    "test": {"id": probe_state["id"], "result": probe_state["result"]} if probe_state["result"] else None})
         except urllib.error.HTTPError as e:
             if e.code == 401:                      # the tunnel no longer exists in the panel
                 gone += 1
