@@ -833,9 +833,9 @@ def bp_status(unit, token="", ping=""):
     lines = [_ANSI.sub("", l) for l in _sh("journalctl", "-u", unit, "-n", "80", "--no-pager", "-o", "cat").stdout.splitlines()]
     verdict, last = None, ""
     for l in lines:
-        if re.search(r"transport \w+ is up|tunnel .{0,40}is up|control channel (successfully )?established|l3: .*handshake (complete|completed|ok)", l, re.I) and "attempting" not in l:
+        if re.search(r"transport \w+ is up|tunnel .{0,40}is up|direct: session( \d+)? established|control channel (successfully )?established|l3: .*handshake (complete|completed|ok)", l, re.I) and "attempting" not in l:
             verdict = True
-        elif re.search(r"FATAL|failed to read from the control channel|was refused|invalid security token|connection refused|timed out|i/o timeout|control channel .*(lost|closed)|handshake did not complete|layer-3 tunnel stopped", l, re.I):
+        elif re.search(r"FATAL|failed to read from the control channel|was refused|invalid security token|connection refused|timed out|i/o timeout|control channel .*(lost|closed)|handshake did not complete|layer-3 tunnel stopped|direct: (dial|session).{0,60}(failed|lost|refused)", l, re.I):
             verdict = False
         if "[" in l:
             last = l

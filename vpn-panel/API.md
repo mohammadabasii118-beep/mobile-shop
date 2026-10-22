@@ -51,6 +51,13 @@ A tunnel carries ports of a server in Iran to a foreign location (reverse tunnel
 | PATCH | `/api/tunnels/{id}` | any of `name`, `iran_host`, `ports`, `enabled` |
 | DELETE | `/api/tunnels/{id}` | removes it from both servers |
 
+`opts` carries the extra settings (see `options` in the meta): `nodelay`, `keepalive_period`, `mss`, `zero_copy`, `max_connections`,
+`bandwidth_mbps`, `proxy_protocol`, `edge_ip` (ws/wss behind a CDN), `fallback_addrs` + `load_balance` or `health_failover`,
+`connection_pool`, `aggressive_pool`, the `kcp_*` tuning, mux settings, and for Direct layer 3 `qdisc`, `txqueuelen`, `mtu`, `auto_mtu`,
+`mss_clamp`, `paths`. Each is written only to the end that reads it and dropped when the chosen transport does not read it; unknown
+keys or out-of-range values answer 422. `preset` (`balance`, `turbo`, `aggressive`) is a label; pick the values with `opts`.
+`direct4` is BackPack's layer-4 direct tunnel (Iran dials out; carriers tcp, stealth, ws, wss).
+
 The Iran server runs `install_command` once; its agent (`/api/relay/config`, `/api/relay/report`, authenticated with the
 tunnel's own token) then keeps the vtunnel server running. The foreign side is set up by the node agent from `tunnels` in
 `/api/node/config`.
@@ -64,10 +71,10 @@ not offered.
 
 | Method | Path | |
 |---|---|---|
-| GET | `/api/bp/meta` | the 12 reverse transports and the 4 direct (layer-3) carriers |
+| GET | `/api/bp/meta` | the 12 reverse transports, the 4 direct layer-3 carriers, the 4 direct layer-4 carriers (`carriers4`), the `presets` and every extra `options` entry (type, range, kinds, side) |
 | GET | `/api/bp` | list with `status` (`up`, `starting`, `wait_iran`, `wait_node`, `off`), both ends' last log line, `install_command` |
-| POST | `/api/bp` | `{name, kind: reverse\|direct, transport, iran_host, node_id, ports, accept_udp, fallbacks, fec_data, fec_parity}` |
-| PATCH | `/api/bp/{id}` | any of `name`, `iran_host`, `transport`, `ports`, `accept_udp`, `fallbacks`, `fec_*`, `enabled` |
+| POST | `/api/bp` | `{name, kind: reverse\|direct\|direct4, transport, iran_host, node_id, ports, accept_udp, fallbacks, fec_data, fec_parity, preset, opts}` |
+| PATCH | `/api/bp/{id}` | any of `name`, `iran_host`, `transport`, `ports`, `accept_udp`, `fallbacks`, `fec_*`, `preset`, `opts`, `enabled` |
 | DELETE | `/api/bp/{id}` | removes only this tunnel's units from both servers |
 
 The Iran server runs `install_command` once (the same installer as for the panel's own tunnels); the foreign side is set up by the

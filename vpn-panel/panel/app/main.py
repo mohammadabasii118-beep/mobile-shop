@@ -1592,14 +1592,14 @@ def bp_out(t: BpTunnel, db: Session, request: Request) -> dict:
     return {"id": t.id, "name": t.name, "kind": t.kind, "transport": t.transport, "label": bpmod.describe(t), "iran_host": t.iran_host,
             "node_id": t.node_id, "node_name": node.name if node else "؟", "port": t.port, "forwards": t.forwards,
             "ports": forwards_text(t.forwards), "accept_udp": t.accept_udp, "fallbacks": t.fallbacks, "fec_data": t.fec_data,
-            "fec_parity": t.fec_parity, "enabled": t.enabled, "status": status, "iran": rs or None, "node": cs or None, "problems": problems,
+            "fec_parity": t.fec_parity, "opts": t.opts if isinstance(t.opts, dict) else {}, "preset": t.preset or "", "enabled": t.enabled, "status": status, "iran": rs or None, "node": cs or None, "problems": problems,
             "net": list(bpmod.net_addrs(t.net_n)) if t.kind == "direct" else None,
             "install_command": f"bash <(curl -fsSL {public_url(request)}/relay-install.sh) --token {t.relay_token}"}
 
 
 class BpIn(BaseModel):
     name: str = Field(min_length=1, max_length=60)
-    kind: Literal["reverse", "direct"] = "reverse"
+    kind: Literal["reverse", "direct", "direct4"] = "reverse"
     transport: str = Field(max_length=20)
     iran_host: str = Field(min_length=1, max_length=253)
     node_id: int
@@ -1608,6 +1608,8 @@ class BpIn(BaseModel):
     fallbacks: list[str] = Field(default=[], max_length=11)
     fec_data: int = Field(default=0, ge=0, le=30)
     fec_parity: int = Field(default=0, ge=0, le=30)
+    preset: str = Field(default="", max_length=20)
+    opts: dict = Field(default={}, max_length=40)
 
 
 class BpPatch(BaseModel):
@@ -1619,15 +1621,19 @@ class BpPatch(BaseModel):
     fallbacks: list[str] | None = Field(default=None, max_length=11)
     fec_data: int | None = Field(default=None, ge=0, le=30)
     fec_parity: int | None = Field(default=None, ge=0, le=30)
+    preset: str | None = Field(default=None, max_length=20)
+    opts: dict | None = Field(default=None, max_length=40)
     enabled: bool | None = None
 
 
 def bp_check(kind: str, transport: str, fallbacks: list[str], fec_data: int, fec_parity: int) -> None:
-    allowed = bpmod.TRANSPORTS if kind == "reverse" else bpmod.CARRIERS
+    allowed = {"reverse": bpmod.TRANSPORTS, "direct": bpmod.CARRIERS, "direct4": bpmod.CARRIERS4}[kind]
     if transport not in allowed:
         raise HTTPException(422, "نوع حمل نامعتبر است")
     if kind == "reverse" and (bad := [f for f in fallbacks if f not in bpmod.TRANSPORTS or f == transport]):
         raise HTTPException(422, f"نوع جایگزین نامعتبر: {bad[0]}")
+    if kind == "direct4" and (fec_data or fec_parity):
+        raise HTTPException(422, "اصلاح خطا (FEC) برای Direct لایه ۴ وجود ندارد")
     if bool(fec_data) != bool(fec_parity):
         raise HTTPException(422, "اصلاح خطا (FEC) را با هر دو عدد داده و توازن بدهید، یا هر دو را صفر بگذارید")
 
@@ -1636,9 +1642,16 @@ def bp_forwards(kind: str, ports: str) -> list[dict]:
     return [] if kind == "direct" and not ports.strip() else parse_forwards(ports)
 
 
+def bp_opts(kind: str, transport: str, opts, preset: str) -> dict:
+    try:
+        return bpmod.clean_opts(kind, transport, opts, preset)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
 def free_bp_port(db: Session, kind: str, host: str, node_id: int, taken: set, exclude: int | None = None) -> int:
     """A tunnel port nobody else uses on the server that listens: the Iran server for a reverse tunnel, the foreign one for a direct tunnel."""
-    col = BpTunnel.iran_host == host if kind == "reverse" else BpTunnel.node_id == node_id
+    col = BpTunnel.iran_host == host if kind == "reverse" else BpTunnel.node_id == node_id    # direct kinds listen on the foreign server
     vcol = Tunnel.iran_host == host if kind == "reverse" else Tunnel.node_id == node_id
     used = {t.port for t in db.scalars(select(BpTunnel).where(col, BpTunnel.kind == kind)) if t.id != exclude}
     used |= {t.ctl_port for t in db.scalars(select(Tunnel).where(vcol))}
@@ -1649,7 +1662,12 @@ def free_bp_port(db: Session, kind: str, host: str, node_id: int, taken: set, ex
 def bp_meta():
     return {"version": bpmod.BP_VERSION,
             "transports": [{"id": k, "label": v[0], "family": v[1], "desc": v[2], "raw": k in bpmod.NEEDS_RAW} for k, v in bpmod.TRANSPORTS.items()],
-            "carriers": [{"id": k, "label": v[0], "desc": v[1], "raw": k in bpmod.NEEDS_RAW} for k, v in bpmod.CARRIERS.items()]}
+            "carriers": [{"id": k, "label": v[0], "desc": v[1], "raw": k in bpmod.NEEDS_RAW} for k, v in bpmod.CARRIERS.items()],
+            "carriers4": [{"id": k, "label": v[0], "desc": v[1], "raw": False} for k, v in bpmod.CARRIERS4.items()],
+            "presets": [{"id": k, "label": v[0], "desc": v[1], "opts": v[2]} for k, v in bpmod.PRESETS.items()],
+            "options": {k: {"type": v[0].split(":")[0], "lo": v[1], "hi": v[2], "kinds": list(v[3]), "side": v[4],
+                            "only": sorted(bpmod.ONLY.get(k, [])), "choices": v[0].split(":")[1].split("|") if v[0].startswith("enum") else []}
+                        for k, v in bpmod.OPTIONS.items()}}
 
 
 @app.get("/api/bp", dependencies=[Depends(require_admin)])
@@ -1662,6 +1680,7 @@ def create_bp(body: BpIn, request: Request, db: Session = Depends(get_db)):
     if not db.get(Node, body.node_id):
         raise HTTPException(404, "لوکیشن خارج پیدا نشد")
     bp_check(body.kind, body.transport, body.fallbacks, body.fec_data, body.fec_parity)
+    opts = bp_opts(body.kind, body.transport, body.opts, body.preset)
     host, forwards = clean_host(body.iran_host), bp_forwards(body.kind, body.ports)
     net_n = 0
     if body.kind == "direct":
@@ -1672,7 +1691,7 @@ def create_bp(body: BpIn, request: Request, db: Session = Depends(get_db)):
     t = BpTunnel(name=body.name.strip(), kind=body.kind, transport=body.transport, iran_host=host, node_id=body.node_id, forwards=forwards,
                  port=free_bp_port(db, body.kind, host, body.node_id, {f["listen"] for f in forwards}), token=bpmod.new_token(),
                  relay_token=secrets.token_urlsafe(24), accept_udp=body.accept_udp, fallbacks=body.fallbacks if body.kind == "reverse" else [],
-                 fec_data=body.fec_data, fec_parity=body.fec_parity, net_n=net_n)
+                 fec_data=body.fec_data, fec_parity=body.fec_parity, net_n=net_n, opts=opts, preset=body.preset)
     db.add(t)
     db.commit()
     return bp_out(t, db, request)
@@ -1686,6 +1705,7 @@ def patch_bp(bp_id: int, body: BpPatch, request: Request, db: Session = Depends(
     fd = body.fec_data if body.fec_data is not None else t.fec_data
     fp = body.fec_parity if body.fec_parity is not None else t.fec_parity
     bp_check(t.kind, transport, fallbacks, fd, fp)
+    opts = bp_opts(t.kind, transport, body.opts if body.opts is not None else t.opts, body.preset if body.preset is not None else t.preset)
     if body.name is not None:
         t.name = body.name.strip()
     if body.iran_host is not None:
@@ -1699,6 +1719,9 @@ def patch_bp(bp_id: int, body: BpPatch, request: Request, db: Session = Depends(
     if body.enabled is not None:
         t.enabled = body.enabled
     t.transport, t.fallbacks, t.fec_data, t.fec_parity = transport, (fallbacks if t.kind == "reverse" else []), fd, fp
+    t.opts = opts
+    if body.preset is not None:
+        t.preset = body.preset
     db.commit()
     return bp_out(t, db, request)
 

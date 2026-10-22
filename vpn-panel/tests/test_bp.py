@@ -134,9 +134,19 @@ def test_agent_installs_verifies_writes_units_and_prunes_only_its_own(tmp_path):
     assert any("SHA-256" in e for e in bad["errors"]) and not (tmp_path / "units" / "vpnp-bp-5.service").exists()
 
 
+REVERSE_ALL = {"nodelay": True, "keepalive_period": 15, "max_connections": 100, "bandwidth_mbps": 200, "heartbeat": 5, "zero_copy": True, "log_level": "info",
+               "mss": 1360, "connection_pool": 4, "aggressive_pool": True, "dial_timeout": 5, "retry_interval": 2}
+KCP_ALL = {"kcp_nodelay": 1, "kcp_interval": 10, "kcp_resend": 2, "kcp_nocongestion": 1, "kcp_acknodelay": True, "kcp_sndwnd": 1024, "kcp_rcvwnd": 1024, "kcp_mtu": 1200}
+CASES = [("reverse", t, {}) for t in ("tcp", "tcpmux", "stealth", "ws", "wsmux", "wss", "wssmux", "kcp", "quic")] + [
+    ("reverse", "tcp", REVERSE_ALL), ("reverse", "stealth", {"nodelay": True, "connection_pool": 16}), ("reverse", "kcp", KCP_ALL),
+    ("reverse", "tcpmux", {"mux_session": 2, "mux_con": 8, "mux_version": 2}), ("reverse", "wss", {"edge_ip": "127.0.0.1"}),
+    ("direct4", "tcp", {}), ("direct4", "stealth", {"nodelay": True, "sessions": 2, "bandwidth_mbps": 100, "max_connections": 50, "keepalive_period": 10}),
+    ("direct4", "ws", {"server_name": "cdn.example.com"}), ("direct4", "wss", {"sessions": 2})]
+
+
 @pytest.mark.skipif(not BIN or not os.access(BIN, os.X_OK), reason="set BACKPACK_BIN to the real binary to run the real-traffic test")
-@pytest.mark.parametrize("transport", ["tcp", "tcpmux", "stealth", "ws", "wsmux", "wss", "wssmux", "kcp", "quic"])
-def test_generated_configs_carry_real_traffic(transport, tmp_path):
+@pytest.mark.parametrize("kind,transport,opts", CASES, ids=[f"{k}-{t}-{'opts' if o else 'plain'}{i}" for i, (k, t, o) in enumerate(CASES)])
+def test_generated_configs_carry_real_traffic(kind, transport, opts, tmp_path):
     def free():
         s = socket.socket()
         s.bind(("127.0.0.1", 0))
@@ -154,12 +164,16 @@ def test_generated_configs_carry_real_traffic(transport, tmp_path):
             c, _ = echo.accept()
             threading.Thread(target=lambda c=c: [c.sendall(d) for d in iter(lambda: c.recv(65536), b"")], daemon=True).start()
     threading.Thread(target=serve, daemon=True).start()
-    t = mk(id=1, transport=transport, port=ctl, token="real-traffic-token-" + "x" * 30, forwards=[{"proto": "tcp", "listen": user, "target": target}])
-    (tmp_path / "s.toml").write_text(bp.render(t, "iran", "127.0.0.1", "127.0.0.1").replace("0.0.0.0:", "127.0.0.1:"))
-    (tmp_path / "c.toml").write_text(bp.render(t, "node", "127.0.0.1", "127.0.0.1"))
-    srv = subprocess.Popen([BIN, "-c", str(tmp_path / "s.toml")], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    opts = bp.clean_opts(kind, transport, opts)
+    t = mk(id=1, kind=kind, transport=transport, port=ctl, token="real-traffic-token-" + "x" * 30, forwards=[{"proto": "tcp", "listen": user, "target": target}],
+           opts=opts, preset="turbo" if opts else "", fec_data=10 if transport == "kcp" and opts else 0, fec_parity=3 if transport == "kcp" and opts else 0)
+    listener = "iran" if kind == "reverse" else "node"          # the end that binds 0.0.0.0
+    (tmp_path / "s.toml").write_text(bp.render(t, "iran", "127.0.0.1", "127.0.0.1").replace("0.0.0.0:", "127.0.0.1:") if listener == "iran" else bp.render(t, "iran", "127.0.0.1", "127.0.0.1"))
+    (tmp_path / "c.toml").write_text(bp.render(t, "node", "127.0.0.1", "127.0.0.1").replace("0.0.0.0:", "127.0.0.1:") if listener == "node" else bp.render(t, "node", "127.0.0.1", "127.0.0.1"))
+    first, second = ("s.toml", "c.toml") if listener == "iran" else ("c.toml", "s.toml")
+    p1 = subprocess.Popen([BIN, "-c", str(tmp_path / first)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(1.5)
-    cli = subprocess.Popen([BIN, "-c", str(tmp_path / "c.toml")], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    p2 = subprocess.Popen([BIN, "-c", str(tmp_path / second)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         ok = False
         for _ in range(15):
@@ -174,10 +188,10 @@ def test_generated_configs_carry_real_traffic(transport, tmp_path):
                     break
             except OSError:
                 pass
-        assert ok, f"{transport}: no traffic through the generated config"
+        assert ok, f"{kind}/{transport}: no traffic through the generated config"
     finally:
-        srv.kill()
-        cli.kill()
+        p1.kill()
+        p2.kill()
 
 
 def test_direct_status_uses_ping_but_falls_back_to_the_log_when_ping_is_missing(monkeypatch):
@@ -199,3 +213,38 @@ def test_direct_status_uses_ping_but_falls_back_to_the_log_when_ping_is_missing(
     monkeypatch.setattr(vt, "_sh", fake(127))                                      # no ping binary on this server: the log decides
     assert vt.bp_status("u", "", "10.20.7.2")["up"] is True
     assert bp.render(mk(transport="kcp"), "iran", "h", "n").count("accept_udp = false") == 1
+
+
+def test_extra_settings_validate_render_and_drop_what_a_transport_does_not_read():
+    ok = bp.clean_opts("reverse", "stealth", {"nodelay": True, "max_connections": 500, "bandwidth_mbps": 100, "mss": 1360, "proxy_protocol": True,
+                        "edge_ip": "104.16.1.1", "fallback_addrs": "5.6.7.8:443, [2001:db8::1]:443", "load_balance": True,
+                        "kcp_interval": 10, "mux_session": 4, "paths": 3})
+    assert ok == {"nodelay": True, "max_connections": 500, "bandwidth_mbps": 100, "mss": 1360, "proxy_protocol": True,
+                  "fallback_addrs": ["5.6.7.8:443", "[2001:db8::1]:443"], "load_balance": True}      # edge_ip needs ws; kcp/mux/paths need their transport
+    t = mk(opts=ok, preset="turbo")
+    s, c = bp.render(t, "iran", "1.2.3.4", "n"), bp.render(t, "node", "1.2.3.4", "n")
+    assert 'preset = "turbo"' in s and "max_connections = 500" in s and "bandwidth_mbps = 100" in s and "proxy_protocol = true" in s and "nodelay = true" in s
+    assert "max_connections" not in c and "proxy_protocol" not in c and 'fallback_addrs = ["5.6.7.8:443", "[2001:db8::1]:443"]' in c and "load_balance = true" in c
+    assert "fallback_addrs" not in s and "mss = 1360" in s and "mss = 1360" in c
+    assert bp.clean_opts("reverse", "wss", {"edge_ip": "104.16.1.1"}) == {"edge_ip": "104.16.1.1"}
+    assert bp.clean_opts("reverse", "kcp", {"kcp_interval": 10, "kcp_sndwnd": 1024}) == {"kcp_interval": 10, "kcp_sndwnd": 1024}
+    assert bp.clean_opts("direct", "udp", {"paths": 4, "qdisc": "fq_codel", "txqueuelen": 300}) == {"paths": 4, "qdisc": "fq_codel", "txqueuelen": 300}
+    assert bp.clean_opts("direct", "quic", {"paths": 4}) == {}
+    for bad in ({"nope": 1}, {"mss": 5}, {"nodelay": "yes"}, {"edge_ip": "a b"}, {"qdisc": "x"}, {"load_balance": True}, {"mtu": 99999}):
+        with pytest.raises(ValueError):
+            bp.clean_opts("reverse" if "mtu" not in bad and "qdisc" not in bad else "direct", "wss", bad)
+    with pytest.raises(ValueError):
+        bp.clean_opts("reverse", "tcp", {"fallback_addrs": ["a:1"], "load_balance": True, "health_failover": True})
+    for name in bp.PRESETS:
+        for kind, tr in (("reverse", "kcp"), ("reverse", "tcp"), ("direct", "udp")):
+            assert bp.clean_opts(kind, tr, bp.preset_opts(kind, tr, name), name)
+    assert not any("spoof" in k or "sni" in k for k in bp.OPTIONS)
+
+
+def test_direct_layer4_render():
+    t = mk(kind="direct4", transport="ws", port=9300, opts={"sessions": 2, "bandwidth_mbps": 50, "server_name": "cdn.example.com", "nodelay": True}, preset="balance")
+    i, k = bp.render(t, "iran", "1.2.3.4", "node.example"), bp.render(t, "node", "1.2.3.4", "node.example")
+    assert '[direct]' in i and 'role = "iran"' in i and 'addr = "node.example:9300"' in i and 'ports = ["80", "81=80"]' in i and "sessions = 2" in i and "bandwidth_mbps = 50" in i
+    assert 'role = "kharej"' in k and 'addr = "0.0.0.0:9300"' in k and "ports" not in k and "sessions" not in k and "bandwidth" not in k and "nodelay = true" in k
+    assert 'server_name = "cdn.example.com"' in i and 'preset = "balance"' in i
+    assert bp.describe(t).startswith("Direct L4")

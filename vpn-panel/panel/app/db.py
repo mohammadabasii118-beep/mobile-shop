@@ -123,6 +123,8 @@ class BpTunnel(Base):
     fallbacks: Mapped[list] = mapped_column(JSON, default=list)
     fec_data: Mapped[int] = mapped_column(default=0)
     fec_parity: Mapped[int] = mapped_column(default=0)
+    opts: Mapped[dict] = mapped_column(JSON, default=dict)   # extra BackPack settings (bp.OPTIONS), already validated
+    preset: Mapped[str] = mapped_column(default="")          # the performance preset the settings came from (a label)
     net_n: Mapped[int] = mapped_column(default=0)            # direct: the tunnel's private /30 is 10.20.<net_n>.0/30
     enabled: Mapped[bool] = mapped_column(default=True)
     relay_seen: Mapped[datetime | None] = mapped_column(default=None)

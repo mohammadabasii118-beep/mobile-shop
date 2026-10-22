@@ -255,7 +255,7 @@ const views = {
         <div><b>${esc(t.name)}</b> <span class="pill">${esc(t.label)}</span> <span class="pill ${st[0]}">${st[1]}</span></div>
         <div class="chips"><button class="btn sm" data-bpedit="${t.id}">ویرایش</button><button class="btn sm" data-bptoggle="${t.id}">${t.enabled ? 'خاموش' : 'روشن'}</button><button class="btn sm danger" data-bpdel="${t.id}">حذف</button></div></div>
         <div style="margin-top:8px" class="muted"><span class="mono" dir="ltr">${esc(t.iran_host)}</span> ← <b>${esc(t.node_name)}</b> · پورت تونل <span class="mono">${t.port}</span> ${t.kind === 'direct' ? `(روی سرور <b>خارج</b>، UDP/TCP باید باز باشد) · شبکه‌ی داخلی <span class="mono" dir="ltr">${esc(t.net.join(' ↔ '))}</span>` : '(روی سرور ایران)'}</div>
-        <div class="chips" style="margin-top:8px">${t.forwards.map(f => `<span class="cc" dir="ltr">${f.listen}${f.target !== f.listen ? ' → ' + f.target : ''}</span>`).join('')}${t.accept_udp ? '<span class="cc">UDP هم</span>' : ''}${t.fallbacks.length ? `<span class="cc" dir="ltr">fallback: ${esc(t.fallbacks.join(', '))}</span>` : ''}</div>
+        <div class="chips" style="margin-top:8px">${t.forwards.map(f => `<span class="cc" dir="ltr">${f.listen}${f.target !== f.listen ? ' → ' + f.target : ''}</span>`).join('')}${t.accept_udp ? '<span class="cc">UDP هم</span>' : ''}${t.preset ? `<span class="cc">${esc(t.preset)}</span>` : ''}${Object.keys(t.opts || {}).length ? `<span class="cc">${Object.keys(t.opts).length} تنظیم پیشرفته</span>` : ''}${t.fallbacks.length ? `<span class="cc" dir="ltr">fallback: ${esc(t.fallbacks.join(', '))}</span>` : ''}</div>
         ${line('ایران', t.iran)}${line('خارج', t.node)}
         ${t.problems.length ? `<div class="note" style="margin-top:8px;color:var(--bad)">${t.problems.map(esc).join('<br>')}</div>` : ''}
         ${t.status === 'wait_iran' ? `<div style="margin-top:10px"><div class="muted">روی سرور ایران (با دسترسی root) این دستور را یک بار اجرا کنید:</div><pre>${esc(t.install_command)}</pre><button class="btn sm" data-copy="${esc(t.install_command)}">کپی دستور</button></div>` : ''}</div>`; }).join('');
@@ -408,24 +408,73 @@ function render() {
 }
 
 function bpOptions(kind, cur) {
-  const list = kind === 'direct' ? S.bpMeta.carriers : S.bpMeta.transports;
+  const list = kind === 'direct' ? S.bpMeta.carriers : kind === 'direct4' ? S.bpMeta.carriers4 : S.bpMeta.transports;
   return list.map(x => `<option value="${x.id}" ${x.id === cur ? 'selected' : ''}>${esc(x.label)} — ${esc(x.desc)}</option>`).join('');
 }
+const BP_OPT = {
+  nodelay: 'Nodelay (غیرفعال کردن Nagle؛ پینگ کمتر)', keepalive_period: 'Keepalive (ثانیه)', mss: 'MSS (اگر انتقال بزرگ گیر می‌کند، مثلاً 1360)',
+  zero_copy: 'ZeroCopy (سریع‌تر، کمتر آزموده)', log_level: 'سطح لاگ', mux_session: 'تعداد جلسه‌ی Mux', mux_con: 'اتصال هم‌زمان در هر جلسه‌ی Mux', mux_version: 'نسخه‌ی smux',
+  max_connections: 'سقف اتصال هم‌زمان (۰ = نامحدود)', bandwidth_mbps: 'سقف پهنای‌باند Mbps (۰ = نامحدود)', proxy_protocol: 'PROXY protocol (آی‌پی واقعی کاربر به سرویس برسد)',
+  heartbeat: 'Heartbeat (ثانیه)', channel_size: 'اندازه‌ی صف اتصال', edge_ip: 'Edge IP (آی‌پی CDN برای WebSocket پشت CDN)',
+  fallback_addrs: 'آدرس‌های جایگزین سرور (host:port، با ویرگول)', load_balance: 'توزیع بار بین آدرس‌ها', health_failover: 'تعویض هوشمند به سالم‌ترین آدرس',
+  connection_pool: 'اتصال آماده (pool)', aggressive_pool: 'pool تهاجمی (رشد سریع‌تر زیر بار)', dial_timeout: 'مهلت اتصال (ثانیه)', retry_interval: 'فاصله‌ی تلاش دوباره (ثانیه)',
+  kcp_nodelay: 'KCP nodelay (۱ = حالت کم‌تأخیر)', kcp_interval: 'KCP tick (میلی‌ثانیه)', kcp_resend: 'KCP resend', kcp_nocongestion: 'KCP بدون کنترل ازدحام (۱ = بله)',
+  kcp_acknodelay: 'KCP ACK فوری', kcp_sndwnd: 'KCP پنجره‌ی ارسال', kcp_rcvwnd: 'KCP پنجره‌ی دریافت', kcp_mtu: 'KCP MTU',
+  qdisc: 'صف رابط (qdisc؛ جیتر را همین تعیین می‌کند)', txqueuelen: 'طول صف ارسال', mtu: 'MTU رابط', auto_mtu: 'اندازه‌گیری خودکار MTU', mss_clamp: 'MSS clamp',
+  paths: 'تعداد سوکت موازی (فقط UDP)', sockbuf: 'بافر سوکت (بایت)', sessions: 'تعداد جلسه‌ی Mux', server_name: 'نام سرور (SNI/Host برای ws/wss)'};
+const BP_SIDE = {iran: ' · ایران', node: ' · خارج'};
+function bpOptFields(kind, tr, cur) {
+  const rows = Object.entries(S.bpMeta.options).filter(([k, o]) => o.kinds.includes(kind) && (!o.only.length || o.only.includes(tr))).map(([k, o]) => {
+    const v = cur[k], lab = esc((BP_OPT[k] || k) + (BP_SIDE[o.side] || ''));
+    if (o.type === 'bool') return `<label class="chk"><input type="checkbox" class="bpOpt" data-k="${k}" ${v ? 'checked' : ''}> ${lab}</label>`;
+    if (o.type === 'enum') return `<label class="f">${lab}<select class="bpOpt" data-k="${k}"><option value="">پیش‌فرض</option>${o.choices.map(c => `<option ${v === c ? 'selected' : ''}>${c}</option>`).join('')}</select></label>`;
+    if (o.type === 'int') return `<label class="f">${lab}<input type="number" class="bpOpt" data-k="${k}" min="${o.lo}" max="${o.hi}" value="${v ?? ''}" placeholder="پیش‌فرض"></label>`;
+    return `<label class="f">${lab}<input type="text" dir="ltr" class="bpOpt" data-k="${k}" value="${esc(Array.isArray(v) ? v.join(', ') : (v || ''))}"></label>`;
+  });
+  return rows.join('');
+}
+function bpOptRead() {
+  const o = {};
+  document.querySelectorAll('.bpOpt').forEach(el => {
+    const k = el.dataset.k, t = S.bpMeta.options[k].type;
+    if (t === 'bool') { if (el.checked) o[k] = true; }
+    else if (t === 'int') { if (el.value !== '') o[k] = +el.value; }
+    else if (el.value.trim()) o[k] = el.value.trim();
+  });
+  return o;
+}
+function bpAdvRefresh(keep) {
+  const kind = ($('#bpKind') || {}).value || $('#bpKindFixed').value, tr = $('#bpTr').value;
+  $('#bpAdvBody').innerHTML = bpOptFields(kind, tr, keep || bpOptRead());
+}
+function bpPresetPick(name) {
+  const kind = ($('#bpKind') || {}).value || $('#bpKindFixed').value, tr = $('#bpTr').value;
+  if (!name) return;
+  const p = S.bpMeta.presets.find(x => x.id === name), cur = bpOptRead();
+  const ok = Object.fromEntries(Object.entries(p.opts).filter(([k]) => { const o = S.bpMeta.options[k]; return o.kinds.includes(kind) && (!o.only.length || o.only.includes(tr)); }));
+  bpAdvRefresh({...cur, ...ok});
+}
+const BP_BEST = {reverse: 'برای کمترین پینگ و جیتر روی مسیر سالم: «TCP + Stealth» یا «TCP» با Nodelay. اگر مسیر بسته گم می‌کند: «UDP + KCP + FEC» با پریست Turbo.',
+  direct: 'Direct لایه ۳ با حمل UDP و qdisc برابر fq_codel کمترین جیتر را می‌دهد (برای ترافیک بازی و VoIP).',
+  direct4: 'برای کمترین پینگ: «TCP + Stealth» با Nodelay.'};
 function bpFields(t) {
   const kind = t ? t.kind : 'reverse';
   return `<div class="form">
     <label class="f">نام<input type="text" id="bpName" value="${esc(t ? t.name : '')}" placeholder="ایران - آلمان (بک‌پک)"></label>
-    ${t ? '' : `<label class="f">نوع تونل<select id="bpKind"><option value="reverse">معکوس: سرور خارج به ایران وصل می‌شود</option><option value="direct">Direct (لایه ۳): ایران به خارج وصل می‌شود</option></select></label>`}
+    ${t ? `<input type="hidden" id="bpKindFixed" value="${kind}">` : `<label class="f">نوع تونل<select id="bpKind"><option value="reverse">معکوس: سرور خارج به ایران وصل می‌شود</option><option value="direct">Direct (لایه ۳ - رابط شبکه): ایران به خارج وصل می‌شود</option><option value="direct4">Direct (لایه ۴ - پورت): ایران به خارج وصل می‌شود</option></select></label>`}
     <label class="f">آدرس سرور ایران (IP یا دامنه)<input type="text" id="bpHost" dir="ltr" value="${esc(t ? t.iran_host : '')}" placeholder="1.2.3.4"></label>
     ${t ? '' : `<label class="f">لوکیشن خارج<select id="bpNode">${S.nodes.map(n => `<option value="${n.id}">${esc(n.name)}</option>`).join('')}</select></label>`}
     <label class="f">نوع حمل (transport)<select id="bpTr">${bpOptions(kind, t ? t.transport : (kind === 'direct' ? 'udp' : 'stealth'))}</select></label>
     <label class="f">پورت‌ها (روی ایران)<input type="text" id="bpPorts" dir="ltr" value="${esc(t ? t.ports : '')}" placeholder="80, 81=80, 443"></label>
     <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="bpUdp" ${t && t.accept_udp ? 'checked' : ''}> UDP هم روی همین پورت‌ها فوروارد شود</label>
-    <div id="bpFbBox" ${kind === 'direct' ? 'hidden' : ''}><div class="muted" style="margin-bottom:4px">انواع جایگزین (اگر نوع اصلی فیلتر شد، خودکار روی بعدی می‌رود؛ اختیاری)</div>
+    <div id="bpFbBox" ${kind !== 'reverse' ? 'hidden' : ''}><div class="muted" style="margin-bottom:4px">انواع جایگزین (اگر نوع اصلی فیلتر شد، خودکار روی بعدی می‌رود؛ اختیاری)</div>
       <div class="chips">${S.bpMeta.transports.map(x => `<label><input type="checkbox" class="bpFb" value="${x.id}" ${t && t.fallbacks.includes(x.id) ? 'checked' : ''}>${esc(x.label)}</label>`).join('')}</div></div>
     <div style="display:flex;gap:10px"><label class="f" style="flex:1">FEC داده<input type="number" id="bpFd" min="0" max="30" value="${t ? t.fec_data : 0}"></label>
       <label class="f" style="flex:1">FEC توازن<input type="number" id="bpFp" min="0" max="30" value="${t ? t.fec_parity : 0}"></label></div></div>
-    <div class="note">FEC فقط برای UDP+KCP و Direct است (هر دو عدد را بده یا هر دو صفر). نوع‌های PCK و xDi به لینوکس و root نیاز دارند. پورت تونل خودکار انتخاب می‌شود.</div>`;
+    <div class="note" id="bpBest">${BP_BEST[kind]}</div>
+    <label class="f">پریست عملکرد<select id="bpPreset"><option value="">بدون پریست</option>${S.bpMeta.presets.map(p => `<option value="${p.id}" ${t && t.preset === p.id ? 'selected' : ''}>${esc(p.label)} — ${esc(p.desc)}</option>`).join('')}</select></label>
+    <details><summary style="cursor:pointer;margin:6px 0">تنظیمات پیشرفته</summary><div class="form" id="bpAdvBody">${bpOptFields(kind, t ? t.transport : (kind === 'direct' ? 'udp' : 'stealth'), t ? t.opts : {})}</div></details>
+    <div class="note">FEC فقط برای UDP+KCP و Direct لایه ۳ است (هر دو عدد را بده یا هر دو صفر). نوع‌های PCK و xDi به لینوکس و root نیاز دارند. پورت تونل خودکار انتخاب می‌شود.</div>`;
 }
 function nodeForm() {
   openModal(`<h2>لوکیشن جدید</h2><div class="form">
@@ -633,7 +682,7 @@ document.addEventListener('click', async e => {
     }
     else if (t.id === 'bpSave') {
       const r = await api('POST', '/bp', {name: $('#bpName').value.trim(), kind: $('#bpKind').value, transport: $('#bpTr').value, iran_host: $('#bpHost').value.trim(), node_id: +$('#bpNode').value,
-        ports: $('#bpPorts').value, accept_udp: $('#bpUdp').checked, fallbacks: [...document.querySelectorAll('.bpFb:checked')].map(x => x.value), fec_data: +$('#bpFd').value || 0, fec_parity: +$('#bpFp').value || 0});
+        ports: $('#bpPorts').value, accept_udp: $('#bpUdp').checked, fallbacks: [...document.querySelectorAll('.bpFb:checked')].map(x => x.value), fec_data: +$('#bpFd').value || 0, fec_parity: +$('#bpFp').value || 0, preset: $('#bpPreset').value, opts: bpOptRead()});
       await refresh();
       openModal(`<h2>تونل ساخته شد</h2><p class="muted" style="margin:0">روی <b>سرور ایران</b> (با دسترسی root) این دستور را اجرا کنید. بک‌پک روی هر دو سرور خودکار نصب و تنظیم می‌شود (سمت خارج خودش از پنل می‌گیرد):</p>
         <pre>${esc(r.install_command)}</pre><div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-copy="${esc(r.install_command)}">کپی دستور</button><button class="btn pri" data-close>بستن</button></div>`);
@@ -644,7 +693,7 @@ document.addEventListener('click', async e => {
     }
     else if (t.id === 'bpEdSave') {
       await api('PATCH', '/bp/' + d.id, {name: $('#bpName').value.trim(), iran_host: $('#bpHost').value.trim(), transport: $('#bpTr').value, ports: $('#bpPorts').value, accept_udp: $('#bpUdp').checked,
-        fallbacks: [...document.querySelectorAll('.bpFb:checked')].map(x => x.value), fec_data: +$('#bpFd').value || 0, fec_parity: +$('#bpFp').value || 0});
+        fallbacks: [...document.querySelectorAll('.bpFb:checked')].map(x => x.value), fec_data: +$('#bpFd').value || 0, fec_parity: +$('#bpFp').value || 0, preset: $('#bpPreset').value, opts: bpOptRead()});
       closeModal(); await refresh(); toast('ذخیره شد؛ ظرف حدود ۳۰ ثانیه روی هر دو سرور اعمال می‌شود');
     }
     else if (d.bptoggle) { const x = S.bp.find(q => q.id === +d.bptoggle); await api('PATCH', '/bp/' + x.id, {enabled: !x.enabled}); await refresh(); }
@@ -855,7 +904,9 @@ document.addEventListener('change', async e => {
     catch (err) { toast(err.message); }
     return;
   }
-  if (e.target.id === 'bpKind') { const k = e.target.value; $('#bpTr').innerHTML = bpOptions(k, k === 'direct' ? 'udp' : 'stealth'); $('#bpFbBox').hidden = k === 'direct'; return; }
+  if (e.target.id === 'bpKind') { const k = e.target.value; $('#bpTr').innerHTML = bpOptions(k, k === 'direct' ? 'udp' : 'stealth'); $('#bpFbBox').hidden = k !== 'reverse'; $('#bpBest').textContent = BP_BEST[k]; bpAdvRefresh(); return; }
+  if (e.target.id === 'bpTr') { bpAdvRefresh(); return; }
+  if (e.target.id === 'bpPreset') { bpPresetPick(e.target.value); return; }
   if (e.target.id === 'uOnline') { S.onlineOnly = e.target.checked; render(); return; }
   if (e.target.id === 'uo') { S.owner = e.target.value; render(); return; }
   if (e.target.dataset.sel) { const id = +e.target.dataset.sel; e.target.checked ? S.sel.add(id) : S.sel.delete(id); render(); return; }

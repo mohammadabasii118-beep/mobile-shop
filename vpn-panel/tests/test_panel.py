@@ -1811,3 +1811,38 @@ def test_backpack_tunnels_api_agents_and_binary_route(tmp_path, monkeypatch):
         for x in (t, d, d2):
             assert c.delete(f"/api/bp/{x['id']}", headers=h).status_code == 200
         assert c.get("/api/relay/config", headers=rh).status_code == 401
+
+
+def test_backpack_extra_settings_presets_and_direct_layer4_api():
+    with TestClient(app) as c:
+        h = admin(c)
+        n = c.post("/api/nodes", headers=h, json={"name": "BpX", "cc": "de", "address": "bpx.example.com"}).json()
+        nh = {"Authorization": "Bearer " + n["install_command"].split("--token ")[1].split()[0]}
+        meta = c.get("/api/bp/meta", headers=h).json()
+        assert {p["id"] for p in meta["presets"]} == {"balance", "turbo", "aggressive"} and "edge_ip" in meta["options"] and {x["id"] for x in meta["carriers4"]} == {"tcp", "stealth", "ws", "wss"}
+        mk_ = lambda **kw: c.post("/api/bp", headers=h, json={"name": "x", "iran_host": "5.5.5.5", "node_id": n["id"], "ports": "80", **kw})
+        assert mk_(transport="tcp", opts={"nope": 1}).status_code == 422 and mk_(transport="tcp", opts={"mss": 1}).status_code == 422
+        assert mk_(transport="tcp", preset="warp").status_code == 422 and mk_(kind="direct4", transport="udp").status_code == 422
+        assert mk_(kind="direct4", transport="tcp", fec_data=4, fec_parity=2).status_code == 422
+        assert mk_(transport="tcp", opts={"load_balance": True}).status_code == 422                # needs a fallback address
+        t = mk_(transport="wss", preset="turbo", opts={"nodelay": True, "edge_ip": "104.16.1.1", "fallback_addrs": "6.6.6.6:443", "load_balance": True,
+                                                       "max_connections": 300, "bandwidth_mbps": 80}).json()
+        assert t["preset"] == "turbo" and t["opts"]["edge_ip"] == "104.16.1.1" and t["opts"]["fallback_addrs"] == ["6.6.6.6:443"]
+        rh = {"Authorization": "Bearer " + t["install_command"].split("--token ")[1]}
+        iran = c.get("/api/relay/config", headers=rh).json()["bp"]["toml"]
+        node = next(x for x in c.get("/api/node/config", headers=nh).json()["bp"] if x["id"] == str(t["id"]))["toml"]
+        assert "max_connections = 300" in iran and "bandwidth_mbps = 80" in iran and "edge_ip" not in iran and 'preset = "turbo"' in iran
+        assert 'edge_ip = "104.16.1.1"' in node and "load_balance = true" in node and "max_connections" not in node
+        # changing the transport drops what the new one does not read; clearing works
+        r = c.patch(f"/api/bp/{t['id']}", headers=h, json={"transport": "tcp"}).json()
+        assert "edge_ip" not in r["opts"] and r["opts"]["max_connections"] == 300
+        r = c.patch(f"/api/bp/{t['id']}", headers=h, json={"opts": {}, "preset": ""}).json()
+        assert r["opts"] == {} and r["preset"] == ""
+        assert c.patch(f"/api/bp/{t['id']}", headers=h, json={"opts": {"zzz": 1}}).status_code == 422
+        d4 = mk_(kind="direct4", transport="stealth", opts={"sessions": 2, "nodelay": True}).json()
+        ncfg = next(x for x in c.get("/api/node/config", headers=nh).json()["bp"] if x["id"] == str(d4["id"]))
+        assert 'role = "kharej"' in ncfg["toml"] and ncfg["ping"] == "" and d4["label"].startswith("Direct L4") and d4["net"] is None
+        rh4 = {"Authorization": "Bearer " + d4["install_command"].split("--token ")[1]}
+        assert 'role = "iran"' in c.get("/api/relay/config", headers=rh4).json()["bp"]["toml"]
+        for x in (t, d4):
+            assert c.delete(f"/api/bp/{x['id']}", headers=h).status_code == 200
