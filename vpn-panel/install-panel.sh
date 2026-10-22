@@ -81,36 +81,45 @@ if [ -f "$ENV_FILE" ] && [ -z "${NEW_INSTALL:-}" ] && [ -n "$DOMAIN" ]; then
   echo "Address changed to $PANEL_URL (admin password unchanged)."
 fi
 
-set_env() { grep -q "^$1=" "$ENV_FILE" && sed -i "s|^$1=.*|$1=$2|" "$ENV_FILE" || echo "$1=$2" >> "$ENV_FILE"; }
-unset_env() { sed -i "/^$1=/d" "$ENV_FILE"; }
+# Reverse-proxy settings live in deploy/caddy/ (admin.json + Caddyfile); the panel's Settings page edits them too.
+CADDY_DIR="$APP/deploy/caddy"; mkdir -p "$CADDY_DIR"
+command -v python3 >/dev/null || apt-get install -y python3 >/dev/null
+FROM=$(grep '^PANEL_FROM=' "$ENV_FILE" | cut -d= -f2-)
+CADDYPY="$APP/panel/app/caddyfile.py"
 if [ -n "$OPEN_ADMIN" ]; then
-  unset_env PANEL_ADMIN_PORT; unset_env PANEL_ADMIN_PATH
+  python3 "$CADDYPY" "$FROM" "$CADDY_DIR.new" off
   echo "Secure admin address turned off: the panel is on its normal address again."
 elif [ -n "$SECURE" ]; then
-  [ -n "$ADMIN_PORT" ] || ADMIN_PORT=$(grep '^PANEL_ADMIN_PORT=' "$ENV_FILE" | cut -d= -f2- || true)
+  [ -n "$ADMIN_PORT" ] || ADMIN_PORT=$(python3 -c "import json;print(json.load(open('$CADDY_DIR/admin.json')).get('port') or '')" 2>/dev/null || true)
   [ -n "$ADMIN_PORT" ] || ADMIN_PORT=$(shuf -i 20000-60000 -n 1)
-  [ -n "$ADMIN_PATH" ] || ADMIN_PATH=$(grep '^PANEL_ADMIN_PATH=' "$ENV_FILE" | cut -d= -f2- || true)
+  [ -n "$ADMIN_PATH" ] || ADMIN_PATH=$(python3 -c "import json;print(json.load(open('$CADDY_DIR/admin.json')).get('path') or '')" 2>/dev/null || true)
   [ -n "$ADMIN_PATH" ] || ADMIN_PATH=$(openssl rand -hex 8)
-  set_env PANEL_ADMIN_PORT "$ADMIN_PORT"; set_env PANEL_ADMIN_PATH "$ADMIN_PATH"
+  python3 "$CADDYPY" "$FROM" "$CADDY_DIR.new" "$ADMIN_PORT" "$ADMIN_PATH"
+elif [ -f "$CADDY_DIR/admin.json" ]; then       # an update keeps whatever the panel's Settings page set
+  cp "$CADDY_DIR/admin.json" "$CADDY_DIR.new.seed" 2>/dev/null || true
+  mkdir -p "$CADDY_DIR.new"; mv "$CADDY_DIR.new.seed" "$CADDY_DIR.new/admin.json"
+  python3 "$CADDYPY" "$FROM" "$CADDY_DIR.new"
+else
+  python3 "$CADDYPY" "$FROM" "$CADDY_DIR.new" off
 fi
-bash "$APP/deploy/make-caddyfile.sh" "$ENV_FILE" "$APP/deploy/Caddyfile.new"
 if [ -z "${SKIP_DOCKER:-}" ]; then
   # a broken Caddyfile would take the panel down: check it first and keep the working one otherwise
-  if docker run --rm -v "$APP/deploy/Caddyfile.new:/etc/caddy/Caddyfile:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
-    mv "$APP/deploy/Caddyfile.new" "$APP/deploy/Caddyfile"
+  if docker run --rm --network host -v "$CADDY_DIR.new:/etc/caddy:ro" caddy:2 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
+    cp "$CADDY_DIR.new/admin.json" "$CADDY_DIR/admin.json"; cp "$CADDY_DIR.new/Caddyfile" "$CADDY_DIR/Caddyfile"
   else
     echo "The new Caddy settings did not validate; keeping the previous ones."
-    [ -f "$APP/deploy/Caddyfile" ] || { echo "no previous Caddyfile: stopping"; exit 1; }
-    rm -f "$APP/deploy/Caddyfile.new"
+    [ -f "$CADDY_DIR/Caddyfile" ] || { echo "no previous Caddyfile: stopping"; exit 1; }
   fi
+  rm -rf "$CADDY_DIR.new"
   docker compose --env-file "$ENV_FILE" -f "$APP/deploy/docker-compose.yml" up -d --build
 else
-  mv "$APP/deploy/Caddyfile.new" "$APP/deploy/Caddyfile"
+  cp "$CADDY_DIR.new/admin.json" "$CADDY_DIR/admin.json"; cp "$CADDY_DIR.new/Caddyfile" "$CADDY_DIR/Caddyfile"; rm -rf "$CADDY_DIR.new"
 fi
 
 URL=$(grep '^PANEL_URL=' "$ENV_FILE" | cut -d= -f2-)
 echo
-AP=$(grep '^PANEL_ADMIN_PORT=' "$ENV_FILE" | cut -d= -f2- || true); APATH=$(grep '^PANEL_ADMIN_PATH=' "$ENV_FILE" | cut -d= -f2- || true)
+AP=$(python3 -c "import json;print(json.load(open('$CADDY_DIR/admin.json')).get('port') or '')" 2>/dev/null || true)
+APATH=$(python3 -c "import json;print(json.load(open('$CADDY_DIR/admin.json')).get('path') or '')" 2>/dev/null || true)
 if [ -n "$AP" ] && [ -n "$APATH" ]; then
   HOSTPART=$(echo "$URL" | sed 's|^\(https\?://\)\(.*\)$|\2|')
   SCHEME=$(echo "$URL" | sed 's|^\(https\?://\).*$|\1|')
@@ -124,4 +133,4 @@ if [ -n "${NEW_INSTALL:-}" ]; then
 fi
 echo "API key for bots/scripts: in $ENV_FILE (PANEL_API_KEY); use it as: Authorization: Bearer <key>"
 case "$URL" in http://*) echo "WARNING: plain HTTP. Use a domain so node tokens and passwords are encrypted." ;; esac
-echo "Ports 80 and 443 must be open. Next: Locations -> New location, then run the install command on each node."
+echo "Ports 80 and 443 must be open. The panel itself is only reachable through Caddy (port 8000 listens on localhost). Next: Locations -> New location, then run the install command on each node."

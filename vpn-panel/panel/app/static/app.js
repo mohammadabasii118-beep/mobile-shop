@@ -1,8 +1,8 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function ago(iso) { const m = Math.max(1, Math.round((Date.now() - new Date(iso)) / 60000)); return m < 60 ? m + ' دقیقه پیش' : m < 1440 ? Math.round(m / 60) + ' ساعت پیش' : Math.round(m / 1440) + ' روز پیش'; }
-const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: [], brand: {name: 'پنل چندلوکیشن', logo: '', color: ''}, dnstt: null, tunnels: [], owner: '', onlineOnly: false};
-const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', routing: 'مسیریابی', users: 'کاربران', tunnels: 'تونل‌ها', admins: 'ادمین‌ها', look: 'ظاهر پنل'};
+const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: [], brand: {name: 'پنل چندلوکیشن', logo: '', color: ''}, dnstt: null, tunnels: [], access: null, owner: '', onlineOnly: false};
+const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', routing: 'مسیریابی', users: 'کاربران', tunnels: 'تونل‌ها', settings: 'تنظیمات', admins: 'ادمین‌ها', look: 'ظاهر پنل'};
 const STATUS = {active: ['good', 'فعال'], disabled: ['bad', 'غیرفعال'], expired: ['bad', 'منقضی'], quota: ['bad', 'حجم تمام شده']};
 
 const ICO = {
@@ -71,7 +71,7 @@ async function refresh() {
     const [users, opts] = await Promise.all([api('GET', '/me/users'), api('GET', '/me/options')]);
     S.users = users; S.nodes = opts.nodes; S.protos = opts.protocols; S.admins = []; S.tab = 'users';
   } else {
-    [S.nodes, S.users, S.protos, S.admins, S.dnstt, S.tunnels] = await Promise.all([api('GET', '/nodes'), api('GET', '/users'), api('GET', '/protocols'), api('GET', '/admins'), api('GET', '/dnstt'), api('GET', '/tunnels')]);
+    [S.nodes, S.users, S.protos, S.admins, S.dnstt, S.tunnels, S.access] = await Promise.all([api('GET', '/nodes'), api('GET', '/users'), api('GET', '/protocols'), api('GET', '/admins'), api('GET', '/dnstt'), api('GET', '/tunnels'), api('GET', '/settings')]);
   }
   const ids = new Set(S.users.map(u => u.id));
   S.sel = new Set([...S.sel].filter(i => ids.has(i)));   // a deleted user cannot stay selected
@@ -146,6 +146,25 @@ const views = {
           <td><button class="btn sm" data-rt-up="${r.id}" ${i === 0 ? 'disabled' : ''}>↑</button> <button class="btn sm" data-rt-down="${r.id}" ${i === R.rules.length - 1 ? 'disabled' : ''}>↓</button> <button class="btn sm" data-rt-delrule="${r.id}">حذف</button></td></tr>`).join('')
           || '<tr><td colspan="5" class="muted">قانونی نیست؛ همه‌ی ترافیک مستقیم می‌رود.</td></tr>'}
         </tbody></table></div></div>`;
+  },
+  settings() {
+    const a = S.access || {}, dis = a.managed ? '' : 'disabled';
+    return `<div class="panel"><h2>آدرس ورود به پنل</h2>
+      <div class="note">با روشن کردن «ورود مخفی»، صفحه‌ی ورود و مدیریت فقط روی یک <b>پورت جدا</b> و زیر یک <b>مسیر مخفی</b> باز می‌شود. آدرس عادی پنل (<span class="mono" dir="ltr" style="unicode-bidi:isolate">${esc(a.normal_url || '')}</span>) فقط برای نودها و لینک‌های اشتراک کاربران جواب می‌دهد و بقیه‌اش ۴۰۴ است. لینک اشتراک کاربران و نودها تغییری نمی‌کنند.
+      ${a.managed ? '' : '<br><b style="color:var(--bad)">این نصب هنوز به‌روز نشده؛ پنل را یک بار با دستور آپدیت به‌روز کنید تا این بخش کار کند.</b>'}</div>
+      ${a.enabled ? `<div class="link" style="margin-top:10px"><span style="min-width:90px">آدرس فعلی</span><code>${esc(a.url)}</code><button class="btn sm" data-copy="${esc(a.url)}">کپی</button></div>` : ''}
+      <div class="form" style="margin-top:12px">
+        <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="acOn" ${a.enabled ? 'checked' : ''} ${dis}> ورود مخفی (پورت + مسیر)</label>
+        <label class="f">پورت (۱۰۲۴ تا ۶۵۵۳۵)<input type="number" id="acPort" min="1024" max="65535" value="${a.port || ''}" dir="ltr" ${dis}></label>
+        <label class="f">مسیر مخفی (حرف انگلیسی و عدد، حداقل ۶)<input type="text" id="acPath" value="${esc(a.path || '')}" dir="ltr" ${dis}></label></div>
+      <div class="chips" style="margin-top:10px"><button class="btn" id="acRand" ${dis}>پورت و مسیر تصادفی</button><button class="btn pri" id="acSave" ${dis}>ذخیره</button></div>
+      <div class="note" style="margin-top:10px"><b>مهم:</b> قبل از ذخیره، پورت جدید را در فایروال سرور (و فایروال هاستینگ) باز کن؛ وگرنه صفحه‌ی ورود باز نمی‌شود. اگر قفل شدی: روی سرور پنل دستور آپدیت را با <span class="mono" dir="ltr" style="unicode-bidi:isolate">--no-secure</span> اجرا کن.</div></div>
+    <div class="panel"><h2>تغییر رمز</h2><div class="form">
+      <label class="f">رمز فعلی<input type="password" id="pwCur" autocomplete="current-password" dir="ltr"></label>
+      <label class="f">رمز جدید (حداقل ۸ کاراکتر)<input type="password" id="pwNew" autocomplete="new-password" dir="ltr"></label>
+      <label class="f">تکرار رمز جدید<input type="password" id="pwNew2" autocomplete="new-password" dir="ltr"></label></div>
+      <div style="margin-top:10px"><button class="btn pri" id="pwSave">ذخیره‌ی رمز</button></div>
+      <div class="note" style="margin-top:10px">رمز داخل فایل <span class="mono" dir="ltr" style="unicode-bidi:isolate">.env</span> سرور همیشه به‌عنوان رمز بازیابی کار می‌کند.</div></div>`;
   },
   tunnels() {
     const ST = {up: ['good', 'برقرار'], wait_client: ['warn', 'ایران آماده؛ منتظر سرور خارج'], wait_iran: ['warn', 'منتظر نصب روی سرور ایران'], off: ['', 'خاموش']};
@@ -261,6 +280,7 @@ function portPanel() {
 function render() {
   $('#title').textContent = TITLES[S.tab];
   document.querySelectorAll('[data-sudo]').forEach(b => b.hidden = isReseller());
+  $('#pwBtn').hidden = !isReseller();   // the main admin changes the password under Settings
   $('#actions').innerHTML = S.tab === 'users' ? (isReseller() ? '' : '<button class="btn" id="bulkBtn">عملیات گروهی</button> ') + '<button class="btn pri" id="addUser">+ کاربر جدید</button>'
     : S.tab === 'nodes' ? '<button class="btn pri" id="addNode">+ لوکیشن جدید</button>'
     : S.tab === 'tunnels' ? '<button class="btn pri" id="addTunnel">+ تونل جدید</button>'
@@ -436,6 +456,21 @@ document.addEventListener('click', async e => {
       a.download = (r.headers.get('content-disposition') || '').split('filename=')[1]?.replace(/"/g, '') || 'panel-backup.db';
       a.click(); URL.revokeObjectURL(a.href); toast('پشتیبان دانلود شد');
     }
+    else if (t.id === 'acRand') {
+      $('#acPort').value = 20000 + Math.floor(Math.random() * 40000);
+      $('#acPath').value = [...crypto.getRandomValues(new Uint8Array(8))].map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    else if (t.id === 'acSave') {
+      const on = $('#acOn').checked, port = +$('#acPort').value, path = $('#acPath').value.trim();
+      if (on && (!port || !path)) { toast('پورت و مسیر را وارد کن'); return; }
+      const r = await api('PUT', '/settings/admin-access', {enabled: on, port: on ? port : null, path: on ? path : null});
+      S.access = r; render();
+      const go = on ? r.url : r.normal_url + '/';
+      openModal(`<h2>ذخیره شد</h2><p class="muted" style="margin:0">${on ? 'از این به بعد صفحه‌ی ورود فقط اینجاست (آن را جایی ننویس):' : 'ورود مخفی خاموش شد؛ پنل دوباره روی آدرس عادی است:'}</p>
+        <div class="link"><code>${esc(go)}</code><button class="btn sm" data-copy="${esc(go)}">کپی</button></div>
+        ${on ? '<div class="note">چند ثانیه صبر کن تا تنظیمات اعمال شود. اگر باز نشد، مطمئن شو پورت در فایروال باز است.</div>' : ''}
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>بستن</button><a class="btn pri" style="text-decoration:none" href="${esc(go)}">باز کردن آدرس جدید</a></div>`);
+    }
     else if (t.id === 'pwBtn') {
       openModal(`<h2>تغییر رمز</h2><div class="form">
         <label class="f">رمز فعلی<input type="password" id="pwCur" autocomplete="current-password" dir="ltr"></label>
@@ -447,7 +482,7 @@ document.addEventListener('click', async e => {
       if ($('#pwNew').value !== $('#pwNew2').value) { toast('تکرار رمز یکی نیست'); return; }
       const r = await api('POST', isReseller() ? '/me/password' : '/password', {current: $('#pwCur').value, new: $('#pwNew').value});
       if (r.token) { token = r.token; try { localStorage.setItem('tok', token); } catch (_) {} }
-      closeModal(); toast('رمز عوض شد');
+      closeModal(); toast('رمز عوض شد'); ['pwCur', 'pwNew', 'pwNew2'].forEach(i => { if ($('#' + i)) $('#' + i).value = ''; });
     }
     else if (t.id === 'logoutBtn') { token = ''; try { localStorage.removeItem('tok'); } catch (_) {} showLogin(); }
     else if (t.id === 'doLogin') {
@@ -684,4 +719,4 @@ document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id
 
 (async () => { await loadBrand(); if (!token) return showLogin(); try { await refresh(); } catch (e) {} })();
 setInterval(() => { const a = document.activeElement, typing = a && ['INPUT', 'SELECT', 'TEXTAREA'].includes(a.tagName) && a.id !== 'uq' && $('#view').contains(a);
-  if (token && $('#modal').hidden && S.tab !== 'look' && !typing) refresh().catch(() => {}); }, 20000);
+  if (token && $('#modal').hidden && S.tab !== 'look' && S.tab !== 'settings' && !typing) refresh().catch(() => {}); }, 20000);

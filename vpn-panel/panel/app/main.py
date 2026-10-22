@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 
 from .catalog import PROTOCOLS, REALITY_SNI, SS_METHOD
 from .db import Admin, Setting, Node, NodeProtocol, Outbound, Rule, Tunnel, User, engine, get_db, init_db, utcnow
+from . import caddyfile
 from . import dns as cfdns
 from . import routing
 from .subpage import qr_text, render_sub_page
@@ -79,9 +80,16 @@ async def security_headers(request: Request, call_next):
     return resp
 
 
+def caddy_dir() -> str:
+    return os.environ.get("PANEL_CADDY_DIR", "")
+
+
 def admin_base() -> str:
-    """"/secret" when the admin pages live under a secret path (set by the installer), else ""."""
-    p = os.environ.get("PANEL_ADMIN_PATH", "")
+    """"/secret" when the admin pages live under a secret path (panel Settings / installer), else ""."""
+    cur = caddyfile.load(caddy_dir()) if caddy_dir() else {"path": None}
+    if cur["path"]:
+        return "/" + cur["path"]
+    p = os.environ.get("PANEL_ADMIN_PATH", "")     # plain setups without the managed Caddy files
     return "/" + p if re.fullmatch(r"[A-Za-z0-9_-]{6,64}", p) else ""
 
 
@@ -148,6 +156,48 @@ def main_password_ok(db: Session, pw: str) -> bool:
     forgotten password (whoever can read that file owns the server anyway)."""
     stored = get_setting(db, "admin_pw_hash")
     return (bool(stored) and check_pw(pw, stored)) or hmac.compare_digest(pw.encode(), admin_password().encode())
+
+
+class AdminAccess(BaseModel):
+    enabled: bool
+    port: int | None = None
+    path: str | None = None
+
+
+def access_out() -> dict:
+    cur = caddyfile.load(caddy_dir()) if caddy_dir() else {"port": None, "path": None}
+    frm = os.environ.get("PANEL_FROM", "")
+    return {"managed": bool(caddy_dir() and frm and os.access(caddy_dir(), os.W_OK)), "enabled": bool(cur["port"] and cur["path"]),
+            "port": cur["port"], "path": cur["path"],
+            "url": caddyfile.admin_url(frm, cur["port"], cur["path"]) if cur["port"] and cur["path"] and frm else "",
+            "normal_url": public_url_from_env()}
+
+
+def public_url_from_env() -> str:
+    return os.environ.get("PANEL_PUBLIC_URL", "").rstrip("/")
+
+
+@app.get("/api/settings", dependencies=[Depends(require_admin)])
+def get_access():
+    return access_out()
+
+
+@app.put("/api/settings/admin-access", dependencies=[Depends(require_admin)])
+def set_access(body: AdminAccess):
+    """Where the login and admin pages live. Takes effect at once (Caddy reloads its Caddyfile by itself); the open
+    page keeps working until reloaded, and the new port has to be open in the server's firewall."""
+    out = access_out()
+    if not out["managed"]:
+        raise HTTPException(409, "این نصب هنوز به‌روز نشده؛ پنل را با دستور آپدیت یک بار به‌روز کنید")
+    frm = os.environ["PANEL_FROM"]
+    try:
+        if body.enabled:
+            caddyfile.write(caddy_dir(), frm, body.port, body.path)
+        else:
+            caddyfile.write(caddy_dir(), frm)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    return access_out()
 
 
 class PasswordChange(BaseModel):

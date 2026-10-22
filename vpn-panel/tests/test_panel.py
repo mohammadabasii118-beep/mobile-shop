@@ -1647,26 +1647,45 @@ def test_password_change_from_the_panel():
 
 
 def test_secret_admin_path_docs_off_and_headers(monkeypatch, tmp_path):
-    import subprocess
+    from app import caddyfile
     with TestClient(app) as c:
         assert c.get("/docs").status_code in (404, 405) and c.get("/openapi.json").status_code in (404, 405)
         r = c.get("/")
         assert r.headers["x-frame-options"] == "DENY" and r.headers["x-content-type-options"] == "nosniff"
         assert 'window.BASE=""' in r.text and 'src="/app.js?v=' in r.text
         monkeypatch.setenv("PANEL_ADMIN_PATH", "s3cretpath99")
-        r = c.get("/")
-        assert 'window.BASE="/s3cretpath99"' in r.text and 'src="/s3cretpath99/app.js?v=' in r.text
+        assert 'window.BASE="/s3cretpath99"' in c.get("/").text and 'src="/s3cretpath99/app.js?v=' in c.get("/").text
         monkeypatch.setenv("PANEL_ADMIN_PATH", "bad path!")                 # an unsafe value is ignored, never echoed
         assert 'window.BASE=""' in c.get("/").text
-    env = tmp_path / "e.env"
-    env.write_text("PANEL_FROM=panel.example.com\nPANEL_ADMIN_PORT=34567\nPANEL_ADMIN_PATH=abc123def456\n")
-    out = tmp_path / "Caddyfile"
-    subprocess.run(["bash", str(ROOT / "deploy" / "make-caddyfile.sh"), str(env), str(out)], check=True)
-    text = out.read_text()
+    text = caddyfile.render("panel.example.com", 34567, "abc123def456")
     assert "panel.example.com:34567 {" in text and "handle_path /abc123def456/*" in text and "respond 404" in text
-    assert "@public path /sub/* /api/node/* /api/relay/*" in text
-    env.write_text("PANEL_FROM=panel.example.com\n")
-    subprocess.run(["bash", str(ROOT / "deploy" / "make-caddyfile.sh"), str(env), str(out)], check=True)
-    assert "reverse_proxy panel:8000" in out.read_text() and "respond 404" not in out.read_text()
-    env.write_text("PANEL_FROM=panel.example.com\nPANEL_ADMIN_PORT=1\nPANEL_ADMIN_PATH=../x\n")
-    assert subprocess.run(["bash", str(ROOT / "deploy" / "make-caddyfile.sh"), str(env), str(out)], capture_output=True).returncode != 0
+    assert "@public path /sub/* /api/node/* /api/relay/*" in text and "reverse_proxy 127.0.0.1:8000" in text
+    plain = caddyfile.render("panel.example.com")
+    assert "reverse_proxy 127.0.0.1:8000" in plain and "respond 404" not in plain
+    assert caddyfile.check(80, "abc123") and caddyfile.check(34567, "../x") and caddyfile.check(34567, "abc123") is None
+    assert caddyfile.admin_url("panel.example.com", 1234, "abc123def") == "https://panel.example.com:1234/abc123def/"
+    assert caddyfile.admin_url("http://1.2.3.4", 1234, "abc123def") == "http://1.2.3.4:1234/abc123def/"
+
+
+def test_admin_access_settings_from_the_panel(monkeypatch, tmp_path):
+    from app import caddyfile
+    with TestClient(app) as c:
+        h = admin(c)
+        monkeypatch.delenv("PANEL_CADDY_DIR", raising=False)
+        assert c.get("/api/settings", headers=h).json()["managed"] is False
+        assert c.put("/api/settings/admin-access", headers=h, json={"enabled": True, "port": 34567, "path": "abc123def"}).status_code == 409
+        monkeypatch.setenv("PANEL_CADDY_DIR", str(tmp_path))
+        monkeypatch.setenv("PANEL_FROM", "panel.example.com")
+        assert c.get("/api/settings").status_code == 401                              # not for the public
+        assert c.get("/api/settings", headers=h).json()["enabled"] is False
+        bad = c.put("/api/settings/admin-access", headers=h, json={"enabled": True, "port": 80, "path": "abc123def"})
+        assert bad.status_code == 422
+        assert c.put("/api/settings/admin-access", headers=h, json={"enabled": True, "port": 34567, "path": "../x"}).status_code == 422
+        r = c.put("/api/settings/admin-access", headers=h, json={"enabled": True, "port": 34567, "path": "abc123def"}).json()
+        assert r["enabled"] and r["url"] == "https://panel.example.com:34567/abc123def/"
+        assert "panel.example.com:34567" in (tmp_path / "Caddyfile").read_text()
+        assert 'window.BASE="/abc123def"' in c.get("/").text                          # the page already uses the new path
+        assert caddyfile.load(str(tmp_path)) == {"port": 34567, "path": "abc123def"}
+        r = c.put("/api/settings/admin-access", headers=h, json={"enabled": False}).json()
+        assert not r["enabled"] and "respond 404" not in (tmp_path / "Caddyfile").read_text()
+        assert 'window.BASE=""' in c.get("/").text
