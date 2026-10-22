@@ -1386,7 +1386,7 @@ def tunnel_out(t: Tunnel, db: Session, request: Request) -> dict:
         problems.append("روی سرور خارج چیزی روی این پورت‌ها گوش نمی‌دهد: " + ", ".join(map(str, cs["down"])))
     problems += list(cs.get("errors", [])) if client_on else []
     return {"id": t.id, "name": t.name, "iran_host": t.iran_host, "node_id": t.node_id, "node_name": node.name if node else "؟",
-            "ctl_port": t.ctl_port, "forwards": t.forwards, "ports": forwards_text(t.forwards), "enabled": t.enabled, "publish": t.publish, "encrypt": t.encrypt,
+            "ctl_port": t.ctl_port, "forwards": t.forwards, "ports": forwards_text(t.forwards), "enabled": t.enabled, "publish": t.publish, "encrypt": t.encrypt, "mode": t.mode,
             "test": test_state(t), "status": status, "pool": pool, "iran_online": relay_on, "node_online": client_on, "problems": problems,
             "install_command": f"bash <(curl -fsSL {public_url(request)}/relay-install.sh) --token {t.relay_token}"}
 
@@ -1398,6 +1398,7 @@ class TunnelIn(BaseModel):
     ports: str = Field(max_length=4000)
     publish: bool = True
     encrypt: Literal["off", "tcp", "all"] = "off"
+    mode: Literal["reverse", "direct"] = "reverse"
 
 
 class TunnelPatch(BaseModel):
@@ -1407,6 +1408,7 @@ class TunnelPatch(BaseModel):
     enabled: bool | None = None
     publish: bool | None = None
     encrypt: Literal["off", "tcp", "all"] | None = None
+    mode: Literal["reverse", "direct"] | None = None
 
 
 def clean_host(host: str) -> str:
@@ -1421,16 +1423,21 @@ def list_tunnels(request: Request, db: Session = Depends(get_db)):
     return [tunnel_out(t, db, request) for t in db.scalars(select(Tunnel).order_by(Tunnel.id))]
 
 
+def free_ctl_port(db: Session, host: str, node_id: int, taken: set, exclude: int | None = None) -> int:
+    """A control port nobody else uses on either server: tunnels of the same Iran address (reverse mode listens there) and of the
+    same foreign location (direct mode listens there) must not share one."""
+    used = {t.ctl_port for t in db.scalars(select(Tunnel).where((Tunnel.iran_host == host) | (Tunnel.node_id == node_id))) if t.id != exclude}
+    return next(p for p in range(7777, 7977) if p not in used and p not in taken)
+
+
 @app.post("/api/tunnels", dependencies=[Depends(require_admin)])
 def create_tunnel(body: TunnelIn, request: Request, db: Session = Depends(get_db)):
     if not db.get(Node, body.node_id):
         raise HTTPException(404, "لوکیشن خارج پیدا نشد")
     host, forwards = clean_host(body.iran_host), parse_forwards(body.ports)
-    used = {t.ctl_port for t in db.scalars(select(Tunnel).where(Tunnel.iran_host == host))}
-    taken = {f["listen"] for f in forwards}
-    ctl = next(p for p in range(7777, 7977) if p not in used and p not in taken)
+    ctl = free_ctl_port(db, host, body.node_id, {f["listen"] for f in forwards})
     t = Tunnel(name=body.name.strip(), iran_host=host, node_id=body.node_id, ctl_port=ctl, forwards=forwards,
-               token=secrets.token_hex(16), relay_token=secrets.token_urlsafe(24), publish=body.publish, encrypt=body.encrypt)
+               token=secrets.token_hex(16), relay_token=secrets.token_urlsafe(24), publish=body.publish, encrypt=body.encrypt, mode=body.mode)
     db.add(t)
     db.commit()
     return tunnel_out(t, db, request)
@@ -1453,6 +1460,11 @@ def patch_tunnel(tunnel_id: int, body: TunnelPatch, request: Request, db: Sessio
         t.publish = body.publish
     if body.encrypt is not None:
         t.encrypt = body.encrypt
+    if body.mode is not None:
+        t.mode = body.mode
+    if body.mode is not None or body.iran_host is not None:       # the port must stay free on the server that listens
+        t.ctl_port = free_ctl_port(db, t.iran_host, t.node_id, {f["listen"] for f in t.forwards} | {t.ctl_port}, exclude=t.id) \
+            if db.scalar(select(Tunnel.id).where(Tunnel.id != t.id, Tunnel.ctl_port == t.ctl_port, (Tunnel.iran_host == t.iran_host) | (Tunnel.node_id == t.node_id))) else t.ctl_port
     db.commit()
     return tunnel_out(t, db, request)
 
@@ -1497,7 +1509,8 @@ def _sha(path: Path) -> str:
 def relay_config(t: Tunnel = Depends(require_relay), db: Session = Depends(get_db)):
     node = db.get(Node, t.node_id)
     return {"test": test_job(t, "iran", node.address) if node else None,
-            "tunnel": {"id": t.id, "name": t.name, "enabled": t.enabled, "ctl_port": t.ctl_port, "token": t.token, "forwards": t.forwards, "encrypt": t.encrypt},
+            "tunnel": {"id": t.id, "name": t.name, "enabled": t.enabled, "ctl_port": t.ctl_port, "token": t.token, "forwards": t.forwards, "encrypt": t.encrypt,
+                       "mode": t.mode, "dial": f"{node.address}:{t.ctl_port}" if node else ""},
             "vtunnel_sha256": _sha(ROOT / "agent" / "vtunnel.py"), "agent_sha256": _sha(ROOT / "agent" / "relay_agent.py")}
 
 
@@ -1537,7 +1550,7 @@ def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db
     served = {p.proto for p in node.protocols if p.enabled}   # a user needs an account while any copy of the protocol runs
     extra = [{"proto": p.proto, "port": p.port, "tag": inst_tag(p)} for p in node.protocols if p.enabled and p.extra]
     dc = dnstt_conf(db)
-    tunnels = [{"id": t.id, "server": f"{t.iran_host}:{t.ctl_port}", "token": t.token, "pool": 8, "encrypt": t.encrypt, "test": test_job(t, "node", t.iran_host),
+    tunnels = [{"id": t.id, "server": f"{t.iran_host}:{t.ctl_port}", "token": t.token, "pool": 8, "encrypt": t.encrypt, "mode": t.mode, "listen": t.ctl_port, "test": test_job(t, "node", t.iran_host),
                 "targets": sorted({f["target"] for f in t.forwards if f["proto"] == "tcp"})}
                for t in db.scalars(select(Tunnel).where(Tunnel.node_id == node.id, Tunnel.enabled == True))]  # noqa: E712
     users = []

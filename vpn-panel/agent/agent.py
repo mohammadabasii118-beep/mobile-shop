@@ -957,6 +957,11 @@ VTUNNEL_PREFIX = "vtunnel-client-"
 tunnel_state = {}   # tunnel id -> {"active": bool, "down": [ports], "errors": [...]}; sent with the next report
 
 
+def client_args(t):
+    """Reverse (default): dial the Iran server. Direct: wait on the control port for the Iran server to dial in."""
+    return f"--listen 0.0.0.0:{t['listen']}" if t.get("mode") == "direct" and t.get("listen") else f"--server {t['server']} --pool {t.get('pool', 8)}"
+
+
 def vtunnel_unit(t):
     return f"""[Unit]
 Description=vtunnel client {t['id']}
@@ -964,7 +969,7 @@ After=network-online.target
 
 [Service]
 EnvironmentFile=/etc/vpn-node/{VTUNNEL_PREFIX}{t['id']}.env
-ExecStart=/usr/bin/python3 {VTUNNEL_BIN} client --server {t['server']} --pool {t.get('pool', 8)} --encrypt {t.get('encrypt', 'off')}
+ExecStart=/usr/bin/python3 {VTUNNEL_BIN} client {client_args(t)} --encrypt {t.get('encrypt', 'off')}
 Restart=always
 RestartSec=2
 LimitNOFILE=1048576

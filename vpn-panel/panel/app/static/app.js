@@ -251,7 +251,7 @@ const views = {
       : `<tr><td>${label}</td><td><span class="pill bad">بسته</span></td><td colspan="5" class="muted">${esc(r.error || '')}</td></tr>`;
     const verdict = (a, b) => (!a || !b) ? '' : a.ok && b.ok ? 'هر دو جهت باز است؛ تونل معکوس (فعلی) و حالت مستقیم هر دو ممکن‌اند.'
       : b.ok ? 'خارج به ایران وصل می‌شود ولی ایران به خارج نه؛ تونل معکوس (فعلی) درست کار می‌کند.'
-      : a.ok ? 'ایران به خارج وصل می‌شود ولی خارج به ایران نه؛ تونل معکوس (فعلی) کار نمی‌کند و باید ایران به خارج وصل شود.'
+      : a.ok ? 'ایران به خارج وصل می‌شود ولی خارج به ایران نه؛ تونل معکوس (فعلی) کار نمی‌کند و باید ایران به خارج وصل شود؛ در «پورت‌ها / ویرایش»، جهت اتصال را «مستقیم» بگذار.'
       : 'هیچ جهتی جواب نداد؛ پورت تست را در فایروال هر دو سرور باز کن و دوباره تست کن.';
     const testBox = t => { const x = t.test; if (!x) return '';
       return `<div class="note" style="margin-top:10px"><b>تست اتصال</b> ${x.status === 'running' ? '<span class="pill warn">در حال انجام (حدود ۲ تا ۳ دقیقه)…</span>' : x.status === 'timeout' ? '<span class="pill bad">ناقص ماند</span>' : '<span class="pill good">تمام شد</span>'}
@@ -269,6 +269,7 @@ const views = {
         <div style="margin-top:8px" class="muted"><span class="mono" dir="ltr">${esc(t.iran_host)}</span> ← <b>${esc(t.node_name)}</b></div>
         <div class="chips" style="margin-top:8px">${t.forwards.map(f => `<span class="cc" dir="ltr">${f.proto === 'udp' ? 'UDP ' : ''}${f.listen}${f.target !== f.listen ? ' → ' + f.target : ''}</span>`).join('')}</div>
         ${testBox(t)}
+        ${t.mode === 'direct' ? `<div class="muted" style="margin-top:6px;font-size:12px">↔ حالت مستقیم: سرور ایران به خارج وصل می‌شود؛ پورت <span class="mono">${t.ctl_port}</span> (TCP و UDP) روی سرور <b>خارج</b> باید باز باشد</div>` : ''}
         ${t.encrypt !== 'off' ? `<div class="muted" style="margin-top:6px;font-size:12px">🔒 رمزنگاری: ${t.encrypt === 'all' ? 'TCP و UDP' : 'فقط TCP'}</div>` : ''}
         ${t.publish ? '<div class="muted" style="margin-top:6px;font-size:12px">در اشتراک کاربران هم هست (کانفیگ‌های «🇮🇷 …»)</div>' : ''}
         ${t.problems.length ? `<div class="note" style="margin-top:8px;color:var(--bad)">${t.problems.map(esc).join('<br>')}</div>` : ''}
@@ -597,12 +598,13 @@ document.addEventListener('click', async e => {
         <label class="f">لوکیشن خارج<select id="tnNode">${S.nodes.map(n => `<option value="${n.id}">${esc(n.name)}</option>`).join('')}</select></label>
         <label class="f">پورت‌ها<input type="text" id="tnPorts" dir="ltr" placeholder="80, 81=80, udp:5000, 2000-2010"></label>
         <label class="f">رمزنگاری بین دو سرور<select id="tnEnc"><option value="off">بدون رمزنگاری (سریع‌ترین؛ برای بازی و پروتکل‌های رمزشده)</option><option value="tcp">فقط TCP (پیشنهادی برای VLESS ساده)</option><option value="all">TCP و UDP</option></select></label>
+        <label class="f">جهت اتصال تونل<select id="tnMode"><option value="reverse">معکوس (پیش‌فرض): سرور خارج به ایران وصل می‌شود</option><option value="direct">مستقیم: سرور ایران به خارج وصل می‌شود (وقتی ورودی ایران بسته است)</option></select></label>
         <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="tnPub" checked> به کاربران هم کانفیگِ «از طریق ایران» بده</label></div>
         <div class="note">با کاما جدا کنید. <span class="mono" dir="ltr" style="unicode-bidi:isolate">81=80</span>: پورت ۸۱ ایران به پورت ۸۰ خارج. <span class="mono" dir="ltr" style="unicode-bidi:isolate">udp:</span> برای UDP (بازی). بازه با خط تیره. پورت‌های ۷۷۷۷ به بعد برای خود تونل رزرو می‌شوند.</div>
         <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="tnSave">ساخت</button></div>`);
     }
     else if (t.id === 'tnSave') {
-      const r = await api('POST', '/tunnels', {name: $('#tnName').value.trim(), iran_host: $('#tnHost').value.trim(), node_id: +$('#tnNode').value, ports: $('#tnPorts').value, publish: $('#tnPub').checked, encrypt: $('#tnEnc').value});
+      const r = await api('POST', '/tunnels', {name: $('#tnName').value.trim(), iran_host: $('#tnHost').value.trim(), node_id: +$('#tnNode').value, ports: $('#tnPorts').value, publish: $('#tnPub').checked, encrypt: $('#tnEnc').value, mode: $('#tnMode').value});
       await refresh();
       openModal(`<h2>تونل ساخته شد</h2><p class="muted" style="margin:0">روی <b>سرور ایران</b> (با دسترسی root) این دستور را اجرا کنید. بقیه‌ی کارها (نصب، تنظیم، راه‌اندازی دوباره و سمت خارج) خودکار است:</p>
         <pre>${esc(r.install_command)}</pre><div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-copy="${esc(r.install_command)}">کپی دستور</button><button class="btn pri" data-close>بستن</button></div>`);
@@ -615,12 +617,13 @@ document.addEventListener('click', async e => {
         <label class="f">آدرس سرور ایران<input type="text" id="teHost" dir="ltr" value="${esc(x.iran_host)}"></label>
         <label class="f">پورت‌ها<input type="text" id="tePorts" dir="ltr" value="${esc(x.ports)}"></label>
         <label class="f">رمزنگاری بین دو سرور<select id="teEnc"><option value="off"${x.encrypt === 'off' ? ' selected' : ''}>بدون رمزنگاری (سریع‌ترین؛ برای بازی و پروتکل‌های رمزشده)</option><option value="tcp"${x.encrypt === 'tcp' ? ' selected' : ''}>فقط TCP (پیشنهادی برای VLESS ساده)</option><option value="all"${x.encrypt === 'all' ? ' selected' : ''}>TCP و UDP</option></select></label>
+        <label class="f">جهت اتصال تونل<select id="teMode"><option value="reverse"${x.mode === 'reverse' ? ' selected' : ''}>معکوس (پیش‌فرض): سرور خارج به ایران وصل می‌شود</option><option value="direct"${x.mode === 'direct' ? ' selected' : ''}>مستقیم: سرور ایران به خارج وصل می‌شود (وقتی ورودی ایران بسته است)</option></select></label>
         <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="tePub" ${x.publish ? 'checked' : ''}> به کاربران هم کانفیگِ «از طریق ایران» بده</label></div>
         <div class="note">وقتی روشن باشد، برای هر پورتِ تونل که به یک پروتکل روشن همان لوکیشن می‌رسد (مثلاً مقصد ۸۰ برای «VLESS بدون TLS»، یا پورت UDP هیستریا)، در اشتراک کاربرانی که آن پروتکل را دارند یک کانفیگ «🇮🇷 …» با آدرس ایران اضافه می‌شود.</div>
         <div class="note">تغییر پورت‌ها ظرف حدود ۳۰ ثانیه روی هر دو سرور اعمال می‌شود. اگر آدرس ایران را عوض می‌کنید، دستور نصب را روی سرور جدید اجرا کنید.</div>
         <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="teSave" data-id="${x.id}">ذخیره</button></div>`);
     }
-    else if (t.id === 'teSave') { await api('PATCH', '/tunnels/' + d.id, {name: $('#teName').value.trim(), iran_host: $('#teHost').value.trim(), ports: $('#tePorts').value, publish: $('#tePub').checked, encrypt: $('#teEnc').value}); closeModal(); await refresh(); toast('ذخیره شد'); }
+    else if (t.id === 'teSave') { await api('PATCH', '/tunnels/' + d.id, {name: $('#teName').value.trim(), iran_host: $('#teHost').value.trim(), ports: $('#tePorts').value, publish: $('#tePub').checked, encrypt: $('#teEnc').value, mode: $('#teMode').value}); closeModal(); await refresh(); toast('ذخیره شد'); }
     else if (d.ttoggle) { const x = S.tunnels.find(q => q.id === +d.ttoggle); await api('PATCH', '/tunnels/' + x.id, {enabled: !x.enabled}); await refresh(); }
     else if (d.tdel) {
       const x = S.tunnels.find(q => q.id === +d.tdel);

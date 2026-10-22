@@ -6,6 +6,9 @@ The server runs on the side users connect to (e.g. Iran) and opens the public po
 
   server:  vtunnel.py server --listen 0.0.0.0:7000 --token SECRET --forward 80 --forward 81=80 --forward udp:5000
   client:  vtunnel.py client --server IRAN_IP:7000 --token SECRET --pool 8
+Direct mode (the server dials out instead, for networks where only that direction is open):
+  client:  vtunnel.py client --listen 0.0.0.0:7000 --token SECRET
+  server:  vtunnel.py server --dial FOREIGN_IP:7000 --token SECRET --forward 80
 
 --forward [tcp:|udp:]LISTEN_PORT[=TARGET_PORT]: connections to LISTEN_PORT on the server come out on 127.0.0.1:TARGET_PORT of
 the client machine (TARGET defaults to LISTEN).
@@ -232,6 +235,35 @@ class UdpBox:
             return None
 
 
+async def accept_handshake(r, w, token, encrypt):
+    """The side that LISTENS for the tunnel connection: challenge/response (or the encrypted handshake) -> (reader, writer)."""
+    if encrypt != "off":
+        return await secure_server(r, w, token)
+    nonce = os.urandom(16)
+    w.write(MAGIC + nonce)
+    await w.drain()
+    resp = await asyncio.wait_for(r.readexactly(32), 5)
+    if not hmac.compare_digest(resp, mac(token, nonce)):
+        raise ConnectionError("wrong token")
+    w.write(b"K")
+    await w.drain()
+    return r, w
+
+
+async def dial_handshake(r, w, token, encrypt):
+    """The side that DIALS the tunnel connection."""
+    if encrypt != "off":
+        return await secure_client(r, w, token)
+    hdr = await asyncio.wait_for(r.readexactly(19), 8)
+    if hdr[:3] != MAGIC:
+        raise ConnectionError("not a vtunnel peer")
+    w.write(mac(token, hdr[3:]))
+    await w.drain()
+    if await asyncio.wait_for(r.readexactly(1), 8) != b"K":
+        raise ConnectionError("rejected")
+    return r, w
+
+
 class Idle:
     """An authenticated connection from the client that waits for a user."""
     def __init__(self, r, w):
@@ -245,8 +277,9 @@ class Idle:
 
 
 class Server:
-    def __init__(self, token, host, port, forwards, status_file="", encrypt="off"):
+    def __init__(self, token, host, port, forwards, status_file="", encrypt="off", dial=None, pool=8):
         self.token, self.host, self.port, self.status_file = token, host, port, status_file
+        self.dial, self.pool_size = dial, pool       # dial=(host, port): DIRECT mode, this side opens the tunnel connections
         self.encrypt = encrypt
         self.ubox = UdpBox(token, "server") if encrypt == "all" else None
         self.failed = []        # forwarded ports that could not be opened (taken by another program)
@@ -265,23 +298,34 @@ class Server:
         tune(w)
         raw = w
         try:
-            if self.encrypt != "off":
-                r, w = await secure_server(r, w, self.token)
-            else:
-                nonce = os.urandom(16)
-                w.write(MAGIC + nonce)
-                await w.drain()
-                resp = await asyncio.wait_for(r.readexactly(32), 5)
-                if not hmac.compare_digest(resp, mac(self.token, nonce)):
-                    LOG.warning("tunnel connection from %s rejected (wrong token)", raw.get_extra_info("peername"))
-                    w.close()
-                    return
-                w.write(b"K")
-                await w.drain()
+            r, w = await accept_handshake(r, w, self.token, self.encrypt)
         except Exception as e:
             LOG.warning("tunnel connection from %s rejected (%s)", raw.get_extra_info("peername"), e.__class__.__name__)
             raw.close()
             return
+        await self.serve_pooled(r, w)
+
+    async def dial_worker(self):
+        """DIRECT mode: keep one ready connection to the other side; a new one is opened as soon as it is used."""
+        backoff = 1
+        while True:
+            raw = None
+            try:
+                r, raw = await asyncio.wait_for(asyncio.open_connection(*self.dial), 8)
+                tune(raw)
+                r, w = await dial_handshake(r, raw, self.token, self.encrypt)
+                backoff = 1
+            except Exception as e:
+                if raw:
+                    raw.close()
+                if backoff == 1 or backoff >= 10:
+                    LOG.warning("cannot reach %s:%s: %s (retrying)", self.dial[0], self.dial[1], e.__class__.__name__ if not str(e) else e)
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, 10)
+                continue
+            await self.serve_pooled(r, w)
+
+    async def serve_pooled(self, r, w):
         e = Idle(r, w)
         self.pool.append(e)
         self.wake.set()
@@ -390,9 +434,23 @@ class Server:
                 pass
             await asyncio.sleep(5)
 
+    async def udp_register(self):
+        """DIRECT mode: announce ourselves to the other side's UDP port (it learns our address from this)."""
+        loop = asyncio.get_running_loop()
+        self.client_addr = (await loop.getaddrinfo(self.dial[0], self.dial[1], family=socket.AF_INET, type=socket.SOCK_DGRAM))[0][4]
+        while True:
+            ts = struct.pack("!Q", int(time.time()))
+            frame = b"R" + ts + mac(self.token, ts)[:16]
+            try_send(self.tsock, self.ubox.seal(frame) if self.ubox else frame, self.client_addr)
+            await asyncio.sleep(UDP_REGISTER)
+
     async def run(self):
         loop = asyncio.get_running_loop()
-        await asyncio.start_server(self.on_tunnel, self.host, self.port, reuse_address=True)
+        if self.dial:
+            for _ in range(self.pool_size):
+                asyncio.ensure_future(self.dial_worker())
+        else:
+            await asyncio.start_server(self.on_tunnel, self.host, self.port, reuse_address=True)
         for lport, tport in self.tcp:
             try:
                 await asyncio.start_server(lambda r, w, t=tport: self.on_user(r, w, t), self.host, lport, reuse_address=True)
@@ -401,8 +459,10 @@ class Server:
                 self.failed.append(f"tcp/{lport}")
                 LOG.error("cannot listen on tcp %s: %s", lport, e)
         if self.udp:
-            self.tsock = udp_socket((self.host, self.port))
+            self.tsock = udp_socket(None if self.dial else (self.host, self.port))
             loop.add_reader(self.tsock.fileno(), self.tunnel_readable)
+            if self.dial:
+                asyncio.ensure_future(self.udp_register())
             for lport, tport in self.udp:
                 try:
                     s = udp_socket((self.host, lport))
@@ -415,13 +475,14 @@ class Server:
             asyncio.ensure_future(self.sweep())
         if self.status_file:
             asyncio.ensure_future(self.write_status())
-        LOG.info("server listening on %s:%s", self.host, self.port)
+        LOG.info("server %s", f"dialing {self.dial[0]}:{self.dial[1]} (direct)" if self.dial else f"listening on {self.host}:{self.port}")
         await asyncio.Event().wait()
 
 
 class Client:
-    def __init__(self, token, host, port, pool, encrypt="off"):
+    def __init__(self, token, host, port, pool, encrypt="off", listen=None):
         self.token, self.host, self.port, self.pool = token, host, port, pool
+        self.listen = listen        # (host, port): DIRECT mode, the other side dials us instead of the other way round
         self.encrypt = encrypt
         self.ubox = UdpBox(token, "client") if encrypt == "all" else None
         self.usock = None
@@ -435,16 +496,7 @@ class Client:
             try:
                 r, w = await asyncio.wait_for(asyncio.open_connection(self.host, self.port), 8)
                 tune(w)
-                if self.encrypt != "off":
-                    r, w = await secure_client(r, w, self.token)
-                else:
-                    hdr = await asyncio.wait_for(r.readexactly(19), 8)
-                    if hdr[:3] != MAGIC:
-                        raise ConnectionError("not a vtunnel server")
-                    w.write(mac(self.token, hdr[3:]))
-                    await w.drain()
-                    if await asyncio.wait_for(r.readexactly(1), 8) != b"K":
-                        raise ConnectionError("rejected")
+                r, w = await dial_handshake(r, w, self.token, self.encrypt)
                 backoff = 1
                 frame = await r.readexactly(3)       # idle until a user arrives; TCP keepalive notices a dead server
             except Exception as e:
@@ -456,6 +508,19 @@ class Client:
                 backoff = min(backoff * 2, 10)
                 continue
             asyncio.ensure_future(self.session(r, w, frame))
+
+    async def on_front(self, r, w):
+        """DIRECT mode: the other side dialed us; wait for its job on this connection."""
+        tune(w)
+        raw = w
+        try:
+            r, w = await accept_handshake(r, w, self.token, self.encrypt)
+            frame = await r.readexactly(3)
+        except Exception as e:
+            LOG.warning("tunnel connection from %s rejected (%s)", raw.get_extra_info("peername"), e.__class__.__name__)
+            raw.close()
+            return
+        await self.session(r, w, frame)
 
     async def session(self, r, w, frame):
         try:
@@ -471,12 +536,20 @@ class Client:
     # ---- UDP ----
     def readable(self):
         try:
-            data, _ = self.usock.recvfrom(65535)
+            data, addr = self.usock.recvfrom(65535)
         except (BlockingIOError, OSError):
             return
         if self.ubox:
             data = self.ubox.open(data)
             if data is None:
+                return
+        if self.listen:       # DIRECT mode: only the registered peer may send us datagrams
+            if data[:1] == b"R" and len(data) == 25:
+                ts = data[1:9]
+                if abs(time.time() - struct.unpack("!Q", ts)[0]) < 120 and hmac.compare_digest(data[9:], mac(self.token, ts)[:16]):
+                    self.server_udp = addr
+                return
+            if addr != self.server_udp:
                 return
         if data[:1] != b"D" or len(data) < 7:
             return
@@ -492,7 +565,8 @@ class Client:
         try_send(s[0], data[7:])
 
     def send(self, frame):
-        try_send(self.usock, self.ubox.seal(frame) if self.ubox else frame, self.server_udp)
+        if self.server_udp:
+            try_send(self.usock, self.ubox.seal(frame) if self.ubox else frame, self.server_udp)
 
     def reply(self, sid, sock):
         try:
@@ -503,12 +577,16 @@ class Client:
 
     async def udp_loop(self):
         loop = asyncio.get_running_loop()
-        self.server_udp = (await loop.getaddrinfo(self.host, self.port, family=socket.AF_INET, type=socket.SOCK_DGRAM))[0][4]
-        self.usock = udp_socket()
+        if self.listen:        # DIRECT: wait on our port; the other side registers itself with its first datagram
+            self.usock = udp_socket(self.listen)
+        else:
+            self.server_udp = (await loop.getaddrinfo(self.host, self.port, family=socket.AF_INET, type=socket.SOCK_DGRAM))[0][4]
+            self.usock = udp_socket()
         loop.add_reader(self.usock.fileno(), self.readable)
         while True:
-            ts = struct.pack("!Q", int(time.time()))
-            self.send(b"R" + ts + mac(self.token, ts)[:16])
+            if not self.listen:
+                ts = struct.pack("!Q", int(time.time()))
+                self.send(b"R" + ts + mac(self.token, ts)[:16])
             now = time.monotonic()
             for sid in [i for i, s in self.sessions.items() if now - s[1] > UDP_IDLE]:
                 sock = self.sessions.pop(sid)[0]
@@ -517,6 +595,11 @@ class Client:
             await asyncio.sleep(UDP_REGISTER)
 
     async def run(self):
+        if self.listen:
+            await asyncio.start_server(self.on_front, self.listen[0], self.listen[1], reuse_address=True)
+            LOG.info("client listening on %s:%s (direct: the other side dials in)", *self.listen)
+            await self.udp_loop()
+            return
         LOG.info("client -> %s:%s, pool %s", self.host, self.port, self.pool)
         jobs = [self.worker() for _ in range(self.pool)] + [self.udp_loop()]
         await asyncio.gather(*jobs)
@@ -672,9 +755,12 @@ def main(argv=None):
     sv = sub.add_parser("server")
     sv.add_argument("--listen", default="0.0.0.0:7000")
     sv.add_argument("--forward", action="append", default=[], metavar="[tcp:|udp:]PORT[=TARGET]")
+    sv.add_argument("--dial", default="", metavar="HOST:PORT", help="DIRECT mode: open the tunnel connections to a client started with --listen")
+    sv.add_argument("--pool", type=int, default=8)
     sv.add_argument("--status-file", default="", help="JSON file refreshed every 5 s with the pool size and failed ports")
     cl = sub.add_parser("client")
-    cl.add_argument("--server", required=True, metavar="HOST:PORT")
+    cl.add_argument("--server", default="", metavar="HOST:PORT")
+    cl.add_argument("--listen", default="", metavar="HOST:PORT", help="DIRECT mode: wait for the other side to dial in (instead of --server)")
     cl.add_argument("--pool", type=int, default=8)
     for p in (sv, cl, pr):
         p.add_argument("--token", default=os.environ.get("VTUNNEL_TOKEN", ""))
@@ -693,10 +779,20 @@ def main(argv=None):
         host, _, port = a.listen.rpartition(":")
         if not a.forward:
             sys.exit("give at least one --forward")
-        job = Server(a.token, host or "0.0.0.0", int(port), [parse_forward(f) for f in a.forward], a.status_file, a.encrypt).run()
+        dial = None
+        if a.dial:
+            dh, _, dp = a.dial.rpartition(":")
+            dial = (dh, int(dp))
+        job = Server(a.token, host or "0.0.0.0", int(port), [parse_forward(f) for f in a.forward], a.status_file, a.encrypt, dial, max(1, a.pool)).run()
     else:
-        host, _, port = a.server.rpartition(":")
-        job = Client(a.token, host, int(port), max(1, a.pool), a.encrypt).run()
+        if bool(a.server) == bool(a.listen):
+            sys.exit("give exactly one of --server (the other side listens) or --listen (the other side dials)")
+        if a.listen:
+            lh, _, lp = a.listen.rpartition(":")
+            job = Client(a.token, "", 0, 1, a.encrypt, (lh or "0.0.0.0", int(lp))).run()
+        else:
+            host, _, port = a.server.rpartition(":")
+            job = Client(a.token, host, int(port), max(1, a.pool), a.encrypt).run()
     try:
         asyncio.run(job)
     except KeyboardInterrupt:

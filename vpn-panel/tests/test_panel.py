@@ -1728,3 +1728,32 @@ def test_tunnel_connection_test_flow():
         assert row["test"]["status"] == "done" and row["test"]["node"] == {"ok": False, "error": "timed out"}
         c.post("/api/relay/report", headers=rh, json={"pool": 0, "test": {"id": 1, "result": res}})   # a wrong test id changes nothing
         c.delete(f"/api/tunnels/{t['id']}", headers=h)
+
+
+def test_direct_mode_reaches_both_ends_and_default_is_unchanged():
+    with TestClient(app) as c:
+        h = admin(c)
+        n = c.post("/api/nodes", headers=h, json={"name": "DirDE", "cc": "de", "address": "dir.example.com"}).json()
+        nh = {"Authorization": "Bearer " + n["install_command"].split("--token ")[1].split()[0]}
+        t = c.post("/api/tunnels", headers=h, json={"name": "rev", "iran_host": "6.6.6.6", "node_id": n["id"], "ports": "443"}).json()
+        assert t["mode"] == "reverse"                                                     # existing behaviour is the default
+        rh = {"Authorization": "Bearer " + t["install_command"].split("--token ")[1]}
+        assert c.get("/api/relay/config", headers=rh).json()["tunnel"]["mode"] == "reverse"
+        t2 = c.post("/api/tunnels", headers=h, json={"name": "dir", "iran_host": "6.6.6.7", "node_id": n["id"], "ports": "444", "mode": "direct"}).json()
+        assert t2["mode"] == "direct" and t2["ctl_port"] != t["ctl_port"]                 # two tunnels to one foreign node: different ports there
+        rh2 = {"Authorization": "Bearer " + t2["install_command"].split("--token ")[1]}
+        rc = c.get("/api/relay/config", headers=rh2).json()["tunnel"]
+        assert rc["mode"] == "direct" and rc["dial"] == f"dir.example.com:{t2['ctl_port']}"
+        mine = next(x for x in c.get("/api/node/config", headers=nh).json()["tunnels"] if x["id"] == t2["id"])
+        assert mine["mode"] == "direct" and mine["listen"] == t2["ctl_port"]
+        ra_spec = importlib.util.spec_from_file_location("relay_agent3", ROOT / "agent" / "relay_agent.py")
+        ra = importlib.util.module_from_spec(ra_spec)
+        ra_spec.loader.exec_module(ra)
+        assert "--dial dir.example.com:" in ra.unit_text({**rc, "id": 9}, "/s", "/e") and "--listen 0.0.0.0" not in ra.unit_text({**rc, "id": 9}, "/s", "/e")
+        assert "--listen 0.0.0.0:7777" in ra.unit_text({"id": 1, "name": "x", "ctl_port": 7777, "forwards": [], "mode": "reverse"}, "/s", "/e")
+        assert f"client --listen 0.0.0.0:{t2['ctl_port']}" in agent.vtunnel_unit({"id": 2, "server": "x:1", "mode": "direct", "listen": t2["ctl_port"]})
+        assert "client --server 1.2.3.4:7777 --pool 8" in agent.vtunnel_unit({"id": 2, "server": "1.2.3.4:7777", "pool": 8})     # old entries still work
+        r = c.patch(f"/api/tunnels/{t['id']}", headers=h, json={"mode": "direct"}).json()                    # switching modes keeps the port unique
+        assert r["mode"] == "direct" and r["ctl_port"] != t2["ctl_port"]
+        for x in (t, t2):
+            c.delete(f"/api/tunnels/{x['id']}", headers=h)

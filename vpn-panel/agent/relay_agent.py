@@ -70,6 +70,11 @@ def forward_args(forwards):
     return " ".join(out)
 
 
+def server_args(t):
+    """Reverse (default): wait for the foreign side on the control port. Direct: dial the foreign side's control port."""
+    return f"--dial {t['dial']}" if t.get("mode") == "direct" and t.get("dial") else f"--listen 0.0.0.0:{t['ctl_port']}"
+
+
 def unit_text(t, status_file, env_file):
     return f"""[Unit]
 Description=vtunnel server {t['name']}
@@ -77,7 +82,7 @@ After=network-online.target
 
 [Service]
 EnvironmentFile={env_file}
-ExecStart=/usr/bin/python3 {VTUNNEL} server --listen 0.0.0.0:{t['ctl_port']} --status-file {status_file} --encrypt {t.get('encrypt', 'off')} {forward_args(t['forwards'])}
+ExecStart=/usr/bin/python3 {VTUNNEL} server {server_args(t)} --status-file {status_file} --encrypt {t.get('encrypt', 'off')} {forward_args(t['forwards'])}
 Restart=always
 RestartSec=2
 LimitNOFILE=1048576

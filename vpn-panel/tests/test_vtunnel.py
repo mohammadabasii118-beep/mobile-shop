@@ -233,3 +233,63 @@ def test_probe_measures_both_directions_and_rejects_wrong_token():
     ra = json.loads(pa.communicate(timeout=60)[0])
     pb.communicate(timeout=60)
     assert ra["ok"] is False
+
+
+def _run_direct(mode, token_back="direct-token-12"):
+    ctl, user_tcp, user_udp, tgt_tcp, tgt_udp = free_port(), free_port(), free_port(socket.SOCK_DGRAM), free_port(), free_port(socket.SOCK_DGRAM)
+    tcp_echo(tgt_tcp)
+    udp_echo(tgt_udp)
+    # the BACK side (foreign) listens; the FRONT side (users) dials it
+    back = launch("client", "--listen", f"127.0.0.1:{ctl}", "--token", token_back, "--encrypt", mode)
+    time.sleep(0.8)
+    front = launch("server", "--dial", f"127.0.0.1:{ctl}", "--token", "direct-token-12", "--encrypt", mode, "--pool", "3",
+                   "--forward", f"{user_tcp}={tgt_tcp}", "--forward", f"udp:{user_udp}={tgt_udp}")
+    try:
+        assert wait_port(user_tcp)
+        time.sleep(1.5)
+        return back, front, user_tcp, user_udp
+    except Exception:
+        back.kill()
+        front.kill()
+        raise
+
+
+def test_direct_mode_tcp_and_udp():
+    for mode in ("off", "tcp", "all"):
+        back, front, user_tcp, user_udp = _run_direct(mode)
+        try:
+            assert tcp_roundtrip(user_tcp, b"d" * 200000) == b"d" * 200000
+            for _ in range(8):                                                   # the pool refills after each use
+                assert tcp_roundtrip(user_tcp, b"ping") == b"ping"
+            u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            u.settimeout(3)
+            u.sendto(b"direct-game", ("127.0.0.1", user_udp))
+            assert u.recvfrom(100)[0] == b"direct-game", mode
+        finally:
+            back.kill()
+            front.kill()
+
+
+def test_direct_mode_rejects_wrong_token_and_survives_a_restart_of_the_back_side():
+    back, front, user_tcp, _ = _run_direct("off", token_back="not-the-token-1")
+    try:
+        try:
+            got = tcp_roundtrip(user_tcp, b"nope", timeout=4)
+        except OSError:
+            got = b""
+        assert got != b"nope"
+    finally:
+        back.kill()
+        front.kill()
+    back, front, user_tcp, _ = _run_direct("off")
+    try:
+        assert tcp_roundtrip(user_tcp, b"one") == b"one"
+        ctl = int(back.args[back.args.index("--listen") + 1].rsplit(":", 1)[1])
+        back.kill()
+        back.wait()
+        back = launch("client", "--listen", f"127.0.0.1:{ctl}", "--token", "direct-token-12")
+        time.sleep(5)                                                            # the front side redials within a few seconds
+        assert tcp_roundtrip(user_tcp, b"two") == b"two"
+    finally:
+        back.kill()
+        front.kill()
