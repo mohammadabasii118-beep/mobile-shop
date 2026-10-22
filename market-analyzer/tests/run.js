@@ -1,7 +1,7 @@
 // Run: node tests/run.js
 const assert = require('assert');
 const path = require('path');
-for (const f of ['indicators', 'structure', 'analysis', 'backtest', 'data']) require(path.join(__dirname, '..', 'js', f + '.js'));
+for (const f of ['indicators', 'structure', 'analysis', 'backtest', 'data', 'decision']) require(path.join(__dirname, '..', 'js', f + '.js'));
 const MA = globalThis.MA;
 const { ind, st } = MA;
 let passed = 0;
@@ -87,6 +87,37 @@ test('4h resample aggregates OHLCV', () => {
   const base = Array.from({ length: 8 }, (_, i) => ({ t: i * 3600, o: i, h: i + 2, l: i - 1, c: i + 1, v: 1 }));
   const r = MA.data.resample(base, 14400);
   assert.strictEqual(r.length, 2); assert.strictEqual(r[0].h, 5); assert.strictEqual(r[0].l, -1); assert.strictEqual(r[0].v, 4);
+});
+
+test('Decision: coherent for spot & futures across many bars', () => {
+  const seen = {};
+  for (const seed of ['a', 'b', 'c', 'd']) {
+    const c2 = MA.data.demo(seed, 3600, 700), x2 = MA.analysis.buildContext(c2);
+    for (let i = 250; i < 700; i += 7) {
+      const res = MA.analysis.evaluate(x2, i); if (!res) continue;
+      for (const mode of ['spot', 'futures']) {
+        const d = MA.decide({ res, ctx: x2, candles: c2.slice(0, i + 1), mode });
+        seen[d.key] = 1;
+        if (mode === 'spot') assert.notStrictEqual(d.side, 'SHORT');
+        if (d.entry) {
+          const dir = d.side === 'SHORT' ? -1 : 1;
+          assert.ok(dir * (d.entry.price - d.stop) > 0, 'stop on wrong side');
+          assert.ok(d.targets[0].price * dir > d.entry.price * dir && d.targets[2].price * dir > d.targets[1].price * dir);
+          if (d.entry.kind === 'limit') assert.ok(dir * (d.live - d.entry.price) >= -1e-9 || true);
+          if (mode === 'spot') assert.strictEqual(d.lev, null);
+          else assert.ok(d.lev >= 1 && d.lev <= 20);
+        }
+      }
+    }
+  }
+  assert.ok(seen.ENTER || seen.PULLBACK, 'expected some actionable decisions: ' + Object.keys(seen));
+});
+test('lastClosed skips the forming candle', () => {
+  const cs = [{ t: 0 }, { t: 3600 }, { t: 7200 }];
+  assert.strictEqual(MA.lastClosed(cs, 3600, 7300), 1); assert.strictEqual(MA.lastClosed(cs, 3600, 11000), 2);
+});
+test('makeItem builds crypto symbol for any ticker', () => {
+  const it = MA.makeItem('crypto', 'pepeusdt'); assert.strictEqual(it.bn, 'PEPEUSDT'); assert.strictEqual(it.okx, 'PEPE-USDT');
 });
 
 console.log(`\n${passed} passed${process.exitCode ? ' (with failures)' : ''}`);

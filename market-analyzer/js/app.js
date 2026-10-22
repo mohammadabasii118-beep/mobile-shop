@@ -24,6 +24,7 @@
     group: store.get('group', 'crypto'), id: store.get('id', 'BTC'), tf: store.get('tf', '1h'), source: store.get('source', 'auto'),
     keys: { td: store.get('td', ''), proxy: store.get('proxy', '') },
     ov: Object.assign(Object.fromEntries(OVERLAYS.map(([k, , d]) => [k, d])), store.get('ov', {})),
+    mode: store.get('mode', 'futures'), custom: store.get('custom', null), dec: null, prevKey: null, wl: store.get('wl', ['BTC', 'ETH', 'SOL', 'BNB', 'XRP']), wlData: {},
     item: null, candles: [], ctx: null, res: null, used: null, bt: null, mtf: null, seq: 0, stopLive: null, timer: null, csv: null,
   };
 
@@ -32,7 +33,7 @@
     $('groups').innerHTML = Object.entries(MA.groups).map(([k, v]) => `<button data-g="${k}" class="${k === state.group ? 'on' : ''}">${v}</button>`).join('');
     $('groups').onclick = (e) => {
       const g = e.target.dataset.g; if (!g) return;
-      state.group = g; state.csv = null;
+      state.group = g; state.csv = null; state.custom = null; store.set('custom', null);
       state.id = MA.catalog.find((x) => x.group === g).id;
       buildHeader(); load();
     };
@@ -40,9 +41,16 @@
     if (!items.some((x) => x.id === state.id)) state.id = items[0].id;
     $('symbol').innerHTML = items.map((x) => `<option value="${x.id}">${esc(x.name)}${x.group === 'crypto' ? ' · ' + x.id + '/USDT' : ''}</option>`).join('');
     $('symbol').value = state.id;
-    $('symbol').onchange = (e) => { state.id = e.target.value; state.csv = null; load(); };
+    $('symbol').onchange = (e) => { state.id = e.target.value; state.csv = null; state.custom = null; store.set('custom', null); load(); };
     $('tfs').innerHTML = MA.timeframes.map((t) => `<button data-t="${t.id}" class="${t.id === state.tf ? 'on' : ''}">${t.id}</button>`).join('');
     $('tfs').onclick = (e) => { const t = e.target.dataset.t; if (!t) return; state.tf = t; state.csv = null; buildHeader(); load(); };
+    $('modes').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.m === state.mode));
+    $('modes').onclick = (e) => { const m = e.target.dataset.m; if (!m) return; state.mode = m; store.set('mode', m); buildHeader(); redecide(); scanWatch(); };
+    $('custom').onkeydown = (e) => {
+      if (e.key !== 'Enter' || !e.target.value.trim()) return;
+      state.custom = MA.makeItem(state.group, e.target.value); store.set('custom', state.custom);
+      e.target.value = ''; load();
+    };
     store.set('group', state.group); store.set('id', state.id); store.set('tf', state.tf);
   }
 
@@ -171,10 +179,10 @@
         r.fib.ext.forEach((f) => line(f.price, 'rgba(181,124,245,.5)', `Fib ${f.r}`, 3));
       }
       if (o.vol && r.vp) { line(r.vp.poc, '#e6a23c', 'POC', 0, 1); }
-      if (o.plan && r.plan) {
-        const p = r.plan;
-        line(p.entry, '#4c8dff', 'ورود', 0, 2); line(p.stop, down, 'حد ضرر', 0, 2);
-        p.targets.forEach((t, k) => line(t.price, up, `TP${k + 1} (${t.rr}R)`, 0, 1));
+      if (o.plan && state.dec && state.dec.entry) {
+        const d = state.dec;
+        line(d.entry.price, '#4c8dff', d.entry.kind === 'limit' ? 'Limit' : 'ورود', d.entry.kind === 'limit' ? 2 : 0, 2); line(d.stop, down, 'حد ضرر', 0, 2);
+        d.targets.forEach((t, k) => line(t.price, up, `TP${k + 1} (${t.rr}R)`, 0, 1));
       }
       if (o.zones) {
         const t0 = (z) => state.candles[z.i].t;
@@ -215,7 +223,7 @@
   async function load(silent = false) {
     const seq = ++state.seq;
     clearTimeout(state.timer); if (state.stopLive) { state.stopLive(); state.stopLive = null; }
-    state.item = state.csv ? state.csv.item : MA.catalog.find((x) => x.id === state.id);
+    state.item = state.csv ? state.csv.item : state.custom || MA.catalog.find((x) => x.id === state.id);
     if (!silent) { document.querySelector('.charts').classList.add('loading'); showMsg(''); }
     try {
       let out;
@@ -248,7 +256,10 @@
   function refresh(fit) {
     const cs = state.candles;
     state.ctx = A.buildContext(cs);
-    state.res = A.evaluate(state.ctx, cs.length - 1);
+    state.sigIdx = state.csv || state.used === 'demo' ? cs.length - 1 : MA.lastClosed(cs, MA.tfOf(state.tf).sec);
+    state.res = A.evaluate(state.ctx, state.sigIdx);
+    state.dec = state.res ? MA.decide({ res: state.res, ctx: state.ctx, candles: cs, mode: state.mode, align: mtfAdjust().align }) : null;
+    checkAlert();
     if (!C) createCharts();
     setChartData(); applyOverlays();
     if (fit) { const n = cs.length; C.main.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 160), to: n + 8 }); }
@@ -271,7 +282,7 @@
 
   function renderHeader() {
     const cs = state.candles, last = cs[cs.length - 1], prev = cs[cs.length - 2];
-    $('chTitle').textContent = `${state.item.name} · ${state.csv ? 'CSV' : state.tf}`;
+    $('chTitle').textContent = `${state.item.name}${state.item.group === 'crypto' ? '/USDT' : ''} · ${state.csv ? 'CSV' : state.tf}`;
     $('chPrice').textContent = fmt(last.c);
     const chg = ((last.c / prev.c - 1) * 100);
     $('chChg').textContent = `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%`;
@@ -306,7 +317,7 @@
   function renderPanels() {
     const r = state.res;
     if (!r) { ['verdict', 'plan', 'calc', 'factors', 'levels'].forEach((k) => ($(k).innerHTML = '')); $('verdict').innerHTML = '<p class="muted">داده برای تحلیل کافی نیست.</p>'; return; }
-    renderVerdict(); renderPlan(); renderCalc(); renderFactors(); renderLevels(); renderBacktest(); renderMTF();
+    renderVerdict(); renderPlan(); renderCalc(); renderWatch(); renderFactors(); renderLevels(); renderBacktest(); renderMTF();
   }
 
   function renderVerdict() {
@@ -328,28 +339,37 @@
       ${state.used === 'binance' ? '<p class="small">کندل جاری هنوز بسته نشده؛ سیگنال با بسته‌شدن کندل نهایی می‌شود.</p>' : ''}`;
   }
 
+  function redecide() {
+    if (!state.res) return;
+    state.dec = MA.decide({ res: state.res, ctx: state.ctx, candles: state.candles, mode: state.mode, align: mtfAdjust().align });
+    checkAlert(); renderVerdict(); renderPlan(); renderCalc(); drawAnnotations();
+  }
+
   function renderPlan() {
-    const r = state.res, p = r.plan;
-    if (!p) {
-      $('plan').innerHTML = `<h4>برنامه‌ی معامله</h4><p class="muted">سیگنال به حد کافی قوی نیست؛ ورود نکنید و منتظر تأیید بمانید.</p>
-        <div class="kv">${r.res ? `<span>شکست رو به بالا بالای</span><b class="num up">${fmt(r.res.price)}</b>` : ''}${r.sup ? `<span>شکست رو به پایین زیر</span><b class="num down">${fmt(r.sup.price)}</b>` : ''}</div>`;
-      return;
+    const d = state.dec; if (!d) { $('plan').innerHTML = ''; return; }
+    const spot = d.mode === 'spot', fe = (x) => fmt(x), pc = (x) => `${(((x - d.live) / d.live) * 100).toFixed(2)}%`;
+    const sideTag = d.side ? `<span class="pill ${d.tone}">${{ BUY: 'خرید اسپات', LONG: 'Long ▲', SHORT: 'Short ▼' }[d.side]}</span>` : '';
+    const age = d.signalBars > 0 ? `بر پایه‌ی کندل بسته‌شده‌ی ${d.signalBars} کندل قبل` : 'بر پایه‌ی آخرین کندل بسته‌شده';
+    let body = '';
+    if (d.entry) {
+      body = `<table><thead><tr><th></th><th class="r">قیمت</th><th class="r">فاصله از قیمت فعلی</th><th class="r">R</th></tr></thead><tbody>
+        <tr><td><b>${d.entry.kind === 'limit' ? 'سفارش Limit' : 'ورود بازار'}</b></td><td class="r num">${fe(d.entry.price)}</td><td class="r num">${pc(d.entry.price)}</td><td class="r"></td></tr>
+        <tr><td class="down">${spot ? 'حد ضرر (فروش)' : 'حد ضرر'}</td><td class="r num down">${fe(d.stop)}</td><td class="r num">${pc(d.stop)}</td><td class="r num">−1</td></tr>
+        ${d.targets.map((t, k) => `<tr><td class="up">هدف ${k + 1}</td><td class="r num up">${fe(t.price)}</td><td class="r num">${pc(t.price)}</td><td class="r num">+${t.rr}</td></tr>`).join('')}</tbody></table>
+        <div class="kv"><span>ریسک تا حد ضرر</span><b class="num">${d.riskPct.toFixed(2)}%</b>${d.lev ? `<span>اهرم پیشنهادی (حداکثر)</span><b class="num">${d.lev}x · Isolated</b>` : ''}</div>`;
     }
-    const long = p.dir > 0, d = (x) => `${(((x - p.entry) / p.entry) * 100).toFixed(2)}%`;
-    $('plan').innerHTML = `
-      <h4>برنامه‌ی معامله <span class="${long ? 'up' : 'down'}">${long ? 'Long ▲' : 'Short ▼'}</span></h4>
-      <table><thead><tr><th></th><th class="r">قیمت</th><th class="r">فاصله</th><th class="r">R</th></tr></thead><tbody>
-        <tr><td>ورود (قیمت فعلی)</td><td class="r num">${fmt(p.entry)}</td><td class="r"></td><td class="r"></td></tr>
-        ${p.pullback ? `<tr><td class="muted">ورود محتاطانه (پولبک به EMA20)</td><td class="r num">${fmt(p.pullback)}</td><td class="r num">${d(p.pullback)}</td><td class="r"></td></tr>` : ''}
-        <tr><td class="down">حد ضرر <small class="muted">(${p.basis === 'structure' ? 'پشت ساختار' : 'بر پایه ATR'})</small></td><td class="r num down">${fmt(p.stop)}</td><td class="r num">${d(p.stop)}</td><td class="r num">−1</td></tr>
-        ${p.targets.map((t, k) => `<tr><td class="up">هدف ${k + 1}</td><td class="r num up">${fmt(t.price)}</td><td class="r num">${d(t.price)}</td><td class="r num">+${t.rr}</td></tr>`).join('')}
-      </tbody></table>
-      <p class="plan-note">پیشنهاد: ۵۰٪ حجم را در هدف ۱ ببندید و حد ضرر را روی نقطه‌ی ورود بیاورید. این پلن بر پایه‌ی ساختار و نوسان فعلی است و با تغییر شرایط باید بازبینی شود. ابطال سناریو: بسته‌شدن کندل ${long ? 'زیر' : 'بالای'} <span class="num">${fmt(p.stop)}</span>.</p>`;
+    $('plan').className = `card act ${d.tone}`;
+    $('plan').innerHTML = `<div class="small muted">${spot ? 'اسپات' : 'فیوچرز'} · ${esc(state.item.name)} ${state.csv ? '' : state.tf} · ${age} ${sideTag}</div>
+      <div class="act-title ${d.tone}">${esc(d.title)}</div><div class="act-sub">${esc(d.sub)} · اطمینان <b class="num">${d.conf}%</b> · امتیاز <b class="num">${d.score > 0 ? '+' : ''}${d.score.toFixed(0)}</b></div>
+      ${body}
+      ${d.reasons.length ? `<h5>چرا؟</h5><ul>${d.reasons.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      ${d.exits.length ? `<h5>${d.entry ? 'مدیریت خروج' : 'چه چیزی وضعیت را عوض می‌کند'}</h5><ul>${d.exits.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
+      <p class="plan-note">قیمت‌ها زنده‌اند و سیگنال فقط با بسته‌شدن کندل تغییر می‌کند. اگر قیمت ورود از دست رفت، دنبالش نکنید.</p>`;
   }
 
   function renderCalc() {
-    const r = state.res, p = r.plan;
-    if (!p) { $('calc').innerHTML = ''; return; }
+    const d = state.dec;
+    if (!d || !d.entry) { $('calc').innerHTML = ''; return; }
     $('calc').innerHTML = `<h4>مدیریت سرمایه</h4>
       <div class="field"><span>سرمایه‌ی حساب</span><input id="cap" type="number" min="0" value="${store.get('cap', 10000)}"></div>
       <div class="field"><span>ریسک هر معامله (٪)</span><input id="rsk" type="number" min="0.1" max="10" step="0.1" value="${store.get('rsk', 1)}"></div>
@@ -357,14 +377,15 @@
     const upd = () => {
       const cap = +$('cap').value, rk = +$('rsk').value;
       store.set('cap', cap); store.set('rsk', rk);
-      const amt = cap * rk / 100, units = amt / p.risk, notional = units * p.entry, lev = cap ? notional / cap : 0;
+      const amt = cap * rk / 100, units = amt / d.risk, notional = units * d.entry.price, lev = cap ? notional / cap : 0;
       const isFx = state.item.group === 'forex';
       $('calcOut').innerHTML = `
         <span>مبلغ در معرض ریسک</span><b class="num">${amt.toFixed(2)}</b>
         <span>حجم پوزیشن</span><b class="num">${units >= 100 ? units.toFixed(0) : units.toFixed(4)} واحد${isFx ? ` (${(units / 100000).toFixed(2)} لات)` : ''}</b>
         <span>ارزش اسمی</span><b class="num">${notional.toFixed(2)}</b>
-        <span>اهرم لازم</span><b class="num ${lev > 10 ? 'down' : ''}">${lev.toFixed(1)}x</b>
-        <span>سود در هدف ۲ (۲.۵R)</span><b class="num up">+${(amt * 2.5).toFixed(2)}</b>`;
+        <span>${d.mode === 'spot' ? 'سهم از سرمایه' : 'اهرم لازم'}</span><b class="num ${lev > (d.mode === 'spot' ? 1 : 10) ? 'down' : ''}">${d.mode === 'spot' ? (lev * 100).toFixed(0) + '%' : lev.toFixed(1) + 'x'}</b>
+        <span>سود در هدف ۲ (۲.۵R)</span><b class="num up">+${(amt * 2.5).toFixed(2)}</b>
+        ${d.mode === 'spot' && lev > 1 ? '<span class="down">هشدار</span><b class="down">با این ریسک، بیش از کل سرمایه لازم است؛ ریسک را کم کنید</b>' : ''}`;
     };
     $('cap').oninput = upd; $('rsk').oninput = upd; upd();
   }
@@ -381,7 +402,7 @@
   }
 
   function renderLevels() {
-    const r = state.res, price = r.price, pct = (x) => `${(((x - price) / price) * 100).toFixed(2)}%`;
+    const r = state.res, price = state.candles[state.candles.length - 1].c, pct = (x) => `${(((x - price) / price) * 100).toFixed(2)}%`;
     const lv = r.levels.slice().sort((a, b) => b.price - a.price);
     const recent = r.patterns.filter((p) => p.dir !== 0 || p.age === 0);
     $('levels').innerHTML = `<h4>سطوح کلیدی</h4>
@@ -413,7 +434,7 @@
       if (seq !== state.seq) return;
     }
     state.mtf = { rows };
-    renderMTF(); renderVerdict();
+    renderMTF(); redecide();
   }
 
   function renderMTF() {
@@ -474,6 +495,73 @@
     $('btRun').onclick = runBacktest;
   }
 
+  // ── Watchlist & alerts ────────────────────────────────────────────────────
+  const ACTION_FA = { ENTER: 'ورود الان', PULLBACK: 'منتظر پولبک', WAIT: 'صبر', WATCH: 'ضعیف', AVOID: 'نخر', EXIT: 'خروج', INVALID: 'باطل' };
+  let audio = null;
+  function beep() {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.connect(g); g.connect(audio.destination); o.frequency.value = 880; g.gain.value = 0.08; o.start(); o.stop(audio.currentTime + 0.25);
+    } catch { /* audio unavailable */ }
+  }
+  function notify(text) {
+    beep();
+    try { if ('Notification' in window && Notification.permission === 'granted') new Notification('تحلیلگر بازار', { body: text }); } catch { /* ignore */ }
+    const t = document.title; document.title = '🔔 ' + text; setTimeout(() => (document.title = t), 8000);
+  }
+  const keyOf = (d) => (d ? d.key + (d.side || '') : null);
+  function checkAlert() {
+    const k = keyOf(state.dec), id = `${state.item.id}|${state.tf}|${state.mode}`;
+    if (state.prevKey && state.prevKey.id === id && state.prevKey.k !== k && ['ENTER', 'PULLBACK', 'EXIT'].includes(state.dec.key))
+      notify(`${state.item.name} ${state.tf}: ${state.dec.title}`);
+    state.prevKey = { id, k };
+  }
+
+  let wlBusy = false;
+  async function scanWatch() {
+    if (wlBusy) return; wlBusy = true;
+    try {
+      for (const sym of state.wl) {
+        const item = MA.makeItem('crypto', sym), id = `${sym}|${state.tf}|${state.mode}`;
+        try {
+          const { candles, source } = await D.fetchCandles(item, state.tf, state.source === 'demo' ? 'demo' : 'auto', state.keys);
+          const ctx = A.buildContext(candles);
+          const i = source === 'demo' ? candles.length - 1 : MA.lastClosed(candles, MA.tfOf(state.tf).sec);
+          const res = A.evaluate(ctx, i);
+          const dec = res && MA.decide({ res, ctx, candles, mode: state.mode });
+          const prev = state.wlData[id];
+          state.wlData[id] = { dec, price: candles[candles.length - 1].c };
+          if (prev && dec && keyOf(prev.dec) !== keyOf(dec) && ['ENTER', 'PULLBACK', 'EXIT'].includes(dec.key)) notify(`${sym} ${state.tf}: ${dec.title}`);
+        } catch (e) { state.wlData[id] = { err: e.message }; }
+        renderWatch();
+      }
+    } finally { wlBusy = false; }
+  }
+  function renderWatch() {
+    const rows = state.wl.map((sym) => {
+      const x = state.wlData[`${sym}|${state.tf}|${state.mode}`];
+      const d = x && x.dec, tone = d ? d.tone : 'muted';
+      const label = !x ? '…' : x.err ? '—' : d ? ACTION_FA[d.key] + (d.side ? ' ' + { BUY: 'خرید', LONG: 'لانگ', SHORT: 'شورت' }[d.side] : '') : '—';
+      return `<div class="wl-row" data-s="${esc(sym)}"><b>${esc(sym)}</b><span class="num muted">${x && x.price ? fmt(x.price) : ''}</span><span class="pill ${tone}">${label}${d ? ` · ${d.score > 0 ? '+' : ''}${d.score.toFixed(0)}` : ''}</span><button class="x" data-x="${esc(sym)}" title="حذف">×</button></div>`;
+    }).join('');
+    $('watch').innerHTML = `<h4>دیده‌بان ارزها <small>${state.tf} · هر ۶۰ ثانیه · ${state.mode === 'spot' ? 'اسپات' : 'فیوچرز'}</small></h4>${rows || '<p class="muted small">ارزی اضافه نشده.</p>'}
+      <div class="wl-add"><input id="wlIn" type="text" placeholder="افزودن ارز: DOGE" maxlength="12"><button class="btn" id="wlAdd">افزودن</button><button class="btn" id="wlNotif" title="فعال‌سازی اعلان مرورگر">🔔</button></div>
+      <p class="small">با تغییر سیگنال به «ورود/پولبک/خروج» اعلان صوتی و مرورگر می‌آید. صفحه باید باز بماند.</p>`;
+    $('watch').onclick = (e) => {
+      const x = e.target.dataset.x, row = e.target.closest('.wl-row');
+      if (x) { state.wl = state.wl.filter((y) => y !== x); store.set('wl', state.wl); renderWatch(); return; }
+      if (row) { state.custom = MA.makeItem('crypto', row.dataset.s); state.group = 'crypto'; store.set('custom', state.custom); store.set('group', 'crypto'); state.csv = null; buildHeader(); load(); }
+    };
+    const add = () => {
+      const v = $('wlIn').value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/(USDT)$/, '');
+      if (v && !state.wl.includes(v)) { state.wl.push(v); store.set('wl', state.wl); scanWatch(); }
+      renderWatch();
+    };
+    $('wlAdd').onclick = add; $('wlIn').onkeydown = (e) => e.key === 'Enter' && add();
+    $('wlNotif').onclick = () => { try { Notification.requestPermission().then(() => notify('اعلان‌ها فعال شد')); } catch { beep(); } };
+  }
+
   // ── Settings / CSV ────────────────────────────────────────────────────────
   function openSettings() {
     $('setSource').innerHTML = Object.entries(MA.providerNames).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
@@ -498,6 +586,6 @@
     e.target.value = '';
   };
 
-  buildHeader(); buildOverlayToggles(); load();
+  buildHeader(); buildOverlayToggles(); load(); renderWatch(); scanWatch(); setInterval(scanWatch, 60000);
   window.MAApp = { state, load };
 })();

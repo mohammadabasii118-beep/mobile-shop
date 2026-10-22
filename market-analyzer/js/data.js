@@ -192,5 +192,14 @@
     return out;
   }
 
+  // Item for any user-typed symbol: crypto base asset (PEPE) or a raw Yahoo/Twelve Data symbol.
+  MA.makeItem = (group, sym) => {
+    sym = sym.trim().toUpperCase().replace(/[^A-Z0-9=^.\-\/]/g, '');
+    const known = MA.catalog.find((x) => x.group === group && x.id === sym);
+    if (known) return known;
+    if (group === 'crypto') { sym = sym.replace(/(USDT|USD)$/, ''); return { id: sym, name: sym, group, bn: sym + 'USDT', bb: sym + 'USDT', okx: sym + '-USDT', yf: sym + '-USD', td: sym + '/USD' }; }
+    return { id: sym, name: sym, group, yf: sym, td: sym };
+  };
+
   MA.data = { fetchCandles, subscribeLive, parseCSV, demo, resample, clean };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
