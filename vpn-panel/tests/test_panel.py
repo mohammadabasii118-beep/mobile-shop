@@ -1846,3 +1846,18 @@ def test_backpack_extra_settings_presets_and_direct_layer4_api():
         assert 'role = "iran"' in c.get("/api/relay/config", headers=rh4).json()["bp"]["toml"]
         for x in (t, d4):
             assert c.delete(f"/api/bp/{x['id']}", headers=h).status_code == 200
+
+
+def test_tunnel_control_port_can_be_changed_and_must_stay_unique():
+    with TestClient(app) as c:
+        h = admin(c)
+        n = c.post("/api/nodes", headers=h, json={"name": "CtlN", "cc": "tr", "address": "ctl.example.com"}).json()
+        mk_ = lambda p: c.post("/api/tunnels", headers=h, json={"name": "t", "iran_host": "9.9.9.9", "node_id": n["id"], "ports": p}).json()
+        a, b = mk_("5001"), mk_("5002")
+        assert c.patch(f"/api/tunnels/{a['id']}", headers=h, json={"ctl_port": b["ctl_port"]}).status_code == 409
+        assert c.patch(f"/api/tunnels/{a['id']}", headers=h, json={"ctl_port": 5001}).status_code == 422
+        r = c.patch(f"/api/tunnels/{a['id']}", headers=h, json={"ctl_port": 8443}).json()
+        assert r["ctl_port"] == 8443
+        assert c.patch(f"/api/tunnels/{a['id']}", headers=h, json={"ctl_port": 80}).status_code == 422
+        rh = {"Authorization": "Bearer " + a["install_command"].split("--token ")[1]}
+        assert c.get("/api/relay/config", headers=rh).json()["tunnel"]["ctl_port"] == 8443

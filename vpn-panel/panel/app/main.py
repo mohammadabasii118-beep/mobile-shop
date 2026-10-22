@@ -1410,6 +1410,7 @@ class TunnelPatch(BaseModel):
     publish: bool | None = None
     encrypt: Literal["off", "tcp", "all"] | None = None
     mode: Literal["reverse", "direct"] | None = None
+    ctl_port: int | None = Field(default=None, ge=1024, le=65535)
 
 
 def clean_host(host: str) -> str:
@@ -1466,6 +1467,13 @@ def patch_tunnel(tunnel_id: int, body: TunnelPatch, request: Request, db: Sessio
     if body.mode is not None or body.iran_host is not None:       # the port must stay free on the server that listens
         t.ctl_port = free_ctl_port(db, t.iran_host, t.node_id, {f["listen"] for f in t.forwards} | {t.ctl_port}, exclude=t.id) \
             if db.scalar(select(Tunnel.id).where(Tunnel.id != t.id, Tunnel.ctl_port == t.ctl_port, (Tunnel.iran_host == t.iran_host) | (Tunnel.node_id == t.node_id))) else t.ctl_port
+    if body.ctl_port is not None and body.ctl_port != t.ctl_port:      # e.g. the default port is already held by another program on the server
+        if body.ctl_port in {f["listen"] for f in t.forwards}:
+            raise HTTPException(422, f"پورت {body.ctl_port} جزو پورت‌های فوروارد همین تونل است")
+        if db.scalar(select(Tunnel.id).where(Tunnel.id != t.id, Tunnel.ctl_port == body.ctl_port, (Tunnel.iran_host == t.iran_host) | (Tunnel.node_id == t.node_id))) \
+                or db.scalar(select(BpTunnel.id).where(BpTunnel.port == body.ctl_port, (BpTunnel.iran_host == t.iran_host) | (BpTunnel.node_id == t.node_id))):
+            raise HTTPException(409, f"پورت {body.ctl_port} را تونل دیگری روی همین سرورها دارد")
+        t.ctl_port = body.ctl_port
     db.commit()
     return tunnel_out(t, db, request)
 

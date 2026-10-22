@@ -728,6 +728,7 @@ document.addEventListener('click', async e => {
       openModal(`<h2>ویرایش ${esc(x.name)}</h2><div class="form">
         <label class="f">نام<input type="text" id="teName" value="${esc(x.name)}"></label>
         <label class="f">آدرس سرور ایران<input type="text" id="teHost" dir="ltr" value="${esc(x.iran_host)}"></label>
+        <label class="f">پورت کنترل تونل (اگر روی سرور پورت دیگری آن را گرفته یا فایروال بسته، عوضش کن)<input type="number" id="teCtl" dir="ltr" min="1024" max="65535" value="${x.ctl_port}"></label>
         <label class="f">پورت‌ها<input type="text" id="tePorts" dir="ltr" value="${esc(x.ports)}"></label>
         <label class="f">رمزنگاری بین دو سرور<select id="teEnc"><option value="off"${x.encrypt === 'off' ? ' selected' : ''}>بدون رمزنگاری (سریع‌ترین؛ برای بازی و پروتکل‌های رمزشده)</option><option value="tcp"${x.encrypt === 'tcp' ? ' selected' : ''}>فقط TCP (پیشنهادی برای VLESS ساده)</option><option value="all"${x.encrypt === 'all' ? ' selected' : ''}>TCP و UDP</option></select></label>
         <label class="f">جهت اتصال تونل<select id="teMode"><option value="reverse"${x.mode === 'reverse' ? ' selected' : ''}>معکوس (پیش‌فرض): سرور خارج به ایران وصل می‌شود</option><option value="direct"${x.mode === 'direct' ? ' selected' : ''}>مستقیم: سرور ایران به خارج وصل می‌شود (وقتی ورودی ایران بسته است)</option></select></label>
@@ -736,7 +737,7 @@ document.addEventListener('click', async e => {
         <div class="note">تغییر پورت‌ها ظرف حدود ۳۰ ثانیه روی هر دو سرور اعمال می‌شود. اگر آدرس ایران را عوض می‌کنید، دستور نصب را روی سرور جدید اجرا کنید.</div>
         <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="teSave" data-id="${x.id}">ذخیره</button></div>`);
     }
-    else if (t.id === 'teSave') { await api('PATCH', '/tunnels/' + d.id, {name: $('#teName').value.trim(), iran_host: $('#teHost').value.trim(), ports: $('#tePorts').value, publish: $('#tePub').checked, encrypt: $('#teEnc').value, mode: $('#teMode').value}); closeModal(); await refresh(); toast('ذخیره شد'); }
+    else if (t.id === 'teSave') { await api('PATCH', '/tunnels/' + d.id, {name: $('#teName').value.trim(), iran_host: $('#teHost').value.trim(), ports: $('#tePorts').value, publish: $('#tePub').checked, encrypt: $('#teEnc').value, mode: $('#teMode').value, ctl_port: +$('#teCtl').value || null}); closeModal(); await refresh(); toast('ذخیره شد'); }
     else if (d.ttoggle) { const x = S.tunnels.find(q => q.id === +d.ttoggle); await api('PATCH', '/tunnels/' + x.id, {enabled: !x.enabled}); await refresh(); }
     else if (d.tdel) {
       const x = S.tunnels.find(q => q.id === +d.tdel);
