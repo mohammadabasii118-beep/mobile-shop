@@ -1689,3 +1689,12 @@ def test_admin_access_settings_from_the_panel(monkeypatch, tmp_path):
         r = c.put("/api/settings/admin-access", headers=h, json={"enabled": False}).json()
         assert not r["enabled"] and "respond 404" not in (tmp_path / "Caddyfile").read_text()
         assert 'window.BASE=""' in c.get("/").text
+
+
+def test_3d_skin_assets_are_served_and_default_look_is_unchanged():
+    with TestClient(app) as c:
+        html = c.get("/").text
+        assert "localStorage.getItem('skin')" in html and 'class="bg3d"' in html           # chosen per browser, no flash
+        js = c.get("/app.js").text
+        assert "function startGlobe" in js and "data-skin=" in js and "setSkin" in js
+        assert 'dataset.skin' in html and 'data-skin="3d"' not in html.split("<body>")[1].split("<script")[0]   # off until chosen

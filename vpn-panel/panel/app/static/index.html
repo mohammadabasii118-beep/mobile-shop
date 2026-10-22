@@ -3,6 +3,7 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
 <link rel="icon" href="data:,">
+<script>try{if(localStorage.getItem('skin')==='3d')document.documentElement.dataset.skin='3d'}catch(e){}</script>
 <style>
 :root{color-scheme:light}
 [hidden]{display:none!important}
@@ -161,9 +162,50 @@ pre{background:var(--surface2);border-radius:10px;padding:12px;margin:0;overflow
   .cols{grid-template-columns:1fr}
   .stat b{font-size:20px}
 }
+/* ---------- skin "3D": glass cards, animated backdrop, tilt, live globe (chosen under «ظاهر پنل», kept per browser) ---------- */
+.bg3d{display:none}
+html[data-skin="3d"]:root{--bg:#05070f;--surface:rgba(255,255,255,.055);--surface2:rgba(255,255,255,.08);--line:rgba(255,255,255,.12);--line2:rgba(255,255,255,.2);
+  --fg:#eaf0ff;--muted:#8b97b8;--accent:#22d3ee;--accent2:#8b5cf6;--accent-fg:#04121a;--accent-soft:rgba(34,211,238,.14);--good:#34d399;--warn:#fbbf24;--bad:#fb7185;
+  --glow1:rgba(139,92,246,.16);--glow2:rgba(34,211,238,.12);--shadow:0 20px 50px -28px rgba(0,0,0,.85);color-scheme:dark}
+html[data-skin="3d"] body{background-color:#05070f;background-image:none}
+html[data-skin="3d"] .bg3d{display:block;position:fixed;inset:0;z-index:-1;overflow:hidden;background:radial-gradient(900px 500px at 70% -10%,#13204a 0,transparent 70%),#05070f}
+.bg3d i{position:absolute;display:block}
+.bg3d .b1,.bg3d .b2,.bg3d .b3{border-radius:50%;filter:blur(70px);opacity:.5;animation:bgdrift 18s ease-in-out infinite alternate}
+.bg3d .b1{width:420px;height:420px;background:#8b5cf6;top:-80px;inset-inline-start:-60px}
+.bg3d .b2{width:380px;height:380px;background:#22d3ee;bottom:-120px;inset-inline-end:10%;animation-duration:22s;animation-delay:-6s}
+.bg3d .b3{width:300px;height:300px;background:#f472b6;top:40%;inset-inline-end:-80px;animation-duration:26s;animation-delay:-12s;opacity:.3}
+@keyframes bgdrift{to{transform:translate(70px,50px) scale(1.18)}}
+.bg3d .floor{left:-50%;right:-50%;bottom:-10%;height:60%;transform:perspective(420px) rotateX(62deg);transform-origin:50% 100%;
+  background-image:linear-gradient(rgba(34,211,238,.26) 1px,transparent 1px),linear-gradient(90deg,rgba(139,92,246,.26) 1px,transparent 1px);background-size:60px 60px;
+  animation:bgfloor 3.2s linear infinite;-webkit-mask-image:linear-gradient(to top,#000 0,transparent 85%);mask-image:linear-gradient(to top,#000 0,transparent 85%)}
+@keyframes bgfloor{to{background-position:0 60px}}
+html[data-skin="3d"] nav,html[data-skin="3d"] .panel,html[data-skin="3d"] .stat,html[data-skin="3d"] .ncard{background:var(--surface);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-color:var(--line)}
+html[data-skin="3d"] .panel,html[data-skin="3d"] .stat{border-radius:22px}
+html[data-skin="3d"] .stat,html[data-skin="3d"] .globe3d{transform-style:preserve-3d;transition:transform .25s ease,box-shadow .25s}
+html[data-skin="3d"] .stat:hover,html[data-skin="3d"] .globe3d:hover{box-shadow:0 30px 60px -30px #000,0 0 0 1px rgba(255,255,255,.18)}
+html[data-skin="3d"] .stat .ico{transform:translateZ(36px)}
+html[data-skin="3d"] .stat b{display:block;transform:translateZ(26px)}
+html[data-skin="3d"] #view.anim .panel,html[data-skin="3d"] #view.anim .stat{animation:skinfly .85s cubic-bezier(.2,.9,.2,1) both}
+html[data-skin="3d"] #view.anim .stat:nth-child(2),html[data-skin="3d"] #view.anim .panel:nth-child(2){animation-delay:.07s}
+html[data-skin="3d"] #view.anim .stat:nth-child(3),html[data-skin="3d"] #view.anim .panel:nth-child(3){animation-delay:.14s}
+html[data-skin="3d"] #view.anim .stat:nth-child(4),html[data-skin="3d"] #view.anim .panel:nth-child(4){animation-delay:.21s}
+html[data-skin="3d"] #view.anim .panel:nth-child(n+5){animation-delay:.28s}
+@keyframes skinfly{from{opacity:0;transform:perspective(900px) translateY(36px) translateZ(-110px) rotateX(16px)}to{opacity:1;transform:none}}
+html[data-skin="3d"] .btn.pri{box-shadow:0 12px 26px -12px var(--accent);transition:transform .2s,box-shadow .2s}
+html[data-skin="3d"] .btn.pri:hover{transform:translateY(-2px) scale(1.03)}
+html[data-skin="3d"] tbody tr{transition:transform .2s,background .2s}
+html[data-skin="3d"] tbody tr:hover{background:rgba(255,255,255,.06)}
+.globe3d{position:relative;min-height:420px;padding:0!important;overflow:hidden}
+.globe3d canvas{position:absolute;inset:0;width:100%;height:100%}
+.globe3d .gt{position:absolute;top:16px;inset-inline-start:20px;z-index:2;pointer-events:none}
+.globe3d .gt b{font-size:15px}.globe3d .gt span{display:block;color:var(--muted);font-size:12px}
+.globe3d .gl{position:absolute;bottom:14px;inset-inline-start:18px;display:flex;gap:8px;z-index:2;flex-wrap:wrap;pointer-events:none}
+.spark3d{padding:16px!important}.spark3d canvas{width:100%;height:110px;display:block}
+.spark3d h2{margin:0 0 6px}
+@media (prefers-reduced-motion:reduce){.bg3d *,html[data-skin="3d"] #view .panel,html[data-skin="3d"] #view .stat{animation:none!important}}
 </style>
 
-</head><body>
+</head><body><div class="bg3d" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="floor"></i></div>
 <div class="shell">
   <nav id="nav" aria-label="بخش‌ها">
     <div class="brand" id="brand"><span class="logo"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg></span><span>پنل چندلوکیشن<small>مدیریت VPN</small></span></div>

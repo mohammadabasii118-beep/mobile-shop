@@ -1,7 +1,7 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function ago(iso) { const m = Math.max(1, Math.round((Date.now() - new Date(iso)) / 60000)); return m < 60 ? m + ' دقیقه پیش' : m < 1440 ? Math.round(m / 60) + ' ساعت پیش' : Math.round(m / 1440) + ' روز پیش'; }
-const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: [], brand: {name: 'پنل چندلوکیشن', logo: '', color: ''}, dnstt: null, tunnels: [], access: null, owner: '', onlineOnly: false};
+const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: [], brand: {name: 'پنل چندلوکیشن', logo: '', color: ''}, dnstt: null, tunnels: [], access: null, loadHist: [], owner: '', onlineOnly: false};
 const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', routing: 'مسیریابی', users: 'کاربران', tunnels: 'تونل‌ها', settings: 'تنظیمات', admins: 'ادمین‌ها', look: 'ظاهر پنل'};
 const STATUS = {active: ['good', 'فعال'], disabled: ['bad', 'غیرفعال'], expired: ['bad', 'منقضی'], quota: ['bad', 'حجم تمام شده']};
 
@@ -73,10 +73,85 @@ async function refresh() {
   } else {
     [S.nodes, S.users, S.protos, S.admins, S.dnstt, S.tunnels, S.access] = await Promise.all([api('GET', '/nodes'), api('GET', '/users'), api('GET', '/protocols'), api('GET', '/admins'), api('GET', '/dnstt'), api('GET', '/tunnels'), api('GET', '/settings')]);
   }
+  const on = S.nodes.filter(n => n.online); if (on.length) { const avg = on.reduce((a, n) => a + n.load, 0) / on.length; if (!S.loadHist.length) S.loadHist = Array(30).fill(avg); S.loadHist.push(avg); if (S.loadHist.length > 60) S.loadHist.shift(); }
   const ids = new Set(S.users.map(u => u.id));
   S.sel = new Set([...S.sel].filter(i => ids.has(i)));   // a deleted user cannot stay selected
   render();
 }
+/* ---------- skin "3D": per-browser look with a live globe of the panel's own locations ---------- */
+const skin = () => { try { return localStorage.getItem('skin') === '3d' ? '3d' : 'classic'; } catch (_) { return 'classic'; } };
+function setSkin(v) {
+  try { localStorage.setItem('skin', v); } catch (_) {}
+  if (v === '3d') document.documentElement.dataset.skin = '3d'; else delete document.documentElement.dataset.skin;
+}
+const GEO = {DE: [50.1, 8.7], TR: [41.0, 29.0], FR: [48.9, 2.3], FI: [60.2, 24.9], NL: [52.4, 4.9], GB: [51.5, -0.1], US: [38.9, -77], CA: [45.4, -75.7], SE: [59.3, 18.1], PL: [52.2, 21], AE: [25.2, 55.3],
+  IT: [41.9, 12.5], ES: [40.4, -3.7], CH: [47.4, 8.5], AT: [48.2, 16.4], RU: [55.8, 37.6], UA: [50.4, 30.5], SG: [1.35, 103.8], JP: [35.7, 139.7], IN: [19.1, 72.9], AM: [40.2, 44.5],
+  AZ: [40.4, 49.9], GE: [41.7, 44.8], KZ: [51.2, 71.4], LT: [54.7, 25.3], LV: [56.9, 24.1], EE: [59.4, 24.7], RO: [44.4, 26.1], BG: [42.7, 23.3], CZ: [50.1, 14.4], HK: [22.3, 114.2], AU: [-33.9, 151.2], BR: [-23.5, -46.6]};
+const IRAN_GEO = [35.7, 51.4];
+const globe = {raf: 0, user: 0, phase: 0, drag: null, idleTimer: 0};
+function stopGlobe() { cancelAnimationFrame(globe.raf); globe.raf = 0; }
+function startGlobe() {
+  stopGlobe();
+  const cv = $('#globe3d'); if (!cv) return;
+  const g = cv.getContext('2d'), reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let W, H, dpr = devicePixelRatio || 1;
+  const size = () => { W = cv.clientWidth; H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0); }; size();
+  const N = 1100, pts = []; for (let i = 0; i < N; i++) { const y = 1 - 2 * (i + .5) / N, r = Math.sqrt(1 - y * y), th = Math.PI * (1 + Math.sqrt(5)) * i; pts.push([Math.cos(th) * r, y, Math.sin(th) * r]); }
+  const rad = d => d * Math.PI / 180, ll = (lat, lon) => [Math.cos(rad(lat)) * Math.sin(rad(lon)), Math.sin(rad(lat)), Math.cos(rad(lat)) * Math.cos(rad(lon))];
+  const tilt = rad(27); let rot = 0;
+  const proj = (v, R, cx, cy) => { const c = Math.cos(rot), s = Math.sin(rot), x1 = v[0] * c + v[2] * s, z1 = -v[0] * s + v[2] * c, ct = Math.cos(tilt), st = Math.sin(tilt); return [cx + x1 * R, cy - (v[1] * ct - z1 * st) * R, v[1] * st + z1 * ct]; };
+  const slerp = (a, b, t) => { const d = Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2])), o = Math.acos(d), sn = Math.sin(o) || 1, k1 = Math.sin((1 - t) * o) / sn, k2 = Math.sin(t * o) / sn; return [0, 1, 2].map(i => a[i] * k1 + b[i] * k2); };
+  const iran = ll(...IRAN_GEO), LAB = [[26, -12], [0, 26], [-4, 24], [0, -18], [24, 18], [-26, -12]];
+  cv.onpointerdown = e => { globe.drag = e.clientX; clearTimeout(globe.idleTimer); cv.setPointerCapture(e.pointerId); };
+  cv.onpointermove = e => { if (globe.drag !== null) { globe.user += (e.clientX - globe.drag) * .008; globe.drag = e.clientX; } };
+  cv.onpointerup = () => { globe.drag = null; };
+  function frame(now) {
+    if (!$('#globe3d')) { globe.raf = 0; return; }
+    const t = now / 1000; if (globe.drag === null && !reduce) globe.phase += .004; rot = globe.user - rad(30) + Math.sin(globe.phase) * rad(42);
+    g.clearRect(0, 0, W, H); const cx = W * .5, cy = H * .54, R = Math.min(W, H) * .43;
+    let gr = g.createRadialGradient(cx, cy, R * .9, cx, cy, R * 1.5); gr.addColorStop(0, 'rgba(34,211,238,.22)'); gr.addColorStop(1, 'transparent'); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, R * 1.5, 0, 7); g.fill();
+    gr = g.createRadialGradient(cx - R * .3, cy - R * .35, R * .1, cx, cy, R); gr.addColorStop(0, 'rgba(60,90,200,.38)'); gr.addColorStop(1, 'rgba(8,12,34,.9)'); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, R, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.16)'; g.lineWidth = 1; g.beginPath(); g.arc(cx, cy, R, 0, 7); g.stroke();
+    for (const p of pts) { const q = proj(p, R, cx, cy), a = q[2] > 0 ? .25 + .6 * q[2] : .07; g.fillStyle = `rgba(147,220,255,${Math.min(1, a + .1)})`; g.fillRect(q[0], q[1], q[2] > 0 ? 2.1 : 1.1, q[2] > 0 ? 2.1 : 1.1); }
+    const nodes = S.nodes.map((n, i) => ({n, v: ll(...(GEO[(n.cc || '').toUpperCase()] || [30 + (i * 17) % 30, 10 + (i * 41) % 60])), lab: LAB[i % LAB.length]}));
+    nodes.forEach(({n, v}, i) => {
+      let prev = null;
+      for (let k = 0; k <= 64; k++) { const u = k / 64, p = slerp(iran, v, u), q = proj(p.map(x => x * (1 + .28 * Math.sin(Math.PI * u))), R, cx, cy);
+        if (prev && q[2] > -.05 && prev[2] > -.05) { g.strokeStyle = n.online ? `rgba(34,211,238,${.18 + .4 * Math.max(0, q[2])})` : 'rgba(251,191,36,.18)'; g.lineWidth = n.online ? 1.6 : 1; g.setLineDash(n.online ? [] : [4, 5]); g.beginPath(); g.moveTo(prev[0], prev[1]); g.lineTo(q[0], q[1]); g.stroke(); g.setLineDash([]); }
+        prev = q; }
+      if (n.online) for (let j = 0; j < 3; j++) { const u = (t * .18 + j / 3 + i * .21) % 1, p = slerp(iran, v, u), q = proj(p.map(x => x * (1 + .28 * Math.sin(Math.PI * u))), R, cx, cy);
+        if (q[2] > -.05) { const b = g.createRadialGradient(q[0], q[1], 0, q[0], q[1], 9); b.addColorStop(0, 'rgba(255,255,255,.95)'); b.addColorStop(.35, 'rgba(34,211,238,.7)'); b.addColorStop(1, 'transparent'); g.fillStyle = b; g.beginPath(); g.arc(q[0], q[1], 9, 0, 7); g.fill(); } }
+    });
+    const mark = (v, color, label, on, pulse, lab) => { const q = proj(v, R, cx, cy); if (q[2] < 0) return;
+      if (on) { const k = (t * .7 + pulse) % 1; g.strokeStyle = color.replace('1)', `${.6 * (1 - k)})`); g.lineWidth = 2; g.beginPath(); g.arc(q[0], q[1], 4 + k * 22, 0, 7); g.stroke(); }
+      g.fillStyle = color; g.beginPath(); g.arc(q[0], q[1], 5, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.stroke();
+      g.font = '700 12.5px Vazirmatn,sans-serif'; g.fillStyle = 'rgba(255,255,255,.95)'; g.textAlign = 'center'; g.fillText(label, q[0] + lab[0], q[1] + lab[1]); };
+    mark(iran, 'rgba(244,114,182,1)', 'ایران', true, 0, [20, -12]);
+    nodes.forEach(({n, v, lab}, i) => mark(v, n.online ? 'rgba(52,211,153,1)' : 'rgba(251,191,36,1)', n.name, n.online, i * .25, lab));
+    globe.raf = requestAnimationFrame(frame);
+  }
+  globe.raf = requestAnimationFrame(frame);
+}
+function drawSpark() {
+  const cv = $('#spark3d'); if (!cv) return;
+  const g = cv.getContext('2d'), dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight; cv.width = W * dpr; cv.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const d = S.loadHist; if (d.length < 2) return; const step = W / Math.max(1, 59);
+  const path = () => { g.beginPath(); d.forEach((v, i) => { const x = W - (d.length - 1 - i) * step, y = H - 6 - Math.min(100, v) / 100 * (H - 14); i ? g.lineTo(x, y) : g.moveTo(x, y); }); };
+  path(); g.lineTo(W, H); g.lineTo(W - (d.length - 1) * step, H); const f = g.createLinearGradient(0, 0, 0, H); f.addColorStop(0, 'rgba(34,211,238,.38)'); f.addColorStop(1, 'transparent'); g.fillStyle = f; g.fill();
+  path(); g.strokeStyle = '#22d3ee'; g.lineWidth = 2.2; g.lineJoin = 'round'; g.shadowColor = '#22d3ee'; g.shadowBlur = 12; g.stroke();
+}
+function skinHooks() {
+  const v = $('#view');
+  if (S._tab !== S.tab) { S._tab = S.tab; v.classList.remove('anim'); void v.offsetWidth; v.classList.add('anim'); }   // entrance motion only when the page changes
+  if (skin() === '3d' && S.tab === 'dash') { startGlobe(); drawSpark(); } else stopGlobe();
+}
+document.addEventListener('mousemove', e => {   // 3D tilt of stat cards and the globe card
+  if (skin() !== '3d' || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const c = e.target.closest && e.target.closest('.stat, .globe3d');
+  document.querySelectorAll('.stat[style*="perspective"], .globe3d[style*="perspective"]').forEach(x => { if (x !== c) x.style.transform = ''; });
+  if (!c) return; const r = c.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+  c.style.transform = `perspective(900px) rotateY(${(x - .5) * -9}deg) rotateX(${(y - .5) * 7}deg) translateZ(12px)`;
+});
 const isReseller = () => S.me.role === 'reseller';
 const uPath = id => (isReseller() ? '/me/users/' : '/users/') + id;   // a sub-admin goes through /me
 
@@ -87,12 +162,15 @@ const views = {
     const stat = (cls, ico, label, value, sub = '') => `<div class="stat"><span class="ico ${cls}">${ic(ico)}</span><div><span class="l">${label}</span><b>${value}${sub ? `<small>${sub}</small>` : ''}</b></div></div>`;
     const top = [...S.users].sort((a, b) => b.used_gb - a.used_gb).slice(0, 5), max = Math.max(1, ...top.map(u => u.used_gb));
     const segs = [['good', 'فعال', active, 'var(--good)'], ['quota', 'حجم تمام', count('quota'), 'var(--warn)'], ['expired', 'منقضی', count('expired'), 'var(--bad)'], ['disabled', 'غیرفعال', count('disabled'), 'var(--muted)']];
+    const hero = skin() === '3d' ? `<div class="panel globe3d"><canvas id="globe3d"></canvas><div class="gt"><b>نقشه‌ی زنده‌ی لوکیشن‌ها و تونل‌ها</b><span>کره را با ماوس بچرخان</span></div>
+      <div class="gl"><span class="pill good">آنلاین</span><span class="pill warn">آفلاین</span></div></div>
+      <div class="panel spark3d"><h2>${ic('activity')}میانگین بار سرورها (زنده)</h2><canvas id="spark3d"></canvas></div>` : '';
     return `<div class="stats">
       ${stat('', 'server', 'لوکیشن آنلاین', `${num(on + ' / ' + S.nodes.length)}`)}
       ${stat('blue', 'users', 'کاربر فعال', `${num(active + ' / ' + S.users.length)}`, S.users.some(u => u.online) ? `${S.users.filter(u => u.online).length} آنلاین` : '')}
       ${stat('blue', 'activity', 'مصرف کل', num(fmtGB(used)), 'GB')}
       ${stat(blocked || S.nodes.some(n => n.conflicts.length) ? 'warn' : '', 'alert', 'نیازمند توجه', num(blocked + S.nodes.filter(n => n.conflicts.length || (n.errors || []).length).length), 'مورد')}</div>
-      <div class="panel"><h2>${ic('pin')}لوکیشن‌ها</h2>${S.nodes.length ? `<div class="nodes">${S.nodes.map(n => `
+      ${hero}<div class="panel"><h2>${ic('pin')}لوکیشن‌ها</h2>${S.nodes.length ? `<div class="nodes">${S.nodes.map(n => `
         <div class="ncard ${n.online ? '' : 'off'}"><div class="ring ${loadCls(n.load)}" style="--v:${n.online ? n.load : 0}"><b>${n.online ? n.load + '%' : '—'}</b></div>
           <div class="t"><strong><span class="cc">${esc(n.cc)}</span>${esc(n.name)}</strong><span class="muted mono">${esc(n.address)}</span>
             <span><span class="pill ${n.online ? 'good' : 'warn'}">${n.online ? 'آنلاین' : 'آفلاین'}</span>${n.conflicts.length ? ' <span class="pill bad" title="' + esc(n.conflicts.join('، ')) + '">تداخل پورت</span>' : ''}</span></div></div>`).join('')}</div>` :
@@ -207,7 +285,10 @@ const views = {
   },
   look() {
     const b = S.brand, presets = ['#0d9488', '#0284c7', '#7c3aed', '#db2777', '#ea580c', '#16a34a', '#475569'];
-    return `<div class="note">نام و لوگو در نوار کناری، صفحه ورود، تب مرورگر و صفحه اشتراک کاربران دیده می‌شوند.</div>
+    const sk = skin(), card = (id, t, d) => `<button class="btn" data-skin="${id}" style="flex:1;min-width:200px;height:auto;padding:14px;text-align:start;${sk === id ? 'outline:2px solid var(--accent)' : ''}"><b>${t}</b>${sk === id ? ' ✓' : ''}<br><span class="muted" style="font-size:12.5px">${d}</span></button>`;
+    return `<div class="panel"><h2>سبک نمایش (فقط در همین مرورگر)</h2><div class="chips" style="align-items:stretch">${card('classic', 'کلاسیک', 'ساده و سبک')}${card('3d', 'سه‌بعدی و متحرک', 'پس‌زمینه‌ی متحرک، کارت‌های شیشه‌ای، کره‌ی زنده‌ی لوکیشن‌ها در داشبورد')}</div>
+      <div class="note" style="margin-top:10px">با یک کلیک همان لحظه اعمال می‌شود و هر وقت خواستی برمی‌گردد. روی گوشی یا سیستم ضعیف، «کلاسیک» سریع‌تر است.</div></div>
+      <div class="note">نام و لوگو در نوار کناری، صفحه ورود، تب مرورگر و صفحه اشتراک کاربران دیده می‌شوند.</div>
       <div class="panel"><div class="form" style="grid-template-columns:1fr">
         <label class="f">نام پنل<input type="text" id="bName" value="${esc(b.name)}" maxlength="40"></label>
         <div class="f"><span>لوگو (PNG، JPG، WebP یا SVG؛ خودکار کوچک می‌شود)</span>
@@ -290,6 +371,7 @@ function render() {
   if (typing !== null && $('#uq')) { $('#uq').focus(); $('#uq').setSelectionRange(typing, typing); }
   $('#nNodes').textContent = S.nodes.length; $('#nUsers').textContent = S.users.length; $('#nAdmins').textContent = S.admins.length || ''; $('#nTunnels').textContent = S.tunnels.length || '';
   document.querySelectorAll('nav [data-tab]').forEach(b => b.setAttribute('aria-current', b.dataset.tab === S.tab));
+  skinHooks();
 }
 
 function nodeForm() {
@@ -456,6 +538,7 @@ document.addEventListener('click', async e => {
       a.download = (r.headers.get('content-disposition') || '').split('filename=')[1]?.replace(/"/g, '') || 'panel-backup.db';
       a.click(); URL.revokeObjectURL(a.href); toast('پشتیبان دانلود شد');
     }
+    else if (d.skin !== undefined) { setSkin(d.skin); S._tab = null; render(); toast(d.skin === '3d' ? 'سبک سه‌بعدی روشن شد' : 'سبک کلاسیک'); }
     else if (t.id === 'acRand') {
       $('#acPort').value = 20000 + Math.floor(Math.random() * 40000);
       $('#acPath').value = [...crypto.getRandomValues(new Uint8Array(8))].map(b => b.toString(16).padStart(2, '0')).join('');
@@ -720,3 +803,4 @@ document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id
 (async () => { await loadBrand(); if (!token) return showLogin(); try { await refresh(); } catch (e) {} })();
 setInterval(() => { const a = document.activeElement, typing = a && ['INPUT', 'SELECT', 'TEXTAREA'].includes(a.tagName) && a.id !== 'uq' && $('#view').contains(a);
   if (token && $('#modal').hidden && S.tab !== 'look' && S.tab !== 'settings' && !typing) refresh().catch(() => {}); }, 20000);
+setInterval(() => { if (token && skin() === '3d' && S.tab === 'dash' && $('#modal').hidden) refresh().catch(() => {}); }, 6000);
