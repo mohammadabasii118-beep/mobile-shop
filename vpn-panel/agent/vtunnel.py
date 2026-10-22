@@ -744,9 +744,169 @@ async def probe(peer, port, token, seconds, listen_port=None):
     return result
 
 
+# ---- BackPack management (used by both panel agents): the pinned binary, a config and a systemd unit per tunnel ----
+BP_BIN_DIR = os.environ.get("VPNP_BIN_DIR", "/usr/local/lib/vpn-panel")
+BP_CONF_DIR = os.environ.get("VPNP_CONF_DIR", "/etc/vpn-panel")
+BP_UNIT_DIR = os.environ.get("VPNP_UNIT_DIR", "/etc/systemd/system")
+BP_PREFIX = "vpnp-bp-"          # everything the panel creates starts with this; a BackPack installed by hand is never touched
+_ANSI = None
+
+
+def _sh(*cmd, timeout=30):
+    import subprocess
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except Exception as e:                                   # a missing tool or a hang must not stop the whole run
+        return subprocess.CompletedProcess(cmd, 127, "", str(e))
+
+
+def bp_arch():
+    import platform
+    return {"x86_64": "amd64", "amd64": "amd64", "aarch64": "arm64", "arm64": "arm64"}.get(platform.machine().lower(), "")
+
+
+def bp_ensure_binary(base_url, sha256_map):
+    """Path of the pinned BackPack binary; downloads it from the panel (checked against the pinned SHA-256) when missing."""
+    import tarfile
+    import urllib.request
+    arch = bp_arch()
+    if arch not in sha256_map:
+        raise RuntimeError(f"no BackPack build for this CPU ({arch or 'unknown'})")
+    want = sha256_map[arch]
+    dest = os.path.join(BP_BIN_DIR, f"backpack-{want[:12]}")
+    if os.access(dest, os.X_OK):
+        return dest
+    with urllib.request.urlopen(f"{base_url.rstrip('/')}/linux-{arch}.tar.gz", timeout=120) as r:
+        data = r.read()
+    if hashlib.sha256(data).hexdigest() != want:
+        raise RuntimeError("the BackPack download does not match its pinned SHA-256; not installing it")
+    import io
+    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tf:
+        member = next((m for m in tf.getmembers() if m.isfile() and os.path.basename(m.name) == "backpack"), None)
+        if member is None:
+            raise RuntimeError("the BackPack archive has no 'backpack' binary")
+        blob = tf.extractfile(member).read()
+    os.makedirs(BP_BIN_DIR, exist_ok=True)
+    with open(dest + ".tmp", "wb") as f:
+        f.write(blob)
+    os.chmod(dest + ".tmp", 0o755)
+    os.replace(dest + ".tmp", dest)
+    return dest
+
+
+def bp_unit_text(tid, binary, conf):
+    return f"""[Unit]
+Description=BackPack tunnel {tid} (managed by the panel)
+After=network-online.target
+
+[Service]
+ExecStart={binary} -c {conf}
+Restart=always
+RestartSec=3
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+
+def _write(path, text, mode):
+    try:
+        if open(path).read() == text:
+            return False
+    except FileNotFoundError:
+        pass
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path + ".tmp", "w") as f:
+        f.write(text)
+    os.chmod(path + ".tmp", mode)
+    os.replace(path + ".tmp", path)
+    return True
+
+
+def bp_status(unit, token="", ping=""):
+    """{"active", "up", "line"}: up comes from the engine's own log (and a ping of the peer for a direct tunnel)."""
+    import re
+    global _ANSI
+    _ANSI = _ANSI or re.compile(r"\x1b\[[0-9;]*m")
+    active = _sh("systemctl", "is-active", unit).stdout.strip() == "active"
+    lines = [_ANSI.sub("", l) for l in _sh("journalctl", "-u", unit, "-n", "80", "--no-pager", "-o", "cat").stdout.splitlines()]
+    verdict, last = None, ""
+    for l in lines:
+        if re.search(r"transport \w+ is up|tunnel .{0,40}is up|control channel (successfully )?established", l, re.I) and "attempting" not in l:
+            verdict = True
+        elif re.search(r"FATAL|failed to read from the control channel|was refused|invalid security token|connection refused|timed out|i/o timeout|control channel .*(lost|closed)", l, re.I):
+            verdict = False
+        if "[" in l:
+            last = l
+    if ping:
+        verdict = _sh("ping", "-c", "1", "-W", "1", ping).returncode == 0
+    if token:
+        last = last.replace(token, "***")
+    return {"active": active, "up": bool(active and verdict), "line": last[-160:]}
+
+
+def bp_apply(spec):
+    """spec = {"base_url", "sha256": {arch: hex}, "tunnels": [{"id", "toml", "ping"?}]} -> {"tunnels": {id: status}, "errors": [...]}.
+    Installs/updates what the panel wants and removes the panel's own units that are no longer wanted."""
+    import re
+    errors, out, wanted = [], {}, set()
+    tunnels = spec.get("tunnels", [])
+    binary = None
+    if tunnels:
+        try:
+            binary = bp_ensure_binary(spec["base_url"], spec["sha256"])
+        except Exception as e:
+            errors.append("BackPack install: " + str(e)[:150])
+    for t in tunnels:
+        tid = str(t["id"])
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,20}", tid):
+            continue
+        wanted.add(tid)
+        unit = f"{BP_PREFIX}{tid}"
+        if binary is None:
+            out[tid] = {"active": False, "up": False, "line": ""}
+            continue
+        conf = os.path.join(BP_CONF_DIR, f"bp-{tid}.toml")
+        changed = _write(conf, t["toml"], 0o600)
+        changed |= _write(os.path.join(BP_UNIT_DIR, unit + ".service"), bp_unit_text(tid, binary, conf), 0o644)
+        if changed:
+            _sh("systemctl", "daemon-reload")
+            _sh("systemctl", "enable", unit)
+            _sh("systemctl", "restart", unit)
+        elif _sh("systemctl", "is-active", unit).stdout.strip() != "active":
+            _sh("systemctl", "restart", unit)
+        m = re.search(r'^token\s*=\s*"([^"]+)"', t["toml"], re.M)
+        out[tid] = bp_status(unit, m.group(1) if m else "", t.get("ping", ""))
+    try:
+        names = os.listdir(BP_UNIT_DIR)
+    except OSError:
+        names = []
+    gone = {str(i) for i in spec.get("remove", [])}
+    for name in names:     # units the panel no longer wants: every unmanaged one when prune is on, or just the ones named in "remove"
+        tid0 = name[len(BP_PREFIX):-8]
+        if name.startswith(BP_PREFIX) and name.endswith(".service") and tid0 not in wanted and (spec.get("prune", True) or tid0 in gone):
+            tid = name[len(BP_PREFIX):-8]
+            _sh("systemctl", "disable", "--now", name)
+            extra = []
+            try:       # the config and whatever BackPack wrote next to it (e.g. bp-3.metrics.json)
+                extra = [os.path.join(BP_CONF_DIR, f) for f in os.listdir(BP_CONF_DIR) if f.startswith(f"bp-{tid}.")]
+            except OSError:
+                pass
+            for path in (os.path.join(BP_UNIT_DIR, name), *extra):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+            _sh("systemctl", "daemon-reload")
+    return {"tunnels": out, "errors": errors}
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = ap.add_subparsers(dest="mode", required=True)
+    bpp = sub.add_parser("bp", help="manage the panel's BackPack tunnels on this server: reads a JSON spec on stdin, prints a JSON status")
+    bpp.add_argument("action", choices=["apply"])
     pr = sub.add_parser("probe", help="connection test: listen and dial on one port, print a JSON result")
     pr.add_argument("--peer", required=True)
     pr.add_argument("--port", type=int, required=True)
@@ -767,6 +927,9 @@ def main(argv=None):
         p.add_argument("--encrypt", choices=["off", "tcp", "all"], default="off",
                        help="tcp: encrypt the TCP connections; all: also the UDP datagrams (both ends must use the same value)")
     a = ap.parse_args(argv)
+    if a.mode == "bp":
+        print(json.dumps(bp_apply(json.load(sys.stdin))))
+        return
     if a.mode == "probe":
         a.token = a.token or os.environ.get("VTUNNEL_TOKEN", "")
     if len(a.token) < 8:

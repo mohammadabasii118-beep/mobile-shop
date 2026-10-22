@@ -106,6 +106,32 @@ class Tunnel(Base):
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
 
+class BpTunnel(Base):
+    """A BackPack tunnel managed by the panel (see bp.py); separate from the panel's own `Tunnel`."""
+    __tablename__ = "bp_tunnels"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str]
+    kind: Mapped[str] = mapped_column(default="reverse")     # reverse | direct (layer-3)
+    transport: Mapped[str] = mapped_column(default="tcp")    # reverse: the transport; direct: the carrier
+    iran_host: Mapped[str]
+    node_id: Mapped[int] = mapped_column(ForeignKey("nodes.id"))
+    port: Mapped[int] = mapped_column(default=9100)          # reverse: the control port on the Iran server; direct: the tunnel port on the foreign server
+    token: Mapped[str]
+    relay_token: Mapped[str] = mapped_column(unique=True)    # what the agent on the Iran server signs in with
+    forwards: Mapped[list] = mapped_column(JSON, default=list)
+    accept_udp: Mapped[bool] = mapped_column(default=False)
+    fallbacks: Mapped[list] = mapped_column(JSON, default=list)
+    fec_data: Mapped[int] = mapped_column(default=0)
+    fec_parity: Mapped[int] = mapped_column(default=0)
+    net_n: Mapped[int] = mapped_column(default=0)            # direct: the tunnel's private /30 is 10.20.<net_n>.0/30
+    enabled: Mapped[bool] = mapped_column(default=True)
+    relay_seen: Mapped[datetime | None] = mapped_column(default=None)
+    relay_state: Mapped[dict] = mapped_column(JSON, default=dict)
+    client_seen: Mapped[datetime | None] = mapped_column(default=None)
+    client_state: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
 class Setting(Base):
     """Small key/value store for panel-wide options (branding)."""
     __tablename__ = "settings"

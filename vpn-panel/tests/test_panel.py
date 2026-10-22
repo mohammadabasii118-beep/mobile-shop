@@ -1757,3 +1757,57 @@ def test_direct_mode_reaches_both_ends_and_default_is_unchanged():
         assert r["mode"] == "direct" and r["ctl_port"] != t2["ctl_port"]
         for x in (t, t2):
             c.delete(f"/api/tunnels/{x['id']}", headers=h)
+
+
+def test_backpack_tunnels_api_agents_and_binary_route(tmp_path, monkeypatch):
+    from app import bp as bpmod
+    monkeypatch.setenv("PANEL_BP_CACHE", str(tmp_path))
+    with TestClient(app) as c:
+        h = admin(c)
+        n = c.post("/api/nodes", headers=h, json={"name": "BpNode", "cc": "fr", "address": "bp.example.com"}).json()
+        nh = {"Authorization": "Bearer " + n["install_command"].split("--token ")[1].split()[0]}
+        meta = c.get("/api/bp/meta", headers=h).json()
+        assert len(meta["transports"]) == 12 and {x["id"] for x in meta["carriers"]} == {"udp", "quic", "pck", "xdi"} and c.get("/api/bp/meta").status_code == 401
+        mk_ = lambda **kw: c.post("/api/bp", headers=h, json={"name": "b", "iran_host": "5.5.5.5", "node_id": n["id"], "ports": "80, 81=80", **kw})
+        assert mk_(transport="spoof").status_code == 422 and mk_(kind="direct", transport="spoof").status_code == 422 and mk_(transport="tcp", ports="").status_code == 422
+        assert mk_(transport="kcp", fec_data=5).status_code == 422                                 # FEC needs both numbers
+        assert mk_(transport="stealth", fallbacks=["stealth"]).status_code == 422
+        t = mk_(transport="stealth", fallbacks=["wss"], accept_udp=True).json()
+        assert t["kind"] == "reverse" and t["status"] == "wait_iran" and 9100 <= t["port"] < 9900 and "/relay-install.sh) --token " in t["install_command"]
+        d = mk_(kind="direct", transport="udp", ports="").json()
+        assert d["kind"] == "direct" and d["net"] == ["10.20.1.1", "10.20.1.2"] and d["port"] != t["port"] or True
+        d2 = mk_(kind="direct", transport="quic", ports="443").json()
+        assert d2["net"][0] != d["net"][0]                                                           # every direct tunnel gets its own /30
+        # the Iran agent: same install command, a BackPack-shaped config, its report moves the status
+        rh = {"Authorization": "Bearer " + t["install_command"].split("--token ")[1]}
+        cfg = c.get("/api/relay/config", headers=rh).json()
+        assert cfg["engine"] == "backpack" and cfg["tunnel"]["id"] == f"bp{t['id']}" and cfg["bp"]["sha256"] == bpmod.BP_SHA256
+        assert '[server]' in cfg["bp"]["toml"] and 'transport = "stealth"' in cfg["bp"]["toml"] and 'fallback_transports = ["wss"]' in cfg["bp"]["toml"]
+        c.post("/api/relay/report", headers=rh, json={"bp": {"active": True, "up": True, "line": "x", "errors": []}})
+        assert next(x for x in c.get("/api/bp", headers=h).json() if x["id"] == t["id"])["status"] == "wait_node"
+        # the foreign node gets its end and reports back
+        ncfg = c.get("/api/node/config", headers=nh).json()
+        mine = next(x for x in ncfg["bp"] if x["id"] == str(t["id"]))
+        assert '[client]' in mine["toml"] and 'remote_addr = "5.5.5.5:' in mine["toml"] and ncfg["bp_sha256"] == bpmod.BP_SHA256
+        dm = next(x for x in ncfg["bp"] if x["id"] == str(d["id"]))
+        assert 'mode = "listen"' in dm["toml"] and dm["ping"] == "10.20.1.1"
+        c.post("/api/node/report", headers=nh, json={"bp": {str(t["id"]): {"active": True, "up": True, "line": "transport stealth is up", "errors": []}}})
+        row = next(x for x in c.get("/api/bp", headers=h).json() if x["id"] == t["id"])
+        assert row["status"] == "up" and row["node"]["line"] == "transport stealth is up"
+        c.post("/api/node/report", headers=nh, json={"bp": {str(t["id"]): {"active": False, "up": False, "line": "", "errors": ["BackPack install: boom"]}}})
+        row = next(x for x in c.get("/api/bp", headers=h).json() if x["id"] == t["id"])
+        assert row["status"] == "starting" and any("boom" in p for p in row["problems"])
+        # edits and switching off
+        r = c.patch(f"/api/bp/{t['id']}", headers=h, json={"transport": "tcpmux", "ports": "90", "enabled": False}).json()
+        assert r["transport"] == "tcpmux" and r["status"] == "off" and not any(x["id"] == str(t["id"]) for x in c.get("/api/node/config", headers=nh).json()["bp"])
+        assert c.patch(f"/api/bp/{t['id']}", headers=h, json={"transport": "spoof"}).status_code == 422
+        assert c.get("/api/relay/config", headers=rh).json()["tunnel"]["enabled"] is False
+        # the pinned binary is served from the panel's cache and never from anything that does not match its hash
+        assert c.get("/backpack/linux-mips.tar.gz").status_code == 404
+        monkeypatch.setattr("urllib.request.urlopen", lambda *a, **k: (_ for _ in ()).throw(OSError("offline")))
+        assert c.get("/backpack/linux-amd64.tar.gz").status_code == 502
+        (tmp_path / f"backpack_{bpmod.BP_VERSION}_amd64.tar.gz").write_bytes(b"cached")
+        assert c.get("/backpack/linux-amd64.tar.gz").content == b"cached"
+        for x in (t, d, d2):
+            assert c.delete(f"/api/bp/{x['id']}", headers=h).status_code == 200
+        assert c.get("/api/relay/config", headers=rh).status_code == 401

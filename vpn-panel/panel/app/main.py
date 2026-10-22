@@ -25,7 +25,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .catalog import PROTOCOLS, REALITY_SNI, SS_METHOD
-from .db import Admin, Setting, Node, NodeProtocol, Outbound, Rule, Tunnel, User, engine, get_db, init_db, utcnow
+from .db import Admin, BpTunnel, Setting, Node, NodeProtocol, Outbound, Rule, Tunnel, User, engine, get_db, init_db, utcnow
+from . import bp as bpmod
 from . import caddyfile
 from . import dns as cfdns
 from . import routing
@@ -1505,9 +1506,23 @@ def _sha(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def require_relay_any(authorization: str | None = Header(None), db: Session = Depends(get_db)):
+    """The agent on an Iran server signs in with the token of one tunnel: one of the panel's own tunnels or a BackPack tunnel."""
+    token = (authorization or "").removeprefix("Bearer ").strip()
+    t = (db.scalar(select(Tunnel).where(Tunnel.relay_token == token)) or db.scalar(select(BpTunnel).where(BpTunnel.relay_token == token))) if token else None
+    if not t:
+        raise HTTPException(401, "توکن تونل نامعتبر است")
+    return t
+
+
 @app.get("/api/relay/config")
-def relay_config(t: Tunnel = Depends(require_relay), db: Session = Depends(get_db)):
+def relay_config(t=Depends(require_relay_any), db: Session = Depends(get_db)):
     node = db.get(Node, t.node_id)
+    if isinstance(t, BpTunnel):
+        return {"engine": "backpack", "tunnel": {"id": f"bp{t.id}", "name": t.name, "enabled": t.enabled},
+                "bp": {"id": str(t.id), "toml": bpmod.render(t, "iran", t.iran_host, node.address if node else ""),
+                       "ping": bpmod.net_addrs(t.net_n)[1] if t.kind == "direct" else "", "sha256": bpmod.BP_SHA256},
+                "vtunnel_sha256": _sha(ROOT / "agent" / "vtunnel.py"), "agent_sha256": _sha(ROOT / "agent" / "relay_agent.py")}
     return {"test": test_job(t, "iran", node.address) if node else None,
             "tunnel": {"id": t.id, "name": t.name, "enabled": t.enabled, "ctl_port": t.ctl_port, "token": t.token, "forwards": t.forwards, "encrypt": t.encrypt,
                        "mode": t.mode, "dial": f"{node.address}:{t.ctl_port}" if node else ""},
@@ -1520,10 +1535,16 @@ class RelayReport(BaseModel):
     failed: list[str] = Field(default=[], max_length=300)
     errors: list[str] = Field(default=[], max_length=20)
     test: dict | None = None      # {"id": ..., "result": {...}} of a connection test this side ran
+    bp: dict | None = None        # BackPack tunnel: {"active", "up", "line", "errors"}
 
 
 @app.post("/api/relay/report")
-def relay_report(body: RelayReport, t: Tunnel = Depends(require_relay), db: Session = Depends(get_db)):
+def relay_report(body: RelayReport, t=Depends(require_relay_any), db: Session = Depends(get_db)):
+    if isinstance(t, BpTunnel):
+        t.relay_seen = utcnow()
+        t.relay_state = bp_state(body.bp)
+        db.commit()
+        return {"ok": True}
     t.relay_seen = utcnow()
     t.relay_state = {"pool": body.pool, "udp_client": body.udp_client, "failed": [f[:30] for f in body.failed],
                      "errors": [e[:200] for e in body.errors]}
@@ -1541,6 +1562,177 @@ def relay_agent_script():
 def relay_install(request: Request):
     script = (ROOT / "agent" / "relay-install.sh").read_text().replace("__PANEL_URL__", public_url(request))
     return Response(script, media_type="text/x-shellscript")
+
+
+# ---------- BackPack tunnels (managed by the panel, separate from the panel's own tunnels) ----------
+def bp_state(raw) -> dict:
+    raw = raw if isinstance(raw, dict) else {}
+    return {"active": bool(raw.get("active")), "up": bool(raw.get("up")), "line": str(raw.get("line", ""))[:160],
+            "errors": [str(e)[:200] for e in (raw.get("errors") or [])[:5]] if isinstance(raw.get("errors"), list) else []}
+
+
+def bp_out(t: BpTunnel, db: Session, request: Request) -> dict:
+    node = db.get(Node, t.node_id)
+    iran_on, node_on = fresh(t.relay_seen), fresh(t.client_seen)
+    rs, cs = (t.relay_state or {}) if iran_on else {}, (t.client_state or {}) if node_on else {}
+    if not t.enabled:
+        status = "off"
+    elif not iran_on:
+        status = "wait_iran"
+    elif not node_on:
+        status = "wait_node"
+    elif rs.get("up") and cs.get("up"):
+        status = "up"
+    else:
+        status = "starting"
+    problems = [e for st in (rs, cs) for e in st.get("errors", [])]
+    for side, st in (("ایران", rs), ("خارج", cs)):
+        if st and not st.get("active") and t.enabled:
+            problems.append(f"سرویس بک‌پک روی سرور {side} اجرا نمی‌شود")
+    return {"id": t.id, "name": t.name, "kind": t.kind, "transport": t.transport, "label": bpmod.describe(t), "iran_host": t.iran_host,
+            "node_id": t.node_id, "node_name": node.name if node else "؟", "port": t.port, "forwards": t.forwards,
+            "ports": forwards_text(t.forwards), "accept_udp": t.accept_udp, "fallbacks": t.fallbacks, "fec_data": t.fec_data,
+            "fec_parity": t.fec_parity, "enabled": t.enabled, "status": status, "iran": rs or None, "node": cs or None, "problems": problems,
+            "net": list(bpmod.net_addrs(t.net_n)) if t.kind == "direct" else None,
+            "install_command": f"bash <(curl -fsSL {public_url(request)}/relay-install.sh) --token {t.relay_token}"}
+
+
+class BpIn(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+    kind: Literal["reverse", "direct"] = "reverse"
+    transport: str = Field(max_length=20)
+    iran_host: str = Field(min_length=1, max_length=253)
+    node_id: int
+    ports: str = Field(default="", max_length=4000)
+    accept_udp: bool = False
+    fallbacks: list[str] = Field(default=[], max_length=11)
+    fec_data: int = Field(default=0, ge=0, le=30)
+    fec_parity: int = Field(default=0, ge=0, le=30)
+
+
+class BpPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=60)
+    transport: str | None = Field(default=None, max_length=20)
+    iran_host: str | None = Field(default=None, min_length=1, max_length=253)
+    ports: str | None = Field(default=None, max_length=4000)
+    accept_udp: bool | None = None
+    fallbacks: list[str] | None = Field(default=None, max_length=11)
+    fec_data: int | None = Field(default=None, ge=0, le=30)
+    fec_parity: int | None = Field(default=None, ge=0, le=30)
+    enabled: bool | None = None
+
+
+def bp_check(kind: str, transport: str, fallbacks: list[str], fec_data: int, fec_parity: int) -> None:
+    allowed = bpmod.TRANSPORTS if kind == "reverse" else bpmod.CARRIERS
+    if transport not in allowed:
+        raise HTTPException(422, "نوع حمل نامعتبر است")
+    if kind == "reverse" and (bad := [f for f in fallbacks if f not in bpmod.TRANSPORTS or f == transport]):
+        raise HTTPException(422, f"نوع جایگزین نامعتبر: {bad[0]}")
+    if bool(fec_data) != bool(fec_parity):
+        raise HTTPException(422, "اصلاح خطا (FEC) را با هر دو عدد داده و توازن بدهید، یا هر دو را صفر بگذارید")
+
+
+def bp_forwards(kind: str, ports: str) -> list[dict]:
+    return [] if kind == "direct" and not ports.strip() else parse_forwards(ports)
+
+
+def free_bp_port(db: Session, kind: str, host: str, node_id: int, taken: set, exclude: int | None = None) -> int:
+    """A tunnel port nobody else uses on the server that listens: the Iran server for a reverse tunnel, the foreign one for a direct tunnel."""
+    col = BpTunnel.iran_host == host if kind == "reverse" else BpTunnel.node_id == node_id
+    vcol = Tunnel.iran_host == host if kind == "reverse" else Tunnel.node_id == node_id
+    used = {t.port for t in db.scalars(select(BpTunnel).where(col, BpTunnel.kind == kind)) if t.id != exclude}
+    used |= {t.ctl_port for t in db.scalars(select(Tunnel).where(vcol))}
+    return next(p for p in range(9100, 9900) if p not in used and p not in taken)
+
+
+@app.get("/api/bp/meta", dependencies=[Depends(require_admin)])
+def bp_meta():
+    return {"version": bpmod.BP_VERSION,
+            "transports": [{"id": k, "label": v[0], "family": v[1], "desc": v[2], "raw": k in bpmod.NEEDS_RAW} for k, v in bpmod.TRANSPORTS.items()],
+            "carriers": [{"id": k, "label": v[0], "desc": v[1], "raw": k in bpmod.NEEDS_RAW} for k, v in bpmod.CARRIERS.items()]}
+
+
+@app.get("/api/bp", dependencies=[Depends(require_admin)])
+def list_bp(request: Request, db: Session = Depends(get_db)):
+    return [bp_out(t, db, request) for t in db.scalars(select(BpTunnel).order_by(BpTunnel.id))]
+
+
+@app.post("/api/bp", dependencies=[Depends(require_admin)])
+def create_bp(body: BpIn, request: Request, db: Session = Depends(get_db)):
+    if not db.get(Node, body.node_id):
+        raise HTTPException(404, "لوکیشن خارج پیدا نشد")
+    bp_check(body.kind, body.transport, body.fallbacks, body.fec_data, body.fec_parity)
+    host, forwards = clean_host(body.iran_host), bp_forwards(body.kind, body.ports)
+    net_n = 0
+    if body.kind == "direct":
+        used = {t.net_n for t in db.scalars(select(BpTunnel).where(BpTunnel.kind == "direct"))}
+        net_n = next((n for n in range(1, 251) if n not in used), 0)
+        if not net_n:
+            raise HTTPException(409, "شبکه‌ی خصوصی آزاد برای تونل مستقیم نمانده")
+    t = BpTunnel(name=body.name.strip(), kind=body.kind, transport=body.transport, iran_host=host, node_id=body.node_id, forwards=forwards,
+                 port=free_bp_port(db, body.kind, host, body.node_id, {f["listen"] for f in forwards}), token=bpmod.new_token(),
+                 relay_token=secrets.token_urlsafe(24), accept_udp=body.accept_udp, fallbacks=body.fallbacks if body.kind == "reverse" else [],
+                 fec_data=body.fec_data, fec_parity=body.fec_parity, net_n=net_n)
+    db.add(t)
+    db.commit()
+    return bp_out(t, db, request)
+
+
+@app.patch("/api/bp/{bp_id}", dependencies=[Depends(require_admin)])
+def patch_bp(bp_id: int, body: BpPatch, request: Request, db: Session = Depends(get_db)):
+    t = db.get(BpTunnel, bp_id) or _404()
+    transport = body.transport if body.transport is not None else t.transport
+    fallbacks = body.fallbacks if body.fallbacks is not None else t.fallbacks
+    fd = body.fec_data if body.fec_data is not None else t.fec_data
+    fp = body.fec_parity if body.fec_parity is not None else t.fec_parity
+    bp_check(t.kind, transport, fallbacks, fd, fp)
+    if body.name is not None:
+        t.name = body.name.strip()
+    if body.iran_host is not None:
+        t.iran_host = clean_host(body.iran_host)
+    if body.ports is not None:
+        t.forwards = bp_forwards(t.kind, body.ports)
+        if t.port in {f["listen"] for f in t.forwards}:
+            raise HTTPException(422, f"پورت {t.port} برای خود تونل رزرو است")
+    if body.accept_udp is not None:
+        t.accept_udp = body.accept_udp
+    if body.enabled is not None:
+        t.enabled = body.enabled
+    t.transport, t.fallbacks, t.fec_data, t.fec_parity = transport, (fallbacks if t.kind == "reverse" else []), fd, fp
+    db.commit()
+    return bp_out(t, db, request)
+
+
+@app.delete("/api/bp/{bp_id}", dependencies=[Depends(require_admin)])
+def delete_bp(bp_id: int, db: Session = Depends(get_db)):
+    db.delete(db.get(BpTunnel, bp_id) or _404())
+    db.commit()
+    return {"ok": True}
+
+
+def bp_cache_dir() -> Path:
+    return Path(os.environ.get("PANEL_BP_CACHE", "/data/bp"))
+
+
+@app.get("/backpack/linux-{arch}.tar.gz")
+def backpack_binary(arch: str):
+    """The pinned BackPack release, downloaded once from GitHub (checked against its pinned SHA-256) and handed to the servers."""
+    import urllib.request
+    if arch not in bpmod.BP_SHA256:
+        _404()
+    path = bp_cache_dir() / f"backpack_{bpmod.BP_VERSION}_{arch}.tar.gz"
+    if not path.exists():
+        try:
+            with urllib.request.urlopen(bpmod.BP_URL.format(version=bpmod.BP_VERSION, arch=arch), timeout=120) as r:
+                data = r.read()
+        except Exception:
+            raise HTTPException(502, "دانلود بک‌پک از GitHub ممکن نشد")
+        if hashlib.sha256(data).hexdigest() != bpmod.BP_SHA256[arch]:
+            raise HTTPException(502, "فایل دانلودشده با هش ثبت‌شده نمی‌خواند؛ نصب نمی‌شود")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.with_suffix(".tmp").write_bytes(data)
+        path.with_suffix(".tmp").replace(path)
+    return Response(path.read_bytes(), media_type="application/gzip")
 
 
 # ---------- node agent API ----------
@@ -1570,6 +1762,10 @@ def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db
             "protocols": enabled, "extra": extra, "users": users, "tunnels": tunnels,
             "keys": node.keys if isinstance(node.keys, dict) else {},
             "vtunnel_sha256": _sha(ROOT / "agent" / "vtunnel.py"),
+            "bp": [{"id": str(t.id), "toml": bpmod.render(t, "node", t.iran_host, node.address),
+                    "ping": bpmod.net_addrs(t.net_n)[0] if t.kind == "direct" else ""}
+                   for t in db.scalars(select(BpTunnel).where(BpTunnel.node_id == node.id, BpTunnel.enabled == True))],  # noqa: E712
+            "bp_sha256": bpmod.BP_SHA256,
             "dnstt": ({"domain": dc["domain"], "privkey": dc["priv"], "inner": dc["inner"]} if "dnstt" in enabled and dc["domain"] else None)}
 
 
@@ -1584,6 +1780,7 @@ class Report(BaseModel):
     ovpn_ca: str = ""
     conflicts: list[str] = Field(default=[], max_length=50)
     errors: list[str] = Field(default=[], max_length=20)
+    bp: dict[str, dict] = Field(default={}, max_length=100)        # BackPack tunnel id -> {"active", "up", "line", "errors"}
     keys: dict[str, dict[str, str]] = Field(default={}, max_length=4)   # {"reality": {private, public, short_id}, "wg": {private, public}}
     tunnels: dict[str, dict] = Field(default={}, max_length=100)   # tunnel id -> {"active": bool, "down": [ports], "errors": [..]}
     dnstt_priv: str = Field(default="", max_length=200, pattern=r"^[0-9a-fA-F]*$")   # set only by the node that generated the key pair
@@ -1612,6 +1809,10 @@ def node_report(body: Report, node: Node = Depends(require_node), db: Session = 
     if body.dnstt_priv and body.dnstt_pub and not get_setting(db, "dnstt_priv"):   # the first key pair wins; nodes then adopt it
         put_setting(db, "dnstt_priv", body.dnstt_priv)
         put_setting(db, "dnstt_pub", body.dnstt_pub)
+    for bid, st in body.bp.items():
+        bt = db.get(BpTunnel, int(bid)) if bid.isdigit() else None
+        if bt and bt.node_id == node.id:
+            bt.client_seen, bt.client_state = utcnow(), bp_state(st)
     for tid, st in body.tunnels.items():
         t = db.get(Tunnel, int(tid)) if tid.isdigit() else None
         if t and t.node_id == node.id:

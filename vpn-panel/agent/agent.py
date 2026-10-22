@@ -1086,6 +1086,33 @@ def apply_tunnels(cfg):
             st["errors"].append("vtunnel client is not running")
 
 
+bp_report = {}   # BackPack tunnel id -> {"active", "up", "line", "errors"}; sent with the next report
+
+
+def apply_backpack(cfg, errors):
+    """The foreign end of the panel's BackPack tunnels: `vtunnel.py bp apply` installs the pinned binary and keeps one unit per tunnel."""
+    wanted = cfg.get("bp", [])
+    try:
+        have = any(n.startswith("vpnp-bp-") for n in os.listdir(os.environ.get("VPNP_UNIT_DIR", "/etc/systemd/system")))
+    except OSError:
+        have = False
+    bp_report.clear()
+    if not wanted and not have:
+        return
+    try:
+        if not ensure_vtunnel_script(cfg):
+            raise RuntimeError("vtunnel.py does not match the panel's hash")
+        spec = {"base_url": load_json(CONF)["panel_url"].rstrip("/") + "/backpack", "sha256": cfg.get("bp_sha256", {}), "tunnels": wanted}
+        r = subprocess.run(["/usr/bin/python3", VTUNNEL_BIN, "bp", "apply"], input=json.dumps(spec), capture_output=True, text=True, timeout=240)
+        res = json.loads(r.stdout.strip().splitlines()[-1])
+    except Exception as e:
+        errors.append("backpack: " + str(e)[:150])
+        return
+    for tid, st in res["tunnels"].items():
+        bp_report[tid] = {**st, "errors": res["errors"]}
+    errors.extend(res["errors"])
+
+
 def apply(cfg, reality, tls, wg):
     """Write configs and restart what changed. Returns the port conflicts found."""
     tcp_busy, udp_busy, conflicts = port_conflicts(cfg, foreign_listeners(sh("ss", "-H", "-ltnup").stdout))
@@ -1110,6 +1137,7 @@ def apply(cfg, reality, tls, wg):
     dnstt = apply_dnstt(cfg, errors, udp_busy)
     apply_mtproto(cfg, errors, tcp_busy)
     apply_tunnels(cfg)
+    apply_backpack(cfg, errors)
     ensure_forwarding()
     fix_ppp_options()
     restart_on_config_change("strongswan-starter", ["/etc/ipsec.conf"])
@@ -1185,7 +1213,7 @@ def main():
             api(conf, "POST", "/api/node/report", {
                 "load": cpu_load_percent(), "usage": pending, "reality_pub": reality["public"],
                 "reality_sid": reality["short_id"], "tls_self_signed": conf.get("tls_self_signed", True), "tls_pin": cert_sha256(tls["cert"]),
-                "conflicts": conflicts, "errors": errors, "wg_pub": wg["public"] if wg else "", "ovpn_ca": read_text(f"{STATE_DIR}/ovpn/ca.crt"), "tunnels": tunnel_state,
+                "conflicts": conflicts, "errors": errors, "wg_pub": wg["public"] if wg else "", "ovpn_ca": read_text(f"{STATE_DIR}/ovpn/ca.crt"), "tunnels": tunnel_state, "bp": bp_report,
                 "keys": {k: v for k, v in (("reality", reality), ("wg", wg)) if v and all(v.values())}, **dnstt})
             pending = {}  # kept in memory until the panel accepted the report
         except Exception as e:  # keep running; the panel may be briefly unreachable

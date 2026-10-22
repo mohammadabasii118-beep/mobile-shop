@@ -54,3 +54,21 @@ A tunnel carries ports of a server in Iran to a foreign location (reverse tunnel
 The Iran server runs `install_command` once; its agent (`/api/relay/config`, `/api/relay/report`, authenticated with the
 tunnel's own token) then keeps the vtunnel server running. The foreign side is set up by the node agent from `tunnels` in
 `/api/node/config`.
+
+## BackPack tunnels (admin only)
+
+Tunnels of [BackPack](https://github.com/AminMGMT/BackPack) managed by the panel, separate from the panel's own tunnels. The panel pins
+one release (`v1.8.5`, SHA-256 checked), serves it at `/backpack/linux-{amd64,arm64}.tar.gz`, generates the TOML of both ends and
+installs `vpnp-bp-<id>.service` units (never touching a BackPack installed by hand). The IP-spoofing and SNI-spoofing carriers are
+not offered.
+
+| Method | Path | |
+|---|---|---|
+| GET | `/api/bp/meta` | the 12 reverse transports and the 4 direct (layer-3) carriers |
+| GET | `/api/bp` | list with `status` (`up`, `starting`, `wait_iran`, `wait_node`, `off`), both ends' last log line, `install_command` |
+| POST | `/api/bp` | `{name, kind: reverse\|direct, transport, iran_host, node_id, ports, accept_udp, fallbacks, fec_data, fec_parity}` |
+| PATCH | `/api/bp/{id}` | any of `name`, `iran_host`, `transport`, `ports`, `accept_udp`, `fallbacks`, `fec_*`, `enabled` |
+| DELETE | `/api/bp/{id}` | removes only this tunnel's units from both servers |
+
+The Iran server runs `install_command` once (the same installer as for the panel's own tunnels); the foreign side is set up by the
+node agent from `bp` in `/api/node/config`.

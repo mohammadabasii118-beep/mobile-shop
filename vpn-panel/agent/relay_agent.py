@@ -157,11 +157,35 @@ def start_probe(conf, cfg):
     probe_state["thread"].start()
 
 
+def apply_backpack(conf, cfg, errors):
+    """A BackPack tunnel: `vtunnel.py bp apply` installs the pinned binary and keeps this tunnel's unit. -> the report for the panel."""
+    bp, on = cfg["bp"], cfg["tunnel"]["enabled"]
+    spec = {"base_url": conf["panel_url"].rstrip("/") + "/backpack", "sha256": bp["sha256"], "prune": False,
+            "tunnels": [{"id": bp["id"], "toml": bp["toml"], "ping": bp.get("ping", "")}] if on else [], "remove": [] if on else [bp["id"]]}
+    try:
+        fetch(conf, "/vtunnel.py", VTUNNEL, cfg["vtunnel_sha256"])
+        r = subprocess.run(["/usr/bin/python3", VTUNNEL, "bp", "apply"], input=json.dumps(spec), capture_output=True, text=True, timeout=240)
+        res = json.loads(r.stdout.strip().splitlines()[-1])
+    except Exception as e:
+        errors.append("backpack: " + str(e)[:150])
+        return {"active": False, "up": False, "line": "", "errors": errors}
+    errors.extend(res["errors"])
+    return {**res["tunnels"].get(bp["id"], {"active": False, "up": False, "line": ""}), "errors": errors}
+
+
 def remove_everything(conf, tunnel_id):
     """The tunnel was deleted in the panel: stop and remove what this agent created on the server."""
-    service = f"vtunnel-server-{tunnel_id}"
-    sh("systemctl", "disable", "--now", service)
-    for path in (f"/etc/systemd/system/{service}.service", f"/etc/vtunnel/{tunnel_id}.env", f"{STATE}/{tunnel_id}.json"):
+    if str(tunnel_id).startswith("bp"):               # a BackPack tunnel: only its own unit goes (others on this server stay)
+        try:
+            subprocess.run(["/usr/bin/python3", VTUNNEL, "bp", "apply"], input=json.dumps({"prune": False, "tunnels": [], "remove": [str(tunnel_id)[2:]]}),
+                           capture_output=True, text=True, timeout=60)
+        except Exception:
+            pass
+        service = None
+    else:
+        service = f"vtunnel-server-{tunnel_id}"
+    for path in ((f"/etc/systemd/system/{service}.service", f"/etc/vtunnel/{tunnel_id}.env", f"{STATE}/{tunnel_id}.json") if service else ()):
+        sh("systemctl", "disable", "--now", service)
         try:
             os.remove(path)
         except OSError:
@@ -194,6 +218,10 @@ def main():
             cfg = api(conf, "GET", "/api/relay/config")
             gone = 0
             self_update(conf, cfg.get("agent_sha256"))
+            if cfg.get("engine") == "backpack":
+                api(conf, "POST", "/api/relay/report", {"bp": apply_backpack(conf, cfg, errors)})
+                time.sleep(INTERVAL)
+                continue
             service, status_file = apply(conf, cfg, errors)
             try:
                 st = json.load(open(status_file))

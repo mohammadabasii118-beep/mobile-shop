@@ -28,7 +28,7 @@ if [ -f /etc/vtunnel/agent.json ] && python3 -c "import json,sys;sys.exit(0 if j
   rm -f /etc/vtunnel/agent.json /etc/systemd/system/vtunnel-agent.service
 fi
 cat > /etc/vtunnel/agent-$ID.json <<JSON
-{"panel_url": "$PANEL_URL", "token": "$TOKEN", "id": $ID}
+{"panel_url": "$PANEL_URL", "token": "$TOKEN", "id": "$ID"}
 JSON
 chmod 600 /etc/vtunnel/agent-$ID.json
 cat > /etc/systemd/system/vtunnel-agent-$ID.service <<UNIT

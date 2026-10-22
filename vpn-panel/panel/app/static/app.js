@@ -1,8 +1,8 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function ago(iso) { const m = Math.max(1, Math.round((Date.now() - new Date(iso)) / 60000)); return m < 60 ? m + ' دقیقه پیش' : m < 1440 ? Math.round(m / 60) + ' ساعت پیش' : Math.round(m / 1440) + ' روز پیش'; }
-const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: [], brand: {name: 'پنل چندلوکیشن', logo: '', color: ''}, dnstt: null, tunnels: [], access: null, loadHist: [], owner: '', onlineOnly: false};
-const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', routing: 'مسیریابی', users: 'کاربران', tunnels: 'تونل‌ها', settings: 'تنظیمات', admins: 'ادمین‌ها', look: 'ظاهر پنل'};
+const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: [], brand: {name: 'پنل چندلوکیشن', logo: '', color: ''}, dnstt: null, tunnels: [], access: null, bp: [], bpMeta: null, loadHist: [], owner: '', onlineOnly: false};
+const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', routing: 'مسیریابی', users: 'کاربران', tunnels: 'تونل‌ها', bp: 'بک‌پک', settings: 'تنظیمات', admins: 'ادمین‌ها', look: 'ظاهر پنل'};
 const STATUS = {active: ['good', 'فعال'], disabled: ['bad', 'غیرفعال'], expired: ['bad', 'منقضی'], quota: ['bad', 'حجم تمام شده']};
 
 const ICO = {
@@ -71,7 +71,8 @@ async function refresh() {
     const [users, opts] = await Promise.all([api('GET', '/me/users'), api('GET', '/me/options')]);
     S.users = users; S.nodes = opts.nodes; S.protos = opts.protocols; S.admins = []; S.tab = 'users';
   } else {
-    [S.nodes, S.users, S.protos, S.admins, S.dnstt, S.tunnels, S.access] = await Promise.all([api('GET', '/nodes'), api('GET', '/users'), api('GET', '/protocols'), api('GET', '/admins'), api('GET', '/dnstt'), api('GET', '/tunnels'), api('GET', '/settings')]);
+    [S.nodes, S.users, S.protos, S.admins, S.dnstt, S.tunnels, S.access, S.bp] = await Promise.all([api('GET', '/nodes'), api('GET', '/users'), api('GET', '/protocols'), api('GET', '/admins'), api('GET', '/dnstt'), api('GET', '/tunnels'), api('GET', '/settings'), api('GET', '/bp')]);
+    if (!S.bpMeta) S.bpMeta = await api('GET', '/bp/meta');
   }
   const on = S.nodes.filter(n => n.online); if (on.length) { const avg = on.reduce((a, n) => a + n.load, 0) / on.length; if (!S.loadHist.length) S.loadHist = Array(30).fill(avg); S.loadHist.push(avg); if (S.loadHist.length > 60) S.loadHist.shift(); }
   const ids = new Set(S.users.map(u => u.id));
@@ -244,6 +245,21 @@ const views = {
       <div style="margin-top:10px"><button class="btn pri" id="pwSave">ذخیره‌ی رمز</button></div>
       <div class="note" style="margin-top:10px">رمز داخل فایل <span class="mono" dir="ltr" style="unicode-bidi:isolate">.env</span> سرور همیشه به‌عنوان رمز بازیابی کار می‌کند.</div></div>`;
   },
+  bp() {
+    const ST = {up: ['good', 'برقرار'], starting: ['warn', 'در حال راه‌اندازی…'], wait_iran: ['warn', 'منتظر نصب روی سرور ایران'], wait_node: ['warn', 'منتظر سرور خارج'], off: ['', 'خاموش']};
+    const note = `<div class="note">تونل‌های <b>BackPack</b> (موتور Go با ۱۲ نوع حمل و حالت Direct) که پنل روی هر دو سرور خودش نصب و تنظیم می‌کند. این بخش کاملاً جدا از «تونل‌ها» است و به BackPackی که خودت دستی نصب کرده‌ای (<span class="mono" dir="ltr" style="unicode-bidi:isolate">/etc/backpack</span>) دست نمی‌زند. نسخه‌ی ثابت: <span class="mono" dir="ltr" style="unicode-bidi:isolate">${esc(S.bpMeta ? S.bpMeta.version : '')}</span> با هش بررسی‌شده.</div>`;
+    if (!S.bp.length) return note + '<div class="panel muted">هنوز تونل بک‌پکی نساخته‌اید.</div>';
+    const line = (label, x) => x && x.line ? `<div class="muted" style="font-size:11.5px"><b>${label}</b> <span class="mono" dir="ltr" style="unicode-bidi:isolate">${esc(x.line)}</span></div>` : '';
+    return note + S.bp.map(t => { const st = ST[t.status];
+      return `<div class="panel"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <div><b>${esc(t.name)}</b> <span class="pill">${esc(t.label)}</span> <span class="pill ${st[0]}">${st[1]}</span></div>
+        <div class="chips"><button class="btn sm" data-bpedit="${t.id}">ویرایش</button><button class="btn sm" data-bptoggle="${t.id}">${t.enabled ? 'خاموش' : 'روشن'}</button><button class="btn sm danger" data-bpdel="${t.id}">حذف</button></div></div>
+        <div style="margin-top:8px" class="muted"><span class="mono" dir="ltr">${esc(t.iran_host)}</span> ← <b>${esc(t.node_name)}</b> · پورت تونل <span class="mono">${t.port}</span> ${t.kind === 'direct' ? `(روی سرور <b>خارج</b>، UDP/TCP باید باز باشد) · شبکه‌ی داخلی <span class="mono" dir="ltr">${esc(t.net.join(' ↔ '))}</span>` : '(روی سرور ایران)'}</div>
+        <div class="chips" style="margin-top:8px">${t.forwards.map(f => `<span class="cc" dir="ltr">${f.listen}${f.target !== f.listen ? ' → ' + f.target : ''}</span>`).join('')}${t.accept_udp ? '<span class="cc">UDP هم</span>' : ''}${t.fallbacks.length ? `<span class="cc" dir="ltr">fallback: ${esc(t.fallbacks.join(', '))}</span>` : ''}</div>
+        ${line('ایران', t.iran)}${line('خارج', t.node)}
+        ${t.problems.length ? `<div class="note" style="margin-top:8px;color:var(--bad)">${t.problems.map(esc).join('<br>')}</div>` : ''}
+        ${t.status === 'wait_iran' ? `<div style="margin-top:10px"><div class="muted">روی سرور ایران (با دسترسی root) این دستور را یک بار اجرا کنید:</div><pre>${esc(t.install_command)}</pre><button class="btn sm" data-copy="${esc(t.install_command)}">کپی دستور</button></div>` : ''}</div>`; }).join('');
+  },
   tunnels() {
     const num1 = v => v === undefined || v === null ? '—' : num(v);
     const row = (label, r) => !r ? `<tr><td>${label}</td><td colspan="6" class="muted">منتظر نتیجه…</td></tr>`
@@ -381,15 +397,36 @@ function render() {
   $('#actions').innerHTML = S.tab === 'users' ? (isReseller() ? '' : '<button class="btn" id="bulkBtn">عملیات گروهی</button> ') + '<button class="btn pri" id="addUser">+ کاربر جدید</button>'
     : S.tab === 'nodes' ? '<button class="btn pri" id="addNode">+ لوکیشن جدید</button>'
     : S.tab === 'tunnels' ? '<button class="btn pri" id="addTunnel">+ تونل جدید</button>'
+    : S.tab === 'bp' ? '<button class="btn pri" id="addBp">+ تونل بک‌پک</button>'
     : S.tab === 'admins' ? '<button class="btn pri" id="addAdmin">+ ادمین جدید</button>' : '';
   const typing = document.activeElement && document.activeElement.id === 'uq' ? document.activeElement.selectionStart : null;
   $('#view').innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">${views[S.tab]()}</div>`;
   if (typing !== null && $('#uq')) { $('#uq').focus(); $('#uq').setSelectionRange(typing, typing); }
-  $('#nNodes').textContent = S.nodes.length; $('#nUsers').textContent = S.users.length; $('#nAdmins').textContent = S.admins.length || ''; $('#nTunnels').textContent = S.tunnels.length || '';
+  $('#nNodes').textContent = S.nodes.length; $('#nUsers').textContent = S.users.length; $('#nAdmins').textContent = S.admins.length || ''; $('#nTunnels').textContent = S.tunnels.length || ''; $('#nBp').textContent = S.bp.length || '';
   document.querySelectorAll('nav [data-tab]').forEach(b => b.setAttribute('aria-current', b.dataset.tab === S.tab));
   skinHooks();
 }
 
+function bpOptions(kind, cur) {
+  const list = kind === 'direct' ? S.bpMeta.carriers : S.bpMeta.transports;
+  return list.map(x => `<option value="${x.id}" ${x.id === cur ? 'selected' : ''}>${esc(x.label)} — ${esc(x.desc)}</option>`).join('');
+}
+function bpFields(t) {
+  const kind = t ? t.kind : 'reverse';
+  return `<div class="form">
+    <label class="f">نام<input type="text" id="bpName" value="${esc(t ? t.name : '')}" placeholder="ایران - آلمان (بک‌پک)"></label>
+    ${t ? '' : `<label class="f">نوع تونل<select id="bpKind"><option value="reverse">معکوس: سرور خارج به ایران وصل می‌شود</option><option value="direct">Direct (لایه ۳): ایران به خارج وصل می‌شود</option></select></label>`}
+    <label class="f">آدرس سرور ایران (IP یا دامنه)<input type="text" id="bpHost" dir="ltr" value="${esc(t ? t.iran_host : '')}" placeholder="1.2.3.4"></label>
+    ${t ? '' : `<label class="f">لوکیشن خارج<select id="bpNode">${S.nodes.map(n => `<option value="${n.id}">${esc(n.name)}</option>`).join('')}</select></label>`}
+    <label class="f">نوع حمل (transport)<select id="bpTr">${bpOptions(kind, t ? t.transport : (kind === 'direct' ? 'udp' : 'stealth'))}</select></label>
+    <label class="f">پورت‌ها (روی ایران)<input type="text" id="bpPorts" dir="ltr" value="${esc(t ? t.ports : '')}" placeholder="80, 81=80, 443"></label>
+    <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="bpUdp" ${t && t.accept_udp ? 'checked' : ''}> UDP هم روی همین پورت‌ها فوروارد شود</label>
+    <div id="bpFbBox" ${kind === 'direct' ? 'hidden' : ''}><div class="muted" style="margin-bottom:4px">انواع جایگزین (اگر نوع اصلی فیلتر شد، خودکار روی بعدی می‌رود؛ اختیاری)</div>
+      <div class="chips">${S.bpMeta.transports.map(x => `<label><input type="checkbox" class="bpFb" value="${x.id}" ${t && t.fallbacks.includes(x.id) ? 'checked' : ''}>${esc(x.label)}</label>`).join('')}</div></div>
+    <div style="display:flex;gap:10px"><label class="f" style="flex:1">FEC داده<input type="number" id="bpFd" min="0" max="30" value="${t ? t.fec_data : 0}"></label>
+      <label class="f" style="flex:1">FEC توازن<input type="number" id="bpFp" min="0" max="30" value="${t ? t.fec_parity : 0}"></label></div></div>
+    <div class="note">FEC فقط برای UDP+KCP و Direct است (هر دو عدد را بده یا هر دو صفر). نوع‌های PCK و xDi به لینوکس و root نیاز دارند. پورت تونل خودکار انتخاب می‌شود.</div>`;
+}
 function nodeForm() {
   openModal(`<h2>لوکیشن جدید</h2><div class="form">
     <label class="f">نام<input type="text" id="nName" placeholder="آلمان - فرانکفورت"></label>
@@ -590,6 +627,33 @@ document.addEventListener('click', async e => {
       closeModal(); await refresh();
     }
     else if (t.id === 'addNode') nodeForm();
+    else if (t.id === 'addBp') {
+      if (!S.nodes.length) { toast('اول یک لوکیشن خارج بسازید'); return; }
+      openModal(`<h2>تونل BackPack جدید</h2>${bpFields(null)}<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="bpSave">ساخت</button></div>`);
+    }
+    else if (t.id === 'bpSave') {
+      const r = await api('POST', '/bp', {name: $('#bpName').value.trim(), kind: $('#bpKind').value, transport: $('#bpTr').value, iran_host: $('#bpHost').value.trim(), node_id: +$('#bpNode').value,
+        ports: $('#bpPorts').value, accept_udp: $('#bpUdp').checked, fallbacks: [...document.querySelectorAll('.bpFb:checked')].map(x => x.value), fec_data: +$('#bpFd').value || 0, fec_parity: +$('#bpFp').value || 0});
+      await refresh();
+      openModal(`<h2>تونل ساخته شد</h2><p class="muted" style="margin:0">روی <b>سرور ایران</b> (با دسترسی root) این دستور را اجرا کنید. بک‌پک روی هر دو سرور خودکار نصب و تنظیم می‌شود (سمت خارج خودش از پنل می‌گیرد):</p>
+        <pre>${esc(r.install_command)}</pre><div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-copy="${esc(r.install_command)}">کپی دستور</button><button class="btn pri" data-close>بستن</button></div>`);
+    }
+    else if (d.bpedit) {
+      const x = S.bp.find(q => q.id === +d.bpedit);
+      openModal(`<h2>ویرایش ${esc(x.name)}</h2>${bpFields(x)}<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="bpEdSave" data-id="${x.id}">ذخیره</button></div>`);
+    }
+    else if (t.id === 'bpEdSave') {
+      await api('PATCH', '/bp/' + d.id, {name: $('#bpName').value.trim(), iran_host: $('#bpHost').value.trim(), transport: $('#bpTr').value, ports: $('#bpPorts').value, accept_udp: $('#bpUdp').checked,
+        fallbacks: [...document.querySelectorAll('.bpFb:checked')].map(x => x.value), fec_data: +$('#bpFd').value || 0, fec_parity: +$('#bpFp').value || 0});
+      closeModal(); await refresh(); toast('ذخیره شد؛ ظرف حدود ۳۰ ثانیه روی هر دو سرور اعمال می‌شود');
+    }
+    else if (d.bptoggle) { const x = S.bp.find(q => q.id === +d.bptoggle); await api('PATCH', '/bp/' + x.id, {enabled: !x.enabled}); await refresh(); }
+    else if (d.bpdel) {
+      const x = S.bp.find(q => q.id === +d.bpdel);
+      openModal(`<h2>حذف تونل ${esc(x.name)}؟</h2><div class="note">بک‌پک از هر دو سرور برداشته می‌شود (فقط همین تونل؛ تونل‌های دیگر و بک‌پک دستی دست نمی‌خورند).</div>
+        <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="bpDelGo" data-id="${x.id}" style="background:var(--bad)">حذف</button></div>`);
+    }
+    else if (t.id === 'bpDelGo') { await api('DELETE', '/bp/' + d.id); closeModal(); await refresh(); toast('تونل حذف شد'); }
     else if (t.id === 'addTunnel') {
       if (!S.nodes.length) { toast('اول یک لوکیشن خارج بسازید'); return; }
       openModal(`<h2>تونل جدید</h2><div class="form">
@@ -791,6 +855,7 @@ document.addEventListener('change', async e => {
     catch (err) { toast(err.message); }
     return;
   }
+  if (e.target.id === 'bpKind') { const k = e.target.value; $('#bpTr').innerHTML = bpOptions(k, k === 'direct' ? 'udp' : 'stealth'); $('#bpFbBox').hidden = k === 'direct'; return; }
   if (e.target.id === 'uOnline') { S.onlineOnly = e.target.checked; render(); return; }
   if (e.target.id === 'uo') { S.owner = e.target.value; render(); return; }
   if (e.target.dataset.sel) { const id = +e.target.dataset.sel; e.target.checked ? S.sel.add(id) : S.sel.delete(id); render(); return; }
