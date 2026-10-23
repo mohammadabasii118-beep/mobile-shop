@@ -1,0 +1,81 @@
+
+## Import from 3x-ui
+
+`POST /api/import/users` — body `{"clients":[{"name","uuid","quota_bytes","used_bytes","expire_ms","enabled"}],"protos":[...],"node_ids":[...]}`.
+Keeps UUID, quota, expiry and used traffic; names that already exist are skipped. `agent/import_xui.py` builds this from `/etc/x-ui/x-ui.db` (run on the 3x-ui server).
+
+`POST /api/users/bulk-protos` — `{"add":["vless_raw"],"remove":["vless"],"names":[]}` changes protocols for many users (all when `names` is empty).
+
+`POST /api/users/bulk` — `{"ids":[...],"delete":false,"add_protos":[],"remove_protos":[],"node_ids":null}`: delete many users, or add/remove protocols and set locations (`[]` = every location, `null` = unchanged). The users tab has checkboxes, a search box and a bulk dialog for this.
+
+`PUT /api/nodes/{id}/protocols/{proto}/host` — `{"host":"relay.example.com"}`: domain or IP clients of that protocol connect to (empty = automatic, the node address). Only links change; TLS names and certificates keep using the node address.
+
+## Sub-admins (resellers)
+`POST /api/login` takes `{"username":"sara","password":"..."}` for a sub-admin (empty username = main admin).
+Main admin: `GET/POST /api/admins`, `PATCH/DELETE /api/admins/{id}` (`enabled`, `password`, `max_users`, `max_quota_gb`, `max_days`; 0 = no cap).
+A sub-admin session only works on `/api/me`, `/api/me/options`, `/api/me/users` (GET, POST) and `/api/me/users/{id}/configs`; everything else answers 403.
+
+## Branding
+`GET /api/branding` (public) -> `{name, logo, color}`. `PUT /api/branding` (main admin) with `{"name":"My VPN","color":"#7c3aed","logo":"data:image/png;base64,..."}`; empty `logo`/`color` restore the defaults. The name, logo and colour appear in the panel, the login box, the browser tab and the users' subscription page.
+
+### Per-admin permissions
+`can_edit` and `can_delete` (both default `false`) on `/api/admins`. With them a sub-admin may `PATCH /api/me/users/{id}` (`enabled`, `quota_gb`, `days`, `extend_days`, `reset_usage`, still within `max_quota_gb`/`max_days`) and `DELETE /api/me/users/{id}`, on their own users only. Without the permission both answer 403.
+
+## DNSTT (DNS tunnel)
+`GET/PUT /api/dnstt` (`domain`, `zone`, `cf_token`; the token is never returned, only `token_set`), `POST /api/dnstt/sync`.
+Turning the `dnstt` protocol on or off for a node (`PUT /api/nodes/{id}/protocols/dnstt`) makes the panel create/remove that node's records in Cloudflare:
+`A nsd<node id>.<zone>` -> node IP and `NS <tunnel domain>` -> that name. Records it did not create are never touched.
+The first node that generates the key pair reports it; the panel keeps that key and hands it to every node, so all nodes answer for the same domain.
+Users with the `dnstt` protocol get one config entry (domain, public key, UUID, dnstt-client commands). Inside the tunnel runs a loopback-only VLESS inbound, so each user is metered and limited like any other.
+
+### DNSTT inner protocol
+`inner` on `PUT /api/dnstt` is `ssh` (default; what NetMod's "DNSTT + SSH" speaks) or `vless`. In `ssh` mode each node runs a loopback-only sshd (`127.0.0.1:2222`, its own config, unit `vpn-node-sshd`) and manages accounts `vs_<name>` (group `vpnssh`, shell `nologin`, password = the panel user's password); expired or disabled users are removed and their sessions killed. SSH traffic is **not** counted against the user's volume. In `vless` mode a loopback Xray inbound is used and the traffic is counted.
+
+## Entry names, ports, addresses and extra copies
+Each location lists its protocols as entries. `PATCH /api/node-protocols/{id}` changes one entry: `label` (the name users see), `host` (address in the link, empty = the location's), `port` or `random_port: true`, `enabled`.
+`POST /api/nodes/{id}/protocols/{proto}/instances` adds another copy of an Xray protocol (random free port, up to 8 per location); `DELETE /api/node-protocols/{id}` removes a copy (the main one can only be switched off).
+Users that have a protocol get one config entry per running copy, named as the admin named it. A copy's Xray inbound tag is `<proto>_x<id>` and can be used in routing rules.
+
+### Admin pool, allowed lists, usage
+On `/api/admins`: `max_total_gb` (pool for the sum of the volume of all the admin's users; 0 = none; with a pool a user cannot be unlimited), `allowed_protos` and `allowed_nodes` (empty = all). The server enforces them on `/api/me/users` (403/422) and `/api/me/options` only lists the allowed ones; an empty location choice then means "all allowed locations".
+`GET /api/admins` also returns `active_users`, `allocated_gb` and `used_gb` per admin.
+
+## Tunnels (admin only)
+
+A tunnel carries ports of a server in Iran to a foreign location (reverse tunnel, `agent/vtunnel.py`).
+
+| Method | Path | |
+|---|---|---|
+| GET | `/api/tunnels` | list with `status` (`up`, `wait_client`, `wait_iran`, `off`), `pool`, `problems`, `install_command` |
+| POST | `/api/tunnels` | `{name, iran_host, node_id, ports}`; `ports` is `"80, 81=80, udp:5000, 2000-2010"` |
+| PATCH | `/api/tunnels/{id}` | any of `name`, `iran_host`, `ports`, `enabled` |
+| DELETE | `/api/tunnels/{id}` | removes it from both servers |
+
+`opts` carries the extra settings (see `options` in the meta): `nodelay`, `keepalive_period`, `mss`, `zero_copy`, `max_connections`,
+`bandwidth_mbps`, `proxy_protocol`, `edge_ip` (ws/wss behind a CDN), `fallback_addrs` + `load_balance` or `health_failover`,
+`connection_pool`, `aggressive_pool`, the `kcp_*` tuning, mux settings, and for Direct layer 3 `qdisc`, `txqueuelen`, `mtu`, `auto_mtu`,
+`mss_clamp`, `paths`. Each is written only to the end that reads it and dropped when the chosen transport does not read it; unknown
+keys or out-of-range values answer 422. `preset` (`balance`, `turbo`, `aggressive`) is a label; pick the values with `opts`.
+`direct4` is BackPack's layer-4 direct tunnel (Iran dials out; carriers tcp, stealth, ws, wss).
+
+The Iran server runs `install_command` once; its agent (`/api/relay/config`, `/api/relay/report`, authenticated with the
+tunnel's own token) then keeps the vtunnel server running. The foreign side is set up by the node agent from `tunnels` in
+`/api/node/config`.
+
+## BackPack tunnels (admin only)
+
+Tunnels of [BackPack](https://github.com/AminMGMT/BackPack) managed by the panel, separate from the panel's own tunnels. The panel pins
+one release (`v1.8.5`, SHA-256 checked), serves it at `/backpack/linux-{amd64,arm64}.tar.gz`, generates the TOML of both ends and
+installs `vpnp-bp-<id>.service` units (never touching a BackPack installed by hand). The IP-spoofing and SNI-spoofing carriers are
+not offered.
+
+| Method | Path | |
+|---|---|---|
+| GET | `/api/bp/meta` | the 12 reverse transports, the 4 direct layer-3 carriers, the 4 direct layer-4 carriers (`carriers4`), the `presets` and every extra `options` entry (type, range, kinds, side) |
+| GET | `/api/bp` | list with `status` (`up`, `starting`, `wait_iran`, `wait_node`, `off`), both ends' last log line, `install_command` |
+| POST | `/api/bp` | `{name, kind: reverse\|direct\|direct4, transport, iran_host, node_id, ports, accept_udp, fallbacks, fec_data, fec_parity, preset, opts}` |
+| PATCH | `/api/bp/{id}` | any of `name`, `iran_host`, `transport`, `ports`, `accept_udp`, `fallbacks`, `fec_*`, `preset`, `opts`, `enabled` |
+| DELETE | `/api/bp/{id}` | removes only this tunnel's units from both servers |
+
+The Iran server runs `install_command` once (the same installer as for the panel's own tunnels); the foreign side is set up by the
+node agent from `bp` in `/api/node/config`.
