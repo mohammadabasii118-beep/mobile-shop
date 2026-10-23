@@ -214,6 +214,26 @@ def test_direct_status_uses_ping_but_falls_back_to_the_log_when_ping_is_missing(
     assert vt.bp_status("u", "", "10.20.7.2")["up"] is True
     assert bp.render(mk(transport="kcp"), "iran", "h", "n").count("accept_udp = false") == 1
 
+    # a healthy tunnel whose only recent line is the routine rekey (the handshake has scrolled out of the journal) is still up
+    for line in ("23-Oct [INFO] l3: rekeyed to session 38c3ca58 (routine, every 2m0s — the tunnel did not drop)",
+                 "23-Oct [INFO] l3: listen up on pn1, gre over udp, mtu 1400 (a 1500-byte path fits 1439)"):
+        globals_log = line + "\n"
+
+        def only(line=line):
+            def _sh(*cmd, timeout=30):
+                out = "active\n" if cmd[:2] == ("systemctl", "is-active") else (line + "\n") if cmd[0] == "journalctl" else ""
+                return subprocess.CompletedProcess(cmd, 127 if cmd[0] == "ping" else 0, out, "")
+            return _sh
+        monkeypatch.setattr(vt, "_sh", only())
+        assert vt.bp_status("u", "", "10.20.7.2")["up"] is True, line
+
+    def failing(*cmd, timeout=30):     # the retry line is still a failure
+        bad = "23-Oct [WARNING] l3: handshake did not complete: 1.2.3.4:9100 did not answer in 6 attempts — retrying\n"
+        out = "active\n" if cmd[:2] == ("systemctl", "is-active") else bad if cmd[0] == "journalctl" else ""
+        return subprocess.CompletedProcess(cmd, 127 if cmd[0] == "ping" else 0, out, "")
+    monkeypatch.setattr(vt, "_sh", failing)
+    assert vt.bp_status("u", "", "10.20.7.2")["up"] is False
+
 
 def test_extra_settings_validate_render_and_drop_what_a_transport_does_not_read():
     ok = bp.clean_opts("reverse", "stealth", {"nodelay": True, "max_connections": 500, "bandwidth_mbps": 100, "mss": 1360, "proxy_protocol": True,
