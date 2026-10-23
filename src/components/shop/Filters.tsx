@@ -36,9 +36,6 @@ export default function Filters({ d }: { d: FilterData }) {
       </button>
       <form
         className={`filters${open ? ' open' : ''}`} method="get" action={d.basePath} aria-label="فیلتر محصولات"
-        onSubmit={() => {
-          try { if (pm) localStorage.setItem('vt_phone', JSON.stringify({ brand: pb, model: pm })); } catch { /* noop */ }
-        }}
       >
         <div className="f-head"><b style={{ fontSize: 18 }}>فیلترها</b><button type="button" className="icon-btn" onClick={() => setOpen(false)} aria-label="بستن فیلترها"><X className="i" /></button></div>
         {d.q && <input type="hidden" name="q" value={d.q} />}

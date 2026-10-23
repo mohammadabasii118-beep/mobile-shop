@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BellRing, Check, Minus, Plus, ShieldCheck, Smartphone, Truck, RotateCcw, TriangleAlert } from 'lucide-react';
+import { BellRing, Minus, Plus, ShieldCheck, Smartphone, Truck, RotateCcw } from 'lucide-react';
 import { fa, pct, toman } from '@/lib/format';
 import { ATTR, effectivePrice, findVariation, optionState } from '@/lib/variations';
 import Pic from './Pic';
@@ -35,26 +35,16 @@ export default function ProductView({ header, ...p }: PVProps & { header: React.
   const [qty, setQty] = useState(1);
   const [idx, setIdx] = useState(0);
   const [picked, setPicked] = useState(false);
-  const [phone, setPhone] = useState<{ brand: string; model: string } | null>(null);
   const optsRef = useRef<HTMLDivElement>(null);
   const [nudge, setNudge] = useState(false);
 
   const variable = p.type === 'variable';
   const slugs = p.attrs.map((a) => a.slug);
 
-  // پیش‌انتخاب: گوشی ذخیره‌شده‌ی مشتری + ویژگی‌هایی که فقط یک گزینه دارند
+  // پیش‌انتخاب: فقط ویژگی‌هایی که یک گزینه دارند (مدل گوشی هیچ‌جا ذخیره نمی‌شود؛ DESIGN.md §۱۸.۱۵)
   useEffect(() => {
     if (!variable) return;
-    let saved: { brand: string; model: string } | null = null;
-    try { saved = JSON.parse(localStorage.getItem('vt_phone') || 'null'); } catch { /* noop */ }
-    setPhone(saved);
     const init: Record<string, string> = {};
-    const modelAttr = p.attrs.find((a) => a.slug === ATTR.model);
-    if (saved && modelAttr?.terms.some((t) => t.slug === saved!.model)) {
-      init[ATTR.model] = saved.model;
-      const parent = modelAttr.terms.find((t) => t.slug === saved!.model)?.parent;
-      if (parent) init[ATTR.brand] = parent;
-    }
     for (const a of p.attrs) if (!init[a.slug] && a.terms.length === 1) init[a.slug] = a.terms[0].slug;
     setSel(init);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -76,11 +66,6 @@ export default function ProductView({ header, ...p }: PVProps & { header: React.
     });
     setPicked(false);
     setQty(1);
-    if (attr.slug === ATTR.model) {
-      const t = attr.terms.find((x) => x.slug === term);
-      try { if (t) localStorage.setItem('vt_phone', JSON.stringify({ brand: t.parent ?? '', model: term })); } catch { /* noop */ }
-      setPhone({ brand: t?.parent ?? '', model: term });
-    }
   };
 
   /* قیمت و موجودی نمایش‌داده‌شده */
@@ -124,10 +109,6 @@ export default function ProductView({ header, ...p }: PVProps & { header: React.
     add({ productId: p.id, variationId: variation?.id ?? null, qty });
   };
 
-  const modelAttr = p.attrs.find((a) => a.slug === ATTR.model);
-  const savedModelName = phone && modelAttr?.terms.find((t) => t.slug === phone.model)?.name;
-  const compatOk = !!variation && !!phone && sel[ATTR.model] === phone.model;
-  const compatMissing = variable && !!phone && !!modelAttr && !modelAttr.terms.some((t) => t.slug === phone.model);
 
   const label = !variable || variation ? (soldOut ? 'خبرم کن' : 'افزودن به سبد خرید') : missing ? `انتخاب ${missing.name}` : 'انتخاب گزینه‌ها';
 
@@ -205,8 +186,6 @@ export default function ProductView({ header, ...p }: PVProps & { header: React.
           </div>
         )}
 
-        {compatOk && <div className="compat"><Check className="i" />سازگار با گوشی شما: <bdi dir="ltr">{savedModelName}</bdi></div>}
-        {compatMissing && <div className="hint warn"><TriangleAlert className="i" style={{ width: 16, height: 16 }} />این محصول برای مدل ذخیره‌شده‌ی شما (<bdi dir="ltr">{phone?.model}</bdi>) موجود نیست.</div>}
 
         <div>
           {(!variable || variation) && (
