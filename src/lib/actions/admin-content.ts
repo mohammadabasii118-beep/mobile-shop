@@ -71,6 +71,7 @@ const GROUPS: Record<string, { keys: string[]; flags?: string[]; ints?: string[]
   shipping: { keys: [], ints: ['shipping_cost', 'free_shipping_min'] },
   payment: { keys: ['checkout_note'] },
   inventory: { keys: [], ints: ['low_stock'] },
+  orders: { keys: [], ints: ['unpaid_cancel_days'] },
 };
 
 export async function saveSettings(group: string, _p: AState, fd: FormData): Promise<AState> {

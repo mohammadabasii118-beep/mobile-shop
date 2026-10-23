@@ -3,7 +3,10 @@ import Link from 'next/link';
 import { getSettings } from '@/lib/catalog';
 import { getUser } from '@/lib/auth';
 import { Card, PageHead } from '@/components/admin/ui';
-import { ActionForm } from '@/components/admin/client';
+import { ActionForm, ConfirmForm } from '@/components/admin/client';
+import { fa } from '@/lib/format';
+import { countDemoOrders } from '@/lib/order-expiry';
+import { purgeDemoOrdersAction } from '@/lib/actions/admin-sales';
 import { changeMyAccount, saveSettings } from '@/lib/actions/admin-content';
 
 export const metadata: Metadata = { title: 'تنظیمات فروشگاه' };
@@ -11,6 +14,7 @@ export const metadata: Metadata = { title: 'تنظیمات فروشگاه' };
 export default async function SettingsPage() {
   const s = getSettings();
   const me = (await getUser())!;
+  const demoCount = countDemoOrders();
   return (
     <>
       <PageHead title="تنظیمات فروشگاه" desc="اطلاعات فروشگاه، هزینه‌ی ارسال، روش‌های پرداخت و حساب شما. هر بخش جداگانه ذخیره می‌شود." />
@@ -48,6 +52,20 @@ export default async function SettingsPage() {
             <div className="fld"><label htmlFor="p1">متن راهنما در صفحه‌ی تسویه</label><textarea id="p1" className="textarea" name="checkout_note" defaultValue={s.checkout_note} style={{ minHeight: 64 }} /></div>
             <p className="help mute" style={{ fontSize: 12.5 }}>روشن/خاموش‌کردن روش‌ها و کارت‌به‌کارت: <Link className="link" href="/admin/payment-methods">روش‌های پرداخت</Link></p>
           </ActionForm>
+        </Card>
+        <Card title="سفارش‌ها" id="orders" desc="لغو خودکار سفارش‌های پرداخت‌نشده و پاک‌سازی داده‌ی نمونه.">
+          <ActionForm action={saveSettings.bind(null, 'orders')}>
+            <div className="fld" style={{ maxWidth: 360 }}>
+              <label htmlFor="o1">لغو خودکار سفارش پرداخت‌نشده بعد از (روز)</label>
+              <input id="o1" className="input num" name="unpaid_cancel_days" inputMode="numeric" defaultValue={s.unpaid_cancel_days} />
+              <span className="help">فقط سفارش‌های آنلاین و کارت‌به‌کارت که پرداخت نشده‌اند و مشتری رسید هم نفرستاده. موجودی کالا برمی‌گردد. ۰ = خاموش. پرداخت در محل لغو نمی‌شود.</span>
+            </div>
+          </ActionForm>
+          <div className="fld" style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--hairline)' }}>
+            <span className="lab">سفارش‌های نمونه (دمو)</span>
+            <span className="help">{demoCount ? `${fa(demoCount)} سفارش نمونه در لیست و گزارش‌ها هست و درآمد الکی نشان می‌دهد. سفارش‌های واقعی پاک نمی‌شوند.` : 'سفارش نمونه‌ای وجود ندارد.'}</span>
+            {demoCount > 0 && <div><ConfirmForm action={purgeDemoOrdersAction} label={`پاک‌کردن ${fa(demoCount)} سفارش نمونه`} message="همه‌ی سفارش‌های نمونه حذف شود؟ قابل بازگشت نیست." confirmLabel="بله، پاک شود" /></div>}
+          </div>
         </Card>
         <Card title="موجودی" id="inventory">
           <ActionForm action={saveSettings.bind(null, 'inventory')}>

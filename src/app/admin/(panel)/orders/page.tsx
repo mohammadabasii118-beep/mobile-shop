@@ -4,6 +4,7 @@ import { Download, Search } from 'lucide-react';
 import { all, get } from '@/lib/db';
 import { fa, jdatetime, normText, ORDER_STATUS, PAY_STATUS, toman } from '@/lib/format';
 import { orderPayCode, payLabels } from '@/lib/payment-methods';
+import { DEMO_NOTE } from '@/lib/order-expiry';
 import { Card, EmptyState, PageHead, Pagination, Pill, qsLink, one } from '@/components/admin/ui';
 
 export const metadata: Metadata = { title: 'سفارش‌ها' };
@@ -19,7 +20,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   if (q) { where.push('(number LIKE ? OR customer_name LIKE ? OR phone LIKE ?)'); const l = `%${q}%`; args.push(l, l, l); }
   const W = where.length ? 'WHERE ' + where.join(' AND ') : '';
   const total = get<{ n: number }>(`SELECT COUNT(*) n FROM orders ${W}`, ...args)!.n;
-  const rows = all<{ id: number; number: string; customer_name: string; phone: string; status: string; payment_status: string; payment_method: string; pay_code: string | null; total: number; created_at: string; items: number }>(
+  const rows = all<{ id: number; number: string; customer_name: string; phone: string; status: string; payment_status: string; payment_method: string; pay_code: string | null; admin_note: string; total: number; created_at: string; items: number }>(
     `SELECT o.*, (SELECT COALESCE(SUM(qty),0) FROM order_items i WHERE i.order_id = o.id) items FROM orders o ${W} ORDER BY id DESC LIMIT ? OFFSET ?`, ...args, PER, (page - 1) * PER);
   const labels = payLabels();
   const counts = Object.fromEntries(all<{ status: string; n: number }>('SELECT status, COUNT(*) n FROM orders GROUP BY status').map((r) => [r.status, r.n]));
@@ -49,7 +50,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             <tbody>{rows.map((o) => (
               <tr key={o.id}>
                 <td data-label="سفارش"><Link className="link num" href={`/admin/orders/${o.id}`}>{fa(o.number)}</Link></td>
-                <td data-label="مشتری"><b style={{ color: 'var(--ink)' }}>{o.customer_name}</b><small className="mute num" style={{ display: 'block' }}>{o.phone}</small></td>
+                <td data-label="مشتری"><b style={{ color: 'var(--ink)' }}>{o.customer_name}</b>{o.admin_note === DEMO_NOTE && <> <Pill tone="muted">نمونه</Pill></>}<small className="mute num" style={{ display: 'block' }}>{o.phone}</small></td>
                 <td data-label="زمان" className="mute">{jdatetime(o.created_at)}</td>
                 <td data-label="اقلام" className="num-col">{fa(o.items)}</td>
                 <td data-label="پرداخت"><Pill tone={PAY_STATUS[o.payment_status].tone}>{PAY_STATUS[o.payment_status].label}</Pill><small className="mute" style={{ display: 'block' }}>{labels[orderPayCode(o)] ?? orderPayCode(o)}</small></td>

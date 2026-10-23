@@ -5,6 +5,7 @@ import { all, get, run, tx } from '../db';
 import { assertAdmin, hashPassword } from '../auth';
 import { isValidIranMobile, normDigits, normText } from '../format';
 import { adjustStock, restockOrder } from '../orders';
+import { purgeDemoOrders } from '../order-expiry';
 import type { AState } from '@/components/admin/client';
 
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? '').trim();
@@ -57,6 +58,13 @@ export async function setPaymentStatus(paymentId: number, status: 'success' | 'f
   });
   revalidatePath('/admin/payments'); revalidatePath('/admin/orders');
   return { ok: 'وضعیت پرداخت تغییر کرد' };
+}
+
+export async function purgeDemoOrdersAction(): Promise<AState> {
+  await assertAdmin();
+  const n = purgeDemoOrders();
+  revalidatePath('/admin', 'layout');
+  return n ? { ok: `${n} سفارش نمونه پاک شد` } : { ok: 'سفارش نمونه‌ای وجود نداشت' };
 }
 
 /* ───── کاربران ───── */

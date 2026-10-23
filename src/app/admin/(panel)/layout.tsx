@@ -3,9 +3,11 @@ import { get } from '@/lib/db';
 import { getSettings } from '@/lib/catalog';
 import AdminNav, { type NavGroup } from '@/components/admin/AdminNav';
 import { adminLogout } from '@/lib/actions/admin-auth';
+import { maybeExpireOrders } from '@/lib/order-expiry';
 
 export default async function PanelLayout({ children }: { children: React.ReactNode }) {
   const user = await requireAdmin();
+  maybeExpireOrders();
   const s = getSettings();
   const low = Number(s.low_stock) || 5;
   const pendingOrders = get<{ n: number }>("SELECT COUNT(*) n FROM orders WHERE status = 'pending'")!.n;

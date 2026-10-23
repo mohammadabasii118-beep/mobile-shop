@@ -18,6 +18,7 @@ export const SETTING_DEFAULTS: Record<string, string> = {
   free_shipping_min: '1500000',
   shipping_cost: '90000',
   low_stock: '5',
+  unpaid_cancel_days: '3',
   pay_cod: '1',
   pay_online: '1',
   checkout_note: 'پس از ثبت سفارش، کارشناسان ما برای تأیید با شما تماس می‌گیرند.',
