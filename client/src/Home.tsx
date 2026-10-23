@@ -7,6 +7,7 @@ import { boxSpeedupCost } from '@game/shared';
 import { Bar, Modal, fa, fmtTime, CardTile, RARITY_FA, Icon, Gem } from './ui';
 import type { LeaderRow } from '@game/shared';
 import { playSfx } from './sfx';
+import { TaskPanel, useClaimable } from './Tasks';
 import { FriendPicker, FriendsPanel } from './Friends';
 
 export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAdmin: () => void }) {
@@ -21,6 +22,8 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
   const [showProfile, setShowProfile] = useState(false);
   const [showFriends, setShowFriends] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
+  const [showTasks, setShowTasks] = useState(false);
+  const claimable = useClaimable(ctx, showTasks);
   const [menuOpen, setMenuOpen] = useState(false);
   const [lb, setLb] = useState<{ rows: LeaderRow[]; myRank: number; refs: { rows: (LeaderRow & { refs: number })[]; myRank: number; myCount: number } } | 'loading' | 'error' | null>(null);
   const [lbTab, setLbTab] = useState<'trophies' | 'refs'>('trophies');
@@ -97,6 +100,10 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
                 <path d="M9.300 5.800l5.400 5M14.700 5.800l-5.400 5" stroke="#5a3a08" strokeWidth="1.300" strokeLinecap="round" />
                 <path d="M8.600 6.700l1.200-1.200M15.400 6.700l-1.200-1.200" stroke="#5a3a08" strokeWidth="1.200" strokeLinecap="round" />
               </svg>
+            </button>
+            <button className="cupbtn taskbtn" onClick={() => setShowTasks(true)} aria-label="تسک‌های هفتگی">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#f3c969" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M7 3.500h8.500L19 7v12.500a1.500 1.500 0 0 1-1.500 1.500h-10A1.500 1.500 0 0 1 6 19.500v-14.500A1.500 1.500 0 0 1 7.500 3.500z" /><path d="M15.500 3.500V7H19M9 12.500l1.700 1.700L14.500 10.500M9 17h6" /></svg>
+              {claimable > 0 && <b className="tbadge num">{fa(claimable)}</b>}
             </button>
             <button className="cupbtn frbtn" onClick={() => setShowFriends(true)} aria-label="دوستان">
               <svg viewBox="0 0 24 24" fill="none" stroke="#f3c969" strokeWidth="1.8" strokeLinecap="round"><circle cx="9" cy="8" r="3.200"/><path d="M3.500 19c.4-3.200 2.700-5 5.500-5s5.100 1.800 5.500 5"/><circle cx="17" cy="9" r="2.400"/><path d="M16 14c2.600-.2 4.200 1.400 4.600 4"/></svg>
@@ -207,6 +214,7 @@ export function Home({ ctx, queued, onAdmin }: { ctx: Ctx; queued: boolean; onAd
           </div>
         </div>
       )}
+      {showTasks && <TaskPanel ctx={ctx} onClose={() => setShowTasks(false)} />}
       {showFriends && <FriendsPanel ctx={ctx} onClose={() => setShowFriends(false)} />}
       {showPicker && <FriendPicker ctx={ctx} onClose={() => setShowPicker(false)} />}
       {showProfile && <ProfileModal ctx={ctx} onClose={() => setShowProfile(false)} />}
@@ -300,6 +308,9 @@ function ProfileModal({ ctx, onClose }: { ctx: Ctx; onClose: () => void }) {
           <div><b>{fa(p.wins)}</b><small>برد</small></div>
           <div><b>{fa(p.losses)}</b><small>باخت</small></div>
           <div><b>{total ? fa(Math.round((p.wins / total) * 100)) + '٪' : '—'}</b><small>درصد برد</small></div>
+          <div><b>{fa(p.winStreak ?? 0)}</b><small>برد متوالی</small></div>
+          <div><b>{fa(p.bestStreak ?? 0)}</b><small>بیشترین برد متوالی</small></div>
+          <div><b>{fa(p.boxesOpened ?? 0)}</b><small>جعبه‌ی بازشده</small></div>
         </div>
         <button className="btn" onClick={onClose}>بستن</button>
       </div>

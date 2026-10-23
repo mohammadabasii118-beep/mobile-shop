@@ -95,6 +95,15 @@ export function validateConfig(cfg: GameConfig): GameConfig {
   if (cfg.ui?.maintenanceOn !== undefined && typeof cfg.ui.maintenanceOn !== 'boolean') bad('وضعیت حالت بروزرسانی نامعتبر است');
   if (cfg.ui?.maintenanceOn && !cfg.ui.maintenance) bad('اول یک عکس برای حالت بروزرسانی آپلود کن');
   if (cfg.ui?.welcome !== undefined && (typeof cfg.ui.welcome !== 'string' || cfg.ui.welcome.length > 3500)) bad('متن پیام اول باید حداکثر ۳۵۰۰ نویسه باشد');
+  if (cfg.weekly !== undefined) {
+    const pool = cfg.weekly?.pool;
+    if (!Array.isArray(pool) || pool.length > 400) bad('پایگاه نمونه‌های تسک هفتگی نامعتبر است');
+    const seen = new Set<string>();
+    for (const t of pool) {
+      if (!t || typeof t.id !== 'string' || seen.has(t.id) || !['solo_win', 'online_win', 'open_box', 'upgrade_card', 'spend_coins', 'win_streak'].includes(t.type) || !Number.isInteger(t.target) || t.target < 1 || !Number.isInteger(t.diff) || t.diff < 1 || t.diff > 5) bad('یکی از نمونه‌های تسک هفتگی نامعتبر است');
+      seen.add(t.id);
+    }
+  }
   if (!cfg.solo || !Array.isArray(cfg.solo.pits) || cfg.solo.pits.length < 1) bad('حداقل یک گودال سولو لازم است');
   for (const pit of cfg.solo.pits) {
     if (!pit || !Array.isArray(pit.stages) || pit.stages.length < 1) bad('هر گودال حداقل یک لول لازم دارد');

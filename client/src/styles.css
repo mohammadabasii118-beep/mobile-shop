@@ -662,3 +662,14 @@ html, body, #root, .app, .screen, .battle, .admin { overscroll-behavior: none; }
 .seg { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 0; padding: 3px; margin: 4px 0 10px; border-radius: 999px; background: rgba(8,14,28,.55); border: 1px solid rgba(255,255,255,.14); box-shadow: inset 0 1px 3px rgba(0,0,0,.5); }
 .seg button { height: 32px; padding: 0 8px; border-radius: 999px; font-size: 13px; font-weight: 800; color: rgba(225,232,248,.7); white-space: nowrap; transition: color .2s, background .25s, box-shadow .25s; }
 .seg button[aria-selected="true"] { color: #2a1b04; background: linear-gradient(180deg, #ffe39a, #e0a93a 55%, #b9821c); box-shadow: 0 1px 0 rgba(255,255,255,.55) inset, 0 2px 6px rgba(0,0,0,.45); text-shadow: 0 1px 0 rgba(255,255,255,.35); }
+
+.taskbtn { inset-inline-end: auto; inset-inline-start: 0; }
+.taskbtn .tbadge { position: absolute; top: -6px; inset-inline-end: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; font-size: 11px; line-height: 18px; color: #fff; background: #e0364d; border: 1.5px solid #14203a; }
+.profile .grid3 { grid-template-columns: repeat(3, 1fr); row-gap: 10px; }
+.tasklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 58vh; overflow-y: auto; }
+.tasklist li { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; padding: 9px 11px; border-radius: 14px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1); }
+.tasklist li.done { border-color: rgba(120,230,150,.55); background: rgba(80,200,120,.1); } .tasklist li.got { opacity: .55; }
+.tasklist .tt { font-weight: 800; font-size: 13.5px; } .tasklist .tp { grid-column: 1 / -1; height: 7px; border-radius: 5px; background: rgba(0,0,0,.4); overflow: hidden; }
+.tasklist .tp i { display: block; height: 100%; background: linear-gradient(90deg, #f3c969, #e0a93a); } .tasklist li.done .tp i { background: linear-gradient(90deg, #5fe08a, #2fb866); }
+.tasklist .tr { font-size: 12px; color: #ffe39a; display: flex; justify-content: space-between; grid-column: 1 / -1; }
+.tasklist .btn { grid-row: 1; grid-column: 2; padding: 6px 12px; font-size: 13px; }

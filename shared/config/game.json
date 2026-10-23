@@ -2847,5 +2847,267 @@
     "موفق باشی",
     "به سلامت",
     "نه!"
-  ]
+  ],
+  "weekly": {
+    "pool": [
+      {
+        "id": "solo_win_2",
+        "type": "solo_win",
+        "target": 2,
+        "diff": 1
+      },
+      {
+        "id": "solo_win_3",
+        "type": "solo_win",
+        "target": 3,
+        "diff": 2
+      },
+      {
+        "id": "solo_win_4",
+        "type": "solo_win",
+        "target": 4,
+        "diff": 2
+      },
+      {
+        "id": "solo_win_5",
+        "type": "solo_win",
+        "target": 5,
+        "diff": 3
+      },
+      {
+        "id": "solo_win_6",
+        "type": "solo_win",
+        "target": 6,
+        "diff": 3
+      },
+      {
+        "id": "solo_win_8",
+        "type": "solo_win",
+        "target": 8,
+        "diff": 4
+      },
+      {
+        "id": "solo_win_10",
+        "type": "solo_win",
+        "target": 10,
+        "diff": 4
+      },
+      {
+        "id": "solo_win_12",
+        "type": "solo_win",
+        "target": 12,
+        "diff": 5
+      },
+      {
+        "id": "online_win_1",
+        "type": "online_win",
+        "target": 1,
+        "diff": 1
+      },
+      {
+        "id": "online_win_2",
+        "type": "online_win",
+        "target": 2,
+        "diff": 2
+      },
+      {
+        "id": "online_win_3",
+        "type": "online_win",
+        "target": 3,
+        "diff": 2
+      },
+      {
+        "id": "online_win_4",
+        "type": "online_win",
+        "target": 4,
+        "diff": 3
+      },
+      {
+        "id": "online_win_5",
+        "type": "online_win",
+        "target": 5,
+        "diff": 3
+      },
+      {
+        "id": "online_win_6",
+        "type": "online_win",
+        "target": 6,
+        "diff": 4
+      },
+      {
+        "id": "online_win_8",
+        "type": "online_win",
+        "target": 8,
+        "diff": 4
+      },
+      {
+        "id": "online_win_10",
+        "type": "online_win",
+        "target": 10,
+        "diff": 5
+      },
+      {
+        "id": "open_box_1",
+        "type": "open_box",
+        "target": 1,
+        "diff": 1
+      },
+      {
+        "id": "open_box_2",
+        "type": "open_box",
+        "target": 2,
+        "diff": 2
+      },
+      {
+        "id": "open_box_3",
+        "type": "open_box",
+        "target": 3,
+        "diff": 2
+      },
+      {
+        "id": "open_box_4",
+        "type": "open_box",
+        "target": 4,
+        "diff": 3
+      },
+      {
+        "id": "open_box_5",
+        "type": "open_box",
+        "target": 5,
+        "diff": 4
+      },
+      {
+        "id": "open_box_6",
+        "type": "open_box",
+        "target": 6,
+        "diff": 4
+      },
+      {
+        "id": "open_box_8",
+        "type": "open_box",
+        "target": 8,
+        "diff": 5
+      },
+      {
+        "id": "upgrade_card_1",
+        "type": "upgrade_card",
+        "target": 1,
+        "diff": 1
+      },
+      {
+        "id": "upgrade_card_2",
+        "type": "upgrade_card",
+        "target": 2,
+        "diff": 2
+      },
+      {
+        "id": "upgrade_card_3",
+        "type": "upgrade_card",
+        "target": 3,
+        "diff": 3
+      },
+      {
+        "id": "upgrade_card_4",
+        "type": "upgrade_card",
+        "target": 4,
+        "diff": 3
+      },
+      {
+        "id": "upgrade_card_5",
+        "type": "upgrade_card",
+        "target": 5,
+        "diff": 4
+      },
+      {
+        "id": "upgrade_card_6",
+        "type": "upgrade_card",
+        "target": 6,
+        "diff": 5
+      },
+      {
+        "id": "spend_coins_200",
+        "type": "spend_coins",
+        "target": 200,
+        "diff": 1
+      },
+      {
+        "id": "spend_coins_300",
+        "type": "spend_coins",
+        "target": 300,
+        "diff": 2
+      },
+      {
+        "id": "spend_coins_500",
+        "type": "spend_coins",
+        "target": 500,
+        "diff": 2
+      },
+      {
+        "id": "spend_coins_800",
+        "type": "spend_coins",
+        "target": 800,
+        "diff": 3
+      },
+      {
+        "id": "spend_coins_1000",
+        "type": "spend_coins",
+        "target": 1000,
+        "diff": 3
+      },
+      {
+        "id": "spend_coins_1500",
+        "type": "spend_coins",
+        "target": 1500,
+        "diff": 4
+      },
+      {
+        "id": "spend_coins_2000",
+        "type": "spend_coins",
+        "target": 2000,
+        "diff": 4
+      },
+      {
+        "id": "spend_coins_3000",
+        "type": "spend_coins",
+        "target": 3000,
+        "diff": 5
+      },
+      {
+        "id": "win_streak_2",
+        "type": "win_streak",
+        "target": 2,
+        "diff": 1
+      },
+      {
+        "id": "win_streak_3",
+        "type": "win_streak",
+        "target": 3,
+        "diff": 2
+      },
+      {
+        "id": "win_streak_4",
+        "type": "win_streak",
+        "target": 4,
+        "diff": 3
+      },
+      {
+        "id": "win_streak_5",
+        "type": "win_streak",
+        "target": 5,
+        "diff": 3
+      },
+      {
+        "id": "win_streak_6",
+        "type": "win_streak",
+        "target": 6,
+        "diff": 4
+      },
+      {
+        "id": "win_streak_8",
+        "type": "win_streak",
+        "target": 8,
+        "diff": 5
+      }
+    ]
+  }
 }

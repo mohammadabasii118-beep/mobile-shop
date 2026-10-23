@@ -401,6 +401,9 @@ export function createGameServer(opt: ServerOptions) {
         removeSlot(kind); commitConfig(next);
         return json(res, 200, cfg);
       }
+      case '/api/admin/tasks': return json(res, 200, game.adminTasks());
+      case '/api/admin/tasks/save': { const b = await readBody(req); game.adminSaveTask(b.slot, b); return json(res, 200, game.adminTasks()); }
+      case '/api/admin/tasks/reroll': { const b = await readBody(req); game.adminRerollTasks(b.slot); return json(res, 200, game.adminTasks()); }
       case '/api/admin/codes': return json(res, 200, { codes: game.adminCodes() });
       case '/api/admin/codes/save': { const b = await readBody(req); game.adminSaveCode(b.code, b.rewards, b.maxUses); return json(res, 200, { codes: game.adminCodes() }); }
       case '/api/admin/codes/delete': { const b = await readBody(req); game.adminDeleteCode(b.code); return json(res, 200, { codes: game.adminCodes() }); }
@@ -475,6 +478,8 @@ export function createGameServer(opt: ServerOptions) {
       let extra: object = {};
       switch (path) {
         case '/api/me': if (!needsChannel(u.tgId)) game.countReferral(userId); break;
+        case '/api/tasks': extra = { taskState: game.taskState(userId) }; break;
+        case '/api/tasks/claim': { const reward = game.claimTask(userId, body.slot); extra = { reward, taskState: game.taskState(userId) }; break; }
         case '/api/redeem': { const r = game.redeemCode(userId, body.code); extra = { redeemed: r.rewards, boxGiven: r.boxGiven }; break; }
         case '/api/deck': game.setDeck(userId, body.cards); break;
         case '/api/upgrade': extra = { upgrade: game.upgradeCard(userId, String(body.cardId)) }; break;

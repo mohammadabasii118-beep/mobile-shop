@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { ABILITY_META, BOX_TYPES, type BoxType, type CardDef, type GameConfig, type Profile, type Rarity } from '@game/shared';
-import { resolveCard } from '@game/shared';
+import { resolveCard, rewardLabel, taskText, TASK_NAME, TASK_TYPES, type RewardKind, type TaskReward, type TaskType } from '@game/shared';
 import type { Ctx } from './App';
 import { call, loadConfig } from './net';
 import { initData } from './telegram';
-import { CardTile, Icon, Modal, RARITY_FA, fa } from './ui';
+import { CardTile, Icon, Modal, RARITY_FA, fa, fmtLong } from './ui';
 
-type Tab = 'cards' | 'eco' | 'shop' | 'solo' | 'look' | 'chat' | 'codes' | 'players' | 'json';
+type Tab = 'cards' | 'eco' | 'shop' | 'solo' | 'look' | 'chat' | 'codes' | 'tasks' | 'players' | 'json';
 interface Stats { users: number; battles: number; pendingBoxes: number; coins: number; banned: number }
 interface AdminUser { id: number; tg_id: number; name: string; avatar: string | null; level: number; coins: number; gems: number; wins: number; losses: number; banned: number }
 
@@ -53,7 +53,7 @@ export function Admin({ ctx, onExit }: { ctx: Ctx; onExit: () => void }) {
         </div>
       )}
       <div className="tabs" role="tablist">
-        {([['cards', 'کارت‌ها و عکس‌ها'], ['eco', 'جعبه و اقتصاد'], ['shop', 'فروشگاه'], ['solo', 'تک‌نفره (گودال‌ها)'], ['look', 'ظاهر و بنر'], ['chat', 'چت'], ['codes', 'کد جایزه'], ['players', 'بازیکن‌ها'], ['json', 'پیشرفته']] as [Tab, string][]).map(([k, l]) => (
+        {([['cards', 'کارت‌ها و عکس‌ها'], ['eco', 'جعبه و اقتصاد'], ['shop', 'فروشگاه'], ['solo', 'تک‌نفره (گودال‌ها)'], ['look', 'ظاهر و بنر'], ['chat', 'چت'], ['codes', 'کد جایزه'], ['tasks', 'تسک هفتگی'], ['players', 'بازیکن‌ها'], ['json', 'پیشرفته']] as [Tab, string][]).map(([k, l]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{l}</button>
         ))}
       </div>
@@ -61,6 +61,7 @@ export function Admin({ ctx, onExit }: { ctx: Ctx; onExit: () => void }) {
       {tab === 'eco' && <EcoTab cfg={cfg} refresh={refresh} run={run} />}
       {tab === 'shop' && <ShopTab cfg={cfg} refresh={refresh} run={run} />}
       {tab === 'solo' && <SoloTab cfg={cfg} refresh={refresh} run={run} />}
+      {tab === 'tasks' && <TasksTab cfg={cfg} run={run} />}
       {tab === 'codes' && <CodesTab cfg={cfg} run={run} />}
       {tab === 'chat' && <ChatTab cfg={cfg} refresh={refresh} run={run} />}
       {tab === 'look' && <LookTab cfg={cfg} refresh={refresh} run={run} />}
@@ -619,6 +620,56 @@ function ChatTab({ cfg, refresh, run }: TabProps) {
   );
 }
 
+/** تسک‌های هفتگیِ همه‌ی بازیکن‌ها: ۱۰ اسلات؛ تغییر برای کسانی که جایزه‌ی آن تسک را نگرفته‌اند همان لحظه اعمال می‌شود */
+function TasksTab({ cfg, run }: { cfg: GameConfig; run: Run }) {
+  type Row = { slot: number; type: TaskType; target: number; reward: TaskReward; tpl: string };
+  const [rows, setRows] = useState<Row[]>([]);
+  const [info, setInfo] = useState({ week: 0, resetInMs: 0, poolSize: 0 });
+  const apply = (j: { week: number; resetInMs: number; poolSize: number; tasks: Row[] }) => { setRows(j.tasks); setInfo({ week: j.week, resetInMs: j.resetInMs, poolSize: j.poolSize }); };
+  useEffect(() => { void run(async () => apply(await call('/api/admin/tasks'))); /* eslint-disable-next-line */ }, []);
+  const edit = (slot: number, fn: (r: Row) => void) => setRows((rs) => rs.map((r) => { if (r.slot !== slot) return r; const c = JSON.parse(JSON.stringify(r)) as Row; fn(c); return c; }));
+  const save = (r: Row) => run(async () => apply(await call('/api/admin/tasks/save', { slot: r.slot, type: r.type, target: r.target, reward: r.reward })), `اسلات ${fa(r.slot + 1)} ذخیره شد و همین الان اعمال شد`);
+  const n = (v: string) => Math.max(0, Math.floor(Number(v) || 0));
+  return (
+    <div className="box">
+      <h3>تسک‌های این هفته <small>(برای همه‌ی بازیکن‌ها یکسان)</small></h3>
+      <small className="hint" style={{ textAlign: 'start' }}>هر شنبه ساعت ۰۰:۰۰ (تهران) ۱۰ تسک تازه و غیرتکراری از «پایگاه نمونه‌ها» ({fa(info.poolSize)} نمونه) ساخته می‌شود؛ جوایز: ۲۰۰۰ سکه، ۲۰ الماس، ۲۰۰ XP و ۲ جعبه (برنزی یا نقره‌ای) به نسبت سختی. تغییر هر اسلات برای بازیکنی که جایزه‌ی همان تسک را هنوز نگرفته فوراً اعمال می‌شود (اگر «نوع» را عوض کنی پیشرفتش صفر می‌شود)؛ کسی که جایزه را گرفته، تسکش ثابت می‌ماند. تا شروع هفته‌ی بعد: {fmtLong(info.resetInMs)}</small>
+      <div className="btns">
+        <button className="btn ghost" onClick={() => { if (confirm('همه‌ی ۱۰ تسک و جایزه‌هایشان رندوم عوض شود؟ (برای کسانی که جایزه‌ای نگرفته‌اند همین الان تغییر می‌کند)')) void run(async () => apply(await call('/api/admin/tasks/reroll', {})), 'همه‌ی تسک‌ها عوض شدند'); }}>🎲 رندوم کردن همه</button>
+      </div>
+      <div className="list">
+        {rows.map((r) => (
+          <div key={r.slot} className="giftbox">
+            <b>اسلات {fa(r.slot + 1)} <small>({r.tpl === 'custom' ? 'دستی' : r.tpl})</small></b>
+            <div className="fgrid">
+              <label className="field">نوع تسک
+                <select value={r.type} onChange={(e) => edit(r.slot, (c) => { c.type = e.target.value as TaskType; })}>{TASK_TYPES.map((t) => <option key={t} value={t}>{TASK_NAME[t]}</option>)}</select>
+              </label>
+              <label className="field">تعداد هدف<input type="number" min={1} value={r.target} onChange={(e) => edit(r.slot, (c) => { c.target = n(e.target.value); })} /></label>
+              <label className="field">نوع جایزه
+                <select value={r.reward.kind} onChange={(e) => edit(r.slot, (c) => { c.reward.kind = e.target.value as RewardKind; if (c.reward.kind === 'box') { c.reward.box ??= 'bronze'; c.reward.amount = Math.min(c.reward.amount || 1, 5); } else delete c.reward.box; })}>
+                  <option value="coins">سکه</option><option value="gems">الماس</option><option value="xp">XP</option><option value="box">جعبه</option>
+                </select>
+              </label>
+              <label className="field">مقدار جایزه<input type="number" min={1} value={r.reward.amount} onChange={(e) => edit(r.slot, (c) => { c.reward.amount = n(e.target.value); })} /></label>
+              {r.reward.kind === 'box' && (
+                <label className="field">نوع جعبه
+                  <select value={r.reward.box ?? 'bronze'} onChange={(e) => edit(r.slot, (c) => { c.reward.box = e.target.value as 'bronze'; })}>{(['bronze', 'silver', 'gold'] as const).map((b) => <option key={b} value={b}>{cfg.box.types[b].name}</option>)}</select>
+                </label>
+              )}
+            </div>
+            <small>{taskText(r.type, r.target, fa)} ← {rewardLabel(r.reward, (b) => cfg.box.types[b].name, fa)}</small>
+            <div className="btns">
+              <button className="btn" onClick={() => void save(r)}>ذخیره و اعمال</button>
+              <button className="btn ghost" onClick={() => void run(async () => apply(await call('/api/admin/tasks/reroll', { slot: r.slot })), 'نمونه‌ی این اسلات عوض شد')}>🎲 نمونه‌ی دیگر</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** کدهای جایزه: ساختن (با انتخاب جایزه)، سقف تعداد استفاده، و حذف */
 function CodesTab({ cfg, run }: { cfg: GameConfig; run: Run }) {
   type Row = { code: string; rewards: { coins?: number; gems?: number; xp?: number; cardId?: string; cardCount?: number; box?: string }; maxUses: number; used: number; createdAt: number };
@@ -734,6 +785,9 @@ function PlayersTab({ cfg, run }: { cfg: GameConfig; run: Run }) {
               <div><small>XP</small><b className="num" dir="ltr">{fa(d.xp)} / {fa(d.xpNeeded)}</b></div>
               <div><small>برد</small><b>{fa(d.wins)}</b></div>
               <div><small>باخت</small><b>{fa(d.losses)}</b></div>
+              <div><small>برد متوالی</small><b>{fa(d.winStreak ?? 0)}</b></div>
+              <div><small>بیشترین برد متوالی</small><b>{fa(d.bestStreak ?? 0)}</b></div>
+              <div><small>جعبه‌ی بازشده</small><b>{fa(d.boxesOpened ?? 0)}</b></div>
               <div><small>درصد برد</small><b>{d.wins + d.losses ? `${fa(Math.round((d.wins / (d.wins + d.losses)) * 100))}٪` : '—'}</b></div>
               <div><small>کارت‌ها</small><b>{fa(d.cards.length)} از {fa(cfg.cards.length)}</b></div>
             </div>

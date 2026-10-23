@@ -90,5 +90,17 @@ export function openDb(path = ':memory:'): Db {
   db.exec('CREATE TABLE IF NOT EXISTS referred (user_id INTEGER PRIMARY KEY, referrer INTEGER NOT NULL, at INTEGER NOT NULL, counted INTEGER NOT NULL DEFAULT 0)');
   db.exec('CREATE INDEX IF NOT EXISTS referred_by ON referred(referrer, counted)');
   try { db.exec('ALTER TABLE users ADD COLUMN ref_bonus INTEGER NOT NULL DEFAULT 0'); } catch { /* ستون از قبل هست */ }
+  // آمار پروفایل: برد متوالی (فعلی و بهترین) و تعداد جعبه‌های بازشده
+  for (const col of ['win_streak', 'best_streak', 'boxes_opened']) { try { db.exec(`ALTER TABLE users ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 0`); } catch { /* ستون از قبل هست */ } }
+  // تسک‌های هفتگی: تعریف تسک‌های هفته (برای همه یکسان) و پیشرفت هر بازیکن؛ snap = تعریفِ ثابت‌شده بعد از گرفتن جایزه
+  db.exec(`CREATE TABLE IF NOT EXISTS weekly_tasks (
+    week INTEGER NOT NULL, slot INTEGER NOT NULL, type TEXT NOT NULL, target INTEGER NOT NULL, reward TEXT NOT NULL, tpl TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (week, slot)
+  );
+  CREATE TABLE IF NOT EXISTS task_progress (
+    user_id INTEGER NOT NULL, week INTEGER NOT NULL, slot INTEGER NOT NULL, type TEXT NOT NULL,
+    progress INTEGER NOT NULL DEFAULT 0, aux INTEGER NOT NULL DEFAULT 0, claimed INTEGER NOT NULL DEFAULT 0, snap TEXT,
+    PRIMARY KEY (user_id, week, slot)
+  );`);
   return db;
 }

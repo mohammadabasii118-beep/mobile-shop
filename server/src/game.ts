@@ -1,4 +1,4 @@
-import { boxSpeedupCost, type FriendBase, resolveCard, type BattleReward, type BoxContents, type BoxSource, type BoxType, type BoxView, type CardView, type GameConfig, type Profile, type Rarity, type UnitInit } from '@game/shared';
+import { REWARD_KINDS, TASK_TYPES, type RewardKind, type TaskReward, type TaskState, type TaskTpl, type TaskType, type TaskView, boxSpeedupCost, type FriendBase, resolveCard, type BattleReward, type BoxContents, type BoxSource, type BoxType, type BoxView, type CardView, type GameConfig, type Profile, type Rarity, type UnitInit } from '@game/shared';
 import type { Db } from './db';
 import type { TgUser } from './auth';
 
@@ -80,6 +80,7 @@ export class Game {
     return {
       id: u.id, name: u.name, avatar: u.avatar, level: u.level, xp: u.xp,
       xpNeeded: this.xpNeeded(u.level), coins: u.coins, gems: u.gems ?? 0, trophies: u.trophies ?? 0, wins: u.wins, losses: u.losses,
+      winStreak: u.win_streak ?? 0, bestStreak: u.best_streak ?? 0, boxesOpened: u.boxes_opened ?? 0,
       soloStage: u.solo_stage, cards, deck, boxes, isAdmin: this.d.isAdmin?.(u.tg_id) ?? false,
       channelOk: this.d.channelRequired?.(u.tg_id) ? !!u.channel_ok : true,
     };
@@ -122,7 +123,9 @@ export class Game {
   /** سکه را کم می‌کند؛ اگر کافی نبود چیزی کم نمی‌شود و false برمی‌گردد */
   chargeEntry(userId: number, fee: number): boolean {
     if (fee <= 0) return true;
-    return Number(this.d.db.prepare('UPDATE users SET coins = coins - ? WHERE id = ? AND coins >= ?').run(fee, userId, fee).changes) === 1;
+    const ok = Number(this.d.db.prepare('UPDATE users SET coins = coins - ? WHERE id = ? AND coins >= ?').run(fee, userId, fee).changes) === 1;
+    if (ok) this.taskEvent(userId, 'spend_coins', fee);
+    return ok;
   }
   refund(userId: number, fee: number) {
     if (fee > 0) this.d.db.prepare('UPDATE users SET coins = coins + ? WHERE id = ?').run(fee, userId);
@@ -171,6 +174,8 @@ export class Game {
     if (coins < need.coins) throw new GameError(`سکه کافی نیست (${coins}/${need.coins})`);
     db.prepare('UPDATE user_cards SET level = level + 1, copies = copies - ? WHERE user_id = ? AND card_id = ?').run(need.copies, userId, cardId);
     db.prepare('UPDATE users SET coins = coins - ? WHERE id = ?').run(need.coins, userId);
+    this.taskEvent(userId, 'upgrade_card', 1);
+    this.taskEvent(userId, 'spend_coins', need.coins);
     // هر ارتقا XP هم می‌دهد (مقدارش در جدول ارتقا برای هر نوع کارت و لول)
     const levelsGained = need.xp > 0 ? this.addXp(userId, need.xp) : 0;
     return { xp: need.xp, levelsGained };
@@ -258,7 +263,8 @@ export class Game {
       gotCards.push({ id: card.id, isNew: !has });
     }
     db.prepare('DELETE FROM boxes WHERE user_id = ? AND slot = ?').run(userId, slot);
-    db.prepare('UPDATE users SET coins = coins + ? WHERE id = ?').run(coins, userId);
+    db.prepare('UPDATE users SET coins = coins + ?, boxes_opened = boxes_opened + 1 WHERE id = ?').run(coins, userId);
+    this.taskEvent(userId, 'open_box', 1);
     return { type, coins, cards: gotCards };
   }
 
@@ -291,14 +297,17 @@ export class Game {
     const { db, cfg } = this.d;
     const on = cfg.online;
     if (!won) {
-      db.prepare('UPDATE users SET losses = losses + 1 WHERE id = ?').run(userId);
+      db.prepare('UPDATE users SET losses = losses + 1, win_streak = 0 WHERE id = ?').run(userId);
+      this.taskStreak(userId, false);
       if (mode === 'multi') {
         db.prepare('UPDATE users SET trophies = MAX(0, trophies - ?) WHERE id = ?').run(on.trophiesLoss, userId);
         return { box: null, type: null, noSlot: false, trophies: -on.trophiesLoss };
       }
       return null;
     }
-    db.prepare('UPDATE users SET wins = wins + 1 WHERE id = ?').run(userId);
+    db.prepare('UPDATE users SET wins = wins + 1, win_streak = win_streak + 1, best_streak = MAX(best_streak, win_streak + 1) WHERE id = ?').run(userId);
+    this.taskEvent(userId, mode === 'solo' ? 'solo_win' : 'online_win', 1);
+    this.taskStreak(userId, true);
     if (mode === 'solo' && soloStage !== undefined) {
       db.prepare('UPDATE users SET solo_stage = MAX(solo_stage, ?) WHERE id = ?').run(soloStage + 1, userId);
     }
@@ -426,6 +435,7 @@ export class Game {
     if (db.prepare('SELECT 1 FROM shop_buys WHERE user_id = ? AND slot = ? AND day = ? AND sig = ?').get(userId, slot, day, sig)) throw new GameError('این پیشنهاد را این هفته خریده‌ای');
     const paid = Number(db.prepare(`UPDATE users SET ${currency} = ${currency} - ? WHERE id = ? AND ${currency} >= ?`).run(price, userId, price).changes);
     if (paid !== 1) throw new GameError(currency === 'coins' ? 'سکه‌ی کافی نداری' : 'الماس کافی نداری');
+    if (currency === 'coins') this.taskEvent(userId, 'spend_coins', price);
     db.prepare('INSERT INTO shop_buys (user_id, slot, day, sig) VALUES (?,?,?,?)').run(userId, slot, day, sig);
     const has = db.prepare('SELECT 1 FROM user_cards WHERE user_id = ? AND card_id = ?').get(userId, o.cardId);
     if (has) db.prepare('UPDATE user_cards SET copies = copies + ? WHERE user_id = ? AND card_id = ?').run(o.count, userId, o.cardId);
@@ -562,6 +572,178 @@ export class Game {
     const has = db.prepare('SELECT 1 FROM user_cards WHERE user_id = ? AND card_id = ?').get(userId, cardId);
     if (has) db.prepare('UPDATE user_cards SET copies = copies + ? WHERE user_id = ? AND card_id = ?').run(count, userId, cardId);
     else { db.prepare('INSERT INTO user_cards (user_id, card_id, copies) VALUES (?,?,?)').run(userId, cardId, count - 1); this.addToDeckIfRoom(userId, cardId); }
+  }
+
+  // ---------- تسک‌های هفتگی ----------
+  private static readonly SLOTS = 10;
+  private static readonly TOTALS = { coins: 2000, gems: 20, xp: 200 };
+  taskWeek(): number { return this.shopDay(); }
+  private pool(): TaskTpl[] { return (this.d.cfg.weekly?.pool ?? []).filter((t) => TASK_TYPES.includes(t.type) && t.target > 0); }
+  private shuffle<T>(a: T[]): T[] { const r = [...a]; for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(this.d.rng() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; } return r; }
+  /** تقسیم total بین وزن‌ها (بر اساس سختی)، هر سهم مضرب step و حداقل step، مجموع دقیقاً total */
+  private split(total: number, weights: number[], step: number): number[] {
+    const units = total / step;
+    const sum = weights.reduce((a, b) => a + b, 0);
+    const base = weights.map((w) => Math.max(1, Math.floor((units * w) / sum)));
+    let left = units - base.reduce((a, b) => a + b, 0);
+    for (let i = 0; left !== 0; i = (i + 1) % base.length) { if (left > 0) { base[i]++; left--; } else if (base[i] > 1) { base[i]--; left++; } }
+    return base.map((b) => b * step);
+  }
+  /** ۱۰ تسک تازه: از هر نوع حداقل یکی، نمونه‌های تکراری هفته‌ی قبل کنار گذاشته می‌شوند؛ جایزه‌ها: ۲۰۰۰ سکه، ۲۰ الماس، ۲۰۰ XP و ۲ جعبه بین تسک‌ها (به نسبت سختی) */
+  private generateTasks(avoid: Set<string>): { type: TaskType; target: number; reward: TaskReward; tpl: string; diff: number }[] {
+    const pool = this.pool();
+    if (pool.length === 0) return [];
+    const fresh = pool.filter((t) => !avoid.has(t.id));
+    const src = fresh.length >= Game.SLOTS ? fresh : pool;
+    const picked: TaskTpl[] = [];
+    for (const type of this.shuffle([...TASK_TYPES])) {
+      const c = this.shuffle(src.filter((t) => t.type === type && !picked.includes(t)));
+      if (c[0]) picked.push(c[0]);
+    }
+    // بقیه‌ی اسلات‌ها رندوم؛ از هر نوع حداکثر ۲ تسک تا تنوع بماند
+    const cnt = (type: TaskType) => picked.filter((p) => p.type === type).length;
+    for (const t of this.shuffle(src)) { if (picked.length >= Game.SLOTS) break; if (!picked.includes(t) && cnt(t.type) < 2) picked.push(t); }
+    for (const t of this.shuffle(pool)) { if (picked.length >= Game.SLOTS) break; if (!picked.includes(t)) picked.push(t); }
+    const tasks = picked.slice(0, Game.SLOTS).sort((a, b) => a.diff - b.diff || a.target - b.target);
+    const kinds: RewardKind[] = this.shuffle<RewardKind>(['box', 'box', 'gems', 'gems', 'xp', 'xp', 'coins', 'coins', 'coins', 'coins']).slice(0, tasks.length);
+    const rewards: TaskReward[] = tasks.map(() => ({ kind: 'coins', amount: 0 }));
+    for (const kind of ['coins', 'gems', 'xp'] as const) {
+      const idx = kinds.map((k, i) => (k === kind ? i : -1)).filter((i) => i >= 0);
+      if (!idx.length) continue;
+      const amounts = this.split(Game.TOTALS[kind], idx.map((i) => tasks[i].diff + 1), kind === 'coins' ? 10 : kind === 'xp' ? 5 : 1);
+      idx.forEach((i, k) => { rewards[i] = { kind, amount: amounts[k] }; });
+    }
+    kinds.forEach((k, i) => { if (k === 'box') rewards[i] = { kind: 'box', amount: 1, box: this.d.rng() < 0.5 ? 'bronze' : 'silver' }; });
+    return tasks.map((t, i) => ({ type: t.type, target: t.target, reward: rewards[i], tpl: t.id, diff: t.diff }));
+  }
+  /** تسک‌های این هفته؛ اگر هنوز ساخته نشده، ساخته می‌شود (شروع هفته: شنبه ۰۰:۰۰ تهران). جایزه‌های نگرفته‌ی هفته‌ی قبل خودبه‌خود می‌سوزند. */
+  private weekDefs(): { slot: number; type: TaskType; target: number; reward: TaskReward; tpl: string }[] {
+    const { db } = this.d;
+    const week = this.taskWeek();
+    const read = () => (db.prepare('SELECT slot, type, target, reward, tpl FROM weekly_tasks WHERE week = ? ORDER BY slot').all(week) as any[])
+      .map((r) => ({ slot: r.slot as number, type: r.type as TaskType, target: r.target as number, reward: JSON.parse(r.reward) as TaskReward, tpl: r.tpl as string }));
+    let rows = read();
+    if (rows.length === 0) {
+      const prev = new Set((db.prepare('SELECT tpl FROM weekly_tasks WHERE week = ?').all(week - 1) as any[]).map((r) => r.tpl as string));
+      const gen = this.generateTasks(prev);
+      gen.forEach((t, slot) => db.prepare('INSERT OR IGNORE INTO weekly_tasks (week, slot, type, target, reward, tpl) VALUES (?,?,?,?,?,?)').run(week, slot, t.type, t.target, JSON.stringify(t.reward), t.tpl));
+      db.prepare('DELETE FROM weekly_tasks WHERE week < ?').run(week - 4);
+      db.prepare('DELETE FROM task_progress WHERE week < ?').run(week - 1);
+      rows = read();
+    }
+    return rows;
+  }
+  /** ردیف پیشرفت بازیکن برای یک اسلات؛ اگر ادمین نوع تسک را عوض کرده و جایزه هنوز گرفته نشده، پیشرفت صفر می‌شود */
+  private progressRow(userId: number, week: number, def: { slot: number; type: TaskType }) {
+    const { db } = this.d;
+    let r = db.prepare('SELECT type, progress, aux, claimed, snap FROM task_progress WHERE user_id = ? AND week = ? AND slot = ?').get(userId, week, def.slot) as any;
+    if (!r) { db.prepare('INSERT OR IGNORE INTO task_progress (user_id, week, slot, type) VALUES (?,?,?,?)').run(userId, week, def.slot, def.type); r = { type: def.type, progress: 0, aux: 0, claimed: 0, snap: null }; }
+    else if (!r.claimed && r.type !== def.type) {
+      db.prepare('UPDATE task_progress SET type = ?, progress = 0, aux = 0 WHERE user_id = ? AND week = ? AND slot = ?').run(def.type, userId, week, def.slot);
+      r = { ...r, type: def.type, progress: 0, aux: 0 };
+    }
+    return r as { type: TaskType; progress: number; aux: number; claimed: number; snap: string | null };
+  }
+  /** یک رویداد (برد، باز کردن جعبه، …) را به تسک‌های هم‌نوعِ این هفته اضافه می‌کند. هیچ‌وقت نباید جلوی بازی را بگیرد. */
+  taskEvent(userId: number, type: TaskType, amount = 1) {
+    try {
+      if (!(amount > 0)) return;
+      const week = this.taskWeek();
+      for (const def of this.weekDefs()) {
+        if (def.type !== type) continue;
+        const r = this.progressRow(userId, week, def);
+        if (r.claimed) continue;
+        this.d.db.prepare('UPDATE task_progress SET progress = MIN(?, progress + ?) WHERE user_id = ? AND week = ? AND slot = ?').run(1_000_000_000, Math.floor(amount), userId, week, def.slot);
+      }
+    } catch (e) { console.error('[tasks] event', (e as Error).message); }
+  }
+  /** تسک «برد پشت‌سرهم»: شمارنده‌ی هفتگی با هر باخت صفر می‌شود؛ پیشرفت = بهترین رشته‌ی هفته */
+  taskStreak(userId: number, won: boolean) {
+    try {
+      const week = this.taskWeek();
+      for (const def of this.weekDefs()) {
+        if (def.type !== 'win_streak') continue;
+        const r = this.progressRow(userId, week, def);
+        if (r.claimed) continue;
+        if (won) this.d.db.prepare('UPDATE task_progress SET aux = aux + 1, progress = MAX(progress, aux + 1) WHERE user_id = ? AND week = ? AND slot = ?').run(userId, week, def.slot);
+        else this.d.db.prepare('UPDATE task_progress SET aux = 0 WHERE user_id = ? AND week = ? AND slot = ?').run(userId, week, def.slot);
+      }
+    } catch (e) { console.error('[tasks] streak', (e as Error).message); }
+  }
+  taskState(userId: number): TaskState {
+    const week = this.taskWeek();
+    const tasks = this.weekDefs().map((def): TaskView => {
+      const r = this.progressRow(userId, week, def);
+      if (r.claimed && r.snap) { // جایزه گرفته شده: تعریفِ همان لحظه برای همیشه ثابت است
+        const s = JSON.parse(r.snap) as { type: TaskType; target: number; reward: TaskReward };
+        return { slot: def.slot, type: s.type, target: s.target, progress: s.target, claimed: true, reward: s.reward };
+      }
+      return { slot: def.slot, type: def.type, target: def.target, progress: Math.min(r.progress, def.target), claimed: false, reward: def.reward };
+    });
+    return { week, resetInMs: this.shopNextResetMs(), tasks };
+  }
+  claimTask(userId: number, slot: unknown) {
+    const { db } = this.d;
+    const week = this.taskWeek();
+    const def = this.weekDefs().find((d) => d.slot === slot);
+    if (!def) throw new GameError('این تسک وجود ندارد');
+    const r = this.progressRow(userId, week, def);
+    if (r.claimed) throw new GameError('جایزه‌ی این تسک را قبلاً گرفته‌ای');
+    if (r.progress < def.target) throw new GameError('این تسک هنوز تمام نشده');
+    const rw = def.reward;
+    if (rw.kind === 'box' && (db.prepare('SELECT COUNT(*) AS n FROM boxes WHERE user_id = ?').get(userId) as any).n + rw.amount > this.d.cfg.box.slots) {
+      throw new GameError('اسلات‌های جعبه‌ات پر است؛ اول یک جعبه را باز کن و دوباره بزن');
+    }
+    const upd = Number(db.prepare('UPDATE task_progress SET claimed = 1, snap = ? WHERE user_id = ? AND week = ? AND slot = ? AND claimed = 0').run(JSON.stringify({ type: def.type, target: def.target, reward: rw }), userId, week, slot as number).changes);
+    if (upd !== 1) throw new GameError('جایزه‌ی این تسک قبلاً گرفته شده');
+    if (rw.kind === 'coins') db.prepare('UPDATE users SET coins = coins + ? WHERE id = ?').run(rw.amount, userId);
+    else if (rw.kind === 'gems') db.prepare('UPDATE users SET gems = gems + ? WHERE id = ?').run(rw.amount, userId);
+    else if (rw.kind === 'xp') this.addXp(userId, rw.amount);
+    else for (let i = 0; i < rw.amount; i++) this.grantBox(userId, rw.box ?? 'bronze', 'multi');
+    return rw;
+  }
+  // پنل مدیریت
+  adminTasks() {
+    const defs = this.weekDefs();
+    return { week: this.taskWeek(), resetInMs: this.shopNextResetMs(), tasks: defs.map((d) => ({ slot: d.slot, type: d.type, target: d.target, reward: d.reward, tpl: d.tpl })), poolSize: this.pool().length };
+  }
+  private cleanTask(b: any): { type: TaskType; target: number; reward: TaskReward } {
+    if (!TASK_TYPES.includes(b?.type)) throw new GameError('نوع تسک نامعتبر است');
+    const target = Number(b.target);
+    if (!Number.isInteger(target) || target < 1 || target > (b.type === 'win_streak' ? 50 : 1_000_000)) throw new GameError('عدد هدف نامعتبر است');
+    const kind = b?.reward?.kind as RewardKind;
+    if (!REWARD_KINDS.includes(kind)) throw new GameError('نوع جایزه نامعتبر است');
+    const amount = Number(b.reward.amount);
+    const max = { coins: 1_000_000, gems: 10_000, xp: 100_000, box: 5 }[kind];
+    if (!Number.isInteger(amount) || amount < 1 || amount > max) throw new GameError('مقدار جایزه نامعتبر است');
+    if (kind === 'box' && !['bronze', 'silver', 'gold'].includes(b.reward.box)) throw new GameError('نوع جعبه نامعتبر است');
+    return { type: b.type, target, reward: kind === 'box' ? { kind, amount, box: b.reward.box } : { kind, amount } };
+  }
+  adminSaveTask(slot: unknown, b: unknown) {
+    this.weekDefs();
+    const s = Number(slot);
+    if (!Number.isInteger(s) || s < 0 || s >= Game.SLOTS) throw new GameError('اسلات نامعتبر است');
+    const t = this.cleanTask(b);
+    this.d.db.prepare('UPDATE weekly_tasks SET type = ?, target = ?, reward = ?, tpl = ? WHERE week = ? AND slot = ?').run(t.type, t.target, JSON.stringify(t.reward), 'custom', this.taskWeek(), s);
+  }
+  /** تسک‌ها را رندوم عوض می‌کند: یک اسلات (نمونه‌ی غیرتکراری) یا همه‌ی ۱۰ تا؛ جایزه‌ی اسلات حفظ می‌شود مگر «همه» */
+  adminRerollTasks(slot?: unknown) {
+    const { db } = this.d;
+    const week = this.taskWeek();
+    const cur = this.weekDefs();
+    if (slot === undefined || slot === null || slot === '') {
+      const used = new Set(cur.map((c) => c.tpl));
+      const gen = this.generateTasks(used);
+      gen.forEach((t, i) => db.prepare('UPDATE weekly_tasks SET type = ?, target = ?, reward = ?, tpl = ? WHERE week = ? AND slot = ?').run(t.type, t.target, JSON.stringify(t.reward), t.tpl, week, i));
+      return;
+    }
+    const s = Number(slot);
+    const me = cur.find((c) => c.slot === s);
+    if (!me) throw new GameError('اسلات نامعتبر است');
+    const used = new Set(cur.map((c) => c.tpl));
+    const c = this.shuffle(this.pool().filter((t) => !used.has(t.id)));
+    if (!c[0]) throw new GameError('نمونه‌ی تازه‌ای در پایگاه نمونه‌ها نمانده');
+    db.prepare('UPDATE weekly_tasks SET type = ?, target = ?, tpl = ? WHERE week = ? AND slot = ?').run(c[0].type, c[0].target, c[0].id, week, s);
   }
 
   // ---------- کد جایزه ----------

@@ -21,6 +21,8 @@ export interface Profile {
   /** آیا شرط عضویت کانال برقرار است (یا لازم نیست)؟ */
   channelOk: boolean;
   cards: CardView[]; deck: string[]; boxes: BoxView[];
+  /** برد متوالی فعلی، بیشترین برد متوالی (تک‌نفره و آنلاین با هم) و تعداد جعبه‌های بازشده */
+  winStreak: number; bestStreak: number; boxesOpened: number;
 }
 
 export interface BattleReward {

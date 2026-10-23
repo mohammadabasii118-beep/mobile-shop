@@ -355,3 +355,28 @@ describe('redeem codes', () => {
     expect((await call(63, '/api/redeem', { code: 'WELCOME1' })).status).toBe(400);
   });
 });
+
+describe('weekly tasks (HTTP)', () => {
+  it('players see 10 tasks, claim is validated, admin edits apply live and are admin-only', async () => {
+    const st = (await (await call(70, '/api/tasks', {})).json()) as any;
+    expect(st.taskState.tasks).toHaveLength(10);
+    expect((await call(70, '/api/tasks/claim', { slot: 0 })).status).toBe(400);              // هنوز تمام نشده
+    expect((await call(70, '/api/admin/tasks')).status).toBe(403);
+    expect((await call(70, '/api/admin/tasks/save', { slot: 0 })).status).toBe(403);
+    const a = (await (await call(42, '/api/admin/tasks')).json()) as any;
+    expect(a.tasks).toHaveLength(10);
+    expect(a.poolSize).toBeGreaterThan(40);
+    const bad = await call(42, '/api/admin/tasks/save', { slot: 0, type: 'open_box', target: 0, reward: { kind: 'coins', amount: 5 } });
+    expect(bad.status).toBe(400);
+    const ok = await call(42, '/api/admin/tasks/save', { slot: 0, type: 'open_box', target: 5, reward: { kind: 'box', amount: 1, box: 'silver' } });
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as any).tasks[0]).toMatchObject({ type: 'open_box', target: 5, reward: { kind: 'box', box: 'silver' } });
+    const again = (await (await call(70, '/api/tasks', {})).json()) as any;
+    expect(again.taskState.tasks[0]).toMatchObject({ type: 'open_box', target: 5 });          // برای بازیکن همان لحظه عوض شد
+    expect((await call(42, '/api/admin/tasks/reroll', { slot: 0 })).status).toBe(200);
+    expect((await call(42, '/api/admin/tasks/reroll', {})).status).toBe(200);
+    expect((await call(70, '/api/me')).status).toBe(200);
+    const me = ((await (await call(70, '/api/me')).json()) as any).profile;
+    expect(me).toMatchObject({ winStreak: 0, bestStreak: 0, boxesOpened: 0 });
+  });
+});

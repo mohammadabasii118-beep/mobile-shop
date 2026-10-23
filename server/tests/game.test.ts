@@ -444,3 +444,103 @@ describe('referrals (subordinates)', () => {
     expect(() => g.adminBalance(other, 'refs', { delta: 1.5 })).toThrow();
   });
 });
+
+describe('weekly tasks', () => {
+  const mk = () => { let t = Date.UTC(2026, 9, 24, 12); let r = 0.37; const g = new Game({ db: openDb(), cfg, now: () => t, rng: () => { r = (r * 9301 + 0.4973) % 1; return r; } }); return { g, adv: (d: number) => { t += d * 86_400_000; }, u: (id: number) => g.upsertUser({ tgId: id, name: 'T' + id, avatar: null }) }; };
+
+  it('creates 10 tasks: every type present, rewards add up to 2000 coins / 20 gems / 200 xp / 2 boxes, no repeats of last week', () => {
+    const { g, adv, u } = mk();
+    const me = u(1);
+    const w1 = g.taskState(me);
+    expect(w1.tasks).toHaveLength(10);
+    expect(new Set(w1.tasks.map((t) => t.type)).size).toBe(6);
+    const sum = (k: string) => w1.tasks.filter((t) => t.reward.kind === k).reduce((s, t) => s + t.reward.amount, 0);
+    expect([sum('coins'), sum('gems'), sum('xp'), sum('box')]).toEqual([2000, 20, 200, 2]);
+    expect(w1.tasks.filter((t) => t.reward.kind === 'box').every((t) => t.reward.box === 'bronze' || t.reward.box === 'silver')).toBe(true);
+    const ids1 = (g as any).d.db.prepare('SELECT tpl FROM weekly_tasks WHERE week = ?').all(g.taskWeek()).map((r: any) => r.tpl);
+    adv(7);
+    const w2 = g.taskState(me);
+    expect(w2.week).toBe(w1.week + 1);
+    const ids2 = (g as any).d.db.prepare('SELECT tpl FROM weekly_tasks WHERE week = ?').all(g.taskWeek()).map((r: any) => r.tpl);
+    expect(ids2.filter((x: string) => ids1.includes(x))).toHaveLength(0);
+  });
+
+  it('progress, claiming (once only), streaks, coin spending, unclaimed rewards burn on a new week', () => {
+    const { g, adv, u } = mk();
+    const me = u(2);
+    const db = (g as any).d.db;
+    const setTasks = (rows: [string, number, any][]) => rows.forEach(([type, target, reward], slot) => db.prepare('UPDATE weekly_tasks SET type = ?, target = ?, reward = ?, tpl = ? WHERE week = ? AND slot = ?').run(type, target, JSON.stringify(reward), 'x', g.taskWeek(), slot));
+    g.taskState(me);
+    setTasks([['solo_win', 2, { kind: 'coins', amount: 100 }], ['online_win', 1, { kind: 'gems', amount: 5 }], ['open_box', 1, { kind: 'xp', amount: 30 }], ['upgrade_card', 1, { kind: 'box', amount: 1, box: 'silver' }], ['spend_coins', 40, { kind: 'coins', amount: 50 }], ['win_streak', 3, { kind: 'coins', amount: 10 }]]);
+    g.recordResult(me, true, 'solo', 0);
+    g.recordResult(me, false, 'solo');                                  // رشته قطع شد
+    g.recordResult(me, true, 'solo', 1);
+    g.recordResult(me, true, 'multi');
+    g.recordResult(me, true, 'multi');
+    const s = g.taskState(me).tasks;
+    expect(s[0]).toMatchObject({ progress: 2, claimed: false });        // ۲ برد سولو
+    expect(s[1].progress).toBe(1);                                      // هدف ۱ (کپ شده)
+    expect(s[5].progress).toBe(3);                                      // ۳ برد پشت‌هم (۱ + ۲ آنلاین بعد از باخت)
+    expect(g.chargeEntry(me, 10)).toBe(true);
+    expect(g.taskState(me).tasks[4].progress).toBe(10);
+    expect(() => g.claimTask(me, 4)).toThrow(/تمام نشده/);
+    const before = g.profile(me);
+    g.claimTask(me, 0);
+    expect(g.profile(me).coins).toBe(before.coins + 100);
+    expect(() => g.claimTask(me, 0)).toThrow(/قبلاً/);
+    expect(g.profile(me)).toMatchObject({ winStreak: 3, bestStreak: 3, wins: 4, losses: 1 });
+    // ادمین: تسکِ نگرفته عوض می‌شود (نوع جدید: پیشرفت صفر)، تسکِ گرفته‌شده برای این بازیکن ثابت می‌ماند
+    g.adminSaveTask(0, { type: 'open_box', target: 9, reward: { kind: 'gems', amount: 3 } });
+    g.adminSaveTask(1, { type: 'online_win', target: 5, reward: { kind: 'xp', amount: 10 } });
+    const t2 = g.taskState(me).tasks;
+    expect(t2[0]).toMatchObject({ type: 'solo_win', target: 2, claimed: true, reward: { kind: 'coins', amount: 100 } });
+    expect(t2[1]).toMatchObject({ target: 5, progress: 2 });            // همان نوع: پیشرفت می‌ماند
+    g.adminSaveTask(1, { type: 'solo_win', target: 5, reward: { kind: 'xp', amount: 10 } });
+    expect(g.taskState(me).tasks[1].progress).toBe(0);                  // نوع عوض شد: صفر
+    expect(() => g.adminSaveTask(1, { type: 'nope', target: 5, reward: { kind: 'xp', amount: 10 } })).toThrow();
+    expect(() => g.adminSaveTask(1, { type: 'solo_win', target: 0, reward: { kind: 'xp', amount: 10 } })).toThrow();
+    expect(() => g.adminSaveTask(11, { type: 'solo_win', target: 1, reward: { kind: 'xp', amount: 10 } })).toThrow();
+    // جعبه: ارتقا → تسک ۳
+    expect(g.taskState(me).tasks[3].progress).toBe(0);
+    // هفته‌ی بعد: همه صفر، قدیمی‌ها سوخته
+    adv(7);
+    const w = g.taskState(me);
+    expect(w.tasks.every((t) => t.progress === 0 && !t.claimed)).toBe(true);
+  });
+
+  it('opening boxes and a failing event never break the game; reroll swaps templates', () => {
+    const { g, u } = mk();
+    const me = u(3);
+    const db = (g as any).d.db;
+    expect(() => g.taskEvent(me, 'open_box', NaN)).not.toThrow();
+    g.taskState(me);
+    const before = g.adminTasks().tasks.map((t) => t.tpl);
+    g.adminRerollTasks(2);
+    const after = g.adminTasks().tasks.map((t) => t.tpl);
+    expect(after[2]).not.toBe(before[2]);
+    expect(after.filter((x, i) => i !== 2)).toEqual(before.filter((_, i) => i !== 2));
+    g.adminRerollTasks();
+    expect(g.adminTasks().tasks).toHaveLength(10);
+    // نمونه‌ی تکراری ممنوع
+    expect(new Set(g.adminTasks().tasks.map((t) => t.tpl)).size).toBe(10);
+    db.prepare('UPDATE users SET coins = 5000').run();
+    expect(() => g.upgradeCard(me, 'giv')).toThrow(GameError);          // کارت کافی نیست؛ ولی تسک‌ها سالم می‌مانند
+    expect(g.taskState(me).tasks).toHaveLength(10);
+  });
+});
+
+describe('weekly tasks variety', () => {
+  it('never more than 2 tasks of one type in a week (over many weeks)', () => {
+    let t = Date.UTC(2026, 9, 24, 12); let r = 0.11;
+    const g = new Game({ db: openDb(), cfg, now: () => t, rng: () => { r = (r * 7919 + 0.2113) % 1; return r; } });
+    const me = g.upsertUser({ tgId: 1, name: 'T', avatar: null });
+    for (let w = 0; w < 12; w++) {
+      const ts = g.taskState(me).tasks;
+      const by: Record<string, number> = {};
+      ts.forEach((x) => { by[x.type] = (by[x.type] ?? 0) + 1; });
+      expect(Math.max(...Object.values(by))).toBeLessThanOrEqual(2);
+      expect(ts).toHaveLength(10);
+      t += 7 * 86_400_000;
+    }
+  });
+});

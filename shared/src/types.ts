@@ -104,6 +104,8 @@ export interface GameConfig {
     drops: { solo: Record<BoxType, number>; multi: Record<BoxType, number> };
   };
   solo: { pits: SoloPit[] };
+  /** تسک‌های هفتگی: پایگاه نمونه‌ها (هر هفته ۱۰ تسک از بین این‌ها انتخاب می‌شود) */
+  weekly?: { pool: import('./tasks').TaskTpl[] };
   /** ظاهر: بنر بالای صفحه‌ی اصلی (آدرس عکس آپلودشده از پنل مدیریت) */
   ui?: { banner?: string; /** پس‌زمینه‌ی بازی (عکس آپلودشده) */ background?: string; /** متن پیام اول /start ربات */ welcome?: string; /** عکس «در حال بروزرسانی» (آپلودشده) */ maintenance?: string; /** روشن = همه‌ی بازیکن‌ها به‌جز ادمین‌ها این عکس را می‌بینند و نمی‌توانند بازی کنند */ maintenanceOn?: boolean };
 }
