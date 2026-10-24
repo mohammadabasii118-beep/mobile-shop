@@ -1611,6 +1611,7 @@ class BpIn(BaseModel):
     transport: str = Field(max_length=20)
     iran_host: str = Field(min_length=1, max_length=253)
     node_id: int
+    port: int | None = Field(default=None, ge=1024, le=65535)
     ports: str = Field(default="", max_length=4000)
     accept_udp: bool = False
     fallbacks: list[str] = Field(default=[], max_length=11)
@@ -1631,6 +1632,7 @@ class BpPatch(BaseModel):
     fec_parity: int | None = Field(default=None, ge=0, le=30)
     preset: str | None = Field(default=None, max_length=20)
     opts: dict | None = Field(default=None, max_length=40)
+    port: int | None = Field(default=None, ge=1024, le=65535)
     enabled: bool | None = None
 
 
@@ -1655,6 +1657,15 @@ def bp_opts(kind: str, transport: str, opts, preset: str) -> dict:
         return bpmod.clean_opts(kind, transport, opts, preset)
     except ValueError as e:
         raise HTTPException(422, str(e))
+
+
+def bp_port_taken(db: Session, kind: str, host: str, node_id: int, port: int, exclude: int | None) -> bool:
+    """Is `port` already the tunnel port of another tunnel on the server that listens for this one?"""
+    col = (BpTunnel.iran_host == host) if kind == "reverse" else (BpTunnel.node_id == node_id)
+    vcol = (Tunnel.iran_host == host) if kind == "reverse" else (Tunnel.node_id == node_id)
+    if db.scalar(select(BpTunnel.id).where(col, BpTunnel.port == port, BpTunnel.kind == kind, BpTunnel.id != (exclude or -1))):
+        return True
+    return bool(db.scalar(select(Tunnel.id).where(vcol, Tunnel.ctl_port == port)))
 
 
 def free_bp_port(db: Session, kind: str, host: str, node_id: int, taken: set, exclude: int | None = None) -> int:
@@ -1690,6 +1701,13 @@ def create_bp(body: BpIn, request: Request, db: Session = Depends(get_db)):
     bp_check(body.kind, body.transport, body.fallbacks, body.fec_data, body.fec_parity)
     opts = bp_opts(body.kind, body.transport, body.opts, body.preset)
     host, forwards = clean_host(body.iran_host), bp_forwards(body.kind, body.ports)
+    taken_listen = {f["listen"] for f in forwards}
+    if body.port is not None:
+        if body.port in taken_listen:
+            raise HTTPException(422, f"پورت {body.port} جزو پورت‌های فوروارد همین تونل است")
+        if bp_port_taken(db, body.kind, host, body.node_id, body.port, None):
+            raise HTTPException(409, f"پورت {body.port} را تونل دیگری روی همان سرور دارد")
+    port = body.port if body.port is not None else free_bp_port(db, body.kind, host, body.node_id, taken_listen)
     net_n = 0
     if body.kind == "direct":
         used = {t.net_n for t in db.scalars(select(BpTunnel).where(BpTunnel.kind == "direct"))}
@@ -1697,7 +1715,7 @@ def create_bp(body: BpIn, request: Request, db: Session = Depends(get_db)):
         if not net_n:
             raise HTTPException(409, "شبکه‌ی خصوصی آزاد برای تونل مستقیم نمانده")
     t = BpTunnel(name=body.name.strip(), kind=body.kind, transport=body.transport, iran_host=host, node_id=body.node_id, forwards=forwards,
-                 port=free_bp_port(db, body.kind, host, body.node_id, {f["listen"] for f in forwards}), token=bpmod.new_token(),
+                 port=port, token=bpmod.new_token(),
                  relay_token=secrets.token_urlsafe(24), accept_udp=body.accept_udp, fallbacks=body.fallbacks if body.kind == "reverse" else [],
                  fec_data=body.fec_data, fec_parity=body.fec_parity, net_n=net_n, opts=opts, preset=body.preset)
     db.add(t)
@@ -1724,6 +1742,12 @@ def patch_bp(bp_id: int, body: BpPatch, request: Request, db: Session = Depends(
             raise HTTPException(422, f"پورت {t.port} برای خود تونل رزرو است")
     if body.accept_udp is not None:
         t.accept_udp = body.accept_udp
+    if body.port is not None and body.port != t.port:
+        if body.port in {f["listen"] for f in t.forwards}:
+            raise HTTPException(422, f"پورت {body.port} جزو پورت‌های فوروارد همین تونل است")
+        if bp_port_taken(db, t.kind, t.iran_host, t.node_id, body.port, t.id):
+            raise HTTPException(409, f"پورت {body.port} را تونل دیگری روی همان سرور دارد")
+        t.port = body.port
     if body.enabled is not None:
         t.enabled = body.enabled
     t.transport, t.fallbacks, t.fec_data, t.fec_parity = transport, (fallbacks if t.kind == "reverse" else []), fd, fp

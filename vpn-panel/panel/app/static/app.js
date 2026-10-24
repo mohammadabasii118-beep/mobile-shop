@@ -465,6 +465,7 @@ function bpFields(t) {
     <label class="f">آدرس سرور ایران (IP یا دامنه)<input type="text" id="bpHost" dir="ltr" value="${esc(t ? t.iran_host : '')}" placeholder="1.2.3.4"></label>
     ${t ? '' : `<label class="f">لوکیشن خارج<select id="bpNode">${S.nodes.map(n => `<option value="${n.id}">${esc(n.name)}</option>`).join('')}</select></label>`}
     <label class="f">نوع حمل (transport)<select id="bpTr">${bpOptions(kind, t ? t.transport : (kind === 'direct' ? 'udp' : 'stealth'))}</select></label>
+    <label class="f">پورت تونل <span class="muted" style="font-weight:400">(${kind === 'reverse' ? 'روی سرور ایران' : 'روی سرور خارج'}؛ اگر گرفته/بسته بود عوضش کن)</span><input type="number" id="bpTunPort" dir="ltr" min="1024" max="65535" value="${t ? t.port : ''}" placeholder="خودکار"></label>
     <label class="f">پورت‌ها (روی ایران)<input type="text" id="bpPorts" dir="ltr" value="${esc(t ? t.ports : '')}" placeholder="80, 81=80, 443"></label>
     <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="bpUdp" ${t && t.accept_udp ? 'checked' : ''}> UDP هم روی همین پورت‌ها فوروارد شود</label>
     <div id="bpFbBox" ${kind !== 'reverse' ? 'hidden' : ''}><div class="muted" style="margin-bottom:4px">انواع جایگزین (اگر نوع اصلی فیلتر شد، خودکار روی بعدی می‌رود؛ اختیاری)</div>
@@ -474,7 +475,7 @@ function bpFields(t) {
     <div class="note" id="bpBest">${BP_BEST[kind]}</div>
     <label class="f">پریست عملکرد<select id="bpPreset"><option value="">بدون پریست</option>${S.bpMeta.presets.map(p => `<option value="${p.id}" ${t && t.preset === p.id ? 'selected' : ''}>${esc(p.label)} — ${esc(p.desc)}</option>`).join('')}</select></label>
     <details><summary style="cursor:pointer;margin:6px 0">تنظیمات پیشرفته</summary><div class="form" id="bpAdvBody">${bpOptFields(kind, t ? t.transport : (kind === 'direct' ? 'udp' : 'stealth'), t ? t.opts : {})}</div></details>
-    <div class="note">FEC فقط برای UDP+KCP و Direct لایه ۳ است (هر دو عدد را بده یا هر دو صفر). نوع‌های PCK و xDi به لینوکس و root نیاز دارند. پورت تونل خودکار انتخاب می‌شود.</div>`;
+    <div class="note">FEC فقط برای UDP+KCP و Direct لایه ۳ است (هر دو عدد را بده یا هر دو صفر). نوع‌های PCK و xDi به لینوکس و root نیاز دارند. پورت تونل اگر خالی بماند خودکار انتخاب می‌شود.</div>`;
 }
 function nodeForm() {
   openModal(`<h2>لوکیشن جدید</h2><div class="form">
@@ -681,7 +682,7 @@ document.addEventListener('click', async e => {
       openModal(`<h2>تونل BackPack جدید</h2>${bpFields(null)}<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="bpSave">ساخت</button></div>`);
     }
     else if (t.id === 'bpSave') {
-      const r = await api('POST', '/bp', {name: $('#bpName').value.trim(), kind: $('#bpKind').value, transport: $('#bpTr').value, iran_host: $('#bpHost').value.trim(), node_id: +$('#bpNode').value,
+      const r = await api('POST', '/bp', {name: $('#bpName').value.trim(), kind: $('#bpKind').value, transport: $('#bpTr').value, iran_host: $('#bpHost').value.trim(), node_id: +$('#bpNode').value, port: +$('#bpTunPort').value || null,
         ports: $('#bpPorts').value, accept_udp: $('#bpUdp').checked, fallbacks: [...document.querySelectorAll('.bpFb:checked')].map(x => x.value), fec_data: +$('#bpFd').value || 0, fec_parity: +$('#bpFp').value || 0, preset: $('#bpPreset').value, opts: bpOptRead()});
       await refresh();
       openModal(`<h2>تونل ساخته شد</h2><p class="muted" style="margin:0">روی <b>سرور ایران</b> (با دسترسی root) این دستور را اجرا کنید. بک‌پک روی هر دو سرور خودکار نصب و تنظیم می‌شود (سمت خارج خودش از پنل می‌گیرد):</p>
@@ -692,7 +693,7 @@ document.addEventListener('click', async e => {
       openModal(`<h2>ویرایش ${esc(x.name)}</h2>${bpFields(x)}<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="bpEdSave" data-id="${x.id}">ذخیره</button></div>`);
     }
     else if (t.id === 'bpEdSave') {
-      await api('PATCH', '/bp/' + d.id, {name: $('#bpName').value.trim(), iran_host: $('#bpHost').value.trim(), transport: $('#bpTr').value, ports: $('#bpPorts').value, accept_udp: $('#bpUdp').checked,
+      await api('PATCH', '/bp/' + d.id, {name: $('#bpName').value.trim(), iran_host: $('#bpHost').value.trim(), transport: $('#bpTr').value, port: +$('#bpTunPort').value || null, ports: $('#bpPorts').value, accept_udp: $('#bpUdp').checked,
         fallbacks: [...document.querySelectorAll('.bpFb:checked')].map(x => x.value), fec_data: +$('#bpFd').value || 0, fec_parity: +$('#bpFp').value || 0, preset: $('#bpPreset').value, opts: bpOptRead()});
       closeModal(); await refresh(); toast('ذخیره شد؛ ظرف حدود ۳۰ ثانیه روی هر دو سرور اعمال می‌شود');
     }

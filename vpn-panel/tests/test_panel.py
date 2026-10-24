@@ -1861,3 +1861,29 @@ def test_tunnel_control_port_can_be_changed_and_must_stay_unique():
         assert c.patch(f"/api/tunnels/{a['id']}", headers=h, json={"ctl_port": 80}).status_code == 422
         rh = {"Authorization": "Bearer " + a["install_command"].split("--token ")[1]}
         assert c.get("/api/relay/config", headers=rh).json()["tunnel"]["ctl_port"] == 8443
+
+
+def test_backpack_tunnel_port_can_be_set_and_edited_manually():
+    with TestClient(app) as c:
+        h = admin(c)
+        n1 = c.post("/api/nodes", headers=h, json={"name": "P1", "cc": "tr", "address": "p1.example.com"}).json()
+        n2 = c.post("/api/nodes", headers=h, json={"name": "P2", "cc": "fr", "address": "p2.example.com"}).json()
+        mk_ = lambda **kw: c.post("/api/bp", headers=h, json={"name": "b", "iran_host": "7.7.7.7", "ports": "80", **kw})
+        # a reverse tunnel with a hand-picked port, and a second on the same Iran server must not reuse it
+        a = mk_(node_id=n1["id"], transport="stealth", port=9500).json()
+        assert a["port"] == 9500
+        assert mk_(node_id=n2["id"], transport="stealth", port=9500).status_code == 409   # same iran_host listens for both reverse tunnels
+        assert mk_(node_id=n1["id"], transport="stealth", port=80).status_code == 422       # a forwarded port
+        # two DIRECT tunnels to different foreign servers may share a port (each listens on its own foreign server)
+        d1 = mk_(node_id=n1["id"], kind="direct", transport="udp", ports="", port=9100).json()
+        d2 = mk_(node_id=n2["id"], kind="direct", transport="udp", ports="", port=9100).json()
+        assert d1["port"] == 9100 and d2["port"] == 9100
+        # but two direct tunnels to the SAME foreign server may not
+        assert mk_(node_id=n1["id"], kind="direct", transport="quic", ports="", port=9100).status_code == 409
+        # editing the port, with the same uniqueness rule
+        assert c.patch(f"/api/bp/{a['id']}", headers=h, json={"port": 9600}).json()["port"] == 9600
+        b = mk_(node_id=n1["id"], transport="tcp", port=9700).json()
+        assert c.patch(f"/api/bp/{a['id']}", headers=h, json={"port": 9700}).status_code == 409
+        assert c.patch(f"/api/bp/{a['id']}", headers=h, json={"port": 9600}).status_code == 200   # unchanged is fine
+        for x in (a, b, d1, d2):
+            c.delete(f"/api/bp/{x['id']}", headers=h)
