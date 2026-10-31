@@ -204,6 +204,17 @@ def test_cloudflare_entries():
         # the direct entries still point at the node itself
         direct = next(r for r in rows if r["proto"] == "vless_ws" and "Cloudflare" not in r["label"])
         assert "@1.2.3.4:2083" in direct["link"]
+        # cf_only hides the direct config of CF-capable protocols, keeps the Cloudflare one, and leaves others (vless_tcp) alone
+        assert c.put(f"/api/nodes/{node['id']}/cloudflare", headers=h,
+                     json={"cf_domain": "cdn.example.com", "cf_address": "104.16.1.1", "cf_only": True}).json()["cf_only"] is True
+        rows = c.get(f"/api/users/{user['id']}/configs", headers=h).json()
+        ws = [r for r in rows if r["proto"] == "vless_ws"]
+        assert len(ws) == 1 and "Cloudflare" in ws[0]["label"]                       # only the CDN one survives
+        assert any(r["proto"] == "vless_tcp" and "Cloudflare" not in r["label"] for r in rows)   # non-CF protocol untouched
+        # clearing the domain also clears cf_only
+        c.put(f"/api/nodes/{node['id']}/cloudflare", headers=h, json={"cf_domain": "", "cf_only": True})
+        rows = c.get(f"/api/users/{user['id']}/configs", headers=h).json()
+        assert any(r["proto"] == "vless_ws" and "Cloudflare" not in r["label"] for r in rows) and not any("Cloudflare" in r["label"] for r in rows)
 
 
 def test_manual_and_random_ports():

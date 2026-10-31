@@ -37,6 +37,7 @@ class Node(Base):
     cf_domain: Mapped[str] = mapped_column(default="")
     cf_address: Mapped[str] = mapped_column(default="")
     raw_host: Mapped[str] = mapped_column(default="")  # address in plain-VLESS links (e.g. the old x-ui domain)
+    cf_only: Mapped[bool] = mapped_column(default=False)  # for CF-capable protocols, publish only the Cloudflare config (hide the direct one)
     errors: Mapped[list] = mapped_column(JSON, default=list)  # configs the agent rejected, from the agent
     wg_pub: Mapped[str] = mapped_column(default="")
     ovpn_ca: Mapped[str] = mapped_column(default="")

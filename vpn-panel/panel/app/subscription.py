@@ -235,10 +235,12 @@ def user_entries(user: User, nodes: list[Node], dnstt: dict | None = None, tunne
                     dnstt_done = True
                 continue
             if np.enabled and np.proto in user.protos:
-                e = build_entry(user, node, np.proto, np.port, conn_host=np.host, name=_entry_name(np))
-                if e:
-                    out.append(e)
-                if node.cf_domain and np.proto in CF_PROTOS and np.port in CF_PORTS:
+                cf_ok = bool(node.cf_domain) and np.proto in CF_PROTOS and np.port in CF_PORTS
+                if not (cf_ok and node.cf_only):   # cf_only hides the direct config of a CF-capable protocol
+                    e = build_entry(user, node, np.proto, np.port, conn_host=np.host, name=_entry_name(np))
+                    if e:
+                        out.append(e)
+                if cf_ok:
                     out.append(build_entry(user, node, np.proto, np.port, cdn=True, name=_entry_name(np)))
     out += tunnel_entries(user, nodes, tunnels or [])
     return out

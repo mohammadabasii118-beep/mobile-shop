@@ -321,7 +321,7 @@ def node_out(node: Node, request: Request) -> dict:
     url = public_url(request)
     return {
         "id": node.id, "name": node.name, "cc": node.cc, "address": node.address,
-        "reality_sni": node.reality_sni or REALITY_SNI, "cf_domain": node.cf_domain, "cf_address": node.cf_address, "raw_host": node.raw_host, "conflicts": node.conflicts or [], "errors": node.errors or [], "port_range": list(PORT_RANGE),
+        "reality_sni": node.reality_sni or REALITY_SNI, "cf_domain": node.cf_domain, "cf_address": node.cf_address, "raw_host": node.raw_host, "cf_only": node.cf_only, "conflicts": node.conflicts or [], "errors": node.errors or [], "port_range": list(PORT_RANGE),
         "online": is_online(node), "load": node.load, "reality_ready": bool(node.reality_pub),
         "last_seen": node.last_seen.isoformat() + "Z" if node.last_seen else None,
         "protocols": [{"id": p.id, "proto": p.proto, "enabled": p.enabled, "port": p.port, "host": p.host,
@@ -401,6 +401,7 @@ class NodeCdn(BaseModel):
     cf_domain: str = Field(default="", pattern=r"^([A-Za-z0-9\-]+\.)+[A-Za-z]{2,}$|^$")
     cf_address: str = Field(default="", pattern=r"^[A-Za-z0-9.\-]{0,253}$")
     raw_host: str = Field(default="", pattern=r"^[A-Za-z0-9.\-]{0,253}$")
+    cf_only: bool = False
 
 
 @app.put("/api/nodes/{node_id}/cloudflare", dependencies=[Depends(require_admin)])
@@ -408,6 +409,7 @@ def set_cloudflare(node_id: int, body: NodeCdn, request: Request, db: Session = 
     node = db.get(Node, node_id) or _404()
     node.cf_domain, node.cf_address = body.cf_domain.lower(), body.cf_address
     node.raw_host = body.raw_host
+    node.cf_only = body.cf_only and bool(node.cf_domain)
     db.commit()
     return node_out(node, request)
 
