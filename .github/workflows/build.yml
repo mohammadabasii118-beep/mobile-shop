@@ -77,3 +77,36 @@ jobs:
           name: MafiaGhab-Windows
           path: MafiaGhab-Windows.zip
           if-no-files-found: error
+
+  # ---------------------------------------------------------------- انتشار (Release)
+  # هر دو فایل را در یک Release با برچسب «latest» می‌گذارد تا لینک دانلودِ
+  # مستقیم و واضح داشته باشی (APK بدون zip اضافه؛ روی گوشی یک کلیک و نصب).
+  release:
+    name: Publish Release
+    needs: [android, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Prepare files
+        run: |
+          mkdir -p out
+          cp dist/MafiaGhab-Android-APK/app-release.apk out/MafiaGhab.apk
+          cp dist/MafiaGhab-Windows/MafiaGhab-Windows.zip out/MafiaGhab-Windows.zip
+          ls -la out
+
+      - name: Create/update "latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest -R "${{ github.repository }}" --yes --cleanup-tag || true
+          gh release create latest -R "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            -t "آخرین نسخه — استودیوی مافیای قاب" \
+            --notes "APK اندروید و نسخهٔ ویندوز (ffmpeg داخلش هست). با هر بار push این‌جا به‌روز می‌شود." \
+            out/MafiaGhab.apk out/MafiaGhab-Windows.zip
