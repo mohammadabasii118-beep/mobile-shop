@@ -98,5 +98,14 @@ void main() {
       'stream=index', '-of', 'csv=p=0', spec.outPath
     ]);
     expect(hasAudio.trim().isNotEmpty, true, reason: 'باید صدا داشته باشد');
+
+    // پیش‌نمایش تک‌کلیپ (مسیر ویرایشگر زیرنویس).
+    final prev = await builder.previewClip(spec, spec.titleClip);
+    expect(File(prev).existsSync(), true, reason: 'پیش‌نمایش باید ساخته شود');
+    final prevSize = await ffmpeg.probe([
+      '-v', 'error', '-select_streams', 'v', '-show_entries',
+      'stream=width,height', '-of', 'csv=p=0:s=x', prev
+    ]);
+    expect(prevSize.trim(), '1080x1920');
   }, timeout: const Timeout(Duration(minutes: 5)));
 }

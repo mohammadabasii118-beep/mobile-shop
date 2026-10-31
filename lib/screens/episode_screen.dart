@@ -9,9 +9,12 @@ import '../models/project.dart';
 import '../models/season.dart';
 import '../models/speakers.dart';
 import '../services/app_paths.dart';
+import '../services/build_service.dart';
 import '../services/export_service.dart';
 import '../theme.dart';
+import 'caption_screen.dart';
 import 'preview_screen.dart';
+import 'subtitle_editor_screen.dart';
 
 class EpisodeScreen extends StatefulWidget {
   final SeasonData season;
@@ -185,16 +188,13 @@ class _EpisodeScreenState extends State<EpisodeScreen> {
   List<int> get _missing =>
       [for (var i = 1; i <= ep.sceneCount; i++) if (!_project!.clips.containsKey(i)) i];
 
-  Future<void> _build() async {
-    final missing = _missing;
-    if (missing.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(
-            'ویدیوی این صحنه‌ها انتخاب نشده: ${missing.map(_fa).join('، ')}'),
-      ));
-      return;
-    }
-
+  /// یک کار طولانی را با دیالوگ پیشرفت اجرا می‌کند؛ خطا را نمایش می‌دهد.
+  Future<T?> _withProgress<T>(
+    String title,
+    Future<T> Function(
+            ValueNotifier<double> progress, ValueNotifier<String> step)
+        task,
+  ) async {
     final progress = ValueNotifier<double>(0);
     final step = ValueNotifier<String>('آماده‌سازی...');
     showDialog<void>(
@@ -204,7 +204,7 @@ class _EpisodeScreenState extends State<EpisodeScreen> {
         canPop: false,
         child: AlertDialog(
           backgroundColor: kSurface,
-          title: const Text('در حال ساخت قسمت'),
+          title: Text(title),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -233,67 +233,10 @@ class _EpisodeScreenState extends State<EpisodeScreen> {
         ),
       ),
     );
-
-    String? outPath;
     try {
-      final work = await AppPaths.workDir(season.season, ep.number);
-      final outDir = await AppPaths.outputDir();
-      outPath = p.join(outDir.path,
-          'mafia-ghab-ep${ep.number.toString().padLeft(2, '0')}.mp4');
-
-      // آماده‌سازی فایل‌ها (اعمال برش دلخواه).
-      final files = <int, String>{};
-      for (final e in _project!.clips.entries) {
-        final a = e.value;
-        if (a.hasTrim) {
-          step.value = 'برش صحنه ${_fa(e.key)}...';
-          final dst = p.join(work.path, 'trim_${e.key}.mp4');
-          files[e.key] =
-              await services.builder.trimClip(a.path, dst, a.trimStart, a.trimEnd);
-        } else {
-          files[e.key] = a.path;
-        }
-      }
-
-      // قسمت قبل: کلیپ‌های قسمت قبلی (در صورت وجود پروژه‌ی آن).
-      final prevNum = ep.number - 1;
-      final prevEp = season.episodes[prevNum];
-      var prevFiles = <int, String>{};
-      if (prevEp != null) {
-        final prevProj =
-            await services.projects.load(season.season, prevNum);
-        if (prevProj != null) {
-          prevFiles = services.projects.filesFor(prevProj);
-        }
-      }
-
-      step.value = 'زمان‌بندی زیرنویس‌ها...';
-      final spec = await services.builder.prepareSpec(
-        ep: ep,
-        files: files,
-        prevEp: prevEp,
-        prevFiles: prevFiles,
-        workDir: work.path,
-        outPath: outPath,
-        onProgress: (f, s) => step.value = s,
-      );
-
-      // اعمال زیرنویس‌های ویرایش‌شده (در صورت وجود).
-      if (_project!.editedSubs != null) {
-        _project!.editedSubs!.forEach((k, v) => spec.subs[k] = v);
-      }
-
-      await services.builder.runBuild(
-        spec,
-        fast720: _project!.fast720,
-        onProgress: (f, s) {
-          progress.value = f;
-          step.value = s;
-        },
-      );
-
-      _project!.lastOutputPath = outPath;
-      await _save();
+      final r = await task(progress, step);
+      if (mounted) Navigator.of(context).pop();
+      return r;
     } catch (e) {
       if (mounted) Navigator.of(context).pop();
       if (mounted) {
@@ -301,21 +244,140 @@ class _EpisodeScreenState extends State<EpisodeScreen> {
           context: context,
           builder: (_) => AlertDialog(
             backgroundColor: kSurface,
-            title: const Text('خطا در ساخت'),
+            title: const Text('خطا'),
             content: SingleChildScrollView(child: Text('$e')),
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('باشه'))
+                  child: const Text('باشه')),
             ],
           ),
         );
       }
-      return;
+      return null;
+    }
+  }
+
+  bool _checkReady() {
+    final missing = _missing;
+    if (missing.isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+            'ویدیوی این صحنه‌ها انتخاب نشده: ${missing.map(_fa).join('، ')}'),
+      ));
+      return false;
+    }
+    return true;
+  }
+
+  /// آماده‌سازی spec: برش دلخواه، قسمت قبل و زمان‌بندی خودکار زیرنویس.
+  Future<BuildSpec> _prepareSpec(void Function(String) step) async {
+    final work = await AppPaths.workDir(season.season, ep.number);
+    final outDir = await AppPaths.outputDir();
+    final outPath = p.join(outDir.path,
+        'mafia-ghab-ep${ep.number.toString().padLeft(2, '0')}.mp4');
+
+    final files = <int, String>{};
+    for (final e in _project!.clips.entries) {
+      final a = e.value;
+      if (a.hasTrim) {
+        step('برش صحنه ${_fa(e.key)}...');
+        final dst = p.join(work.path, 'trim_${e.key}.mp4');
+        files[e.key] = await services.builder
+            .trimClip(a.path, dst, a.trimStart, a.trimEnd);
+      } else {
+        files[e.key] = a.path;
+      }
     }
 
-    if (mounted) Navigator.of(context).pop(); // بستن دیالوگ پیشرفت
-    if (mounted) _showExportSheet(outPath);
+    final prevNum = ep.number - 1;
+    final prevEp = season.episodes[prevNum];
+    var prevFiles = <int, String>{};
+    if (prevEp != null) {
+      final prevProj = await services.projects.load(season.season, prevNum);
+      if (prevProj != null) prevFiles = services.projects.filesFor(prevProj);
+    }
+
+    step('زمان‌بندی زیرنویس‌ها...');
+    final spec = await services.builder.prepareSpec(
+      ep: ep,
+      files: files,
+      prevEp: prevEp,
+      prevFiles: prevFiles,
+      workDir: work.path,
+      outPath: outPath,
+      onProgress: (f, s) => step(s),
+    );
+    if (_project!.editedSubs != null) {
+      _project!.editedSubs!
+          .forEach((k, v) => spec.subs[k] = [for (final l in v) l.copy()]);
+    }
+    return spec;
+  }
+
+  /// ساخت مستقیم (بدون ویرایش زیرنویس).
+  Future<void> _buildAuto() async {
+    if (!_checkReady()) return;
+    final spec =
+        await _withProgress<BuildSpec>('ساخت قسمت', (progress, step) async {
+      final sp = await _prepareSpec((m) => step.value = m);
+      await services.builder.runBuild(sp,
+          fast720: _project!.fast720,
+          onProgress: (f, s) {
+        progress.value = f;
+        step.value = s;
+      });
+      return sp;
+    });
+    if (spec != null) {
+      _project!.lastOutputPath = spec.outPath;
+      await _save();
+      if (mounted) _showExportSheet(spec.outPath);
+    }
+  }
+
+  /// آماده‌سازی + ویرایشگر زیرنویس، سپس ساخت نهایی در صورت تأیید.
+  Future<void> _editSubsThenBuild() async {
+    if (!_checkReady()) return;
+    final spec = await _withProgress<BuildSpec>('آماده‌سازی و زمان‌بندی',
+        (progress, step) async => _prepareSpec((m) => step.value = m));
+    if (spec == null || !mounted) return;
+
+    final doBuild = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => SubtitleEditorScreen(spec: spec)),
+    );
+
+    _project!.editedSubs = {
+      for (final e in spec.subs.entries)
+        e.key: [for (final l in e.value) l.copy()]
+    };
+    await _save();
+
+    if (doBuild == true) {
+      final ok = await _withProgress<bool>('ساخت نهایی', (progress, step) async {
+        await services.builder.runBuild(spec,
+            fast720: _project!.fast720,
+            onProgress: (f, s) {
+          progress.value = f;
+          step.value = s;
+        });
+        return true;
+      });
+      if (ok == true) {
+        _project!.lastOutputPath = spec.outPath;
+        await _save();
+        if (mounted) _showExportSheet(spec.outPath);
+      }
+    }
+  }
+
+  void _openCaption() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+          builder: (_) => CaptionScreen(season: season, episode: ep)),
+    );
   }
 
   void _showExportSheet(String outPath) {
@@ -397,6 +459,11 @@ class _EpisodeScreenState extends State<EpisodeScreen> {
         title: Text('قسمت ${_fa(ep.number)}: ${ep.title}'),
         actions: [
           IconButton(
+            tooltip: 'کپشن و هشتگ',
+            icon: const Icon(Icons.tag),
+            onPressed: _openCaption,
+          ),
+          IconButton(
             tooltip: 'انتخاب گروهی ویدیوها',
             icon: const Icon(Icons.library_add_outlined),
             onPressed: _pickAll,
@@ -449,7 +516,8 @@ class _EpisodeScreenState extends State<EpisodeScreen> {
       bottomSheet: _BuildBar(
         assigned: assigned,
         total: ep.sceneCount,
-        onBuild: _build,
+        onBuild: _buildAuto,
+        onEditSubs: _editSubsThenBuild,
       ),
     );
   }
@@ -665,8 +733,12 @@ class _BuildBar extends StatelessWidget {
   final int assigned;
   final int total;
   final VoidCallback onBuild;
+  final VoidCallback onEditSubs;
   const _BuildBar(
-      {required this.assigned, required this.total, required this.onBuild});
+      {required this.assigned,
+      required this.total,
+      required this.onBuild,
+      required this.onEditSubs});
 
   @override
   Widget build(BuildContext context) {
@@ -680,10 +752,24 @@ class _BuildBar extends StatelessWidget {
           Text('${_fa(assigned)} از ${_fa(total)} صحنه آماده',
               style: TextStyle(color: ready ? kGold : Colors.white70)),
           const SizedBox(height: 8),
-          ElevatedButton.icon(
-            icon: const Icon(Icons.movie_creation_outlined),
-            label: const Text('ساخت قسمت'),
-            onPressed: onBuild,
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.subtitles_outlined),
+                  label: const Text('زیرنویس و پیش‌نمایش'),
+                  onPressed: onEditSubs,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.movie_creation_outlined),
+                  label: const Text('ساخت قسمت'),
+                  onPressed: onBuild,
+                ),
+              ),
+            ],
           ),
         ],
       ),

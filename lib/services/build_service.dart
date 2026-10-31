@@ -330,30 +330,8 @@ class EpisodeBuilder {
     void prog(String step) =>
         onProgress?.call(doneW / totalW, step);
 
-    // --- رندر اورلی‌ها (مثل add() در editor.py)
+    // --- کارت پایانی را از قبل رندر کن.
     prog('ساخت زیرنویس‌ها و تیترها...');
-    final ov = <int, List<_Ov>>{};
-    Future<void> add(int ci, double s, double e, Uint8List png) async {
-      final idx = ov[ci]?.length ?? 0;
-      final path = p.join(work, 'ov_${ci}_$idx.png');
-      await File(path).writeAsBytes(png);
-      (ov[ci] ??= []).add(_Ov(s, e, path));
-    }
-
-    if (spec.hook != null && spec.hook!.isNotEmpty) {
-      await add(1, 0, 3.0, await Overlays.hook(spec.hook!));
-    }
-    await add(spec.titleClip, 0, 2.6, await Overlays.title(spec.ep, spec.title));
-    for (final entry in spec.labels.entries) {
-      final l = entry.value;
-      await add(entry.key, l.s, l.e, await Overlays.label(l.a, l.b));
-    }
-    for (final entry in spec.subs.entries) {
-      for (final line in entry.value) {
-        await add(entry.key, line.start, line.end,
-            await Overlays.subtitle(line.text));
-      }
-    }
     final endPng = p.join(work, 'end.png');
     await File(endPng)
         .writeAsBytes(await Overlays.endCard(spec.endLines[0], spec.endLines[1]));
@@ -363,35 +341,10 @@ class EpisodeBuilder {
     // --- پردازش هر کلیپ با فیلترهای editor.py
     final segs = <String>[];
     for (var i = 1; i <= nClips; i++) {
-      final clip = spec.clips[i - 1];
       prog('کلیپ $i از $nClips');
-      final lst = ov[i] ?? const <_Ov>[];
-      final args = <String>['-v', 'error', '-y', '-i', clip];
-      for (final o in lst) {
-        args.addAll(['-i', o.png]);
-      }
-      final aud = await _hasAudio(clip);
-      if (!aud) {
-        args.addAll(['-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo']);
-      }
-      var fc =
-          '[0:v]crop=iw/1.04:ih/1.04,scale=1080:1920:flags=lanczos,unsharp=5:5:0.6,eq=contrast=1.06:saturation=1.08:brightness=0.01,fps=30,setsar=1[v0]';
-      var last = 'v0';
-      for (var k = 0; k < lst.length; k++) {
-        final o = lst[k];
-        fc +=
-            ";[$last][${k + 1}:v]overlay=0:0:enable='between(t,${_num(o.s)},${_num(o.e)})'[v${k + 1}]";
-        last = 'v${k + 1}';
-      }
-      fc += ';[$last]format=yuv420p[vo]';
-      final ain = aud ? '0:a' : '${lst.length + 1}:a';
-      fc += ';[$ain]aresample=44100,aformat=channel_layouts=stereo[ao]';
+      final lst = await _renderClipOverlays(spec, i, work);
       final o = p.join(work, 'seg${_two(i)}.mp4');
-      await ffmpeg.run([
-        ...args, '-filter_complex', fc, '-map', '[vo]', '-map', '[ao]',
-        '-c:v', 'libx264', '-crf', '20', '-c:a', 'aac', '-b:a', '192k',
-        '-ar', '44100', '-shortest', o
-      ]);
+      await _encodeSegment(spec.clips[i - 1], lst, o);
       segs.add(o);
       doneW += 2;
       prog('کلیپ $i از $nClips آماده شد');
@@ -468,6 +421,75 @@ class EpisodeBuilder {
     ], onStderr: onErr);
     doneW += 4;
     onProgress?.call(1.0, 'تمام شد!');
+  }
+
+  /// اورلی‌های یک کلیپ را رندر و روی دیسک می‌نویسد؛ ترتیب دقیقاً مثل editor.py:
+  /// شروع تند (فقط کلیپ ۱) ← تیتر (فقط کلیپ تیتر) ← برچسب ← زیرنویس‌ها.
+  Future<List<_Ov>> _renderClipOverlays(
+      BuildSpec spec, int ci, String work) async {
+    final lst = <_Ov>[];
+    Future<void> add(double s, double e, Uint8List png) async {
+      final path = p.join(work, 'ov_${ci}_${lst.length}.png');
+      await File(path).writeAsBytes(png);
+      lst.add(_Ov(s, e, path));
+    }
+
+    if (ci == 1 && spec.hook != null && spec.hook!.isNotEmpty) {
+      await add(0, 3.0, await Overlays.hook(spec.hook!));
+    }
+    if (ci == spec.titleClip) {
+      await add(0, 2.6, await Overlays.title(spec.ep, spec.title));
+    }
+    final label = spec.labels[ci];
+    if (label != null) {
+      await add(label.s, label.e, await Overlays.label(label.a, label.b));
+    }
+    final subs = spec.subs[ci];
+    if (subs != null) {
+      for (final line in subs) {
+        await add(line.start, line.end, await Overlays.subtitle(line.text));
+      }
+    }
+    return lst;
+  }
+
+  /// یک کلیپ را با اورلی‌هایش پردازش می‌کند (فیلترهای عیناً editor.py).
+  Future<void> _encodeSegment(String clip, List<_Ov> lst, String out) async {
+    final args = <String>['-v', 'error', '-y', '-i', clip];
+    for (final o in lst) {
+      args.addAll(['-i', o.png]);
+    }
+    final aud = await _hasAudio(clip);
+    if (!aud) {
+      args.addAll(['-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=stereo']);
+    }
+    var fc =
+        '[0:v]crop=iw/1.04:ih/1.04,scale=1080:1920:flags=lanczos,unsharp=5:5:0.6,eq=contrast=1.06:saturation=1.08:brightness=0.01,fps=30,setsar=1[v0]';
+    var last = 'v0';
+    for (var k = 0; k < lst.length; k++) {
+      final o = lst[k];
+      fc +=
+          ";[$last][${k + 1}:v]overlay=0:0:enable='between(t,${_num(o.s)},${_num(o.e)})'[v${k + 1}]";
+      last = 'v${k + 1}';
+    }
+    fc += ';[$last]format=yuv420p[vo]';
+    final ain = aud ? '0:a' : '${lst.length + 1}:a';
+    fc += ';[$ain]aresample=44100,aformat=channel_layouts=stereo[ao]';
+    await ffmpeg.run([
+      ...args, '-filter_complex', fc, '-map', '[vo]', '-map', '[ao]',
+      '-c:v', 'libx264', '-crf', '20', '-c:a', 'aac', '-b:a', '192k',
+      '-ar', '44100', '-shortest', out
+    ]);
+  }
+
+  /// پیش‌نمایش یک کلیپ با اورلی‌هایش (برای ویرایشگر زیرنویس، بدون xfade/نرمال‌سازی).
+  Future<String> previewClip(BuildSpec spec, int clipIndex) async {
+    final work = p.join(spec.workDir, 'preview');
+    Directory(work).createSync(recursive: true);
+    final lst = await _renderClipOverlays(spec, clipIndex, work);
+    final out = p.join(work, 'preview_$clipIndex.mp4');
+    await _encodeSegment(spec.clips[clipIndex - 1], lst, out);
+    return out;
   }
 
   // ---------------------------------------------------------------- کمک‌ها
