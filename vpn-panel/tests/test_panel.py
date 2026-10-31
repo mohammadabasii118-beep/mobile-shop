@@ -1898,3 +1898,10 @@ def test_backpack_tunnel_port_can_be_set_and_edited_manually():
         assert c.patch(f"/api/bp/{a['id']}", headers=h, json={"port": 9600}).status_code == 200   # unchanged is fine
         for x in (a, b, d1, d2):
             c.delete(f"/api/bp/{x['id']}", headers=h)
+
+
+def test_cf_scan_script_is_served_publicly():
+    with TestClient(app) as c:
+        r = c.get("/cf-scan.py")
+        assert r.status_code == 200 and "Cloudflare" in r.text and "def main" in r.text and "cf_address" in r.text
+        assert "import" in r.text and "token" not in r.text.lower().split("def main")[0][:200]   # no secret/token leaked in the header

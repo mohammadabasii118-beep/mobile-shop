@@ -1898,6 +1898,12 @@ def vtunnel_script():
     return PlainTextResponse((ROOT / "agent" / "vtunnel.py").read_text())
 
 
+@app.get("/cf-scan.py")
+def cf_scan_script():
+    """The clean-Cloudflare-IP scanner (public, no secrets): run it on a server near your users to find a fast edge IP."""
+    return PlainTextResponse((ROOT / "agent" / "cf_scan.py").read_text())
+
+
 @app.get("/node-install.sh")
 def node_install(request: Request):
     script = (ROOT / "agent" / "install.sh").read_text().replace("__PANEL_URL__", public_url(request))

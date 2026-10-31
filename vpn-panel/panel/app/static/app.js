@@ -517,6 +517,7 @@ function cfDialog(n) {
     <div class="form">
       <label class="f">دامنه (پروکسی‌شده در کلادفلر، ابر نارنجی)<input type="text" id="cfDomain" value="${esc(n.cf_domain)}" placeholder="cdn.example.com" dir="ltr"></label>
       <label class="f">آی‌پی تمیز (اختیاری)<input type="text" id="cfAddr" value="${esc(n.cf_address)}" placeholder="104.16.x.x" dir="ltr"></label></div>
+    <div class="note">برای پیدا کردن آی‌پی تمیز سریع، این را روی <b>سرور ایران</b> اجرا کن (نتیجه را در فیلد بالا بگذار):<br><span class="mono" dir="ltr" style="unicode-bidi:isolate">curl -fsSL ${esc(location.origin)}/cf-scan.py | python3 - --port 2083 --top 10</span></div>
     <label class="f">آدرس VLESS ساده (بدون TLS)؛ مثلاً دامنه‌ی قبلی x-ui<input type="text" id="rawHost" value="${esc(n.raw_host)}" placeholder="tunnel.example.com" dir="ltr"></label>
     <label class="chk" style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" id="cfOnly" ${n.cf_only ? 'checked' : ''}> فقط کانفیگ Cloudflare به کاربر داده شود (نسخهٔ مستقیم که IP را لو می‌دهد مخفی شود)</label>
     <div class="note">در کلادفلر: رکورد A دامنه را به آی‌پی ${esc(n.address)} با ابر نارنجی بسازید، SSL/TLS را روی <b>Full</b> بگذارید (نه Strict)، و برای gRPC گزینه‌ی gRPC را در Network روشن کنید. فقط پورت‌های 443، 2053، 2083، 2087، 2096 و 8443 از کلادفلر رد می‌شوند.</div>
