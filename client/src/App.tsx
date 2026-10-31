@@ -36,6 +36,9 @@ export function App() {
   const [invited, setInvited] = useState<{ from: number; name: string } | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const sock = useRef(new Socket()).current;
+  const reconnecting = useRef(false);
+  const battleRef = useRef<BattleInit | null>(null);
+  battleRef.current = battle;
   const timer = useRef<number>();
 
   // آهنگ نبرد فقط وقتی داخل دوئل (سولو یا آنلاین) هستیم
@@ -74,7 +77,23 @@ export function App() {
       }
     })();
     return sock.on((m) => {
-      if (m.t === 'closed') return setErr(m.code === 4001 ? 'این حساب هم‌زمان جای دیگری (پنجره یا دستگاه دیگر) باز شد و این نشست بسته شد.' : 'ارتباط با سرور قطع شد. صفحه را دوباره باز کن.');
+      if (m.t === 'closed') {
+        if (m.code === 4001) return setErr('این حساب هم‌زمان جای دیگری (پنجره یا دستگاه دیگر) باز شد و این نشست بسته شد.');
+        // قطعی کوتاه اینترنت: خودکار چند بار دوباره وصل می‌شود (وسط مبارزه، سرور همان لحظه بازنده حساب کرده است)
+        if (reconnecting.current) return;
+        reconnecting.current = true;
+        if (battleRef.current) { setBattle(null); setResult(null); toast('ارتباط قطع شد و مبارزه را باختی'); }
+        setQueued(false);
+        void (async () => {
+          for (let i = 1; i <= 6; i++) {
+            await new Promise((r) => setTimeout(r, i * 1000));
+            try { await sock.connect(); toast('دوباره وصل شدی ✅'); reconnecting.current = false; return; } catch { /* دوباره تلاش */ }
+          }
+          reconnecting.current = false;
+          setErr('ارتباط با سرور قطع شد. اینترنتت را چک کن و دوباره بزن.');
+        })();
+        return;
+      }
       if (m.t === 'ready' || m.t === 'profile') setProfile(m.profile);
       if (m.t === 'queued') setQueued(true);
       if (m.t === 'error') { setQueued(false); toast(m.message); }
