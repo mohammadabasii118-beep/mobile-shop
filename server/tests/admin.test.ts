@@ -380,3 +380,16 @@ describe('weekly tasks (HTTP)', () => {
     expect(me).toMatchObject({ winStreak: 0, bestStreak: 0, boxesOpened: 0 });
   });
 });
+
+describe('reset all (HTTP)', () => {
+  it('admin-only, needs the exact confirmation token', async () => {
+    expect((await call(80, '/api/admin/reset-all', { confirm: 'RESET-ALL' })).status).toBe(403);
+    expect((await call(42, '/api/admin/reset-all', {})).status).toBe(400);
+    expect((await call(42, '/api/admin/reset-all', { confirm: 'yes' })).status).toBe(400);
+    await call(81, '/api/me');
+    const ok = await call(42, '/api/admin/reset-all', { confirm: 'RESET-ALL' });
+    expect(ok.status).toBe(200);
+    expect(((await ok.json()) as any).users).toBeGreaterThan(0);
+    expect(((await (await call(81, '/api/me')).json()) as any).profile).toMatchObject({ coins: 100, gems: 50, level: 1 });
+  });
+});

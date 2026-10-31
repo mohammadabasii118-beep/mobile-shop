@@ -401,6 +401,13 @@ export function createGameServer(opt: ServerOptions) {
         removeSlot(kind); commitConfig(next);
         return json(res, 200, cfg);
       }
+      case '/api/admin/reset-all': {
+        const b = await readBody(req);
+        if (b.confirm !== 'RESET-ALL') throw new GameError('تأیید ریست نامعتبر است');
+        const r = game.adminResetAll({ friends: !!b.friends, referrals: !!b.referrals }, join(opt.dataDir ?? '.', 'backups'));
+        console.log(`[admin] ریست کامل انجام شد؛ ${r.users} بازیکن؛ نسخه‌ی قبل: ${r.backup}`);
+        return json(res, 200, { ok: true, users: r.users });
+      }
       case '/api/admin/tasks': return json(res, 200, game.adminTasks());
       case '/api/admin/tasks/save': { const b = await readBody(req); game.adminSaveTask(b.slot, b); return json(res, 200, game.adminTasks()); }
       case '/api/admin/tasks/reroll': { const b = await readBody(req); game.adminRerollTasks(b.slot); return json(res, 200, game.adminTasks()); }

@@ -1,4 +1,6 @@
 import { REWARD_KINDS, TASK_TYPES, type RewardKind, type TaskReward, type TaskState, type TaskTpl, type TaskType, type TaskView, boxSpeedupCost, type FriendBase, resolveCard, type BattleReward, type BoxContents, type BoxSource, type BoxType, type BoxView, type CardView, type GameConfig, type Profile, type Rarity, type UnitInit } from '@game/shared';
+import { mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Db } from './db';
 import type { TgUser } from './auth';
 
@@ -803,6 +805,34 @@ export class Game {
     let boxGiven: boolean | null = null;
     if (r.box) boxGiven = this.grantBox(userId, r.box, 'multi').box !== null;
     return { rewards: r, boxGiven };
+  }
+
+  /**
+   * ریست کامل: همه‌ی بازیکن‌ها به حالت اول برمی‌گردند (سکه ۱۰۰، الماس ۵۰، لول ۱، کارت‌های شروع، بدون جعبه/کاپ/برد/باخت/تسک/سولو).
+   * هویت (اسم، عکس، شناسه‌ی تلگرام، مسدودی، عضویت کانال) و سفارش‌های پرداخت می‌مانند.
+   * friends / referrals: اگر true باشد دوستی‌ها و زیرمجموعه‌ها هم پاک می‌شوند. قبلش یک نسخه‌ی دیتابیس در data/backups ذخیره می‌شود.
+   */
+  adminResetAll(o: { friends?: boolean; referrals?: boolean }, backupDir?: string): { users: number; backup: string | null } {
+    const { db, cfg } = this.d;
+    let backup: string | null = null;
+    if (backupDir) {
+      mkdirSync(backupDir, { recursive: true });
+      backup = join(backupDir, `before-reset-${new Date(this.d.now()).toISOString().replace(/[:.]/g, '-')}.db`);
+      db.exec(`VACUUM INTO '${backup.replace(/'/g, "''")}'`);
+    }
+    const ids = (db.prepare('SELECT id FROM users').all() as { id: number }[]).map((r) => r.id);
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.exec('UPDATE users SET level = 1, xp = 0, coins = 100, gems = 50, trophies = 0, wins = 0, losses = 0, solo_stage = 0, win_streak = 0, best_streak = 0, boxes_opened = 0, ref_bonus = 0');
+      db.exec('DELETE FROM user_cards; DELETE FROM deck; DELETE FROM boxes; DELETE FROM task_progress; DELETE FROM shop_buys; DELETE FROM redeem_uses; UPDATE redeem_codes SET used = 0');
+      const addCard = db.prepare('INSERT INTO user_cards (user_id, card_id) VALUES (?,?)');
+      const addDeck = db.prepare('INSERT INTO deck (user_id, slot, card_id) VALUES (?,?,?)');
+      for (const id of ids) cfg.startingDeck.forEach((c, slot) => { addCard.run(id, c); addDeck.run(id, slot, c); });
+      if (o.friends) db.exec('DELETE FROM friends');
+      if (o.referrals) db.exec('DELETE FROM referred; DELETE FROM referrals');
+      db.exec('COMMIT');
+    } catch (e) { db.exec('ROLLBACK'); throw e; }
+    return { users: ids.length, backup };
   }
 
   /** پروفایل کامل یک بازیکن برای پنل مدیریت */

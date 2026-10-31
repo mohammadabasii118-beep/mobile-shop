@@ -544,3 +544,40 @@ describe('weekly tasks variety', () => {
     }
   });
 });
+
+describe('admin reset all', () => {
+  it('returns every player to the starting state, keeps identity, saves a backup, and can also clear friends/referrals', async () => {
+    const { mkdtempSync, existsSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = mkdtempSync(join(tmpdir(), 'rst-'));
+    const g = new Game({ db: openDb(), cfg, now: () => Date.UTC(2026, 9, 24, 12), rng: () => 0.5 });
+    const a = g.upsertUser({ tgId: 1, name: 'A', avatar: null }), b = g.upsertUser({ tgId: 2, name: 'B', avatar: null });
+    const db = (g as any).d.db;
+    db.prepare('UPDATE users SET coins = 9999, gems = 777, xp = 50, level = 4, trophies = 30, wins = 9, losses = 3, solo_stage = 12, win_streak = 4, best_streak = 6, boxes_opened = 5, channel_ok = 1').run();
+    db.prepare("INSERT INTO user_cards (user_id, card_id, level, copies) VALUES (?, 'sohrab', 3, 5)").run(a);
+    g.grantBox(a, 'gold');
+    g.addFriend(a, b); g.acceptFriend(b, a);
+    g.refStart(9, a); const c = g.upsertUser({ tgId: 9, name: 'C', avatar: null }); g.setChannelOk(c);
+    g.adminSaveCode('XCODE1', { coins: 5 }, 0); g.redeemCode(a, 'XCODE1');
+    g.taskState(a); g.taskEvent(a, 'open_box', 1);
+    const r = g.adminResetAll({}, dir);
+    expect(r.users).toBe(3);
+    expect(r.backup && existsSync(r.backup)).toBe(true);
+    const p = g.profile(a);
+    expect(p).toMatchObject({ coins: 100, gems: 50, level: 1, xp: 0, trophies: 0, wins: 0, losses: 0, soloStage: 0, winStreak: 0, bestStreak: 0, boxesOpened: 0, name: 'A' });
+    expect(p.cards.map((x) => x.id).sort()).toEqual([...cfg.startingDeck].sort());
+    expect(p.cards.every((x) => x.level === 1 && x.copies === 0)).toBe(true);
+    expect(p.deck).toEqual(cfg.startingDeck);
+    expect(p.boxes).toHaveLength(0);
+    expect(p.channelOk).toBe(true);                                       // هویت و عضویت کانال می‌ماند
+    expect(g.taskState(a).tasks.every((t) => t.progress === 0)).toBe(true);
+    expect(g.adminCodes()[0].used).toBe(0);
+    expect(g.redeemCode(a, 'XCODE1').rewards.coins).toBe(5);                  // کد دوباره قابل استفاده است
+    expect(g.areFriends(a, b)).toBe(true);                                // پیش‌فرض: دوستی و زیرمجموعه می‌ماند
+    expect(g.refCount(a)).toBe(1);
+    g.adminResetAll({ friends: true, referrals: true });
+    expect(g.areFriends(a, b)).toBe(false);
+    expect(g.refCount(a)).toBe(0);
+  });
+});

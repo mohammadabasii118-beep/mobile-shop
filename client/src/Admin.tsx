@@ -65,7 +65,7 @@ export function Admin({ ctx, onExit }: { ctx: Ctx; onExit: () => void }) {
       {tab === 'codes' && <CodesTab cfg={cfg} run={run} />}
       {tab === 'chat' && <ChatTab cfg={cfg} refresh={refresh} run={run} />}
       {tab === 'look' && <LookTab cfg={cfg} refresh={refresh} run={run} />}
-      {tab === 'players' && <PlayersTab cfg={cfg} run={run} />}
+      {tab === 'players' && <><PlayersTab cfg={cfg} run={run} /><ResetAll run={run} /></>}
       {tab === 'json' && <JsonTab cfg={cfg} refresh={refresh} run={run} />}
     </div>
   );
@@ -725,6 +725,36 @@ function CodesTab({ cfg, run }: { cfg: GameConfig; run: Run }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+/** منطقه‌ی خطر: ریست کامل همه‌ی بازیکن‌ها به حالت اول (با تأیید تایپی) */
+function ResetAll({ run }: { run: Run }) {
+  const [open, setOpen] = useState(false);
+  const [word, setWord] = useState('');
+  const [friends, setFriends] = useState(false);
+  const [refs, setRefs] = useState(false);
+  const go = () => run(async () => {
+    const j = await call('/api/admin/reset-all', { confirm: 'RESET-ALL', friends, referrals: refs });
+    setOpen(false); setWord('');
+    alert(`✅ ریست انجام شد (${j.users} بازیکن). نسخه‌ی قبلی دیتابیس در پوشه‌ی data/backups ذخیره شد.`);
+  }, 'ریست کامل انجام شد');
+  return (
+    <div className="box dangerbox">
+      <h3>⚠ منطقه‌ی خطر: ریست کامل</h3>
+      <small className="hint" style={{ textAlign: 'start' }}>همه‌ی بازیکن‌ها به حالت اول برمی‌گردند: سکه ۱۰۰، الماس ۵۰، لول ۱ و XP صفر، فقط کارت‌های شروع (لول ۱)، بدون جعبه، کاپ، برد و باخت، مرحله‌ی سولو، برد متوالی و تسک؛ خرید فروشگاه و استفاده از کدهای جایزه هم صفر می‌شود (کدها دوباره قابل استفاده‌اند). اسم و عکس، عضویت کانال، مسدودی و سفارش‌های پرداخت می‌مانند. این کار برگشت ندارد، ولی قبلش یک نسخه از دیتابیس در سرور (data/backups) ذخیره می‌شود.</small>
+      {!open ? <div className="btns"><button className="btn ghost neg" onClick={() => setOpen(true)}>ریست کامل همه‌ی بازیکن‌ها…</button></div> : (
+        <>
+          <label className="chk"><input type="checkbox" checked={friends} onChange={(e) => setFriends(e.target.checked)} /> دوستی‌ها هم پاک شود</label>
+          <label className="chk"><input type="checkbox" checked={refs} onChange={(e) => setRefs(e.target.checked)} /> زیرمجموعه‌ها هم صفر شود (رده‌بندی زیرمجموعه)</label>
+          <label className="field">برای تأیید، کلمه‌ی «ریست» را بنویس<input value={word} onChange={(e) => setWord(e.target.value)} placeholder="ریست" /></label>
+          <div className="btns">
+            <button className="btn neg" disabled={word.trim() !== 'ریست'} onClick={() => void go()}>🗑 همه چیز ریست شود</button>
+            <button className="btn ghost" onClick={() => { setOpen(false); setWord(''); }}>انصراف</button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
