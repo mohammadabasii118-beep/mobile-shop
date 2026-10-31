@@ -6,7 +6,6 @@ list(APPEND FLUTTER_PLUGIN_LIST
   ffmpeg_kit_flutter_new
   media_kit_libs_windows_video
   media_kit_video
-  permission_handler_windows
   share_plus
   url_launcher_windows
 )
