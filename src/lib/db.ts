@@ -266,6 +266,10 @@ function migrate(d: Database.Database) {
   d.exec(`INSERT OR IGNORE INTO product_categories (product_id, category_id) SELECT id, category_id FROM products WHERE category_id IS NOT NULL;
           INSERT OR IGNORE INTO product_brands (product_id, brand_id) SELECT id, brand_id FROM products WHERE brand_id IS NOT NULL;`);
   if (!cols('payments').includes('meta')) d.exec('ALTER TABLE payments ADD COLUMN meta TEXT');
+  // آیکن نمونه برای دسته‌های ساخته‌شده‌ی مدیر که هنوز تصویر ندارند (فقط جاهای خالی پر می‌شود)
+  const fillArt = d.prepare("UPDATE categories SET art = ? WHERE (art IS NULL OR art = '') AND (image IS NULL OR image = '') AND name LIKE ?");
+  fillArt.run('p-protect', '%محافظ شارژر%');
+  fillArt.run('p-strap', '%بند%آویز%');
   const flag = (k: string, def: number) => {
     const r = d.prepare('SELECT value FROM settings WHERE key = ?').get(k) as { value: string } | undefined;
     return r ? (r.value === '1' ? 1 : 0) : def;

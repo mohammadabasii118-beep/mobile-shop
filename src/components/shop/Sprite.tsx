@@ -1,7 +1,7 @@
 /** تصاویر برداری نمونه‌ی محصولات؛ تا زمان آپلود عکس واقعی در پنل مدیریت استفاده می‌شود. */
-export const ART_KEYS = ['p-case', 'p-glass', 'p-cable', 'p-charger', 'p-bank', 'p-buds', 'p-holder', 'p-flash'] as const;
+export const ART_KEYS = ['p-case', 'p-glass', 'p-cable', 'p-charger', 'p-bank', 'p-buds', 'p-holder', 'p-flash', 'p-protect', 'p-strap'] as const;
 export const ART_LABELS: Record<string, string> = {
-  'p-case': 'قاب', 'p-glass': 'گلس', 'p-cable': 'کابل', 'p-charger': 'شارژر', 'p-bank': 'پاوربانک', 'p-buds': 'هندزفری', 'p-holder': 'هولدر', 'p-flash': 'فلش',
+  'p-case': 'قاب', 'p-glass': 'گلس', 'p-cable': 'کابل', 'p-charger': 'شارژر', 'p-bank': 'پاوربانک', 'p-buds': 'هندزفری', 'p-holder': 'هولدر', 'p-flash': 'فلش', 'p-protect': 'محافظ شارژر', 'p-strap': 'بند و آویز',
 };
 
 export default function Sprite() {
@@ -71,6 +71,26 @@ export default function Sprite() {
           <rect x="22" y="66" width="116" height="68" rx="18" fill="none" stroke="#fff" strokeOpacity=".35" strokeWidth="1.5" />
           <circle cx="52" cy="100" r="9" fill="#0a3fc7" stroke="#fff" strokeOpacity=".7" strokeWidth="2" />
           <path d="M72 88 H118 M72 100 H108 M72 112 H100" stroke="#fff" strokeOpacity=".7" strokeWidth="3" strokeLinecap="round" />
+        </symbol>
+        <symbol id="p-protect" viewBox="0 0 200 200">
+          <rect x="82" y="22" width="9" height="28" rx="2" fill="#a2a7b2" /><rect x="109" y="22" width="9" height="28" rx="2" fill="#a2a7b2" />
+          <rect x="52" y="46" width="96" height="92" rx="20" fill="url(#gLight)" />
+          <rect x="52" y="46" width="96" height="92" rx="20" fill="none" stroke="#fff" strokeWidth="1.5" />
+          <circle cx="100" cy="72" r="5" fill="#7fe3f3" stroke="#111216" strokeWidth="2" />
+          <path d="M42 108 H158 V150 Q158 172 136 172 H64 Q42 172 42 150 Z" fill="url(#gDark)" />
+          <path d="M42 108 H158 V150 Q158 172 136 172 H64 Q42 172 42 150 Z" fill="none" stroke="#fff" strokeOpacity=".2" strokeWidth="1.5" />
+          <path d="M42 108 Q100 124 158 108" fill="none" stroke="#7fe3f3" strokeWidth="3" strokeLinecap="round" />
+          <rect x="84" y="170" width="32" height="8" rx="3" fill="#6b6f7a" />
+          <path d="M100 178 V186 M92 180 H108 M92 184 H108" stroke="#b4b9c3" strokeWidth="3" strokeLinecap="round" />
+        </symbol>
+        <symbol id="p-strap" viewBox="0 0 200 200">
+          <path d="M70 24 C 54 70, 64 118, 100 142 C 136 118, 146 70, 130 24" fill="none" stroke="#5b606b" strokeWidth="12" strokeLinecap="round" />
+          <path d="M70 24 C 54 70, 64 118, 100 142 C 136 118, 146 70, 130 24" fill="none" stroke="#7fe3f3" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="3 7" />
+          <circle cx="100" cy="148" r="11" fill="none" stroke="url(#gSilver)" strokeWidth="5" />
+          <rect x="72" y="158" width="56" height="30" rx="10" fill="url(#gLight)" />
+          <rect x="72" y="158" width="56" height="30" rx="10" fill="none" stroke="#c4c8d0" strokeWidth="1.5" />
+          <circle cx="100" cy="173" r="5" fill="#0c0d10" /><circle cx="100" cy="173" r="1.8" fill="#7fe3f3" />
+          <rect x="60" y="14" width="80" height="16" rx="8" fill="url(#gDark)" />
         </symbol>
       </defs>
     </svg>
