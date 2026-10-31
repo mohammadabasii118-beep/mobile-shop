@@ -1,5 +1,6 @@
 import { loadButtonLooks } from '../modules/ui/buttons';
 import { Bot, InputFile, session } from 'grammy';
+import { setBackupSender } from '../modules/backup/service';
 import QRCode from 'qrcode';
 import { prisma } from '../db/client';
 import { RateLimiter } from '../utils/ratelimit';
@@ -73,6 +74,7 @@ export function createBot(token: string, opts: { fetchFile?: FileFetcher; botInf
     await bot.api.sendMessage(Number(m.chatId), m.text.slice(0, 4000), { reply_markup, link_preview_options: { is_disabled: true }, ...(parse_mode ? { parse_mode } : {}) });
     if (png) await bot.api.sendPhoto(Number(m.chatId), new InputFile(png, 'qr.png')).catch((e: any) => logger.warn({ err: String(e?.message) }, 'qr send failed'));
   });
+  setBackupSender(async (chatId, file, name, caption) => { await bot.api.sendDocument(Number(chatId), new InputFile(file, name), { caption }); });
   setBroadcastSender(async (m) => {
     const reply_markup = m.button ? toKb([[{ text: m.button.text, url: m.button.url }]]) : undefined;
     if (m.photoFileId) await bot.api.sendPhoto(Number(m.chatId), m.photoFileId, { caption: m.html, parse_mode: 'HTML', reply_markup });

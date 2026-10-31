@@ -1,3 +1,4 @@
+import { sendBackupNow } from '../modules/backup/service';
 import { Composer } from 'grammy';
 import { prisma } from '../db/client';
 import { AppError, ForbiddenError } from '../utils/errors';
@@ -39,7 +40,7 @@ export function adminHandlers() {
     { id: 'fin', title: '💰 فروش و مالی', hint: 'پرداخت‌ها، سفارش‌ها، کدهای تخفیف و همکاران', items: [['payments.view', '💳 پرداخت‌ها', 'adm:pays'], ['users.view', '🧾 سفارش‌ها و کاربران', 'adm:orders'], ['coupons.manage', '🎁 کدهای تخفیف', 'adm:coupons'], ['partners.manage', '🤝 همکاری‌ها', 'pa:h']] },
     { id: 'cat', title: '📦 محصولات و منوی خرید', hint: 'پلن‌های قابل فروش و دسته‌بندی منو', items: [['products.manage', '📦 محصولات', 'adm:products'], ['products.manage', '🗂 دسته‌بندی منوی خرید', 'ct:l:root']] },
     { id: 'srv', title: '🛰 سرویس‌ها و سرورها', hint: 'سرویس‌های مشتریان و پنل‌های X-UI', items: [['vpn.view', '🛰 سرویس‌های VPN', 'vl:0'], ['panels.manage', '🖥 پنل‌ها و inboundها', 'pn:l']] },
-    { id: 'set', title: '⚙️ تنظیمات و ابزارها', hint: 'متن‌ها، کانال‌های اجباری، تنظیمات و گزارش تغییرات', items: [['texts.manage', '✏️ ویرایش متن‌های ربات', 'tx:l'], ['settings.manage', '📢 کانال‌های اجباری', 'ch:l'], ['settings.manage', '⚙️ تنظیمات', 'adm:settings'], ['audit.view', '🧾 Audit Log', 'adm:audit']] },
+    { id: 'set', title: '⚙️ تنظیمات و ابزارها', hint: 'متن‌ها، کانال‌های اجباری، تنظیمات و گزارش تغییرات', items: [['texts.manage', '✏️ ویرایش متن‌های ربات', 'tx:l'], ['settings.manage', '📢 کانال‌های اجباری', 'ch:l'], ['settings.manage', '⚙️ تنظیمات', 'adm:settings'], ['settings.manage', '💾 بکاپ همین حالا', 'adm:backup'], ['audit.view', '🧾 Audit Log', 'adm:audit']] },
   ];
 
   /** Two buttons per row (a lone last button keeps its own row). */
@@ -373,6 +374,14 @@ export function adminHandlers() {
             return show(ctx, '🎫 تیکت‌های باز', [...ts.map((t): Button[] => [{ text: `#${t.id.slice(-6)} ${t.subject.slice(0, 24)} · ${t.status}`, data: `at:v:${t.id}` }]), back('adm:home')]);
           }
           case 'settings': return settingsView(ctx);
+          case 'backup': {
+            await need(ctx, 'settings.manage');
+            await ctx.answerCallbackQuery({ text: 'در حال تهیه‌ی بکاپ…' }).catch(() => undefined);
+            try {
+              const r = await sendBackupNow(actor(ctx));
+              return show(ctx, `✅ بکاپ برای ${r.sent} ادمین ارسال شد (${Math.round(r.bytes / 1024)} KB).`, [back('adm:g:set')]);
+            } catch (e: any) { return show(ctx, `❌ بکاپ ساخته نشد:\n${String(e?.message).slice(0, 300)}`, [back('adm:g:set')]); }
+          }
           case 'audit': {
             await need(ctx, 'audit.view');
             const logs = await prisma.auditLog.findMany({ orderBy: { createdAt: 'desc' }, take: 15 });

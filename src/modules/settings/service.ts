@@ -22,6 +22,9 @@ export const SETTING_DEFAULTS = {
   'provisioning.backoffSeconds': () => '60,300,900,1800,3600',
   'provisioning.processingTimeoutSeconds': () => '300',
   'notify.expiryDays': () => '3,1',
+  'backup.telegram': () => 'false', // send a daily database backup to the super admins on Telegram
+  'backup.hour': () => '3', // Tehran hour (0-23) at/after which the daily backup is sent
+  'backup.lastDay': () => '', // internal: last day a backup was attempted
   'sale.percent': () => '0', // store-wide sale: % off every plan (0 = no sale)
   'sale.endsAt': () => '', // "YYYY-MM-DD HH:mm" Tehran time; empty = until switched off
   'sale.title': () => '🔥 تخفیف ویژه',

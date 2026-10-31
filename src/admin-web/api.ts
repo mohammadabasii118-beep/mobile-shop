@@ -60,6 +60,8 @@ export const SETTING_RULES: Partial<Record<SettingKey, z.ZodType<string>>> = {
   'provisioning.maxRetries': int(0, 20),
   'provisioning.backoffSeconds': csvInts,
   'notify.expiryDays': csvInts,
+  'backup.telegram': bool,
+  'backup.hour': int(0, 23),
   'sale.percent': int(0, 90),
   'sale.endsAt': z.string().superRefine((raw, ctx) => {
     const v = raw.trim();

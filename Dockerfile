@@ -13,6 +13,12 @@ WORKDIR /app
 ENV NODE_ENV=production
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates curl && rm -rf /var/lib/apt/lists/* \
  && useradd -r -u 10001 bot && mkdir -p /app/data/receipts && chown -R bot /app/data
+# pg_dump 16 (matches the postgres:16 service) for the Telegram backup. Optional: if the repo is unreachable the bot still builds; only the backup feature reports an error.
+RUN (apt-get update && apt-get install -y --no-install-recommends gnupg \
+ && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/pgdg.gpg \
+ && echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+ && apt-get update && apt-get install -y --no-install-recommends postgresql-client-16) \
+ || echo "WARNING: pg_dump not installed; the Telegram backup will be unavailable"; rm -rf /var/lib/apt/lists/*
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/prisma ./prisma
