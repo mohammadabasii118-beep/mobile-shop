@@ -419,6 +419,9 @@ section.sec.tight-top { padding-top: 0; }
 .thumb { flex: none; width: 64px; height: 64px; border-radius: var(--r-sm); background: var(--studio); display: grid; place-items: center; box-shadow: inset 0 0 0 2px transparent; overflow: hidden; transition: box-shadow .16s; }
 .thumb[aria-current='true'] { box-shadow: inset 0 0 0 2px var(--ink); }
 .thumb .art, .thumb img { width: 80%; height: 80%; object-fit: contain; }
+/* عکس واقعی (آپلودی) قاب را کامل پر می‌کند؛ حاشیه و سایه‌ی افکت فقط برای تصویر برداری نمونه‌ی بی‌زمینه است (DESIGN.md §18.18) */
+.media picture img.art, .g-main picture img.art, .thumb picture img.art { width: 100%; height: 100%; object-fit: cover; filter: none; }
+.g-main:has(> picture) { aspect-ratio: 1; }
 .buy { display: grid; gap: 20px; align-content: start; }
 @media (min-width: 900px) { .buy { position: sticky; top: 96px; } }
 .buy .p-brand { font-size: 13px; color: var(--action); font-weight: 600; unicode-bidi: plaintext; width: fit-content; }
