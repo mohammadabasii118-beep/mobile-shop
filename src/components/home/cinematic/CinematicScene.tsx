@@ -9,6 +9,7 @@ import {
   AdaptiveDpr,
   PerformanceMonitor,
 } from "@react-three/drei";
+import { EffectComposer, DepthOfField, Vignette } from "@react-three/postprocessing";
 import { Suspense, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { scrollState, SCENES, seg, smoothstep, lerp, mapRange } from "@/lib/scroll";
@@ -70,7 +71,7 @@ const metalProps = (color: string, roughness = 0.2) => ({
 /* ---------- the rig ---------- */
 
 function Rig({ quality }: { quality: number }) {
-  const { camera, scene } = useThree();
+  const { camera } = useThree();
 
   const phone = useRef<THREE.Group>(null);
   const screen = useRef<THREE.Mesh>(null);
@@ -93,25 +94,17 @@ function Rig({ quality }: { quality: number }) {
   const rings = useRef<THREE.Group>(null);
 
   const camTarget = useMemo(() => new THREE.Vector3(), []);
-  const bgA = useMemo(() => new THREE.Color("#070709"), []);
-  const bgB = useMemo(() => new THREE.Color("#04040a"), []);
-  const bgTmp = useMemo(() => new THREE.Color(), []);
 
   useFrame((state) => {
     const p = scrollState.progress;
     const t = state.clock.elapsedTime;
 
-    /* camera */
+    /* camera — transparent canvas lets an optional ad backdrop show behind */
     sampleCam(p, camTarget);
     camera.position.lerp(camTarget, 0.06);
     camera.lookAt(0, mapRange(p, 0.6, 0.8, 0, -0.2), 0);
 
-    /* background darkens toward the audio scene */
-    bgTmp.copy(bgA).lerp(bgB, smoothstep(0.5, 0.75, p));
-    scene.background = bgTmp;
-
     /* ---- Phone (scenes 1-3, exits during 4) ---- */
-    const sHero = seg(p, ...SCENES.hero);
     const phoneExit = smoothstep(0.62, 0.8, p);
     if (phone.current) {
       phone.current.rotation.y = p * TWO_PI * 2.1 + Math.sin(t * 0.3) * 0.1;
@@ -462,6 +455,19 @@ export default function CinematicScene({ mobile = false }: { mobile?: boolean })
         <AdaptiveDpr pixelated />
         <Rig quality={quality} />
         <Particles count={mobile ? 40 : 110} />
+        {/* Depth of field — desktop only, keeps the subject sharp and blurs
+            the depth. Skipped on mobile and when perf drops, to protect FPS. */}
+        {!mobile && quality > 0.6 && (
+          <EffectComposer enableNormalPass={false} multisampling={0}>
+            <DepthOfField
+              focusDistance={0.012}
+              focalLength={0.06}
+              bokehScale={2.2}
+              height={420}
+            />
+            <Vignette eskil={false} offset={0.2} darkness={0.75} />
+          </EffectComposer>
+        )}
       </Suspense>
     </Canvas>
   );

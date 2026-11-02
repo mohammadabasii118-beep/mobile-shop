@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
-import { Star, Plus, Check } from "lucide-react";
+import { Star, Plus, Check, Heart } from "lucide-react";
 import type { Product } from "@/lib/products";
 import { formatPrice, formatDiscount, toFa } from "@/lib/format";
 import { useCart } from "@/lib/cart-context";
+import { useWishlist } from "@/lib/wishlist-context";
 import ProductMedia from "@/components/ui/ProductMedia";
 
 const BADGE_LABEL: Record<string, string> = {
@@ -18,7 +19,9 @@ const BADGE_LABEL: Record<string, string> = {
 
 export default function ProductCard({ product }: { product: Product }) {
   const { add } = useCart();
+  const { has, toggle } = useWishlist();
   const [added, setAdded] = useState(false);
+  const liked = has(product.id);
 
   // 3D tilt on hover
   const ref = useRef<HTMLDivElement>(null);
@@ -91,6 +94,21 @@ export default function ProductCard({ product }: { product: Product }) {
                 </span>
               ))}
           </div>
+
+          {/* wishlist toggle */}
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              toggle(product.id);
+            }}
+            aria-label={liked ? "حذف از علاقه‌مندی‌ها" : "افزودن به علاقه‌مندی‌ها"}
+            aria-pressed={liked}
+            className="absolute left-3 top-3 grid h-9 w-9 place-items-center rounded-full bg-black/50 text-silver-200 backdrop-blur transition-all duration-300 hover:scale-110 hover:text-rose-400 active:scale-95"
+          >
+            <Heart
+              className={`h-4 w-4 ${liked ? "fill-rose-500 text-rose-500" : ""}`}
+            />
+          </button>
 
           {/* quick add */}
           <button

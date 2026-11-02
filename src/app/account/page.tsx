@@ -11,6 +11,9 @@ import {
   Truck,
 } from "lucide-react";
 import { toFa, formatPrice } from "@/lib/format";
+import { useWishlist } from "@/lib/wishlist-context";
+import { getProductById } from "@/lib/products";
+import ProductCard from "@/components/product/ProductCard";
 
 type Tab = "profile" | "orders" | "wishlist" | "addresses";
 
@@ -23,6 +26,8 @@ const demoOrders = [
 
 export default function AccountPage() {
   const [tab, setTab] = useState<Tab>("profile");
+  const { ids } = useWishlist();
+  const wishItems = ids.map(getProductById).filter(Boolean);
 
   const tabs: { key: Tab; label: string; icon: typeof User }[] = [
     { key: "profile", label: "پروفایل", icon: User },
@@ -138,17 +143,27 @@ export default function AccountPage() {
             </div>
           )}
 
-          {tab === "wishlist" && (
-            <div className="grid min-h-[260px] place-items-center text-center">
-              <div>
-                <Heart className="mx-auto mb-3 h-12 w-12 text-silver-600" />
-                <p className="text-silver-300">لیست علاقه‌مندی‌ها خالی است.</p>
-                <Link href="/products" className="btn-ghost mt-4">
-                  مشاهده محصولات
-                </Link>
+          {tab === "wishlist" &&
+            (wishItems.length === 0 ? (
+              <div className="grid min-h-[260px] place-items-center text-center">
+                <div>
+                  <Heart className="mx-auto mb-3 h-12 w-12 text-silver-600" />
+                  <p className="text-silver-300">لیست علاقه‌مندی‌ها خالی است.</p>
+                  <Link href="/products" className="btn-ghost mt-4">
+                    مشاهده محصولات
+                  </Link>
+                </div>
               </div>
-            </div>
-          )}
+            ) : (
+              <div>
+                <h2 className="mb-4 text-lg font-bold text-silver-50">
+                  علاقه‌مندی‌ها ({toFa(wishItems.length)})
+                </h2>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {wishItems.map((p) => p && <ProductCard key={p.id} product={p} />)}
+                </div>
+              </div>
+            ))}
 
           {tab === "addresses" && (
             <div>

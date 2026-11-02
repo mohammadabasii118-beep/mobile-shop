@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { CartProvider } from "@/lib/cart-context";
+import { WishlistProvider } from "@/lib/wishlist-context";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 
@@ -42,11 +43,18 @@ export default function RootLayout({
     <html lang="fa" dir="rtl" className={vazir.variable}>
       <body className="min-h-screen bg-ink-950 font-sans antialiased">
         <CartProvider>
-          <div className="relative flex min-h-screen flex-col">
-            <Header />
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </div>
+          <WishlistProvider>
+            <div className="relative flex min-h-screen flex-col">
+              <a href="#main" className="skip-link">
+                پرش به محتوای اصلی
+              </a>
+              <Header />
+              <main id="main" className="flex-1">
+                {children}
+              </main>
+              <Footer />
+            </div>
+          </WishlistProvider>
         </CartProvider>
       </body>
     </html>

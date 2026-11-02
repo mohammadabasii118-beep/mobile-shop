@@ -342,6 +342,9 @@ export const products: Product[] = [
 export const getProduct = (slug: string) =>
   products.find((p) => p.slug === slug);
 
+export const getProductById = (id: string) =>
+  products.find((p) => p.id === id);
+
 export const productsByBadge = (badge: Product["badges"][number]) =>
   products.filter((p) => p.badges.includes(badge));
 

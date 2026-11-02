@@ -20,6 +20,7 @@ import type { Product } from "@/lib/products";
 import { categoryBySlug } from "@/lib/products";
 import { formatPrice, formatDiscount, toFa } from "@/lib/format";
 import { useCart } from "@/lib/cart-context";
+import { useWishlist } from "@/lib/wishlist-context";
 import ProductMedia from "@/components/ui/ProductMedia";
 
 const ProductViewer3D = dynamic(() => import("./ProductViewer3D"), {
@@ -33,10 +34,17 @@ const ProductViewer3D = dynamic(() => import("./ProductViewer3D"), {
 
 export default function ProductDetail({ product }: { product: Product }) {
   const { add } = useCart();
+  const { has, toggle } = useWishlist();
+  const liked = has(product.id);
   const [color, setColor] = useState(product.colors[0]);
   const [qty, setQty] = useState(1);
   const [mode, setMode] = useState<"art" | "3d">("art");
   const [added, setAdded] = useState(false);
+
+  const gallery = [product.image, ...(product.gallery ?? [])].filter(
+    Boolean
+  ) as string[];
+  const [activeImg, setActiveImg] = useState<string | undefined>(product.image);
 
   const cat = categoryBySlug(product.categorySlug);
   const discount = product.oldPrice
@@ -69,7 +77,7 @@ export default function ProductDetail({ product }: { product: Product }) {
         <div>
           <div className="relative aspect-square overflow-hidden rounded-3xl border border-white/[0.07] bg-ink-850">
             {mode === "art" ? (
-              <ProductMedia product={product} />
+              <ProductMedia product={product} src={activeImg} priority />
             ) : (
               <ProductViewer3D
                 categorySlug={product.categorySlug}
@@ -106,6 +114,26 @@ export default function ProductDetail({ product }: { product: Product }) {
               <Box className="h-4 w-4" /> نمای سه‌بعدی
             </button>
           </div>
+          {/* multi-angle gallery thumbnails (shown when real images exist) */}
+          {gallery.length > 1 && mode === "art" && (
+            <div className="mt-3 flex gap-2">
+              {gallery.map((g) => (
+                <button
+                  key={g}
+                  onClick={() => setActiveImg(g)}
+                  aria-label="تغییر زاویهٔ تصویر"
+                  className={`relative h-16 w-16 overflow-hidden rounded-xl border transition ${
+                    activeImg === g
+                      ? "border-accent"
+                      : "border-white/10 hover:border-white/30"
+                  }`}
+                >
+                  <ProductMedia product={product} src={g} sizes="64px" />
+                </button>
+              ))}
+            </div>
+          )}
+
           <p className="mt-2 text-center text-[11px] text-silver-600">
             نمای سه‌بعدی یک بازنمایی تزئینی و قابل‌چرخش است، نه مدل اسکن‌شده‌ی محصول واقعی.
           </p>
@@ -214,10 +242,16 @@ export default function ProductDetail({ product }: { product: Product }) {
             </button>
 
             <button
-              className="grid h-11 w-11 place-items-center rounded-xl border border-white/10 text-silver-300 transition hover:border-white/25 hover:text-rose-400"
-              aria-label="افزودن به علاقه‌مندی‌ها"
+              onClick={() => toggle(product.id)}
+              aria-pressed={liked}
+              className={`grid h-11 w-11 place-items-center rounded-xl border transition ${
+                liked
+                  ? "border-rose-500/40 bg-rose-500/10 text-rose-400"
+                  : "border-white/10 text-silver-300 hover:border-white/25 hover:text-rose-400"
+              }`}
+              aria-label={liked ? "حذف از علاقه‌مندی‌ها" : "افزودن به علاقه‌مندی‌ها"}
             >
-              <Heart className="h-5 w-5" />
+              <Heart className={`h-5 w-5 ${liked ? "fill-rose-500" : ""}`} />
             </button>
           </div>
 

@@ -67,9 +67,12 @@ export default function MobileMenu({
               <div className="space-y-1">
                 {[
                   { href: "/products", label: "فروشگاه" },
+                  { href: "/products?sort=newest", label: "جدیدترین محصولات" },
+                  { href: "/products?sort=bestseller", label: "پرفروش‌ترین‌ها" },
                   { href: "/about", label: "درباره ما" },
                   { href: "/contact", label: "تماس با ما" },
                   { href: "/account", label: "حساب کاربری" },
+                  { href: "/wishlist", label: "علاقه‌مندی‌ها" },
                   { href: "/cart", label: "سبد خرید" },
                 ].map((l) => (
                   <Link

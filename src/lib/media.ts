@@ -1,0 +1,20 @@
+/**
+ * مسیر مرکزی تصاویر تبلیغاتی (AI/تولیدی) — جدا از تصاویر واقعی محصولات.
+ *
+ * - تصاویر تبلیغاتی سینمایی: public/images/advertising/**
+ * - تصاویر واقعی محصولات:      public/images/products/**  (فیلد `image` روی محصول)
+ *
+ * برای جایگزینی هنر، فقط فایلِ همان مسیر را عوض کنید؛ نیازی به تغییر کد نیست.
+ * اگر فایلی موجود نباشد، کامپوننت‌ها به‌صورت بی‌خطا به fallback سه‌بعدی/تیره برمی‌گردند.
+ */
+export const AD = {
+  hero: "/images/advertising/hero/hero.jpg",
+  scenes: {
+    cases: "/images/advertising/scenes/cases.jpg",
+    power: "/images/advertising/scenes/power.jpg",
+    audio: "/images/advertising/scenes/audio.jpg",
+  },
+  banners: {
+    offer: "/images/advertising/banners/offer.jpg",
+  },
+} as const;

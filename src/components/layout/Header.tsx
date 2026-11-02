@@ -5,15 +5,19 @@ import { useEffect, useState } from "react";
 import { Search, User, ShoppingBag, Menu, Heart } from "lucide-react";
 import { categories } from "@/lib/products";
 import { useCart } from "@/lib/cart-context";
+import { useWishlist } from "@/lib/wishlist-context";
 import { toFa } from "@/lib/format";
 import MobileMenu from "./MobileMenu";
+import CartDrawer from "./CartDrawer";
 import Logo from "./Logo";
 
 export default function Header() {
   const { count } = useCart();
+  const { count: wishCount } = useWishlist();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 16);
@@ -85,6 +89,18 @@ export default function Header() {
               فروشگاه
             </Link>
             <Link
+              href="/products?sort=newest"
+              className="rounded-lg px-3 py-2 text-sm text-silver-200 transition hover:bg-white/5 hover:text-white"
+            >
+              جدیدترین
+            </Link>
+            <Link
+              href="/products?sort=bestseller"
+              className="rounded-lg px-3 py-2 text-sm text-silver-200 transition hover:bg-white/5 hover:text-white"
+            >
+              پرفروش‌ترین
+            </Link>
+            <Link
               href="/about"
               className="rounded-lg px-3 py-2 text-sm text-silver-200 transition hover:bg-white/5 hover:text-white"
             >
@@ -116,11 +132,16 @@ export default function Header() {
             </Link>
 
             <Link
-              href="/account"
-              className="hidden h-10 w-10 place-items-center rounded-lg text-silver-200 hover:bg-white/5 sm:grid"
-              aria-label="حساب کاربری"
+              href="/wishlist"
+              className="relative hidden h-10 w-10 place-items-center rounded-lg text-silver-200 hover:bg-white/5 sm:grid"
+              aria-label="علاقه‌مندی‌ها"
             >
               <Heart className="h-5 w-5" />
+              {wishCount > 0 && (
+                <span className="num absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-rose-500 px-1 text-[11px] font-bold text-white">
+                  {toFa(wishCount)}
+                </span>
+              )}
             </Link>
             <Link
               href="/account"
@@ -131,8 +152,8 @@ export default function Header() {
             </Link>
 
             {/* cart */}
-            <Link
-              href="/cart"
+            <button
+              onClick={() => setCartOpen(true)}
               className="relative grid h-10 w-10 place-items-center rounded-lg text-silver-100 hover:bg-white/5"
               aria-label="سبد خرید"
             >
@@ -142,12 +163,13 @@ export default function Header() {
                   {toFa(count)}
                 </span>
               )}
-            </Link>
+            </button>
           </div>
         </div>
       </header>
 
       <MobileMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
     </>
   );
 }

@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { ArrowLeft, Timer } from "lucide-react";
 import Reveal from "@/components/ui/Reveal";
+import AdBackdrop from "@/components/ui/AdBackdrop";
+import { AD } from "@/lib/media";
 
 export default function OfferBanner() {
   return (
     <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
       <Reveal>
         <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-gradient-to-l from-ink-800 via-ink-850 to-ink-900 p-8 shadow-luxe sm:p-12">
+          {/* optional advertising image (falls back to the gradient if absent) */}
+          <AdBackdrop src={AD.banners.offer} opacity={0.4} />
           <div className="pointer-events-none absolute -left-20 -top-20 h-72 w-72 rounded-full bg-accent-glow/15 blur-[100px]" />
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_120%_at_90%_-10%,rgba(174,185,214,0.12),transparent)]" />
 

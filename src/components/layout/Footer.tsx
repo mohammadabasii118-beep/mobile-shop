@@ -56,7 +56,7 @@ export default function Footer() {
                 { href: "/about", label: "درباره ما" },
                 { href: "/contact", label: "تماس با ما" },
                 { href: "/terms", label: "قوانین و مقررات" },
-                { href: "/account", label: "پیگیری سفارش" },
+                { href: "/track", label: "پیگیری سفارش" },
                 { href: "/cart", label: "سبد خرید" },
               ].map((l) => (
                 <li key={l.href}>

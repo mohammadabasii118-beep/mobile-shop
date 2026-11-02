@@ -7,8 +7,10 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { ArrowLeft, Sparkles, ChevronDown } from "lucide-react";
 import { scrollState } from "@/lib/scroll";
+import { AD } from "@/lib/media";
 import { productsByBadge, products } from "@/lib/products";
 import ProductCard from "@/components/product/ProductCard";
+import AdBackdrop from "@/components/ui/AdBackdrop";
 
 const CinematicScene = dynamic(() => import("./CinematicScene"), {
   ssr: false,
@@ -147,6 +149,10 @@ function Cinematic({ mobile }: { mobile: boolean }) {
         ref={stage}
         className="sticky top-0 h-screen w-full overflow-hidden"
       >
+        {/* optional cinematic advertising backdrop (behind the transparent 3D
+            canvas). Falls back to the dark scene if the file is absent. */}
+        <AdBackdrop src={AD.hero} opacity={0.5} />
+
         {/* 3D canvas — never blocks interaction */}
         <div className="pointer-events-none absolute inset-0 z-0">
           {active && <CinematicScene mobile={mobile} />}
