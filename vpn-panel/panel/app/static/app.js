@@ -679,6 +679,20 @@ document.addEventListener('click', async e => {
       closeModal(); await refresh();
     }
     else if (t.id === 'addNode') nodeForm();
+    else if (t.id === 'bpTestAll') {
+      const tok = 'bptest-' + Math.random().toString(36).slice(2, 12);
+      const base = location.origin;   // the binary is fetched from this panel's hash-verified /backpack route
+      const kh = `curl -fsSL ${base}/bp-test.py | python3 - kharej --token ${tok} --iran IRAN_IP --base ${base}`;
+      const ir = `curl -fsSL ${base}/bp-test.py | python3 - iran --token ${tok} --kharej FOREIGN_IP --base ${base}`;
+      openModal(`<h2>تست همهٔ نوع‌های حمل</h2>
+        <p class="muted" style="margin:0 0 8px">همهٔ نوع‌های BackPack را بین دو سرور امتحان می‌کند و می‌گوید کدام کار می‌کند، با پینگ و سرعت. دو دستور، هر کدام روی یک سرور (root). جای <b>IRAN_IP</b> و <b>FOREIGN_IP</b> آی‌پی واقعی سرورها را بگذار.</p>
+        <div class="note" style="margin-bottom:6px">پورت‌های <span class="mono" dir="ltr">9100 تا 9110</span> باید بین دو سرور باز باشند (روی فایروال سرور ایران). نتیجه فقط برای همین لحظه و همین مسیر است.</div>
+        <div style="font-weight:600;margin:6px 0 2px">۱) روی سرور خارج (باز بگذار):</div>
+        <pre dir="ltr">${esc(kh)}</pre><button class="btn sm" data-copy="${esc(kh)}">کپی</button>
+        <div style="font-weight:600;margin:10px 0 2px">۲) روی سرور ایران (جدول همین‌جا چاپ می‌شود):</div>
+        <pre dir="ltr">${esc(ir)}</pre><button class="btn sm" data-copy="${esc(ir)}">کپی</button>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><button class="btn pri" data-close>بستن</button></div>`);
+    }
     else if (t.id === 'addBp') {
       if (!S.nodes.length) { toast('اول یک لوکیشن خارج بسازید'); return; }
       openModal(`<h2>تونل BackPack جدید</h2>${bpFields(null)}<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-close>انصراف</button><button class="btn pri" id="bpSave">ساخت</button></div>`);

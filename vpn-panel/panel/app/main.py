@@ -1681,7 +1681,7 @@ def free_bp_port(db: Session, kind: str, host: str, node_id: int, taken: set, ex
 
 @app.get("/api/bp/meta", dependencies=[Depends(require_admin)])
 def bp_meta():
-    return {"version": bpmod.BP_VERSION,
+    return {"version": bpmod.BP_VERSION, "sha256": bpmod.BP_SHA256,
             "transports": [{"id": k, "label": v[0], "family": v[1], "desc": v[2], "raw": k in bpmod.NEEDS_RAW} for k, v in bpmod.TRANSPORTS.items()],
             "carriers": [{"id": k, "label": v[0], "desc": v[1], "raw": k in bpmod.NEEDS_RAW} for k, v in bpmod.CARRIERS.items()],
             "carriers4": [{"id": k, "label": v[0], "desc": v[1], "raw": False} for k, v in bpmod.CARRIERS4.items()],
@@ -1902,6 +1902,12 @@ def vtunnel_script():
 def cf_scan_script():
     """The clean-Cloudflare-IP scanner (public, no secrets): run it on a server near your users to find a fast edge IP."""
     return PlainTextResponse((ROOT / "agent" / "cf_scan.py").read_text())
+
+
+@app.get("/bp-test.py")
+def bp_test_script():
+    """The BackPack transport tester (public, no secrets): run it on the two servers to see which transports hold."""
+    return PlainTextResponse((ROOT / "agent" / "bp_test.py").read_text())
 
 
 @app.get("/node-install.sh")

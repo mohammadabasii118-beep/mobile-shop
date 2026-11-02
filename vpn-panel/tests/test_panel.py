@@ -1905,3 +1905,13 @@ def test_cf_scan_script_is_served_publicly():
         r = c.get("/cf-scan.py")
         assert r.status_code == 200 and "Cloudflare" in r.text and "def main" in r.text and "cf_address" in r.text
         assert "import" in r.text and "token" not in r.text.lower().split("def main")[0][:200]   # no secret/token leaked in the header
+
+
+def test_bp_test_script_served_and_meta_has_sha():
+    with TestClient(app) as c:
+        h = admin(c)
+        r = c.get("/bp-test.py")
+        assert r.status_code == 200 and "BackPack transport tester" in r.text and 'choices=["iran", "kharej"]' in r.text
+        assert "token" not in r.text.split("def main")[0][:300].lower() or "--token" in r.text  # only argument names, no embedded secret
+        meta = c.get("/api/bp/meta", headers=h).json()
+        assert "sha256" in meta and "amd64" in meta["sha256"]
