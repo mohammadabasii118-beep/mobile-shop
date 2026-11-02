@@ -58,6 +58,7 @@ function Cinematic({ mobile }: { mobile: boolean }) {
   const s3 = useRef<HTMLDivElement>(null);
   const s4 = useRef<HTMLDivElement>(null);
   const s5 = useRef<HTMLDivElement>(null);
+  const heroBg = useRef<HTMLDivElement>(null);
 
   // Only mount the Canvas while the section is near the viewport (frees GPU).
   const [active, setActive] = useState(true);
@@ -107,7 +108,10 @@ function Cinematic({ mobile }: { mobile: boolean }) {
         y: 36,
       });
       gsap.set(s1.current, { opacity: 1, y: 0 });
+      gsap.set(heroBg.current, { opacity: 1 });
 
+      // hero advertising image fades out as the 3D story takes over
+      tl.to(heroBg.current, { opacity: 0, duration: 0.06 }, 0.1);
       // scene 1 out
       tl.to(s1.current, { opacity: 0, y: -24, duration: 0.03 }, 0.16);
       // scene 2
@@ -149,9 +153,12 @@ function Cinematic({ mobile }: { mobile: boolean }) {
         ref={stage}
         className="sticky top-0 h-screen w-full overflow-hidden"
       >
-        {/* optional cinematic advertising backdrop (behind the transparent 3D
-            canvas). Falls back to the dark scene if the file is absent. */}
-        <AdBackdrop src={AD.hero} opacity={0.5} />
+        {/* cinematic advertising image — prominent in scene 1, then fades out
+            on scroll so scenes 2-5 are pure 3D space. Behind the transparent
+            canvas; falls back to the dark scene if the file is absent. */}
+        <div ref={heroBg} className="absolute inset-0">
+          <AdBackdrop src={AD.hero} opacity={0.85} />
+        </div>
 
         {/* 3D canvas — never blocks interaction */}
         <div className="pointer-events-none absolute inset-0 z-0">

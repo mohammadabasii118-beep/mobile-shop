@@ -8,13 +8,13 @@
  * اگر فایلی موجود نباشد، کامپوننت‌ها به‌صورت بی‌خطا به fallback سه‌بعدی/تیره برمی‌گردند.
  */
 export const AD = {
-  hero: "/images/advertising/hero/hero.jpg",
+  hero: "/images/advertising/hero/hero.webp",
   scenes: {
     cases: "/images/advertising/scenes/cases.jpg",
     power: "/images/advertising/scenes/power.jpg",
     audio: "/images/advertising/scenes/audio.jpg",
   },
   banners: {
-    offer: "/images/advertising/banners/offer.jpg",
+    offer: "/images/advertising/banners/offer.webp",
   },
 } as const;
