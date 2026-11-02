@@ -10,9 +10,9 @@
 export const AD = {
   hero: "/images/advertising/hero/hero.webp",
   scenes: {
-    cases: "/images/advertising/scenes/cases.jpg",
-    power: "/images/advertising/scenes/power.jpg",
-    audio: "/images/advertising/scenes/audio.jpg",
+    cases: "/images/advertising/scenes/cases.png",
+    power: "/images/advertising/scenes/power.png",
+    audio: "/images/advertising/scenes/audio.png",
   },
   banners: {
     offer: "/images/advertising/banners/offer.webp",

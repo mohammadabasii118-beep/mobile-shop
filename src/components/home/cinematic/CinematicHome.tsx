@@ -59,6 +59,9 @@ function Cinematic({ mobile }: { mobile: boolean }) {
   const s4 = useRef<HTMLDivElement>(null);
   const s5 = useRef<HTMLDivElement>(null);
   const heroBg = useRef<HTMLDivElement>(null);
+  const casesBg = useRef<HTMLDivElement>(null);
+  const powerBg = useRef<HTMLDivElement>(null);
+  const audioBg = useRef<HTMLDivElement>(null);
 
   // Only mount the Canvas while the section is near the viewport (frees GPU).
   const [active, setActive] = useState(true);
@@ -109,9 +112,19 @@ function Cinematic({ mobile }: { mobile: boolean }) {
       });
       gsap.set(s1.current, { opacity: 1, y: 0 });
       gsap.set(heroBg.current, { opacity: 1 });
+      gsap.set([casesBg.current, powerBg.current, audioBg.current], {
+        opacity: 0,
+      });
 
       // hero advertising image fades out as the 3D story takes over
       tl.to(heroBg.current, { opacity: 0, duration: 0.06 }, 0.1);
+      // per-scene backdrops fade in only during their own scene
+      tl.to(casesBg.current, { opacity: 1, duration: 0.04 }, 0.2)
+        .to(casesBg.current, { opacity: 0, duration: 0.04 }, 0.37);
+      tl.to(powerBg.current, { opacity: 1, duration: 0.04 }, 0.41)
+        .to(powerBg.current, { opacity: 0, duration: 0.04 }, 0.57);
+      tl.to(audioBg.current, { opacity: 1, duration: 0.04 }, 0.61)
+        .to(audioBg.current, { opacity: 0, duration: 0.04 }, 0.77);
       // scene 1 out
       tl.to(s1.current, { opacity: 0, y: -24, duration: 0.03 }, 0.16);
       // scene 2
@@ -158,6 +171,16 @@ function Cinematic({ mobile }: { mobile: boolean }) {
             canvas; falls back to the dark scene if the file is absent. */}
         <div ref={heroBg} className="absolute inset-0">
           <AdBackdrop src={AD.hero} opacity={0.85} />
+        </div>
+        {/* per-scene cinematic backdrops — each fades in only during its scene */}
+        <div ref={casesBg} className="absolute inset-0 opacity-0">
+          <AdBackdrop src={AD.scenes.cases} opacity={0.6} />
+        </div>
+        <div ref={powerBg} className="absolute inset-0 opacity-0">
+          <AdBackdrop src={AD.scenes.power} opacity={0.6} />
+        </div>
+        <div ref={audioBg} className="absolute inset-0 opacity-0">
+          <AdBackdrop src={AD.scenes.audio} opacity={0.42} />
         </div>
 
         {/* 3D canvas — never blocks interaction */}
