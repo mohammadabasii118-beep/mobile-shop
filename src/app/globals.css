@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #050506;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--bg);
+  color: #e9ebef;
+  font-feature-settings: "ss01", "ss02";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+/* Persian digits & numerals look balanced */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom scrollbar — subtle, luxurious */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0a0c;
+}
+::-webkit-scrollbar-thumb {
+  background: #26262e;
+  border-radius: 999px;
+  border: 2px solid #0a0a0c;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a44;
+}
+
+@layer components {
+  /* Metallic silver text */
+  .text-metal {
+    background: linear-gradient(135deg, #f7f8fa 0%, #b4bac4 40%, #6f7686 60%, #e9ebef 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Glass panel */
+  .glass {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+  }
+
+  .hairline {
+    border-color: rgba(255, 255, 255, 0.07);
+  }
+
+  /* Primary luxe button */
+  .btn-luxe {
+    @apply relative inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold transition-all duration-300;
+    background: linear-gradient(135deg, #e9ebef, #b4bac4);
+    color: #0a0a0c;
+    box-shadow: 0 10px 30px -10px rgba(174, 185, 214, 0.5);
+  }
+  .btn-luxe:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 16px 40px -12px rgba(174, 185, 214, 0.6);
+  }
+  .btn-luxe:active {
+    transform: translateY(0);
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-6 py-3 text-sm font-semibold text-silver-100 transition-all duration-300 hover:border-white/25 hover:bg-white/[0.06];
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1 text-xs text-silver-300;
+  }
+
+  .card-luxe {
+    @apply relative overflow-hidden rounded-2xl border border-white/[0.07] bg-ink-850/80 transition-all duration-500;
+  }
+}
+
+/* Reduced motion respect */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
