@@ -8,20 +8,35 @@ import {
   ContactShadows,
   RoundedBox,
   Float,
+  useGLTF,
+  Center,
 } from "@react-three/drei";
 import { Suspense } from "react";
 
+/** Loads a real GLB/GLTF model when a product provides one. */
+function GLBModel({ url }: { url: string }) {
+  const { scene } = useGLTF(url);
+  return (
+    <Center>
+      <primitive object={scene} />
+    </Center>
+  );
+}
+
 /**
- * Stylized, rotatable 3D representation of a product, tinted by the selected
- * color. This is a decorative 3D object — NOT a scanned model of the real
- * product. Drag to rotate.
+ * Rotatable 3D view of a product. If the product supplies a real GLB/GLTF
+ * model (`modelUrl`), it is shown; otherwise a stylized decorative primitive
+ * (clearly not a scanned model) is rendered, tinted by the selected color.
+ * Drag to rotate.
  */
 export default function ProductViewer3D({
   categorySlug,
   color,
+  modelUrl,
 }: {
   categorySlug: string;
   color: string;
+  modelUrl?: string;
 }) {
   return (
     <Canvas
@@ -34,7 +49,11 @@ export default function ProductViewer3D({
         <spotLight position={[5, 6, 5]} angle={0.4} penumbra={1} intensity={40} />
 
         <Float speed={1.2} rotationIntensity={0.3} floatIntensity={0.6}>
-          <Shape categorySlug={categorySlug} color={color} />
+          {modelUrl ? (
+            <GLBModel url={modelUrl} />
+          ) : (
+            <Shape categorySlug={categorySlug} color={color} />
+          )}
         </Float>
 
         <ContactShadows

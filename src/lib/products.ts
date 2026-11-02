@@ -38,6 +38,11 @@ export type Product = {
   image?: string;
   /** زوایای اضافی برای نمایش چندتصویری؛ در صورت وجود پر شود. */
   gallery?: string[];
+  /**
+   * مسیر مدل سه‌بعدی واقعی GLB/GLTF (مثلاً "/models/slug.glb").
+   * اگر ست شود، نمای سه‌بعدی به‌جای شکل primitive، مدل واقعی را نمایش می‌دهد.
+   */
+  model?: string;
 };
 
 export const categories: Category[] = [

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { getProduct, products, productsByCategory } from "@/lib/products";
 import ProductDetail from "@/components/product/ProductDetail";
 import ProductRail from "@/components/home/ProductRail";
+import { SITE_URL } from "@/lib/site";
 
 export function generateStaticParams() {
   return products.map((p) => ({ slug: p.slug }));
@@ -34,8 +35,38 @@ export default function ProductPage({
   );
   const fallback = products.filter((p) => p.id !== product.id).slice(0, 4);
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: product.shortDesc,
+    sku: product.id,
+    ...(product.image
+      ? { image: `${SITE_URL}${product.image}` }
+      : {}),
+    aggregateRating: {
+      "@type": "AggregateRating",
+      ratingValue: product.rating,
+      reviewCount: product.reviews,
+    },
+    offers: {
+      "@type": "Offer",
+      priceCurrency: "IRT",
+      price: product.price,
+      availability:
+        product.stock > 0
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
+      url: `${SITE_URL}/products/${product.slug}`,
+    },
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <ProductDetail product={product} />
       <ProductRail
         title="محصولات مرتبط"

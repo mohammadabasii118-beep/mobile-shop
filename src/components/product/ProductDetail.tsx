@@ -82,6 +82,7 @@ export default function ProductDetail({ product }: { product: Product }) {
               <ProductViewer3D
                 categorySlug={product.categorySlug}
                 color={color.hex}
+                modelUrl={product.model}
               />
             )}
             {discount > 0 && (
@@ -135,7 +136,9 @@ export default function ProductDetail({ product }: { product: Product }) {
           )}
 
           <p className="mt-2 text-center text-[11px] text-silver-600">
-            نمای سه‌بعدی یک بازنمایی تزئینی و قابل‌چرخش است، نه مدل اسکن‌شده‌ی محصول واقعی.
+            {product.model
+              ? "نمای سه‌بعدی واقعی محصول — برای چرخش بکشید."
+              : "نمای سه‌بعدی یک بازنمایی تزئینی و قابل‌چرخش است، نه مدل اسکن‌شده‌ی محصول واقعی."}
           </p>
         </div>
 

@@ -62,6 +62,7 @@ function Cinematic({ mobile }: { mobile: boolean }) {
   const casesBg = useRef<HTMLDivElement>(null);
   const powerBg = useRef<HTMLDivElement>(null);
   const audioBg = useRef<HTMLDivElement>(null);
+  const flare = useRef<HTMLDivElement>(null);
 
   // Only mount the Canvas while the section is near the viewport (frees GPU).
   const [active, setActive] = useState(true);
@@ -138,6 +139,16 @@ function Cinematic({ mobile }: { mobile: boolean }) {
         .to(s4.current, { opacity: 0, y: -24, duration: 0.03 }, 0.76);
       // scene 5 (stays)
       tl.to(s5.current, { opacity: 1, y: 0, duration: 0.04 }, 0.82);
+
+      // light bloom pulse at each scene boundary (morph-like transition)
+      gsap.set(flare.current, { opacity: 0 });
+      [0.2, 0.4, 0.6, 0.8].forEach((b) => {
+        tl.to(flare.current, { opacity: 0.5, duration: 0.02 }, b - 0.02).to(
+          flare.current,
+          { opacity: 0, duration: 0.03 },
+          b + 0.01
+        );
+      });
     }, section);
 
     const refresh = () => ScrollTrigger.refresh();
@@ -190,6 +201,13 @@ function Cinematic({ mobile }: { mobile: boolean }) {
 
         {/* ambient vignette */}
         <div className="pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(70%_70%_at_50%_30%,transparent,rgba(5,5,6,0.55))]" />
+
+        {/* scene-transition light bloom — pulses at each scene boundary to make
+            scenes feel like they morph into one another (scroll-driven) */}
+        <div
+          ref={flare}
+          className="pointer-events-none absolute inset-0 z-[5] opacity-0 bg-[radial-gradient(circle_at_50%_45%,rgba(174,185,214,0.55),transparent_60%)]"
+        />
 
         {/* overlays layer — container passes clicks through, children don't */}
         <div className="pointer-events-none absolute inset-0 z-10">

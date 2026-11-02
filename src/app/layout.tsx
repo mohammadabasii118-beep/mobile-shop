@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { SITE_URL } from "@/lib/site";
 import { CartProvider } from "@/lib/cart-context";
 import { WishlistProvider } from "@/lib/wishlist-context";
 import Header from "@/components/layout/Header";
@@ -13,6 +14,7 @@ const vazir = localFont({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "لوکس‌سل | فروشگاه لوکس لوازم جانبی موبایل",
     template: "%s | لوکس‌سل",
