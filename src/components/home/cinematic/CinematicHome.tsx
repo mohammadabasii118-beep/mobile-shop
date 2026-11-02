@@ -191,7 +191,7 @@ function Cinematic({ mobile }: { mobile: boolean }) {
           <AdBackdrop src={AD.scenes.power} opacity={0.6} />
         </div>
         <div ref={audioBg} className="absolute inset-0 opacity-0">
-          <AdBackdrop src={AD.scenes.audio} opacity={0.42} />
+          <AdBackdrop src={AD.scenes.audio} opacity={0.55} />
         </div>
 
         {/* 3D canvas — never blocks interaction */}
