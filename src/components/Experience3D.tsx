@@ -7,14 +7,14 @@ import { THRESHOLDS } from '../three/scenes'
 import { scrollToId } from '../lib/scrollTo'
 
 const CAPTIONS = [
-  { title: 'تجربه‌ای فراتر از یک گوشی', sub: 'هر چیزی که آیفون شما به آن نیاز دارد، اینجاست.' },
-  { title: 'زیبایی در کنار محافظت', sub: 'قاب، مثل یک قطعه، روی بدنه می‌نشیند.' },
-  { title: 'محافظت نامرئی، شفافیت بی‌نهایت', sub: 'گلس روی نمایشگر قرار می‌گیرد؛ هست، اما دیده نمی‌شود.' },
-  { title: 'همیشه آماده شارژ', sub: 'شارژر و کابل، کنار شما در هر لحظه.' },
-  { title: 'انرژی بدون محدودیت', sub: 'پاوربانک مغناطیسی، انرژی همیشگی.' },
-  { title: 'صدایی فراتر از انتظار', sub: 'کیس باز می‌شود و صدا آزاد می‌شود.' },
-  { title: 'تمام چیزی که آیفون شما نیاز دارد', sub: 'مجموعهٔ کامل، در یک قاب سینمایی.' },
+  { title: 'تجربه‌ای فراتر از یک گوشی', sub: 'آیفون ۱۸ پرومکس — هر چیزی که به آن نیاز دارد، اینجاست.' },
+  { title: 'محافظت نامرئی، شفافیت بی‌نهایت', sub: 'گلس دقیقاً روی نمایشگر می‌نشیند؛ هست، اما دیده نمی‌شود.' },
+  { title: 'نگهبان دوربین شما', sub: 'گلس لنز با حلقه‌های آلومینیومی، روی هر لنز قفل می‌شود.' },
+  { title: 'زیبایی در کنار محافظت', sub: 'قاب مگ‌سیف، مثل یک قطعه، روی بدنه جا می‌افتد.' },
+  { title: 'تمام چیزی که آیفون شما نیاز دارد', sub: 'قاب، گلس صفحه و گلس لنز — در یک قاب سینمایی.' },
 ]
+
+const LAST = CAPTIONS.length - 1
 
 function stageFromProgress(p: number) {
   let s = 0
@@ -39,13 +39,13 @@ export default function Experience3D({ reduced }: { reduced: boolean }) {
   const sectionRef = useRef<HTMLDivElement>(null)
   const pinRef = useRef<HTMLDivElement>(null)
   const progress = useRef(0)
-  const [stage, setStage] = useState(reduced ? 6 : 0)
+  const [stage, setStage] = useState(reduced ? LAST : 0)
   const isMobile = useIsMobile()
 
   useEffect(() => {
     if (reduced) {
       progress.current = 1
-      setStage(6)
+      setStage(LAST)
       return
     }
     const el = sectionRef.current
@@ -54,7 +54,7 @@ export default function Experience3D({ reduced }: { reduced: boolean }) {
     const st = ScrollTrigger.create({
       trigger: el,
       start: 'top top',
-      end: '+=600%',
+      end: '+=450%',
       pin: pinEl,
       pinSpacing: true,
       anticipatePin: 1,
@@ -119,7 +119,7 @@ export default function Experience3D({ reduced }: { reduced: boolean }) {
             </motion.div>
           </AnimatePresence>
 
-          {stage === 6 && (
+          {stage === LAST && (
             <motion.div
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}

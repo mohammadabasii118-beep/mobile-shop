@@ -7,26 +7,16 @@
 //   public/models/iphone.glb
 //   public/models/case.glb
 //   public/models/glass.glb
-//   public/models/charger.glb
-//   public/models/powerbank.glb
-//   public/models/airpods.glb
+//   public/models/lens.glb
 //
 // Example: enable the iPhone GLB →  iphone: '/models/iphone.glb',
 // ──────────────────────────────────────────────────────────────────────────
 
-export type ModelKind =
-  | 'iphone'
-  | 'case'
-  | 'glass'
-  | 'charger'
-  | 'powerbank'
-  | 'airpods'
+export type ModelKind = 'iphone' | 'case' | 'glass' | 'lens'
 
 export const GLB_FILES: Record<ModelKind, string | undefined> = {
   iphone: undefined,
   case: undefined,
   glass: undefined,
-  charger: undefined,
-  powerbank: undefined,
-  airpods: undefined,
+  lens: undefined,
 }
