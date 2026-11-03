@@ -24,6 +24,8 @@ export function useLenis(enabled: boolean) {
       wheelMultiplier: 1,
     })
     lenisInstance = lenis
+    // Debug/testing hook so tooling can drive scroll deterministically.
+    ;(window as unknown as { __lenis?: Lenis }).__lenis = lenis
 
     lenis.on('scroll', ScrollTrigger.update)
 

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import Preloader from './components/Preloader'
 import Navbar from './components/Navbar'
-import ScrollStory from './components/ScrollStory'
+import Experience3D from './components/Experience3D'
 import FeatureBar from './components/FeatureBar'
 import CategoryShowcase from './components/shop/CategoryShowcase'
 import Highlights from './components/shop/Highlights'
@@ -43,7 +43,7 @@ export default function App() {
       <Navbar />
 
       <main>
-        <ScrollStory reduced={reduced} />
+        <Experience3D reduced={reduced} />
         <FeatureBar />
         <CategoryShowcase />
         <Highlights onOpen={setActive} />
