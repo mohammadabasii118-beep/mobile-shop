@@ -9,7 +9,7 @@ export default function PowerBank(props: JSX.IntrinsicElements['group']) {
   return (
     <group {...props}>
       <mesh geometry={bodyGeo} castShadow receiveShadow>
-        <meshPhysicalMaterial color="#17181c" metalness={0.5} roughness={0.4} clearcoat={0.5} clearcoatRoughness={0.3} />
+        <meshPhysicalMaterial color="#eef0f3" metalness={0.1} roughness={0.35} clearcoat={0.5} clearcoatRoughness={0.3} />
       </mesh>
       {/* MagSafe ring */}
       <mesh position={[0, 0.16, z + 0.001]}>

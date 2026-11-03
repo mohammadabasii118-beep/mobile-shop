@@ -44,7 +44,7 @@ export default function Charger(props: JSX.IntrinsicElements['group']) {
 
       {/* cable */}
       <mesh geometry={cableGeo} castShadow>
-        <meshStandardMaterial color="#1b1b1f" metalness={0.3} roughness={0.5} />
+        <meshStandardMaterial color="#f2f3f5" metalness={0.05} roughness={0.45} />
       </mesh>
       {/* cable connector (USB-C) */}
       <mesh position={[0.1, -1.64, 0]} castShadow>
