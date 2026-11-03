@@ -1915,3 +1915,19 @@ def test_bp_test_script_served_and_meta_has_sha():
         assert "token" not in r.text.split("def main")[0][:300].lower() or "--token" in r.text  # only argument names, no embedded secret
         meta = c.get("/api/bp/meta", headers=h).json()
         assert "sha256" in meta and "amd64" in meta["sha256"]
+
+
+def test_node_reports_and_exposes_live_bandwidth():
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "BW", "cc": "de", "address": "bw.example.com"}).json()
+        nh = {"Authorization": "Bearer " + node["install_command"].split("--token ")[1].split()[0]}
+        c.get("/api/node/config", headers=nh)
+        c.post("/api/node/report", headers=nh, json={"load": 10, "rx_bps": 1500000, "tx_bps": 900000})
+        row = next(n for n in c.get("/api/nodes", headers=h).json() if n["id"] == node["id"])
+        assert row["rx_bps"] == 1500000 and row["tx_bps"] == 900000 and row["online"] is True
+        # defaults to 0 when the agent omits them, and negatives are rejected
+        c.post("/api/node/report", headers=nh, json={"load": 5})
+        row = next(n for n in c.get("/api/nodes", headers=h).json() if n["id"] == node["id"])
+        assert row["rx_bps"] == 0 and row["tx_bps"] == 0
+        assert c.post("/api/node/report", headers=nh, json={"rx_bps": -1}).status_code == 422

@@ -56,6 +56,13 @@ const loadCls = v => v > 75 ? 'bad' : v > 55 ? 'warn' : '';
 const protoLabel = id => (S.protos.find(p => p.id === id) || {label: id}).label;
 const nodeBy = id => S.nodes.find(n => n.id === id);
 const fmtGB = v => v.toLocaleString('en', {maximumFractionDigits: 2});
+const fmtRate = bps => {  // bytes/sec -> human-readable; <1s of data shows 0
+  const b = Math.max(0, bps || 0);
+  if (b < 1024) return b.toFixed(0) + ' B/s';
+  if (b < 1024 * 1024) return (b / 1024).toFixed(0) + ' KB/s';
+  if (b < 1024 * 1024 * 1024) return (b / 1024 / 1024).toFixed(1) + ' MB/s';
+  return (b / 1024 / 1024 / 1024).toFixed(2) + ' GB/s';
+};
 
 function showLogin() {
   openModal(`<div class="login">${logoMark()}<h2>${esc(S.brand.name)}</h2><span class="muted">برای ادامه رمز مدیر را وارد کنید</span></div>
@@ -159,6 +166,8 @@ const uPath = id => (isReseller() ? '/me/users/' : '/users/') + id;   // a sub-a
 const views = {
   dash() {
     const on = S.nodes.filter(n => n.online).length, used = S.users.reduce((a, u) => a + u.used_gb, 0);
+    const onNodes = S.nodes.filter(n => n.online);
+    const sumRx = onNodes.reduce((a, n) => a + (n.rx_bps || 0), 0), sumTx = onNodes.reduce((a, n) => a + (n.tx_bps || 0), 0);
     const count = k => S.users.filter(u => u.status === k).length, active = count('active'), blocked = S.users.length - active;
     const stat = (cls, ico, label, value, sub = '') => `<div class="stat"><span class="ico ${cls}">${ic(ico)}</span><div><span class="l">${label}</span><b>${value}${sub ? `<small>${sub}</small>` : ''}</b></div></div>`;
     const top = [...S.users].sort((a, b) => b.used_gb - a.used_gb).slice(0, 5), max = Math.max(1, ...top.map(u => u.used_gb));
@@ -170,11 +179,13 @@ const views = {
       ${stat('', 'server', 'لوکیشن آنلاین', `${num(on + ' / ' + S.nodes.length)}`)}
       ${stat('blue', 'users', 'کاربر فعال', `${num(active + ' / ' + S.users.length)}`, S.users.some(u => u.online) ? `${S.users.filter(u => u.online).length} آنلاین` : '')}
       ${stat('blue', 'activity', 'مصرف کل', num(fmtGB(used)), 'GB')}
-      ${stat(blocked || S.nodes.some(n => n.conflicts.length) ? 'warn' : '', 'alert', 'نیازمند توجه', num(blocked + S.nodes.filter(n => n.conflicts.length || (n.errors || []).length).length), 'مورد')}</div>
+      ${stat(blocked || S.nodes.some(n => n.conflicts.length) ? 'warn' : '', 'alert', 'نیازمند توجه', num(blocked + S.nodes.filter(n => n.conflicts.length || (n.errors || []).length).length), 'مورد')}
+      ${stat('blue', 'activity', 'پهنای‌باند کل (زنده)', `<span dir="ltr">↓ ${fmtRate(sumRx)}</span>`, `<span dir="ltr">↑ ${fmtRate(sumTx)}</span>`)}</div>
       ${hero}<div class="panel"><h2>${ic('pin')}لوکیشن‌ها</h2>${S.nodes.length ? `<div class="nodes">${S.nodes.map(n => `
         <div class="ncard ${n.online ? '' : 'off'}"><div class="ring ${loadCls(n.load)}" style="--v:${n.online ? n.load : 0}"><b>${n.online ? n.load + '%' : '—'}</b></div>
           <div class="t"><strong><span class="cc">${esc(n.cc)}</span>${esc(n.name)}</strong><span class="muted mono">${esc(n.address)}</span>
-            <span><span class="pill ${n.online ? 'good' : 'warn'}">${n.online ? 'آنلاین' : 'آفلاین'}</span>${n.conflicts.length ? ' <span class="pill bad" title="' + esc(n.conflicts.join('، ')) + '">تداخل پورت</span>' : ''}</span></div></div>`).join('')}</div>` :
+            <span><span class="pill ${n.online ? 'good' : 'warn'}">${n.online ? 'آنلاین' : 'آفلاین'}</span>${n.conflicts.length ? ' <span class="pill bad" title="' + esc(n.conflicts.join('، ')) + '">تداخل پورت</span>' : ''}</span>
+            ${n.online ? `<span class="muted mono" dir="ltr" style="font-size:12px">↓ ${fmtRate(n.rx_bps)} · ↑ ${fmtRate(n.tx_bps)}</span>` : ''}</div></div>`).join('')}</div>` :
         `<div class="empty">${ic('pin')}<span>هنوز لوکیشنی اضافه نشده. از بخش «لوکیشن‌ها» اولین نود را اضافه کنید.</span></div>`}</div>
       <div class="cols">
         <div class="panel"><h2>${ic('trophy')}پرمصرف‌ترین کاربران</h2>${top.length ? `<div class="top5">${top.map(u => `

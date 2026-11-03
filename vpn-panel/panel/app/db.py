@@ -27,6 +27,8 @@ class Node(Base):
     l2tp_psk: Mapped[str]
     last_seen: Mapped[datetime | None] = mapped_column(default=None)
     load: Mapped[int] = mapped_column(default=0)
+    rx_bps: Mapped[int] = mapped_column(default=0)   # last reported uplink throughput, bytes/sec (download)
+    tx_bps: Mapped[int] = mapped_column(default=0)   # last reported uplink throughput, bytes/sec (upload)
     reality_pub: Mapped[str] = mapped_column(default="")
     reality_sid: Mapped[str] = mapped_column(default="")
     tls_self_signed: Mapped[bool] = mapped_column(default=True)

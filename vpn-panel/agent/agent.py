@@ -412,6 +412,59 @@ def cpu_load_percent():
         return min(100, int(os.getloadavg()[0] / (os.cpu_count() or 1) * 100))
 
 
+def _default_iface():
+    """The interface with the default route (the server's main uplink), or '' if it can't be read."""
+    try:
+        with open("/proc/net/route") as f:
+            for line in f.readlines()[1:]:
+                parts = line.split()
+                if len(parts) > 1 and parts[1] == "00000000":   # destination 0.0.0.0 = the default route
+                    return parts[0]
+    except OSError:
+        pass
+    return ""
+
+
+def _iface_bytes(iface):
+    """(rx_bytes, tx_bytes) for one interface from /proc/net/dev."""
+    with open("/proc/net/dev") as f:
+        for line in f:
+            if ":" in line:
+                name, rest = line.split(":", 1)
+                if name.strip() == iface:
+                    v = rest.split()
+                    return int(v[0]), int(v[8])
+    return 0, 0
+
+
+_net_prev = None   # (iface, rx, tx, monotonic time)
+
+
+def net_rate():
+    """Current uplink throughput of the main interface since the last call: (rx_bytes_per_sec, tx_bytes_per_sec).
+    rx is what the server receives (download), tx is what it sends (upload). 0,0 until there are two readings."""
+    global _net_prev
+    try:
+        iface = _default_iface()
+        if not iface:
+            return 0, 0
+        rx, tx = _iface_bytes(iface)
+        now = time.monotonic()
+        prev = _net_prev
+        _net_prev = (iface, rx, tx, now)
+        if not prev or prev[0] != iface:
+            return 0, 0
+        dt = now - prev[3]
+        if dt <= 0:
+            return 0, 0
+        drx, dtx = rx - prev[1], tx - prev[2]
+        if drx < 0 or dtx < 0:       # counter reset (reboot / NIC reset)
+            return 0, 0
+        return int(drx / dt), int(dtx / dt)
+    except (OSError, ValueError, IndexError):
+        return 0, 0
+
+
 _hash_cache = {}
 
 
@@ -1210,8 +1263,10 @@ def main():
             for src in (xray_usage(), wg_usage(cfg) if wg else {}, session_usage()):
                 for k, v in src.items():
                     pending[k] = pending.get(k, 0) + v
+            rx_bps, tx_bps = net_rate()
             api(conf, "POST", "/api/node/report", {
                 "load": cpu_load_percent(), "usage": pending, "reality_pub": reality["public"],
+                "rx_bps": rx_bps, "tx_bps": tx_bps,
                 "reality_sid": reality["short_id"], "tls_self_signed": conf.get("tls_self_signed", True), "tls_pin": cert_sha256(tls["cert"]),
                 "conflicts": conflicts, "errors": errors, "wg_pub": wg["public"] if wg else "", "ovpn_ca": read_text(f"{STATE_DIR}/ovpn/ca.crt"), "tunnels": tunnel_state, "bp": bp_report,
                 "keys": {k: v for k, v in (("reality", reality), ("wg", wg)) if v and all(v.values())}, **dnstt})

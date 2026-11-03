@@ -322,7 +322,7 @@ def node_out(node: Node, request: Request) -> dict:
     return {
         "id": node.id, "name": node.name, "cc": node.cc, "address": node.address,
         "reality_sni": node.reality_sni or REALITY_SNI, "cf_domain": node.cf_domain, "cf_address": node.cf_address, "raw_host": node.raw_host, "cf_only": node.cf_only, "conflicts": node.conflicts or [], "errors": node.errors or [], "port_range": list(PORT_RANGE),
-        "online": is_online(node), "load": node.load, "reality_ready": bool(node.reality_pub),
+        "online": is_online(node), "load": node.load, "rx_bps": node.rx_bps, "tx_bps": node.tx_bps, "reality_ready": bool(node.reality_pub),
         "last_seen": node.last_seen.isoformat() + "Z" if node.last_seen else None,
         "protocols": [{"id": p.id, "proto": p.proto, "enabled": p.enabled, "port": p.port, "host": p.host,
                        "label": p.label, "extra": p.extra, "fixed": PROTOCOLS[p.proto]["fixed_port"]}
@@ -1828,6 +1828,8 @@ def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db
 
 class Report(BaseModel):
     load: int = Field(ge=0, le=100, default=0)
+    rx_bps: int = Field(ge=0, default=0)   # uplink throughput now, bytes/sec (download)
+    tx_bps: int = Field(ge=0, default=0)   # uplink throughput now, bytes/sec (upload)
     usage: dict[str, int] = {}  # username -> bytes since last report
     reality_pub: str = ""
     reality_sid: str = ""
@@ -1850,6 +1852,7 @@ KEY_FIELDS = {"reality": {"private", "public", "short_id"}, "wg": {"private", "p
 @app.post("/api/node/report")
 def node_report(body: Report, node: Node = Depends(require_node), db: Session = Depends(get_db)):
     node.last_seen, node.load = utcnow(), body.load
+    node.rx_bps, node.tx_bps = body.rx_bps, body.tx_bps
     node.conflicts = [c[:120] for c in body.conflicts]
     node.errors = [e[:300] for e in body.errors]
     node.tls_self_signed = body.tls_self_signed
