@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">
+<defs>
+<linearGradient id="metal" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#fbfbfc"/><stop offset=".35" stop-color="#c9cdd3"/>
+<stop offset=".6" stop-color="#8a9099"/><stop offset=".8" stop-color="#d7dadf"/><stop offset="1" stop-color="#9aa0a8"/>
+</linearGradient>
+<linearGradient id="metalV" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0" stop-color="#7d838c"/><stop offset=".25" stop-color="#e9ebee"/>
+<stop offset=".5" stop-color="#b4b9c0"/><stop offset=".75" stop-color="#f5f6f7"/><stop offset="1" stop-color="#6f757e"/>
+</linearGradient>
+<linearGradient id="metalH" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#f6f7f8"/><stop offset=".45" stop-color="#b9bec5"/><stop offset=".55" stop-color="#8d939b"/><stop offset="1" stop-color="#d4d7dc"/>
+</linearGradient>
+<linearGradient id="dark" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#5d626b"/><stop offset=".5" stop-color="#2b2e34"/><stop offset="1" stop-color="#16181b"/>
+</linearGradient>
+<linearGradient id="darkV" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0" stop-color="#121316"/><stop offset=".3" stop-color="#4a4f57"/><stop offset=".55" stop-color="#26292e"/><stop offset="1" stop-color="#0d0e10"/>
+</linearGradient>
+<linearGradient id="red" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#ff5a4f"/><stop offset=".45" stop-color="#e10600"/><stop offset="1" stop-color="#7d0000"/>
+</linearGradient>
+<linearGradient id="redV" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0" stop-color="#8a0000"/><stop offset=".35" stop-color="#ff4136"/><stop offset=".6" stop-color="#d40500"/><stop offset="1" stop-color="#6e0000"/>
+</linearGradient>
+<linearGradient id="gold" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0" stop-color="#8a6a2a"/><stop offset=".35" stop-color="#f3d98b"/><stop offset=".6" stop-color="#c79a3c"/><stop offset="1" stop-color="#6b4f1c"/>
+</linearGradient>
+<linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#4b7bd6"/><stop offset="1" stop-color="#173a7a"/>
+</linearGradient>
+<linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#fff" stop-opacity=".75"/><stop offset=".5" stop-color="#fff" stop-opacity=".08"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+</linearGradient>
+<radialGradient id="shadow" cx=".5" cy=".5" r=".5">
+<stop offset="0" stop-color="#000" stop-opacity=".38"/><stop offset=".6" stop-color="#000" stop-opacity=".12"/><stop offset="1" stop-color="#000" stop-opacity="0"/>
+</radialGradient>
+<radialGradient id="disc" cx=".42" cy=".38" r=".7">
+<stop offset="0" stop-color="#f4f5f6"/><stop offset=".35" stop-color="#c3c7cd"/><stop offset=".55" stop-color="#e4e6e9"/>
+<stop offset=".75" stop-color="#959ba3"/><stop offset="1" stop-color="#666c75"/>
+</radialGradient>
+<filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="6"/></filter>
+</defs>
+<ellipse cx="290" cy="490" rx="230" ry="22" fill="url(#shadow)"/>
+<g>
+<path d="M380 330 L470 350 Q500 370 490 420 L470 450 L380 420Z" fill="url(#darkV)"/>
+<path d="M70 230 Q90 130 230 120 L400 130 Q470 150 465 260 L455 360 Q440 420 360 420 L160 410 Q70 400 70 300Z" fill="url(#dark)" stroke="#000" stroke-width="3"/>
+<path d="M95 240 Q110 150 232 142 L395 152 Q445 168 442 262 L433 352 Q422 398 360 398 L165 390 Q95 382 95 300Z" fill="url(#metal)" opacity=".9"/>
+<path d="M95 240 Q110 150 232 142 L395 152 Q445 168 442 262 L433 352 Q422 398 360 398 L165 390 Q95 382 95 300Z" fill="url(#blue)" opacity=".28"/>
+<path d="M110 230 Q130 165 240 160 L330 164 L180 380 L160 378 Q110 370 110 300Z" fill="#fff" opacity=".35"/>
+<path d="M120 400 L420 405" stroke="#ff8a00" stroke-width="8" stroke-linecap="round"/>
+</g>
+</svg>

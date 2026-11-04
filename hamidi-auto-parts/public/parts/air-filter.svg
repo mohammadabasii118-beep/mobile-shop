@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 600">
+<defs>
+<linearGradient id="metal" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#fbfbfc"/><stop offset=".35" stop-color="#c9cdd3"/>
+<stop offset=".6" stop-color="#8a9099"/><stop offset=".8" stop-color="#d7dadf"/><stop offset="1" stop-color="#9aa0a8"/>
+</linearGradient>
+<linearGradient id="metalV" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0" stop-color="#7d838c"/><stop offset=".25" stop-color="#e9ebee"/>
+<stop offset=".5" stop-color="#b4b9c0"/><stop offset=".75" stop-color="#f5f6f7"/><stop offset="1" stop-color="#6f757e"/>
+</linearGradient>
+<linearGradient id="metalH" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#f6f7f8"/><stop offset=".45" stop-color="#b9bec5"/><stop offset=".55" stop-color="#8d939b"/><stop offset="1" stop-color="#d4d7dc"/>
+</linearGradient>
+<linearGradient id="dark" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#5d626b"/><stop offset=".5" stop-color="#2b2e34"/><stop offset="1" stop-color="#16181b"/>
+</linearGradient>
+<linearGradient id="darkV" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0" stop-color="#121316"/><stop offset=".3" stop-color="#4a4f57"/><stop offset=".55" stop-color="#26292e"/><stop offset="1" stop-color="#0d0e10"/>
+</linearGradient>
+<linearGradient id="red" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#ff5a4f"/><stop offset=".45" stop-color="#e10600"/><stop offset="1" stop-color="#7d0000"/>
+</linearGradient>
+<linearGradient id="redV" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0" stop-color="#8a0000"/><stop offset=".35" stop-color="#ff4136"/><stop offset=".6" stop-color="#d40500"/><stop offset="1" stop-color="#6e0000"/>
+</linearGradient>
+<linearGradient id="gold" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0" stop-color="#8a6a2a"/><stop offset=".35" stop-color="#f3d98b"/><stop offset=".6" stop-color="#c79a3c"/><stop offset="1" stop-color="#6b4f1c"/>
+</linearGradient>
+<linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#4b7bd6"/><stop offset="1" stop-color="#173a7a"/>
+</linearGradient>
+<linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#fff" stop-opacity=".75"/><stop offset=".5" stop-color="#fff" stop-opacity=".08"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+</linearGradient>
+<radialGradient id="shadow" cx=".5" cy=".5" r=".5">
+<stop offset="0" stop-color="#000" stop-opacity=".38"/><stop offset=".6" stop-color="#000" stop-opacity=".12"/><stop offset="1" stop-color="#000" stop-opacity="0"/>
+</radialGradient>
+<radialGradient id="disc" cx=".42" cy=".38" r=".7">
+<stop offset="0" stop-color="#f4f5f6"/><stop offset=".35" stop-color="#c3c7cd"/><stop offset=".55" stop-color="#e4e6e9"/>
+<stop offset=".75" stop-color="#959ba3"/><stop offset="1" stop-color="#666c75"/>
+</radialGradient>
+<filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="6"/></filter>
+</defs>
+<ellipse cx="310" cy="450" rx="250" ry="24" fill="url(#shadow)"/>
+<g transform="translate(0 20)">
+<path d="M90 250 L510 220 L540 330 L120 370Z" fill="#1d1f23"/>
+<path d="M110 255 L500 228 L522 322 L132 356Z" fill="#f5efe2"/>
+<line x1="110.0" y1="255.0" x2="132.0" y2="356.0" stroke="#fffaf0" stroke-width="7"/><line x1="122.6" y1="254.1" x2="144.6" y2="354.9" stroke="#d6cdb8" stroke-width="7"/><line x1="135.2" y1="253.3" x2="157.2" y2="353.8" stroke="#fffaf0" stroke-width="7"/><line x1="147.7" y1="252.4" x2="169.7" y2="352.7" stroke="#d6cdb8" stroke-width="7"/><line x1="160.3" y1="251.5" x2="182.3" y2="351.6" stroke="#fffaf0" stroke-width="7"/><line x1="172.9" y1="250.6" x2="194.9" y2="350.5" stroke="#d6cdb8" stroke-width="7"/><line x1="185.5" y1="249.8" x2="207.5" y2="349.4" stroke="#fffaf0" stroke-width="7"/><line x1="198.1" y1="248.9" x2="220.1" y2="348.3" stroke="#d6cdb8" stroke-width="7"/><line x1="210.6" y1="248.0" x2="232.6" y2="347.2" stroke="#fffaf0" stroke-width="7"/><line x1="223.2" y1="247.2" x2="245.2" y2="346.1" stroke="#d6cdb8" stroke-width="7"/><line x1="235.8" y1="246.3" x2="257.8" y2="345.0" stroke="#fffaf0" stroke-width="7"/><line x1="248.4" y1="245.4" x2="270.4" y2="343.9" stroke="#d6cdb8" stroke-width="7"/><line x1="261.0" y1="244.5" x2="283.0" y2="342.8" stroke="#fffaf0" stroke-width="7"/><line x1="273.5" y1="243.7" x2="295.5" y2="341.7" stroke="#d6cdb8" stroke-width="7"/><line x1="286.1" y1="242.8" x2="308.1" y2="340.6" stroke="#fffaf0" stroke-width="7"/><line x1="298.7" y1="241.9" x2="320.7" y2="339.5" stroke="#d6cdb8" stroke-width="7"/><line x1="311.3" y1="241.1" x2="333.3" y2="338.5" stroke="#fffaf0" stroke-width="7"/><line x1="323.9" y1="240.2" x2="345.9" y2="337.4" stroke="#d6cdb8" stroke-width="7"/><line x1="336.5" y1="239.3" x2="358.5" y2="336.3" stroke="#fffaf0" stroke-width="7"/><line x1="349.0" y1="238.5" x2="371.0" y2="335.2" stroke="#d6cdb8" stroke-width="7"/><line x1="361.6" y1="237.6" x2="383.6" y2="334.1" stroke="#fffaf0" stroke-width="7"/><line x1="374.2" y1="236.7" x2="396.2" y2="333.0" stroke="#d6cdb8" stroke-width="7"/><line x1="386.8" y1="235.8" x2="408.8" y2="331.9" stroke="#fffaf0" stroke-width="7"/><line x1="399.4" y1="235.0" x2="421.4" y2="330.8" stroke="#d6cdb8" stroke-width="7"/><line x1="411.9" y1="234.1" x2="433.9" y2="329.7" stroke="#fffaf0" stroke-width="7"/><line x1="424.5" y1="233.2" x2="446.5" y2="328.6" stroke="#d6cdb8" stroke-width="7"/><line x1="437.1" y1="232.4" x2="459.1" y2="327.5" stroke="#fffaf0" stroke-width="7"/><line x1="449.7" y1="231.5" x2="471.7" y2="326.4" stroke="#d6cdb8" stroke-width="7"/><line x1="462.3" y1="230.6" x2="484.3" y2="325.3" stroke="#fffaf0" stroke-width="7"/><line x1="474.8" y1="229.7" x2="496.8" y2="324.2" stroke="#d6cdb8" stroke-width="7"/><line x1="487.4" y1="228.9" x2="509.4" y2="323.1" stroke="#fffaf0" stroke-width="7"/><line x1="500.0" y1="228.0" x2="522.0" y2="322.0" stroke="#d6cdb8" stroke-width="7"/>
+<path d="M90 250 L120 370 L120 390 L90 270Z" fill="#0d0e10"/>
+<path d="M120 370 L540 330 L540 350 L120 390Z" fill="#0d0e10"/>
+<path d="M90 250 L510 220" stroke="#e10600" stroke-width="5"/>
+</g>
+</svg>
