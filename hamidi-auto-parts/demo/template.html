@@ -1,0 +1,1208 @@
+<title>فروشگاه حمیدی</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="نسخه نمایشی فروشگاه اینترنتی لوازم یدکی نیسان و هوندا — HAMIDI AUTO PARTS">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800;900&display=swap">
+<style>
+/* Layout: sticky store header → full-width dark bands for heroes, white catalogue body in a 1320px column. Single committed look (brand colours set by the client). */
+:root {
+  --ink: #0b0b0d; --ink-2: #16161a; --red: #e10600; --red-d: #b00500; --red-soft: #fff0ef;
+  --bg: #ffffff; --soft: #f4f4f6; --line: #e5e5ea; --tx: #0b0b0d; --tx-2: #55555e; --tx-3: #6f6f78;
+  --ok: #0f8a4b; --warn: #b26a00; --wa: #25d366;
+  --font: "Vazirmatn", Tahoma, "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --r: 16px; --r-lg: 24px;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--tx); font-family: var(--font); font-size: 15px; line-height: 1.7; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 60; background: var(--bg); }
+a { color: inherit; text-decoration: none; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: none; padding: 0; }
+img { max-width: 100%; display: block; }
+h1, h2, h3 { text-wrap: balance; line-height: 1.35; margin: 0; }
+:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+.wrap { width: 100%; max-width: 1320px; margin-inline: auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.ltr { direction: ltr; unicode-bidi: isolate; font-family: var(--mono); }
+.muted { color: var(--tx-2); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.carbon { background-color: #0e0e10; background-image: radial-gradient(circle at 25% 25%, rgb(255 255 255 / .04) 1px, transparent 1.5px), radial-gradient(circle at 75% 75%, rgb(255 255 255 / .04) 1px, transparent 1.5px); background-size: 6px 6px; color: #fff; }
+.grid-bg { position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(to right, rgb(255 255 255 / .05) 1px, transparent 1px), linear-gradient(to bottom, rgb(255 255 255 / .05) 1px, transparent 1px); background-size: 44px 44px; -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%); mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%); }
+.glow { position: absolute; border-radius: 50%; background: rgb(225 6 0 / .3); filter: blur(110px); pointer-events: none; }
+.studio { background: radial-gradient(120% 90% at 50% 30%, #fff 0%, #f1f1f3 55%, #e5e5e9 100%); }
+
+/* buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: 12px; font-weight: 700; font-size: 14px; white-space: nowrap; transition: background .2s, transform .1s, box-shadow .2s, border-color .2s; }
+.btn:active { transform: scale(.97); }
+.btn svg { width: 18px; height: 18px; flex: none; }
+.btn-red { background: var(--red); color: #fff; box-shadow: 0 8px 20px -8px rgb(225 6 0 / .7); }
+.btn-red:hover { background: var(--red-d); }
+.btn-dark { background: var(--ink); color: #fff; }
+.btn-dark:hover { background: var(--red); }
+.btn-out { border: 1px solid var(--line); background: #fff; }
+.btn-out:hover { border-color: var(--ink); }
+.btn-ghost-w { border: 1px solid rgb(255 255 255 / .2); background: rgb(255 255 255 / .05); color: #fff; }
+.btn-ghost-w:hover { background: #fff; color: var(--ink); }
+.btn-wa { background: var(--wa); color: #fff; }
+.btn-sm { height: 36px; padding: 0 12px; font-size: 13px; border-radius: 10px; }
+.btn-lg { height: 52px; padding: 0 26px; font-size: 15px; border-radius: 14px; }
+.btn[disabled] { opacity: .5; pointer-events: none; }
+.btn.done { background: var(--ok); box-shadow: none; }
+
+/* header */
+.topbar { font-size: 12px; color: #cfcfd4; }
+.topbar .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 36px; }
+.topbar .t-items { display: flex; gap: 20px; }
+.topbar .t-items span { display: inline-flex; align-items: center; gap: 6px; }
+.topbar svg { width: 14px; height: 14px; color: var(--red); }
+header.main { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 40; background: #fff; border-bottom: 1px solid var(--line); }
+.h-row { display: flex; align-items: center; gap: 12px; padding-block: 12px; }
+.logo { display: flex; align-items: center; gap: 10px; }
+.logo svg { width: 44px; height: 44px; transition: transform .5s; flex: none; }
+.logo:hover svg { transform: rotate(30deg); }
+.logo b { display: block; font-size: 16px; font-weight: 900; letter-spacing: -.01em; direction: ltr; text-align: right; line-height: 1.2; }
+.logo b i { font-style: normal; color: var(--red); }
+.logo small { display: block; font-size: 11px; color: var(--tx-3); line-height: 1.4; }
+.dark .logo small { color: #a1a1aa; }
+.dark .logo b { color: #fff; }
+.search { position: relative; flex: 1; max-width: 640px; }
+.search input { width: 100%; height: 48px; border-radius: 16px; border: 1px solid #d4d4da; background: var(--soft); padding: 0 46px 0 104px; font-size: 16px; outline: none; transition: border-color .2s, background .2s; }
+.search input:focus { border-color: var(--ink); background: #fff; }
+.search .s-ico { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--tx-3); pointer-events: none; }
+.search .s-btn { position: absolute; left: 6px; top: 6px; bottom: 6px; padding: 0 16px; border-radius: 12px; background: var(--ink); color: #fff; font-weight: 700; font-size: 13px; }
+.search .s-btn:hover { background: var(--red); }
+.suggest { position: absolute; inset-inline: 0; top: calc(100% + 8px); background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 24px 60px -20px rgb(0 0 0 / .35); overflow: hidden; z-index: 50; }
+.suggest .s-head { padding: 10px 16px; font-size: 12px; color: var(--tx-2); border-bottom: 1px solid var(--soft); }
+.suggest a.s-item { display: flex; align-items: center; gap: 12px; padding: 9px 16px; }
+.suggest a.s-item:hover, .suggest a.s-item.on { background: var(--soft); }
+.suggest .s-item img { width: 46px; height: 46px; border-radius: 10px; padding: 4px; flex: none; }
+.suggest .s-item .nm { display: block; font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.suggest .s-item .mt { display: block; font-size: 11px; color: var(--tx-2); }
+.suggest .s-item .pr { margin-inline-start: auto; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.suggest .s-all { display: block; text-align: center; padding: 12px; background: var(--soft); color: var(--red); font-weight: 700; font-size: 14px; }
+.suggest .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 16px; }
+.h-actions { display: flex; align-items: center; gap: 8px; margin-inline-start: auto; }
+.h-phone { display: none; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 14px; }
+.h-phone .ic { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: var(--red-soft); color: var(--red); }
+.h-phone .ic svg { width: 18px; height: 18px; }
+.h-phone small { display: block; font-size: 11px; color: var(--tx-3); line-height: 1.3; }
+.h-phone b { font-size: 14px; }
+.cart-btn { position: relative; display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 14px; border-radius: 16px; background: var(--ink); color: #fff; font-weight: 700; font-size: 14px; }
+.cart-btn:hover { background: var(--red); }
+.cart-btn svg { width: 20px; height: 20px; }
+.cart-btn .lbl { display: none; }
+.cart-btn .cnt { position: absolute; top: -7px; left: -7px; min-width: 24px; height: 24px; padding: 0 5px; border-radius: 99px; background: var(--red); border: 2px solid #fff; font-size: 11px; display: grid; place-items: center; }
+.menu-btn { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 16px; border: 1px solid #d4d4da; }
+.menu-btn svg { width: 20px; height: 20px; }
+.m-search { padding-bottom: 12px; }
+nav.mainnav { display: none; background: var(--ink); color: #fff; }
+nav.mainnav .wrap { display: flex; align-items: stretch; height: 48px; }
+.mega { position: relative; }
+.mega > a { display: flex; align-items: center; gap: 8px; height: 100%; padding: 0 20px; background: var(--red); font-weight: 700; font-size: 14px; }
+.mega > a svg { width: 16px; height: 16px; }
+.mega-panel { position: absolute; top: 100%; right: 0; width: 760px; background: #fff; color: var(--tx); border-radius: 0 0 20px 20px; box-shadow: 0 30px 60px -20px rgb(0 0 0 / .4); padding: 18px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; opacity: 0; visibility: hidden; transform: translateY(8px); transition: .2s; }
+.mega:hover .mega-panel, .mega:focus-within .mega-panel { opacity: 1; visibility: visible; transform: none; }
+.mega-panel a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; }
+.mega-panel a:hover { background: var(--soft); }
+.mega-panel img { width: 42px; height: 42px; border-radius: 10px; padding: 3px; flex: none; }
+.mega-panel b { display: block; font-size: 14px; }
+.mega-panel small { display: block; font-size: 11px; color: var(--tx-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+.navlinks { display: flex; }
+.navlinks a { position: relative; display: flex; align-items: center; padding: 0 16px; font-size: 14px; color: #cfcfd4; }
+.navlinks a:hover, .navlinks a.on { color: #fff; }
+.navlinks a::after { content: ""; position: absolute; inset-inline: 16px; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--red); transform: scaleX(0); transition: transform .2s; }
+.navlinks a:hover::after, .navlinks a.on::after { transform: scaleX(1); }
+.nav-deal { margin: auto 0; margin-inline-start: auto; display: flex; align-items: center; gap: 8px; padding: 6px 16px; border-radius: 99px; background: rgb(255 255 255 / .1); font-size: 12px; font-weight: 700; }
+.nav-deal i { width: 6px; height: 6px; border-radius: 50%; background: var(--red); }
+
+/* drawers */
+.overlay { position: fixed; inset: 0; background: rgb(0 0 0 / .55); z-index: 70; }
+.drawer { position: fixed; z-index: 71; background: #fff; display: flex; flex-direction: column; box-shadow: 0 0 60px rgb(0 0 0 / .3); }
+.drawer.side { top: 0; bottom: 0; right: 0; width: min(88%, 380px); padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); animation: slideR .3s ease; }
+.drawer.bottom { left: 0; right: 0; bottom: 0; max-height: 86dvh; border-radius: 24px 24px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px); animation: slideB .3s ease; }
+.drawer.center { left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(calc(100% - 32px), 440px); border-radius: 24px; max-height: 90dvh; overflow: auto; }
+@keyframes slideR { from { transform: translateX(100%); } }
+@keyframes slideB { from { transform: translateY(100%); } }
+.drawer .d-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.drawer .d-body { flex: 1; overflow-y: auto; padding: 14px; }
+.drawer .d-foot { padding: 14px; border-top: 1px solid var(--line); display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.x-btn { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--soft); flex: none; }
+.x-btn svg { width: 16px; height: 16px; }
+.m-links a { display: flex; justify-content: space-between; align-items: center; padding: 13px 14px; border-radius: 12px; font-weight: 700; }
+.m-links a:hover, .m-links a.on { background: var(--red-soft); color: var(--red); }
+details.m-acc { margin-top: 8px; background: var(--soft); border-radius: 12px; }
+details.m-acc summary { list-style: none; padding: 12px 14px; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; justify-content: space-between; }
+details.m-acc summary::-webkit-details-marker { display: none; }
+details.m-acc .acc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 0 8px 10px; }
+details.m-acc .acc-grid a { padding: 8px 10px; border-radius: 8px; font-size: 14px; }
+details.m-acc .acc-grid a:hover { background: #fff; }
+
+/* hero */
+.hero { position: relative; overflow: hidden; }
+.hero .wrap { position: relative; display: grid; gap: 28px; align-items: center; padding-block: 40px 120px; }
+.eyebrow-pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgb(255 255 255 / .15); background: rgb(255 255 255 / .05); border-radius: 99px; padding: 5px 14px; font-size: 12px; font-weight: 600; color: #e4e4e7; }
+.eyebrow-pill i { width: 6px; height: 6px; border-radius: 50%; background: var(--red); }
+.hero h1 { margin-top: 22px; font-size: clamp(34px, 7vw, 56px); font-weight: 900; line-height: 1.3; letter-spacing: -.01em; }
+.hero h1 span { background: linear-gradient(to left, #ff6a5f, #ff2a1f); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hero p.lead { margin: 18px 0 0; max-width: 34em; color: #d4d4d8; font-size: clamp(15px, 2vw, 18px); line-height: 2; }
+.hero .ctas { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+.hero-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 480px; margin-top: 34px; }
+.hero-stats div { border: 1px solid rgb(255 255 255 / .1); background: rgb(255 255 255 / .03); border-radius: 16px; padding: 12px; }
+.hero-stats b { display: block; font-size: 18px; font-weight: 900; margin-top: 6px; }
+.hero-stats small { color: #d4d4d8; font-size: 11px; }
+.hero-stats svg { width: 20px; height: 20px; color: #ff5a4f; }
+.hero-art { position: relative; width: 100%; max-width: 300px; aspect-ratio: 1; margin-inline: auto; }
+.hero-art .ring { position: absolute; inset: 6%; border-radius: 50%; border: 1px solid rgb(255 255 255 / .1); }
+.hero-art .ring2 { position: absolute; inset: 16%; border-radius: 50%; border: 1px dashed rgb(255 255 255 / .15); animation: spin 28s linear infinite; }
+.hero-art .main { position: absolute; inset: 8%; width: 84%; height: 84%; object-fit: contain; filter: drop-shadow(0 40px 60px rgb(0 0 0 / .6)); }
+.hero-art .float { position: absolute; display: none; width: 108px; height: 108px; border-radius: 24px; background: rgb(255 255 255 / .92); padding: 8px; box-shadow: 0 20px 40px rgb(0 0 0 / .4); animation: float 6s ease-in-out infinite; }
+.hero-art .float.a { top: 2%; right: -2%; }
+.hero-art .float.b { bottom: 6%; left: -2%; animation-delay: -3s; }
+.hero-art .tag { position: absolute; top: 42%; left: -6px; background: var(--red); border-radius: 14px; padding: 8px 14px; font-weight: 800; font-size: 13px; box-shadow: 0 15px 40px -10px rgb(225 6 0 / .9); }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes float { 50% { transform: translateY(-12px); } }
+
+.trust { position: relative; z-index: 2; margin-top: -76px; }
+.trust ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 24px; overflow: hidden; box-shadow: 0 30px 60px -30px rgb(0 0 0 / .3); }
+.trust li { display: flex; align-items: center; gap: 12px; background: #fff; padding: 14px; }
+.trust li:last-child { grid-column: 1 / -1; }
+.trust .ic { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 14px; background: var(--ink); color: #fff; flex: none; }
+.trust .ic svg { width: 20px; height: 20px; }
+.trust b { display: block; font-size: 13px; font-weight: 800; }
+.trust small { display: block; font-size: 11px; color: var(--tx-2); line-height: 1.6; }
+
+/* sections */
+section.sec { margin-top: 64px; }
+.sec-h { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: 26px; }
+.eyebrow { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; color: var(--red); letter-spacing: .02em; margin: 0 0 6px; }
+.eyebrow::before { content: ""; width: 24px; height: 3px; border-radius: 3px; background: var(--red); }
+.sec-h h2 { font-size: clamp(22px, 3.4vw, 30px); font-weight: 900; }
+.sec-h p { margin: 6px 0 0; color: var(--tx-2); font-size: 14px; max-width: 36em; }
+.more { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 99px; padding: 7px 16px; font-size: 14px; font-weight: 700; transition: .2s; }
+.more:hover { background: var(--ink); border-color: var(--ink); color: #fff; }
+.more svg { width: 16px; height: 16px; }
+
+/* finder */
+.finder { border: 1px solid var(--line); border-radius: 24px; padding: 20px; background: #fff; box-shadow: 0 30px 60px -30px rgb(0 0 0 / .25); }
+.finder-h { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.finder-h .ic { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; background: var(--red); color: #fff; flex: none; }
+.finder-h .ic svg { width: 20px; height: 20px; }
+.finder-h h2 { font-size: 17px; font-weight: 800; }
+.finder-h p { margin: 0; font-size: 12px; color: var(--tx-2); }
+.finder-g { display: grid; gap: 14px; }
+.step { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--tx-2); margin-bottom: 8px; }
+.step i { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ink); color: #fff; font-style: normal; font-size: 10px; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.seg button { height: 44px; border-radius: 12px; border: 1px solid #d4d4da; font-weight: 800; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; transition: .2s; }
+.seg button small { font-size: 10px; letter-spacing: .15em; opacity: .75; direction: ltr; }
+.seg button.on { background: var(--red); border-color: var(--red); color: #fff; }
+.sel { position: relative; }
+.sel select { width: 100%; height: 44px; border-radius: 12px; border: 1px solid #d4d4da; background: #fff; padding: 0 14px 0 36px; appearance: none; font-size: 15px; }
+.sel select:disabled { opacity: .55; }
+.sel svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; pointer-events: none; opacity: .6; }
+
+/* category cards */
+.cat-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.cat-card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: #fff; transition: transform .3s, box-shadow .3s, border-color .3s; height: 100%; }
+.cat-card:hover { transform: translateY(-4px); border-color: var(--ink); box-shadow: 0 20px 40px -20px rgb(0 0 0 / .35); }
+.cat-card .im { aspect-ratio: 1; padding: 14%; }
+.cat-card .im img { width: 100%; height: 100%; object-fit: contain; transition: transform .5s; }
+.cat-card:hover .im img { transform: scale(1.1); }
+.cat-card .tx { padding: 12px 14px; }
+.cat-card b { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cat-card small { font-size: 11px; color: var(--tx-2); }
+.cat-card p { margin: 6px 0 0; font-size: 12px; color: var(--tx-2); line-height: 1.8; }
+
+/* product card */
+.p-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr; gap: 14px; }
+.p-grid > li { display: flex; }
+.card { position: relative; display: flex; flex-direction: column; width: 100%; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; background: #fff; transition: transform .3s, box-shadow .3s; }
+.card:hover { transform: translateY(-4px); box-shadow: 0 24px 48px -24px rgb(11 11 13 / .35); }
+.card .im { position: relative; aspect-ratio: 4 / 3.4; }
+.card .im img { width: 100%; height: 100%; object-fit: contain; padding: 8%; transition: transform .5s; }
+.card:hover .im img { transform: scale(1.07) rotate(-2deg); }
+.card.out .im img { opacity: .5; filter: grayscale(1); }
+.badges { position: absolute; top: 12px; right: 12px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.badge { display: inline-block; border-radius: 7px; padding: 1px 8px; font-size: 11px; font-weight: 800; background: var(--red); color: #fff; }
+.badge.dark { background: var(--ink); }
+.badge.light { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+.brand-tag { position: absolute; top: 12px; left: 12px; border-radius: 7px; padding: 1px 8px; font-size: 10px; font-weight: 900; letter-spacing: .08em; direction: ltr; background: var(--ink); color: #fff; }
+.brand-tag.honda { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+.card .bd { display: flex; flex-direction: column; gap: 9px; padding: 14px 16px 16px; flex: 1; }
+.card .row1 { display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
+.sku { font-family: var(--mono); background: var(--soft); border-radius: 6px; padding: 1px 6px; font-weight: 700; direction: ltr; font-size: 11px; }
+.star { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; }
+.star svg { width: 13px; height: 13px; fill: #f5b301; color: #e0a200; }
+.card h3 { font-size: 15px; font-weight: 800; line-height: 1.55; min-height: 2.9em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card h3 a::after { content: ""; position: absolute; inset: 0; z-index: 0; }
+.card h3 a:hover { color: var(--red); }
+.card .meta { font-size: 11px; color: var(--tx-2); margin: 0; }
+.card .fits { font-size: 12px; color: var(--tx-2); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stock { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; }
+.stock i { width: 8px; height: 8px; border-radius: 50%; }
+.stock.in { color: var(--ok); } .stock.in i { background: #10b981; }
+.stock.low { color: var(--warn); } .stock.low i { background: #f59e0b; }
+.stock.no { color: var(--tx-3); } .stock.no i { background: #a1a1aa; }
+.price { display: flex; flex-direction: column; }
+.price s { font-size: 12px; color: var(--tx-3); text-decoration-color: rgb(225 6 0 / .6); }
+.price b { font-size: 18px; font-weight: 900; letter-spacing: -.01em; }
+.price b small { font-size: 11px; font-weight: 500; color: var(--tx-2); margin-inline-start: 4px; }
+.card .pr { margin-top: auto; padding-top: 12px; border-top: 1px dashed var(--line); }
+.card .acts { position: relative; z-index: 1; display: grid; grid-template-columns: auto 1fr; gap: 8px; }
+
+/* rails */
+.rail-wrap { position: relative; }
+.rail { list-style: none; margin: 0 -16px; padding: 4px 16px 24px; display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.rail::-webkit-scrollbar { display: none; }
+.rail > li { flex: none; width: 78%; scroll-snap-align: start; display: flex; }
+.rail-arrow { display: none; position: absolute; top: 33%; z-index: 3; width: 44px; height: 44px; border-radius: 50%; background: var(--ink); color: #fff; place-items: center; box-shadow: 0 10px 20px rgb(0 0 0 / .2); }
+.rail-arrow:hover { background: var(--red); }
+.rail-arrow svg { width: 20px; height: 20px; }
+.rail-arrow.prev { right: -20px; } .rail-arrow.next { left: -20px; }
+.deals .rail-arrow { background: #fff; color: var(--ink); }
+
+/* brand panels */
+.brand-panels { display: grid; gap: 18px; }
+.bpanel { position: relative; overflow: hidden; border-radius: 28px; padding: 26px; }
+.bpanel.light { border: 1px solid var(--line); background: linear-gradient(135deg, #fafafa, #efeff1); }
+.bpanel .wm { position: absolute; bottom: -24px; left: -6px; font-size: 7.5rem; font-weight: 900; line-height: 1; letter-spacing: -.04em; opacity: .05; pointer-events: none; direction: ltr; }
+.bpanel .k { font-size: 12px; font-weight: 900; letter-spacing: .3em; color: #ff5a4f; direction: ltr; display: inline-block; }
+.bpanel.light .k { color: var(--red); }
+.bpanel h3 { font-size: 28px; font-weight: 900; margin-top: 6px; }
+.bpanel p { color: #d4d4d8; font-size: 14px; margin: 8px 0 0; }
+.bpanel.light p { color: var(--tx-2); }
+.bpanel .chips { margin-top: 18px; }
+.bpanel .art { display: none; position: absolute; left: 24px; top: 50%; transform: translateY(-50%); width: 170px; height: 170px; object-fit: contain; filter: drop-shadow(0 20px 30px rgb(0 0 0 / .4)); transition: transform .7s; }
+.bpanel:hover .art { transform: translateY(-50%) scale(1.08) rotate(-6deg); }
+.bpanel .btn { margin-top: 24px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 99px; padding: 6px 14px; font-size: 12px; font-weight: 700; border: 1px solid var(--line); background: #fff; transition: .2s; }
+.chip:hover { border-color: var(--ink); }
+.chip.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.chip.dk { background: rgb(255 255 255 / .1); border-color: transparent; color: #fff; }
+.chip.dk:hover, .chip.dk.on { background: var(--red); }
+.chip .x { width: 14px; height: 14px; opacity: .7; }
+
+/* deals */
+.deals { position: relative; overflow: hidden; border-radius: 32px; padding: 24px; }
+.deals-h { position: relative; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 18px; margin-bottom: 24px; }
+.deals-h .pill { display: inline-flex; align-items: center; gap: 6px; background: var(--red); border-radius: 99px; padding: 3px 12px; font-size: 12px; font-weight: 800; }
+.deals-h h2 { font-size: clamp(24px, 4vw, 34px); font-weight: 900; margin-top: 10px; }
+.deals-h p { margin: 6px 0 0; color: #d4d4d8; font-size: 14px; }
+.cd { display: flex; gap: 8px; direction: ltr; align-items: center; }
+.cd div { width: 62px; text-align: center; border-radius: 16px; background: rgb(255 255 255 / .1); padding: 6px 0; }
+.cd b { display: block; font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.cd small { font-size: 10px; color: #d4d4d8; }
+.cd span { color: var(--red); font-weight: 900; font-size: 20px; }
+
+/* expertise */
+.expert { position: relative; overflow: hidden; margin-top: 80px; padding-block: 64px; }
+.expert .wrap { position: relative; display: grid; gap: 40px; }
+.expert h2 { font-size: clamp(26px, 4vw, 38px); font-weight: 900; margin-top: 8px; }
+.expert h2 em { font-style: normal; color: #ff5a4f; }
+.expert p.lead { color: #d4d4d8; line-height: 2; max-width: 34em; }
+.stats4 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 26px; }
+.stats4 div { border: 1px solid rgb(255 255 255 / .1); background: rgb(255 255 255 / .03); border-radius: 18px; padding: 18px; }
+.stats4 b { font-size: 28px; font-weight: 900; } .stats4 b i { font-style: normal; color: #ff5a4f; }
+.stats4 small { display: block; color: #d4d4d8; font-size: 12px; }
+.feat { display: grid; gap: 14px; }
+.feat div { border: 1px solid rgb(255 255 255 / .1); background: linear-gradient(to bottom, rgb(255 255 255 / .07), rgb(255 255 255 / .02)); border-radius: 24px; padding: 22px; }
+.feat .ic { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 16px; background: rgb(225 6 0 / .15); color: #ff5a4f; }
+.feat .ic svg { width: 24px; height: 24px; }
+.feat h3 { font-size: 16px; font-weight: 800; margin-top: 16px; }
+.feat p { color: #d4d4d8; font-size: 13px; line-height: 1.9; margin: 8px 0 0; }
+
+/* contact cards */
+.c-cards { display: grid; gap: 12px; }
+.c-card { display: flex; align-items: flex-start; gap: 14px; border: 1px solid var(--line); border-radius: 24px; padding: 18px; background: #fff; transition: transform .2s, box-shadow .2s; }
+.c-card:hover { transform: translateY(-3px); box-shadow: 0 20px 40px -24px rgb(0 0 0 / .4); }
+.c-card .ic { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 18px; flex: none; }
+.c-card .ic svg { width: 24px; height: 24px; }
+.c-card small { display: block; font-size: 12px; color: var(--tx-2); }
+.c-card b { display: block; font-weight: 800; margin-top: 2px; }
+.c-card p { margin: 2px 0 0; font-size: 12px; color: var(--tx-2); }
+
+/* page header */
+.ph { position: relative; overflow: hidden; }
+.ph .wrap { position: relative; padding-block: 34px; }
+.ph h1 { font-size: clamp(26px, 5vw, 42px); font-weight: 900; margin-top: 14px; }
+.ph p { margin: 10px 0 0; max-width: 42em; color: #d4d4d8; font-size: 15px; }
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12px; color: #c4c4cc; }
+.crumbs a:hover { color: #ff5a4f; }
+.crumbs .cur { color: #fff; font-weight: 700; }
+.crumbs.lt { color: var(--tx-2); }
+.crumbs.lt .cur { color: var(--tx); }
+.crumbs svg { width: 12px; height: 12px; opacity: .5; }
+.landing .wrap { display: grid; gap: 24px; align-items: center; }
+.landing .k { display: inline-block; margin-top: 20px; background: var(--red); border-radius: 7px; padding: 3px 10px; font-size: 12px; font-weight: 900; letter-spacing: .2em; direction: ltr; }
+.landing dl { display: flex; flex-wrap: wrap; gap: 22px; margin: 22px 0 0; }
+.landing dl div { display: flex; flex-direction: column-reverse; }
+.landing dl div + div { border-right: 1px solid rgb(255 255 255 / .12); padding-right: 22px; }
+.landing dt { color: #d4d4d8; font-size: 13px; }
+.landing dd { margin: 0; font-size: 24px; font-weight: 900; }
+.landing .art { display: none; width: 280px; height: 280px; object-fit: contain; margin-inline: auto; animation: float 6s ease-in-out infinite; filter: drop-shadow(0 40px 50px rgb(0 0 0 / .6)); }
+.landing .wm { position: absolute; bottom: -30px; left: 0; font-size: 9rem; font-weight: 900; line-height: 1; letter-spacing: -.04em; color: rgb(255 255 255 / .04); pointer-events: none; direction: ltr; }
+.model-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.model-card { display: block; position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; padding: 16px; background: #fff; transition: .2s; height: 100%; }
+.model-card:hover { border-color: var(--ink); transform: translateY(-2px); box-shadow: 0 16px 30px -18px rgb(0 0 0 / .35); }
+.model-card small { display: block; font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--tx-2); direction: ltr; text-align: right; }
+.model-card b { display: block; font-size: 18px; font-weight: 900; margin-top: 2px; }
+.model-card .yr { font-size: 11px; color: var(--tx-2); margin-top: 6px; display: block; }
+.model-card .ft { display: flex; justify-content: space-between; margin-top: 10px; font-size: 11px; }
+.model-card .ft span:first-child { background: var(--soft); border-radius: 6px; padding: 0 6px; }
+.model-card .ft span:last-child { color: var(--red); font-weight: 800; }
+
+/* listing */
+.listing { display: grid; gap: 24px; margin-top: 28px; }
+.filters { display: none; }
+.f-panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; }
+.drawer { max-width: 100vw; overflow-x: hidden; }
+.f-panel h4 { margin: 0 0 10px; font-size: 14px; font-weight: 900; }
+.f-list { display: grid; gap: 2px; max-height: 300px; overflow-y: auto; }
+.f-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 10px; font-size: 14px; text-align: right; width: 100%; }
+.f-item:hover { background: var(--soft); }
+.f-item.on { background: var(--red-soft); color: var(--red); font-weight: 800; }
+.f-item .n { font-size: 11px; color: var(--tx-3); }
+.f-item .box { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid #a1a1aa; display: grid; place-items: center; flex: none; }
+.f-item.on .box { background: var(--red); border-color: var(--red); }
+.f-item.on .box::after { content: ""; width: 8px; height: 4px; border: 2px solid #fff; border-top: 0; border-right: 0; transform: rotate(-45deg) translate(1px, -1px); }
+.f-item .l { display: flex; align-items: center; gap: 10px; }
+.f-item .l small { font-size: 11px; color: var(--tx-3); direction: ltr; }
+.f-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.f-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.f-btn { border: 1px solid var(--line); border-radius: 10px; padding: 7px 4px; font-size: 12px; font-weight: 700; text-align: center; }
+.f-btn:hover { border-color: #71717a; }
+.f-btn.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.f-btn.red.on { background: var(--red); border-color: var(--red); }
+.toggle { display: flex; align-items: center; justify-content: space-between; background: var(--soft); border-radius: 12px; padding: 12px; font-weight: 700; font-size: 14px; width: 100%; }
+.toggle i { position: relative; width: 44px; height: 24px; border-radius: 99px; background: #d4d4d8; transition: .2s; }
+.toggle i::after { content: ""; position: absolute; top: 4px; right: 4px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: .2s; }
+.toggle.on i { background: var(--red); } .toggle.on i::after { transform: translateX(-20px); }
+.f-search { position: relative; }
+.f-search input { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); padding: 0 38px 0 12px; font-size: 15px; outline: none; }
+.f-search svg { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--tx-3); }
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 16px; padding: 10px; margin-bottom: 16px; }
+.toolbar .cnt { font-size: 14px; color: var(--tx-2); } .toolbar .cnt b { color: var(--tx); font-weight: 900; }
+.toolbar .sorts { margin-inline-start: auto; display: flex; align-items: center; gap: 4px; }
+.toolbar .sorts .sbtn { display: none; padding: 6px 12px; border-radius: 10px; font-size: 13px; color: var(--tx-2); }
+.toolbar .sorts .sbtn.on { background: var(--ink); color: #fff; font-weight: 700; }
+.toolbar .sorts .sbtn:hover:not(.on) { background: var(--soft); }
+.toolbar .sorts .sel select { height: 40px; width: 150px; font-size: 14px; }
+.f-open { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px; border: 1px solid var(--line); border-radius: 12px; font-weight: 700; font-size: 14px; }
+.f-open svg { width: 16px; height: 16px; }
+.f-open i { font-style: normal; background: var(--red); color: #fff; border-radius: 99px; min-width: 20px; height: 20px; font-size: 10px; display: grid; place-items: center; }
+.active-chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 16px; }
+.active-chips .chip { background: var(--ink); color: #fff; border-color: var(--ink); }
+.active-chips .chip:hover { background: var(--red); }
+.active-chips .clr { color: var(--red); font-size: 12px; font-weight: 800; padding: 0 6px; }
+.empty { text-align: center; border: 1px dashed #d4d4d8; background: var(--soft); border-radius: 24px; padding: 48px 20px; }
+.empty .ic { display: inline-grid; place-items: center; width: 64px; height: 64px; border-radius: 18px; background: #fff; color: var(--tx-3); }
+.empty .ic svg { width: 30px; height: 30px; }
+.empty h2 { font-size: 18px; margin-top: 16px; }
+.empty p { color: var(--tx-2); font-size: 14px; max-width: 30em; margin: 8px auto 0; }
+.empty .row { display: flex; justify-content: center; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+.load-more { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 30px; font-size: 12px; color: var(--tx-2); }
+.load-more .bar { width: 190px; height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.load-more .bar i { display: block; height: 100%; background: var(--red); }
+.seo-copy { display: grid; gap: 28px; margin-top: 56px; }
+.seo-copy p { color: #3f3f46; line-height: 2.05; margin: 12px 0 0; max-width: 46em; }
+.seo-copy h2 { font-size: 20px; font-weight: 900; }
+.side-box { border: 1px solid var(--line); background: var(--soft); border-radius: 24px; padding: 22px; }
+.side-box h2 { font-size: 16px; margin-bottom: 14px; }
+.faq { display: grid; gap: 10px; }
+details.qa { border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; background: #fff; }
+details.qa[open] { border-color: var(--ink); }
+details.qa summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; font-weight: 800; font-size: 15px; }
+details.qa summary::-webkit-details-marker { display: none; }
+details.qa summary svg { width: 18px; height: 18px; flex: none; transition: transform .2s; }
+details.qa[open] summary svg { transform: rotate(180deg); }
+details.qa p { margin: 10px 0 0; color: #3f3f46; font-size: 14px; line-height: 1.95; }
+
+/* product page */
+.pd-crumbs { border-bottom: 1px solid var(--line); background: var(--soft); }
+.pd-crumbs .wrap { padding-block: 14px; }
+.pd { display: grid; gap: 28px; margin-top: 28px; }
+.gal { display: flex; flex-direction: column-reverse; gap: 10px; }
+.gal .thumbs { display: flex; gap: 8px; overflow-x: auto; }
+.gal .thumbs button { width: 74px; height: 74px; flex: none; border-radius: 14px; border: 2px solid transparent; overflow: hidden; }
+.gal .thumbs button.on { border-color: var(--red); }
+.gal .thumbs img { width: 100%; height: 100%; object-fit: contain; padding: 6px; }
+.gal .big { position: relative; aspect-ratio: 1; width: 100%; border: 1px solid var(--line); border-radius: 26px; overflow: hidden; }
+.gal .big img { width: 100%; height: 100%; object-fit: contain; padding: 10%; transition: transform .35s; }
+.gal .big:hover img { transform: scale(1.25); }
+.v1 { transform: scaleX(-1) rotate(6deg); } .v2 { transform: scale(1.6); transform-origin: 60% 40%; } .v3 { transform: rotate(-14deg) scale(.9); }
+.pd-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.pd-tags a, .pd-tags span { border-radius: 7px; padding: 2px 10px; font-size: 12px; font-weight: 700; background: var(--soft); }
+.pd-tags .b { background: var(--ink); color: #fff; letter-spacing: .1em; font-weight: 900; font-size: 11px; direction: ltr; }
+.pd-tags .q { background: var(--red-soft); color: var(--red-d); }
+.pd h1 { font-size: clamp(22px, 4vw, 30px); font-weight: 900; margin-top: 14px; }
+.pd .en { color: var(--tx-2); font-size: 14px; margin: 2px 0 0; direction: ltr; text-align: right; }
+.pd .rate { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; font-size: 14px; margin-top: 10px; }
+.codes { display: grid; gap: 8px; margin-top: 20px; }
+.code { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; text-align: right; width: 100%; }
+.code:hover { border-color: var(--ink); }
+.code small { display: block; font-size: 11px; color: var(--tx-2); }
+.code b { display: block; font-family: var(--mono); direction: ltr; text-align: right; font-size: 14px; }
+.code svg { width: 16px; height: 16px; color: var(--tx-3); }
+.fitbox { border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-top: 20px; }
+.fitbox h2 { font-size: 14px; font-weight: 900; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.fitbox h2 svg { width: 16px; height: 16px; color: var(--ok); }
+.fitbox a { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: var(--soft); border-radius: 10px; padding: 8px 12px; font-size: 14px; margin-top: 6px; }
+.fitbox a:hover { color: var(--red); }
+.fitbox a b small { font-weight: 400; color: var(--tx-2); font-size: 11px; direction: ltr; }
+.fitbox a span { font-size: 12px; color: var(--tx-2); }
+.buy { border: 1px solid var(--line); border-radius: 24px; padding: 20px; display: grid; gap: 14px; box-shadow: 0 30px 60px -40px rgb(0 0 0 / .4); align-self: start; }
+.buy .top { display: flex; justify-content: space-between; align-items: center; }
+.buy .price b { font-size: 30px; }
+.buy .sum { display: flex; justify-content: space-between; background: var(--soft); border-radius: 12px; padding: 10px 14px; font-size: 14px; }
+.qty { display: inline-flex; align-items: center; border: 1px solid #d4d4da; border-radius: 12px; height: 48px; flex: none; }
+.qty button { width: 42px; height: 100%; display: grid; place-items: center; }
+.qty button:disabled { opacity: .3; }
+.qty button svg { width: 16px; height: 16px; }
+.qty output { width: 34px; text-align: center; font-weight: 800; }
+.qty.sm { height: 36px; } .qty.sm button { width: 32px; }
+.buy .row { display: flex; gap: 8px; }
+.buy .row .btn { flex: 1; height: 48px; }
+.buy ul { list-style: none; margin: 0; padding: 14px 0 0; border-top: 1px dashed var(--line); display: grid; gap: 10px; font-size: 13px; color: #3f3f46; }
+.buy li { display: flex; align-items: center; gap: 10px; }
+.buy li svg { width: 18px; height: 18px; color: var(--red); flex: none; }
+.pd-secs { display: grid; gap: 36px; margin-top: 44px; }
+.pd-secs h2 { font-size: 20px; font-weight: 900; margin-bottom: 14px; }
+.pd-secs p { line-height: 2.05; color: #27272a; margin: 0 0 12px; }
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 16px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 11px 14px; text-align: right; border-top: 1px solid var(--line); }
+thead th { background: var(--ink); color: #fff; border-top: 0; font-weight: 700; }
+tbody tr:nth-child(odd) { background: var(--soft); }
+tbody tr:first-child th, tbody tr:first-child td { border-top: 0; }
+th[scope=row] { font-weight: 400; color: var(--tx-2); width: 38%; }
+.lat { direction: ltr; text-align: right; font-family: var(--mono); }
+
+/* cart */
+.steps { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--tx-2); flex-wrap: wrap; }
+.steps i { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #e4e4e7; font-style: normal; }
+.steps .on { color: var(--tx); } .steps .on i { background: var(--red); color: #fff; }
+.steps hr { width: 22px; border: 0; border-top: 1px solid #d4d4d8; margin: 0; }
+.cart-g { display: grid; gap: 24px; margin-top: 28px; align-items: start; }
+.free { border: 1px solid var(--line); border-radius: 16px; padding: 14px; font-size: 14px; }
+.free .bar { height: 6px; background: var(--soft); border-radius: 6px; overflow: hidden; margin-top: 10px; }
+.free .bar i { display: block; height: 100%; background: linear-gradient(to left, var(--red), #ff6a5f); border-radius: 6px; transition: width .4s; }
+.lines { list-style: none; margin: 14px 0 0; padding: 0; border: 1px solid var(--line); border-radius: 24px; overflow: hidden; }
+.lines li { display: flex; gap: 14px; padding: 16px; }
+.lines li + li { border-top: 1px solid var(--line); }
+.lines .im { width: 92px; height: 92px; border-radius: 16px; flex: none; overflow: hidden; }
+.lines .im img { width: 100%; height: 100%; object-fit: contain; padding: 8px; }
+.lines .inf { flex: 1; min-width: 0; display: grid; gap: 10px; }
+.lines .nm { font-weight: 800; line-height: 1.6; }
+.lines .nm:hover { color: var(--red); }
+.lines .cd2 { font-size: 11px; color: var(--tx-2); display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.lines .bot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.lines .tot s { display: block; font-size: 11px; color: var(--tx-3); }
+.lines .tot b { font-weight: 900; }
+.icon-btn { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; color: var(--tx-3); }
+.icon-btn:hover { background: var(--red-soft); color: var(--red); }
+.icon-btn svg { width: 16px; height: 16px; }
+.box { border: 1px solid var(--line); border-radius: 24px; padding: 18px; }
+.box h2 { font-size: 16px; font-weight: 900; margin-bottom: 12px; }
+.ship { display: flex; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: 16px; padding: 12px; margin-top: 8px; cursor: pointer; }
+.ship.on { border-color: var(--ink); background: var(--soft); }
+.ship input { accent-color: var(--red); width: 16px; height: 16px; }
+.ship b { display: block; font-size: 14px; } .ship small { font-size: 11px; color: var(--tx-2); }
+.ship em { margin-inline-start: auto; font-style: normal; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.coupon { display: flex; gap: 8px; }
+.coupon input, .field input, .field textarea { width: 100%; height: 44px; border: 1px solid #d4d4da; border-radius: 12px; padding: 0 14px; font-size: 15px; outline: none; background: #fff; }
+.coupon input:focus, .field input:focus, .field textarea:focus { border-color: var(--ink); }
+.applied { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; background: #ecfdf3; color: #067647; border-radius: 10px; padding: 8px 12px; font-size: 12px; font-weight: 700; }
+.sumlist { display: grid; gap: 10px; margin: 18px 0 0; font-size: 14px; }
+.sumlist div { display: flex; justify-content: space-between; }
+.sumlist dt { color: var(--tx-2); } .sumlist dd { margin: 0; font-weight: 700; }
+.sumlist .acc { color: var(--red); } .sumlist .acc dt { color: var(--red); }
+.sumlist .total { border-top: 1px dashed var(--line); padding-top: 14px; align-items: center; }
+.sumlist .total dt { color: var(--tx); font-weight: 800; } .sumlist .total dd { font-size: 20px; font-weight: 900; }
+.field { display: grid; gap: 6px; font-size: 14px; font-weight: 700; }
+.field textarea { height: auto; padding: 12px 14px; }
+.ok-ic { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: #ecfdf3; color: var(--ok); margin-inline: auto; }
+.ok-ic svg { width: 34px; height: 34px; }
+
+/* about / contact */
+.two { display: grid; gap: 28px; }
+.timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 22px; }
+.timeline .yr { display: inline-grid; place-items: center; height: 44px; padding: 0 22px; border-radius: 99px; background: var(--ink); color: #fff; font-weight: 900; }
+.timeline h3 { font-size: 16px; font-weight: 800; margin-top: 12px; }
+.timeline p { margin: 4px 0 0; color: var(--tx-2); font-size: 14px; }
+.values { display: grid; gap: 14px; }
+.values div { border: 1px solid var(--line); border-radius: 24px; padding: 22px; transition: .2s; }
+.values div:hover { border-color: var(--ink); transform: translateY(-3px); }
+.values .ic { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 16px; background: var(--red-soft); color: var(--red); }
+.values .ic svg { width: 24px; height: 24px; }
+.values h3 { font-size: 17px; font-weight: 800; margin-top: 14px; }
+.values p { margin: 6px 0 0; color: var(--tx-2); font-size: 14px; line-height: 1.9; }
+.pics { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.pics div { border: 1px solid var(--line); border-radius: 24px; overflow: hidden; aspect-ratio: 1; }
+.pics div:nth-child(even) { transform: translateY(24px); }
+.pics img { width: 100%; height: 100%; object-fit: contain; padding: 18px; }
+.topic { border: 1px solid var(--line); border-radius: 99px; padding: 7px 16px; font-size: 12px; font-weight: 700; }
+.topic.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.map { position: relative; height: 180px; background: #eceef1; overflow: hidden; }
+.map svg.pin { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -90%); width: 48px; height: 48px; color: var(--red); animation: bounce 1.2s infinite; }
+@keyframes bounce { 50% { transform: translate(-50%, -110%); } }
+.copybox { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+/* footer */
+footer { margin-top: 80px; color: #c4c4cc; position: relative; overflow: hidden; }
+footer .cta { display: grid; gap: 18px; padding-block: 36px; border-bottom: 1px solid rgb(255 255 255 / .1); }
+footer .cta p.t { color: #fff; font-size: clamp(19px, 3vw, 24px); font-weight: 900; margin: 0; }
+footer .cta p.t em { font-style: normal; color: #ff5a4f; }
+footer .cta p.s { margin: 6px 0 0; font-size: 14px; }
+footer .cols { display: grid; gap: 32px; padding-block: 40px; }
+footer h2 { font-size: 14px; color: #fff; display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+footer h2::before { content: ""; width: 4px; height: 16px; border-radius: 4px; background: var(--red); }
+footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 9px; font-size: 14px; }
+footer ul a:hover { color: #fff; }
+footer .about p { font-size: 14px; line-height: 2; }
+footer .about li { display: flex; gap: 10px; }
+footer .about svg { width: 16px; height: 16px; color: var(--red); flex: none; margin-top: 4px; }
+footer .copy { border-top: 1px solid rgb(255 255 255 / .1); padding-block: 22px; font-size: 12px; text-align: center; }
+.fab { position: fixed; left: calc(18px + env(safe-area-inset-left, 0px)); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 45; }
+.fab > button { width: 56px; height: 56px; border-radius: 50%; background: var(--wa); color: #fff; display: grid; place-items: center; box-shadow: 0 12px 30px -8px rgb(37 211 102 / .8); }
+.fab > button svg { width: 26px; height: 26px; }
+.fab .opts { position: absolute; bottom: 66px; left: 0; display: grid; gap: 8px; width: max-content; }
+.fab .opts a, .fab .opts div { display: flex; align-items: center; gap: 10px; background: #fff; border-radius: 99px; padding: 6px 16px 6px 6px; font-weight: 700; font-size: 14px; box-shadow: 0 10px 30px rgb(0 0 0 / .18); }
+.fab .opts i { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: #fff; }
+.fab .opts svg { width: 18px; height: 18px; }
+.toasts { position: fixed; top: calc(12px + env(safe-area-inset-top, 0px)); left: 0; right: 0; z-index: 80; display: grid; justify-items: center; gap: 8px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); pointer-events: none; }
+.toast { pointer-events: auto; display: flex; align-items: flex-start; gap: 12px; width: 100%; max-width: 380px; background: #fff; border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; box-shadow: 0 20px 50px -20px rgb(0 0 0 / .45); animation: tin .25s ease; }
+@keyframes tin { from { opacity: 0; transform: translateY(-10px); } }
+.toast svg { width: 20px; height: 20px; color: var(--ok); flex: none; margin-top: 2px; }
+.toast.err svg { color: var(--red); }
+.toast b { display: block; font-size: 14px; } .toast small { display: block; font-size: 12px; color: var(--tx-2); }
+.toast .ta { margin-inline-start: auto; background: var(--ink); color: #fff; border-radius: 8px; padding: 4px 10px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.demo-note { background: #fffbeb; color: #92400e; font-size: 12px; text-align: center; padding: 6px 16px; border-bottom: 1px solid #fde68a; }
+
+@media (max-width: 767px) { .hide-sm { display: none !important; } }
+@media (min-width: 420px) { .p-grid { grid-template-columns: 1fr 1fr; } .rail > li { width: 46%; } }
+@media (min-width: 640px) {
+  .cat-grid { grid-template-columns: repeat(4, 1fr); }
+  .hero-art { max-width: 420px; } .hero-art .float { display: block; }
+  .trust ul { grid-template-columns: repeat(5, 1fr); } .trust li:last-child { grid-column: auto; }
+  .trust li { padding: 18px; }
+  .model-grid { grid-template-columns: repeat(3, 1fr); }
+  .c-cards { grid-template-columns: 1fr 1fr; }
+  .finder { padding: 24px; }
+  .bpanel .art { display: block; } .bpanel .body { padding-left: 190px; }
+  .codes { grid-template-columns: 1fr 1fr; }
+  .values { grid-template-columns: 1fr 1fr; }
+  .feat { grid-template-columns: 1fr 1fr; } .feat div:nth-child(even) { transform: translateY(28px); }
+  .timeline { grid-template-columns: repeat(4, 1fr); }
+  .gal { flex-direction: row; align-items: flex-start; } .gal .thumbs { flex-direction: column; }
+  .deals { padding: 40px; } .cart-btn .lbl { display: inline; }
+  footer .cols { grid-template-columns: 1fr 1fr; }
+}
+@media (min-width: 768px) { .p-grid { grid-template-columns: repeat(3, 1fr); } .rail > li { width: 31%; } .rail-arrow { display: grid; } .rail { margin: 0; padding-inline: 0; } }
+@media (min-width: 1024px) {
+  .menu-btn, .m-search { display: none; }
+  .h-row { gap: 32px; padding-block: 16px; }
+  .h-actions { margin-inline-start: 0; }
+  nav.mainnav { display: block; }
+  .hero .wrap { grid-template-columns: 1.05fr 1fr; min-height: 580px; padding-block: 60px 150px; }
+  .hero-art { max-width: 500px; }
+  .trust { margin-top: -96px; }
+  .finder-g { grid-template-columns: 1.2fr 1fr .8fr auto; align-items: end; }
+  .brand-panels { grid-template-columns: 1fr 1fr; }
+  .expert .wrap { grid-template-columns: 1fr 1.1fr; align-items: center; }
+  .c-cards { grid-template-columns: repeat(4, 1fr); }
+  .landing .wrap { grid-template-columns: 1.3fr 1fr; } .landing .art { display: block; }
+  .model-grid { grid-template-columns: repeat(6, 1fr); }
+  .listing { grid-template-columns: 280px 1fr; }
+  .filters { display: block; } .filters .f-panel { position: sticky; top: 150px; border: 1px solid var(--line); border-radius: 16px; padding: 20px; max-height: calc(100dvh - 170px); overflow-y: auto; }
+  .f-open { display: none; }
+  .seo-copy { grid-template-columns: 1.4fr 1fr; }
+  .faq { grid-template-columns: 1fr 1fr; }
+  .pd { grid-template-columns: 1.05fr 1fr; } .buy { grid-column: 1 / -1; }
+  .pd-secs { grid-template-columns: 1fr 1fr; }
+  .cart-g { grid-template-columns: 1fr 380px; } .cart-g aside { position: sticky; top: 150px; display: grid; gap: 14px; }
+  .two { grid-template-columns: 1fr 1fr; align-items: center; }
+  .values { grid-template-columns: repeat(4, 1fr); }
+  .contact-g { grid-template-columns: 1fr 400px !important; align-items: start !important; }
+  footer .cta { grid-template-columns: 1.4fr 1fr; align-items: center; }
+  footer .cols { grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr; }
+  .cat-grid.home { grid-template-columns: repeat(8, 1fr); }
+}
+@media (min-width: 1280px) {
+  .h-phone { display: flex; }
+  .pd { grid-template-columns: 1.1fr 1fr 340px; } .buy { grid-column: auto; position: sticky; top: 150px; }
+  .codes { grid-template-columns: 1fr; }
+  .toolbar .sorts .sbtn { display: block; } .toolbar .sorts .sel { display: none; }
+  .p-grid.g4 { grid-template-columns: repeat(4, 1fr); }
+  .rail > li { width: calc(25% - 11px); }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+</style>
+
+<div id="app">
+  <div class="demo-note">نسخه نمایشی (Live Demo) — قیمت‌ها و موجودی‌ها نمونه هستند و پرداخت واقعی انجام نمی‌شود.</div>
+  <div class="carbon topbar"><div class="wrap">
+    <div class="t-items"><span data-i="truck">ارسال سریع به سراسر ایران</span><span class="hide-sm" data-i="shield">ضمانت اصالت کالا</span></div>
+    <span class="ltr" style="font-family:var(--font);font-weight:700;color:#fff" id="topPhone"></span>
+  </div></div>
+  <header class="main">
+    <div class="wrap h-row">
+      <button class="menu-btn" data-act="menu" aria-label="باز کردن منو" data-i="menu"></button>
+      <a href="#home" class="logo" id="logo"></a>
+      <div class="search" id="searchDesk" hidden></div>
+      <div class="h-actions">
+        <div class="h-phone"><span class="ic" data-i="phone"></span><span><small>مشاوره و استعلام</small><b class="ltr" style="font-family:var(--font)" id="hPhone"></b></span></div>
+        <a href="#cart" class="cart-btn" aria-label="سبد خرید"><span data-i="bag"></span><span class="lbl">سبد خرید</span><span class="cnt" id="cartCnt" hidden>۰</span></a>
+      </div>
+    </div>
+    <div class="wrap m-search"><div class="search" id="searchMob"></div></div>
+    <nav class="mainnav" aria-label="منوی اصلی"><div class="wrap">
+      <div class="mega"><a href="#categories"><span data-i="grid"></span>دسته‌بندی قطعات<span data-i="down"></span></a><div class="mega-panel" id="megaPanel"></div></div>
+      <div class="navlinks" id="navLinks"></div>
+      <a href="#shop" class="nav-deal" data-act="deals"><i></i>پیشنهادهای ویژه این هفته</a>
+    </div></nav>
+  </header>
+  <main id="main" tabindex="-1"></main>
+  <footer class="carbon" id="footer"></footer>
+  <div class="fab" id="fab"></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+  <div id="layer"></div>
+</div>
+
+<script>
+const D = /*__DATA__*/null;
+const IMG = /*__IMG__*/null;
+</script>
+<script>
+(() => {
+"use strict";
+/* ---------- icons (Lucide-style, stroke) ---------- */
+const P = {
+  search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  bag: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+  cart: '<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>',
+  menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  truck: '<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62L18.3 9.38A1 1 0 0 0 17.52 9H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>',
+  shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+  grid: '<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>',
+  down: '<path d="m6 9 6 6 6-6"/>',
+  left: '<path d="m15 18-6-6 6-6"/>', right: '<path d="m9 18 6-6-6-6"/>',
+  arrowL: '<path d="M19 12H5M12 19l-7-7 7-7"/>',
+  star: '<path d="M11.5 2.3a.5.5 0 0 1 1 0l2.3 4.7a2 2 0 0 0 1.6 1.1l5.2.8a.5.5 0 0 1 .3.9l-3.8 3.6a2 2 0 0 0-.6 1.9l.9 5.2a.5.5 0 0 1-.8.6l-4.6-2.5a2 2 0 0 0-2 0l-4.6 2.5a.5.5 0 0 1-.8-.6l.9-5.2a2 2 0 0 0-.6-1.9L1.4 9.8a.5.5 0 0 1 .3-.9l5.2-.8a2 2 0 0 0 1.6-1.1z"/>',
+  eye: '<path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>', checkC: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+  plus: '<path d="M5 12h14M12 5v14"/>', minus: '<path d="M5 12h14"/>',
+  trash: '<path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>',
+  copy: '<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  car: '<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
+  sliders: '<path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/>',
+  sort: '<path d="m3 16 4 4 4-4M7 20V4M11 4h10M11 8h7M11 12h4"/>',
+  pkg: '<path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12M3.29 7 12 12l8.71-5M7.5 4.27l9 5.15"/>',
+  badge: '<path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m9 12 2 2 4-4"/>',
+  headset: '<path d="M3 11h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-5Zm0 0a9 9 0 1 1 18 0m0 0v5a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3Z"/>',
+  returnI: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  card: '<rect width="20" height="14" x="2" y="5" rx="2"/><path d="M2 10h20"/>',
+  pin: '<path d="M20 10c0 4.99-5.54 10.19-7.4 11.8a1 1 0 0 1-1.2 0C9.54 20.19 4 14.99 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  mail: '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+  chat: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
+  flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+  spark: '<path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.14-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.14a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.14 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.14a.5.5 0 0 1-.96 0z"/>',
+  zap: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+  cpu: '<rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2M15 20v2M2 15h2M2 9h2M20 15h2M20 9h2M9 2v2M9 20v2"/>',
+  award: '<path d="m15.48 12.89 1.51 8.53a.5.5 0 0 1-.81.47l-3.58-2.69a1 1 0 0 0-1.2 0l-3.59 2.69a.5.5 0 0 1-.81-.47l1.51-8.53"/><circle cx="12" cy="8" r="6"/>',
+  boxes: '<path d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42ZM7 16.5l-4.74-2.85M7 16.5l5-3M7 16.5v5.17M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3ZM17 16.5l-5-3M17 16.5l4.74-2.85M17 16.5v5.17M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8ZM12 8 7.26 5.15M12 8l4.74-2.85M12 13.5V8"/>',
+  wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  heart: '<path d="M11 14h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 16"/><path d="m7 20 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><path d="m2 15 6 6"/><path d="M19.5 8.5c.7-.7 1.5-1.6 1.5-2.7A2.73 2.73 0 0 0 16 4a2.78 2.78 0 0 0-5 1.8c0 1.2.8 2 1.5 2.8L16 12Z"/>',
+  lock: '<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  tag: '<path d="M12.59 2.59A2 2 0 0 0 11.17 2H4a2 2 0 0 0-2 2v7.17a2 2 0 0 0 .59 1.41l8.7 8.7a2.43 2.43 0 0 0 3.42 0l6.58-6.58a2.43 2.43 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>',
+  send: '<path d="M14.54 21.69a.5.5 0 0 0 .94-.03l6.5-19a.5.5 0 0 0-.64-.64l-19 6.5a.5.5 0 0 0-.02.94l7.93 3.18a2 2 0 0 1 1.11 1.11z"/><path d="m21.85 2.15-10.94 10.94"/>',
+  home: '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .71-1.53l7-6a2 2 0 0 1 2.58 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  cal: '<path d="M8 2v4M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
+};
+const WA = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.47 14.38c-.3-.15-1.75-.86-2.02-.96-.27-.1-.47-.15-.67.15-.2.3-.77.96-.94 1.16-.17.2-.35.22-.64.07-.3-.15-1.25-.46-2.38-1.47-.88-.79-1.47-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.45-.52.15-.18.2-.3.3-.5.1-.2.05-.37-.03-.52-.07-.15-.67-1.6-.92-2.2-.24-.58-.49-.5-.67-.5h-.57c-.2 0-.52.07-.8.37-.27.3-1.04 1.02-1.04 2.48 0 1.46 1.07 2.88 1.21 3.07.15.2 2.1 3.2 5.08 4.49.71.3 1.27.49 1.7.63.72.23 1.37.2 1.88.12.57-.09 1.75-.72 2-1.41.25-.7.25-1.29.17-1.41-.07-.13-.27-.2-.57-.35M12.05 21.5h-.01a9.4 9.4 0 0 1-4.8-1.32l-.35-.2-3.56.93.95-3.47-.22-.36a9.4 9.4 0 0 1-1.44-5.02c0-5.2 4.23-9.43 9.44-9.43 2.52 0 4.89.98 6.67 2.77a9.37 9.37 0 0 1 2.76 6.67c0 5.2-4.24 9.43-9.44 9.43m8.03-17.46A11.27 11.27 0 0 0 12.05.72C5.8.72.7 5.8.7 12.06c0 2 .52 3.95 1.52 5.67L.6 23.62l6.03-1.58a11.3 11.3 0 0 0 5.42 1.38h.01c6.25 0 11.34-5.08 11.35-11.34 0-3.03-1.18-5.88-3.33-8.03"/></svg>';
+const ic = (n, cls = "") => `<svg class="${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n] || ""}</svg>`;
+const LOGO = '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M24 2 43 13v22L24 46 5 35V13Z" fill="#0b0b0d"/><path d="M24 5.5 40 14.8v18.4L24 42.5 8 33.2V14.8Z" fill="#e10600"/><path d="M15.5 14.5h5v7.2h7v-7.2h5v19h-5v-7.3h-7v7.3h-5z" fill="#fff"/></svg>';
+const logoHTML = '' + LOGO + '<span><b>HAMIDI <i>AUTO</i> PARTS</b><small>فروشگاه حمیدی · نیسان و هوندا</small></span>';
+
+/* ---------- helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fa = (v) => String(v).replace(/[0-9]/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[d]);
+const money = (n) => new Intl.NumberFormat("fa-IR").format(n);
+const img = (k) => IMG[k] || "";
+const SHOP = { phone: "021-66712345", mobile: "09121234567", wa: "989121234567", address: "تهران، خیابان امین‌السلطان (چراغ برق)، پاساژ ایرانیان، طبقه همکف، پلاک ۱۸", hours: "شنبه تا چهارشنبه ۹ تا ۱۹ — پنجشنبه ۹ تا ۱۴", email: "info@hamidiautoparts.ir" };
+const waLink = (t) => `https://wa.me/${SHOP.wa}${t ? "?text=" + encodeURIComponent(t) : ""}`;
+const brand = (id) => D.brands.find((b) => b.id === id);
+const model = (id) => D.models.find((m) => m.id === id);
+const cat = (id) => D.categories.find((c) => c.id === id);
+const modelsOf = (b) => D.models.filter((m) => m.brand === b);
+const yearsOf = (id) => { const m = model(id); const y = []; if (m) for (let i = m.to; i >= m.from; i--) y.push(i); return y; };
+const off = (p) => (p.oldPrice ? Math.round(((p.oldPrice - p.price) / p.oldPrice) * 100) : 0);
+const fits = (p, m, y) => !m || p.fitments.some((f) => f.model === m && (!y || (y >= f.from && y <= f.to)));
+const norm = (s) => String(s).toLowerCase().replace(/[۰-۹]/g, (d) => d.charCodeAt(0) - 1776).replace(/ي/g, "ی").replace(/ك/g, "ک").replace(/[‌\-_\s]+/g, " ").trim();
+const INDEX = new Map(D.products.map((p) => { const t = norm([p.name, p.nameEn, p.sku, p.oem, p.manufacturer, cat(p.category)?.nameFa, brand(p.brand)?.nameFa, p.brand, ...p.fitments.map((f) => `${model(f.model)?.nameFa} ${model(f.model)?.nameEn}`)].join(" ")); return [p.id, { t, c: t.replace(/[\s-]/g, "") }]; }));
+const match = (p, q) => norm(q).split(" ").filter(Boolean).every((w) => { const i = INDEX.get(p.id); return i.t.includes(w) || i.c.includes(w.replace(/-/g, "")); });
+const route = (p) => "p-" + p.slug;
+const bySlug = new Map(D.products.map((p) => [p.slug, p]));
+const store = { get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
+
+/* ---------- state ---------- */
+let cart = store.get("hap-demo-cart", []).filter((l) => D.products.some((p) => p.id === l.id));
+let ui = { q: "", f: freshFilters(), limit: 12, ship: "courier", coupon: null, checkout: null, gview: 0, qty: 1, topic: 0 };
+function freshFilters() { return { cats: [], brand: "", year: 0, price: "", stock: false, sort: "popular" }; }
+const saveCart = () => { store.set("hap-demo-cart", cart); renderCount(); };
+const cartCount = () => cart.reduce((n, l) => n + l.qty, 0);
+const prod = (id) => D.products.find((p) => p.id === id);
+const maxQ = (p) => Math.max(1, Math.min(20, p.stockQty));
+function addCart(id, q = 1) { const p = prod(id); const l = cart.find((x) => x.id === id); if (l) l.qty = Math.min(maxQ(p), l.qty + q); else cart.push({ id, qty: Math.min(maxQ(p), q) }); saveCart(); }
+
+/* ---------- toast ---------- */
+function toast(title, sub, action, err) {
+  const el = document.createElement("div");
+  el.className = "toast" + (err ? " err" : "");
+  el.innerHTML = `${ic(err ? "x" : "checkC")}<span><b>${esc(title)}</b>${sub ? `<small>${esc(sub)}</small>` : ""}</span>${action ? `<a class="ta" href="${action.href || "#"}" data-tact="1">${action.label}</a>` : ""}`;
+  if (action && action.fn) el.querySelector(".ta").addEventListener("click", (e) => { e.preventDefault(); action.fn(); el.remove(); });
+  $("#toasts").appendChild(el);
+  while ($("#toasts").children.length > 3) $("#toasts").firstChild.remove();
+  setTimeout(() => el.remove(), 4000);
+}
+
+/* ---------- shared bits ---------- */
+const priceHTML = (v, o, big) => `<div class="price">${o ? `<s>${money(o)}</s>` : ""}<b>${money(v)}<small>تومان</small></b></div>`;
+const stockHTML = (p) => { const m = { "in-stock": ["in", "موجود در انبار"], "low-stock": ["low", `تعداد محدود (${fa(p.stockQty)} عدد)`], "out-of-stock": ["no", "ناموجود"] }[p.stock]; return `<span class="stock ${m[0]}"><i></i>${m[1]}</span>`; };
+const addBtn = (p, cls = "btn-sm", label = "افزودن به سبد") => p.stock === "out-of-stock"
+  ? `<a href="#contact" class="btn btn-out ${cls}">استعلام موجودی</a>`
+  : `<button class="btn btn-red ${cls}" data-act="add" data-id="${p.id}">${ic("cart")}<span>${label}</span></button>`;
+
+function card(p) {
+  const o = off(p); const ms = p.fitments.map((f) => model(f.model)?.nameFa).filter(Boolean);
+  return `<article class="card${p.stock === "out-of-stock" ? " out" : ""}">
+    <div class="im studio"><img src="${img(p.img)}" alt="${esc(p.name)}" loading="lazy" decoding="async">
+      <div class="badges">${o ? `<span class="badge">٪${fa(o)} تخفیف</span>` : ""}${p.badges.includes("new") ? `<span class="badge dark">جدید</span>` : ""}</div>
+      <span class="brand-tag ${p.brand}">${brand(p.brand).nameEn}</span></div>
+    <div class="bd">
+      <div class="row1"><span class="sku">${p.sku}</span><span class="star">${ic("star")}${fa(p.rating.toFixed(1))}</span></div>
+      <h3><a href="#${route(p)}">${esc(p.name)}</a></h3>
+      <p class="meta">OEM: <span class="ltr">${p.oem}</span></p>
+      <p class="fits"><span class="muted">سازگار با: </span>${ms.slice(0, 3).join("، ")}${ms.length > 3 ? ` <span class="muted">و ${fa(ms.length - 3)} مدل دیگر</span>` : ""}</p>
+      ${stockHTML(p)}
+      <div class="pr">${priceHTML(p.price, p.oldPrice)}</div>
+      <div class="acts"><a href="#${route(p)}" class="btn btn-out btn-sm" aria-label="مشاهده ${esc(p.name)}">${ic("eye")}مشاهده</a>${addBtn(p)}</div>
+    </div></article>`;
+}
+const grid = (list, cls = "") => `<ul class="p-grid ${cls}">${list.map((p) => `<li>${card(p)}</li>`).join("")}</ul>`;
+const rail = (list, dark) => `<div class="rail-wrap"><button class="rail-arrow prev" data-act="rail" data-dir="1" aria-label="قبلی">${ic("right")}</button><button class="rail-arrow next" data-act="rail" data-dir="-1" aria-label="بعدی">${ic("left")}</button><ul class="rail">${list.map((p) => `<li>${card(p)}</li>`).join("")}</ul></div>`;
+const secHead = (eb, title, sub, href, lbl = "مشاهده همه") => `<div class="sec-h"><div>${eb ? `<p class="eyebrow">${eb}</p>` : ""}<h2>${title}</h2>${sub ? `<p>${sub}</p>` : ""}</div>${href ? `<a class="more" href="#${href}">${lbl}${ic("arrowL")}</a>` : ""}</div>`;
+const crumbs = (items, light) => `<nav class="crumbs${light ? " lt" : ""}" aria-label="مسیر صفحه"><a href="#home">خانه</a>${items.map((c, i) => `${ic("left")}${i < items.length - 1 && c.h ? `<a href="#${c.h}">${c.l}</a>` : `<span class="cur">${c.l}</span>`}`).join("")}</nav>`;
+const catCount = (id, f = () => true) => D.products.filter((p) => p.category === id && f(p)).length;
+const catCard = (c, large) => `<a class="cat-card" href="#c-${c.id}"><div class="im studio"><img src="${img(c.image)}" alt="" loading="lazy"></div><div class="tx"><b>${c.nameFa}</b><small>${fa(catCount(c.id))} محصول</small>${large ? `<p>${c.description}</p>` : ""}</div></a>`;
+const phoneTxt = () => `<span class="ltr" style="font-family:var(--font)">${fa(SHOP.phone)}</span>`;
+const faq = (items, title) => `<section class="sec"><h2 style="font-size:20px;font-weight:900;margin-bottom:16px">${title}</h2><div class="faq">${items.map((f) => `<details class="qa"><summary>${f.q}${ic("down")}</summary><p>${f.a}</p></details>`).join("")}</div></section>`;
+
+/* ---------- finder ---------- */
+let finder = { b: "", m: "", y: "" };
+function finderHTML() {
+  const ms = finder.b ? modelsOf(finder.b) : [];
+  return `<form class="finder" id="finder" aria-labelledby="fdt">
+    <div class="finder-h"><span class="ic">${ic("car")}</span><div><h2 id="fdt">قطعه مناسب خودروی خود را پیدا کنید</h2><p>برند، مدل و سال ساخت را انتخاب کنید</p></div></div>
+    <div class="finder-g">
+      <div><div class="step"><i>۱</i>برند خودرو</div><div class="seg">${D.brands.map((b) => `<button type="button" class="${finder.b === b.id ? "on" : ""}" data-act="fb" data-b="${b.id}" aria-pressed="${finder.b === b.id}"><small>${b.nameEn}</small>${b.nameFa}</button>`).join("")}</div></div>
+      <div><label class="step" for="fm"><i>۲</i>مدل خودرو</label><div class="sel"><select id="fm" ${finder.b ? "" : "disabled"}><option value="">${finder.b ? "همه مدل‌ها" : "ابتدا برند را انتخاب کنید"}</option>${ms.map((m) => `<option value="${m.id}" ${finder.m === m.id ? "selected" : ""}>${m.nameFa} (${m.nameEn})</option>`).join("")}</select>${ic("down")}</div></div>
+      <div><label class="step" for="fy"><i>۳</i>سال ساخت</label><div class="sel"><select id="fy" ${finder.m ? "" : "disabled"}><option value="">همه سال‌ها</option>${yearsOf(finder.m).map((y) => `<option value="${y}" ${String(y) === finder.y ? "selected" : ""}>${fa(y)}</option>`).join("")}</select>${ic("down")}</div></div>
+      <button class="btn btn-red" type="submit" ${finder.b ? "" : "disabled"}>${ic("search")}نمایش قطعات</button>
+    </div></form>`;
+}
+
+/* ---------- pages ---------- */
+function home() {
+  const best = [...D.products].filter((p) => p.badges.includes("bestseller")).sort((a, b) => b.sold - a.sold).slice(0, 8);
+  const deals = D.products.filter((p) => p.badges.includes("special") && p.oldPrice).slice(0, 8);
+  const fresh = [...D.products].filter((p) => p.badges.includes("new")).sort((a, b) => b.addedAt.localeCompare(a.addedAt)).slice(0, 8);
+  return `
+  <section class="hero carbon"><div class="grid-bg"></div><div class="glow" style="width:520px;height:520px;left:5%;top:10%"></div>
+    <div class="wrap">
+      <div>
+        <p class="eyebrow-pill"><i></i>مرجع تخصصی لوازم یدکی نیسان و هوندا</p>
+        <h1>لوازم یدکی اصلی<br><span>نیسان و هوندا</span></h1>
+        <p class="lead">قطعات Genuine و OEM برای مورانو، ماکسیما، تیانا، ایکس‌تریل، جوک، اکسل و تمام مدل‌های هوندا از ۱۹۹۰ تا ۲۰۱۷، با ضمانت اصالت، استعلام با شماره شاسی و ارسال سریع به سراسر ایران.</p>
+        <div class="ctas"><a href="#shop" class="btn btn-red btn-lg">مشاهده فروشگاه${ic("arrowL")}</a><a href="${waLink("سلام، برای استعلام قیمت قطعه پیام می‌دهم.")}" target="_blank" rel="noopener" class="btn btn-ghost-w btn-lg"><span style="color:var(--wa);display:flex">${WA}</span>استعلام در واتساپ</a></div>
+        <div class="hero-stats"><div>${ic("badge")}<b>۱۰۰٪</b><small>ضمانت اصالت</small></div><div>${ic("truck")}<b>۲۴ ساعته</b><small>ارسال تهران</small></div><div>${ic("headset")}<b>+۲۰ سال</b><small>تجربه تخصصی</small></div></div>
+      </div>
+      <div class="hero-art"><div class="ring"></div><div class="ring2"></div>
+        <img class="main" src="${img("brake-disc")}" alt="دیسک ترمز و کالیپر">
+        <a href="#c-shocks" class="float a" aria-label="کمک‌فنر"><img src="${img("shock-absorber")}" alt=""></a>
+        <a href="#c-piston" class="float b" aria-label="پیستون"><img src="${img("piston")}" alt=""></a>
+        <span class="tag">تا ۱۵٪ تخفیف</span></div>
+    </div></section>
+  <div class="wrap trust"><ul>
+    ${[["badge", "ضمانت اصالت کالا", "قطعات Genuine و OEM با کد فنی"], ["truck", "ارسال سریع", "تهران ۲۴ ساعته، شهرستان ۴۸ ساعته"], ["headset", "مشاوره تخصصی", "استعلام با شماره شاسی و OEM"], ["pkg", "۷ روز ضمانت بازگشت", "در صورت عدم تطابق قطعه"], ["card", "پرداخت امن", "درگاه بانکی و پرداخت در محل"]].map(([i, t, d]) => `<li><span class="ic">${ic(i)}</span><span><b>${t}</b><small>${d}</small></span></li>`).join("")}
+  </ul></div>
+  <div class="wrap" style="margin-top:48px">${finderHTML()}</div>
+  <section class="sec wrap">${secHead("دسته‌بندی قطعات", "هر قطعه‌ای که خودروی شما نیاز دارد", "۱۶ دسته تخصصی از موتور تا بدنه؛ قطعه مورد نظرتان را سریع‌تر پیدا کنید.", "categories", "همه دسته‌بندی‌ها")}
+    <ul class="cat-grid home" style="list-style:none;padding:0;margin:0">${D.categories.map((c) => `<li>${catCard(c)}</li>`).join("")}</ul></section>
+  <section class="sec wrap">${secHead("پرفروش‌ترین‌ها", `<span style="display:inline-flex;align-items:center;gap:8px"><span style="color:var(--red);display:flex;width:28px">${ic("flame")}</span>محصولات پرفروش</span>`, "قطعاتی که بیشترین سفارش را از سوی مشتریان و تعمیرکاران داشته‌اند.", "shop")}${rail(best)}</section>
+  <section class="sec wrap brand-panels">${D.brands.map((b, i) => brandPanel(b, i === 0)).join("")}</section>
+  <section class="sec wrap"><div class="deals carbon"><div class="glow" style="width:380px;height:380px;right:-120px;top:-120px"></div>
+    <div class="deals-h"><div><span class="pill">${ic("zap")}پیشنهاد شگفت‌انگیز</span><h2>پیشنهادهای ویژه امروز</h2><p>تخفیف‌های محدود روی قطعات منتخب نیسان و هوندا، تا پایان امروز</p></div>
+      <div style="display:grid;gap:10px;justify-items:end"><div class="cd" id="cd"></div><a href="#shop" data-act="deals" style="font-size:14px;font-weight:700">مشاهده همه تخفیف‌ها ←</a></div></div>
+    <div style="position:relative">${rail(deals, true)}</div></div></section>
+  <section class="sec wrap">${secHead("تازه رسیده", `<span style="display:inline-flex;align-items:center;gap:8px"><span style="color:var(--red);display:flex;width:28px">${ic("spark")}</span>جدیدترین محصولات</span>`, "آخرین قطعاتی که به انبار فروشگاه حمیدی اضافه شده‌اند.", "shop")}${grid(fresh, "g4")}</section>
+  ${expertise()}
+  <section class="sec wrap">${secHead("ارتباط با ما", "همیشه در دسترس شما هستیم", "برای استعلام قیمت، موجودی یا تطابق قطعه، از هر راهی که راحت‌ترید با ما در تماس باشید.", "contact", "صفحه تماس")}${contactCards()}</section>`;
+}
+function brandPanel(b, dark) {
+  const ms = modelsOf(b.id); const n = D.products.filter((p) => p.brand === b.id).length;
+  return `<div class="bpanel ${dark ? "carbon" : "light"}"><span class="wm">${b.nameEn}</span><img class="art" src="${img(dark ? "shock-absorber" : "timing-belt")}" alt="">
+    <div class="body" style="position:relative"><span class="k">${b.nameEn}</span><h3>لوازم یدکی ${b.nameFa}</h3>
+    <p>${b.id === "nissan" ? "تخصص ما در مورانو، ماکسیما، تیانا، ایکس‌تریل، جوک و اکسل." : "پوشش کامل مدل‌های هوندا از ۱۹۹۰ تا ۲۰۱۷؛ آکورد، سیویک، سی‌آر‌وی و …"} <b>${fa(n)}</b> محصول آماده ارسال.</p>
+    <div class="chips">${ms.slice(0, 8).map((m) => `<a class="chip ${dark ? "dk" : ""}" href="#m-${b.id}-${m.id}">${m.nameFa}</a>`).join("")}${ms.length > 8 ? `<a class="chip" style="border:0;background:none;color:var(--red)" href="#${b.id}">+${fa(ms.length - 8)} مدل دیگر</a>` : ""}</div>
+    <a href="#${b.id}" class="btn ${dark ? "btn-red" : "btn-dark"} btn-lg">ورود به فروشگاه ${b.nameFa}${ic("arrowL")}</a></div></div>`;
+}
+function expertise() {
+  return `<section class="expert carbon"><div class="grid-bg" style="opacity:.6"></div><div class="wrap">
+    <div><p class="eyebrow" style="color:#ff5a4f">چرا فروشگاه حمیدی؟</p><h2>متخصص <em>نیسان</em> و <em>هوندا</em>،<br>نه یک فروشگاه همه‌چیز فروش</h2>
+      <p class="lead">فروشگاه حمیدی از سال ۱۳۸۴ در بازار امین‌السلطان تهران، فقط روی قطعات خودروهای نیسان و هوندا تمرکز کرده است. همین تخصص باعث شده تعمیرکاران و مالکان این خودروها در سراسر ایران به ما اعتماد کنند.</p>
+      <div class="stats4">${[["۲۰", "+", "سال تجربه در بازار قطعات"], ["۱۲٬۰۰۰", "+", "قطعه متنوع در انبار"], ["۳۵٬۰۰۰", "+", "مشتری راضی در سراسر کشور"], ["۹۸", "٪", "رضایت از تطابق قطعه"]].map(([v, s, l]) => `<div><b>${v}<i>${s}</i></b><small>${l}</small></div>`).join("")}</div></div>
+    <div class="feat">${[["cpu", "استعلام با شماره شاسی (VIN)", "قطعه دقیق خودروی شما را با شماره شاسی و کاتالوگ رسمی EPC پیدا می‌کنیم؛ بدون حدس و خطا."], ["award", "فقط قطعات اصلی و OEM", "تأمین مستقیم از نمایندگی‌های امارات و ژاپن و برندهای OEM مانند Aisin، KYB، NGK و Denso."], ["boxes", "انبار تخصصی نیسان و هوندا", "تمرکز روی دو برند یعنی موجودی عمیق‌تر، قیمت بهتر و تحویل سریع‌تر برای شما."], ["wrench", "پشتیبانی فنی برای تعمیرکاران", "همکاران و تعمیرگاه‌ها از قیمت عمده و مشاوره فنی اختصاصی بهره‌مند می‌شوند."]].map(([i, t, d]) => `<div><span class="ic">${ic(i)}</span><h3>${t}</h3><p>${d}</p></div>`).join("")}</div>
+  </div></section>`;
+}
+function contactCards() {
+  return `<div class="c-cards">
+    <a class="c-card" href="${waLink("سلام، استعلام قیمت دارم.")}" target="_blank" rel="noopener"><span class="ic" style="background:var(--wa);color:#fff">${WA}</span><span><small>واتساپ فروشگاه</small><b class="ltr" style="font-family:var(--font)">${fa(SHOP.mobile)}</b><p>ارسال عکس قطعه و دریافت قیمت</p></span></a>
+    <div class="c-card"><span class="ic" style="background:var(--ink);color:#fff">${ic("phone")}</span><span><small>تلفن فروش</small><b>${phoneTxt()}</b><p>مشاوره رایگان قبل از خرید</p></span></div>
+    <a class="c-card" href="#contact"><span class="ic" style="background:var(--red);color:#fff">${ic("pin")}</span><span><small>آدرس فروشگاه</small><b>تهران، امین‌السلطان</b><p>پاساژ ایرانیان، پلاک ۱۸</p></span></a>
+    <div class="c-card"><span class="ic" style="background:var(--soft)">${ic("clock")}</span><span><small>ساعات کاری</small><b>شنبه تا پنجشنبه</b><p>${SHOP.hours}</p></span></div></div>`;
+}
+
+const pageHead = (title, sub, items, extra = "") => `<section class="ph carbon"><div class="grid-bg" style="-webkit-mask-image:linear-gradient(#000,transparent);mask-image:linear-gradient(#000,transparent)"></div><div class="glow" style="width:320px;height:320px;left:-100px;top:-100px"></div><div class="wrap">${crumbs(items)}<h1>${title}</h1>${sub ? `<p>${sub}</p>` : ""}${extra}</div></section>`;
+
+/* ---------- listing ---------- */
+const PRICES = [["0-1m", "تا ۱ میلیون", 0, 1e6], ["1m-5m", "۱ تا ۵ میلیون", 1e6, 5e6], ["5m-20m", "۵ تا ۲۰ میلیون", 5e6, 2e7], ["20m", "بیش از ۲۰ میلیون", 2e7, Infinity]];
+const SORTS = [["popular", "پرفروش‌ترین"], ["newest", "جدیدترین"], ["price-asc", "ارزان‌ترین"], ["price-desc", "گران‌ترین"], ["discount", "بیشترین تخفیف"]];
+const sorters = { popular: (a, b) => b.sold - a.sold, newest: (a, b) => b.addedAt.localeCompare(a.addedAt), "price-asc": (a, b) => a.price - b.price, "price-desc": (a, b) => b.price - a.price, discount: (a, b) => (b.oldPrice ? 1 - b.price / b.oldPrice : 0) - (a.oldPrice ? 1 - a.price / a.oldPrice : 0) };
+function inScope(p, s) { return (!s.brand || p.brand === s.brand) && (!s.category || p.category === s.category) && fits(p, s.model) && (!s.q || match(p, s.q)); }
+function query(scope) {
+  const f = ui.f; const pr = PRICES.find((x) => x[0] === f.price);
+  return D.products.filter((p) => inScope(p, scope) && (!f.brand || p.brand === f.brand) && (!f.cats.length || f.cats.includes(p.category)) && (!f.year || fits(p, scope.model, f.year)) && (!f.stock || p.stock !== "out-of-stock") && (!pr || (p.price >= pr[2] && p.price < pr[3])))
+    .sort(sorters[f.sort]).sort((a, b) => (a.stock === "out-of-stock") - (b.stock === "out-of-stock"));
+}
+function filterPanel(scope, facets) {
+  const f = ui.f; let h = "";
+  if (facets.search) h += `<form class="f-search" data-form="fsearch"><label class="sr" for="fq">جستجو در نتایج</label><input id="fq" value="${esc(ui.q)}" placeholder="نام قطعه، کد فنی، OEM…">${ic("search")}</form>`;
+  if (facets.brands) h += `<div><h4>برند خودرو</h4><div class="f-2">${D.brands.map((b) => facets.brands === "link" ? `<a class="f-btn" href="#${b.id}">${b.nameFa}</a>` : `<button class="f-btn ${f.brand === b.id ? "on" : ""}" data-act="fbrand" data-v="${b.id}">${b.nameFa}</button>`).join("")}</div></div>`;
+  if (facets.models) h += `<div><h4>مدل خودرو</h4><div class="f-list">${modelsOf(facets.models).map((m) => { const n = D.products.filter((p) => fits(p, m.id)).length; const on = scope.model === m.id; return `<a class="f-item ${on ? "on" : ""}" href="#${on ? m.brand : `m-${m.brand}-${m.id}`}"><span class="l">${m.nameFa}<small>${m.nameEn}</small></span><span class="n">${fa(n)}</span></a>`; }).join("")}</div></div>`;
+  if (facets.years) h += `<div><h4>سال ساخت</h4><div class="f-4">${yearsOf(facets.years).map((y) => `<button class="f-btn red ${f.year === y ? "on" : ""}" data-act="fyear" data-v="${y}">${fa(y)}</button>`).join("")}</div></div>`;
+  if (facets.cats) h += `<div><h4>دسته‌بندی قطعه</h4><div class="f-list">${D.categories.map((c) => { const n = D.products.filter((p) => p.category === c.id && inScope(p, scope)).length; if (!n) return ""; const on = f.cats.includes(c.id); return facets.cats === "link" ? `<a class="f-item" href="#c-${c.id}"><span class="l">${c.nameFa}</span><span class="n">${fa(n)}</span></a>` : `<button class="f-item ${on ? "on" : ""}" data-act="fcat" data-v="${c.id}" aria-pressed="${on}"><span class="l"><span class="box"></span>${c.nameFa}</span><span class="n">${fa(n)}</span></button>`; }).join("")}</div></div>`;
+  h += `<div><h4>محدوده قیمت (تومان)</h4><div class="f-2">${PRICES.map((p) => `<button class="f-btn red ${f.price === p[0] ? "on" : ""}" data-act="fprice" data-v="${p[0]}">${p[1]}</button>`).join("")}</div></div>`;
+  h += `<button class="toggle ${f.stock ? "on" : ""}" data-act="fstock" role="switch" aria-checked="${f.stock}">فقط کالاهای موجود<i></i></button>`;
+  return `<div class="f-panel">${h}</div>`;
+}
+function listing(scope, facets) {
+  const list = query(scope); const f = ui.f; const chips = [];
+  if (f.brand) chips.push(["fbrand", f.brand, brand(f.brand).nameFa]);
+  if (f.year) chips.push(["fyear", f.year, "مدل " + fa(f.year)]);
+  f.cats.forEach((c) => chips.push(["fcat", c, cat(c).nameFa]));
+  if (f.price) chips.push(["fprice", f.price, PRICES.find((x) => x[0] === f.price)[1]]);
+  if (f.stock) chips.push(["fstock", "", "فقط موجود"]);
+  ui._scope = scope; ui._facets = facets;
+  return `<div class="listing"><aside class="filters" aria-label="فیلتر محصولات">${filterPanel(scope, facets)}</aside>
+    <div style="min-width:0">
+      <div class="toolbar"><button class="f-open" data-act="fopen">${ic("sliders")}فیلترها${chips.length ? `<i>${fa(chips.length)}</i>` : ""}</button>
+        <span class="cnt"><b>${fa(list.length)}</b> محصول</span>
+        <div class="sorts"><span class="muted" style="font-size:13px">مرتب‌سازی:</span>${SORTS.map(([v, l]) => `<button class="sbtn ${f.sort === v ? "on" : ""}" data-act="fsort" data-v="${v}">${l}</button>`).join("")}
+          <div class="sel"><label class="sr" for="fsortsel">مرتب‌سازی</label><select id="fsortsel">${SORTS.map(([v, l]) => `<option value="${v}" ${f.sort === v ? "selected" : ""}>${l}</option>`).join("")}</select>${ic("down")}</div></div></div>
+      ${chips.length ? `<div class="active-chips">${chips.map(([a, v, l]) => `<button class="chip" data-act="${a}" data-v="${v}">${l}${ic("x", "x")}</button>`).join("")}<button class="clr" data-act="fclear">حذف همه فیلترها</button></div>` : ""}
+      ${list.length ? grid(list.slice(0, ui.limit)) + (list.length > ui.limit ? `<div class="load-more"><span>نمایش ${fa(ui.limit)} از ${fa(list.length)} محصول</span><div class="bar"><i style="width:${(ui.limit / list.length) * 100}%"></i></div><button class="btn btn-dark btn-lg" data-act="more">نمایش محصولات بیشتر</button></div>` : "")
+        : `<div class="empty"><span class="ic">${ic("search")}</span><h2>محصولی با این مشخصات پیدا نشد</h2><p>فیلترها را تغییر دهید یا کد فنی قطعه را برای کارشناسان ما بفرستید تا از انبار مرکزی استعلام شود.</p><div class="row"><button class="btn btn-out" data-act="fclear">حذف فیلترها</button><a class="btn btn-red" href="#contact">استعلام قطعه</a></div></div>`}
+    </div></div>`;
+}
+function shop() { return pageHead("فروشگاه لوازم یدکی نیسان و هوندا", `${fa(D.products.length)} قطعه اصلی و OEM برای نیسان و هوندا. با فیلتر برند، مدل خودرو و دسته‌بندی، قطعه دقیق خودروی خود را پیدا کنید.`, [{ l: "فروشگاه" }]) + `<div class="wrap">${listing({}, { brands: "link", cats: "link" })}</div>`; }
+function search() {
+  const q = ui.q;
+  return pageHead(q ? `نتایج جستجو برای «${esc(q)}»` : "جستجوی قطعات", "بر اساس نام قطعه، کد فنی فروشگاه (مثل HAP-NS-1021) یا شماره OEM (مثل 15208-65F0E) جستجو کنید.", [{ l: "جستجو" }],
+    `<div class="chips" style="margin-top:20px">${["لنت", "مورانو", "15400-PLM-A02", "HAP-NS-3041", "واترپمپ آکورد", "سنسور"].map((e) => `<button class="chip dk" data-act="q" data-v="${esc(e)}">${e}</button>`).join("")}</div>`)
+    + `<div class="wrap">${q.length >= 2 ? listing({ q }, { search: true, brands: "toggle", cats: "toggle" }) : `<p class="empty" style="margin-top:28px">عبارت مورد نظر خود را (حداقل ۲ حرف) در کادر جستجوی بالای صفحه وارد کنید.</p>`}</div>`;
+}
+function landingHero(cr, k, title, intro, wm, art, stats) {
+  return `<section class="ph landing carbon"><div class="glow" style="width:420px;height:420px;left:20%;top:-40px"></div><span class="wm">${wm}</span><div class="wrap"><div>${crumbs(cr)}<span class="k">${k}</span><h1>${title}</h1><p>${intro}</p><dl>${stats.map(([v, l]) => `<div><dt>${l}</dt><dd>${v}</dd></div>`).join("")}</dl></div><img class="art" src="${img(art)}" alt=""></div></section>`;
+}
+function brandPage(bid) {
+  const b = brand(bid); const c = D.brandContent[bid]; const ms = modelsOf(bid); const n = D.products.filter((p) => p.brand === bid).length;
+  return landingHero([{ h: "shop", l: "فروشگاه" }, { l: `لوازم یدکی ${b.nameFa}` }], b.nameEn, `لوازم یدکی ${b.nameFa}`, c.intro, b.nameEn, c.image.replace("/images/parts/", "").replace(".png", ""), [[fa(ms.length), "مدل پشتیبانی‌شده"], [fa(n), "قطعه موجود"], [`${fa(Math.min(...ms.map((m) => m.from)))}–${fa(Math.max(...ms.map((m) => m.to)))}`, "سال‌های ساخت"]])
+    + `<section class="wrap" style="margin-top:36px"><h2 style="font-size:20px;font-weight:900;margin-bottom:16px">مدل خودروی ${b.nameFa} خود را انتخاب کنید</h2><ul class="model-grid">${ms.map((m) => `<li><a class="model-card" href="#m-${bid}-${m.id}"><small>${b.nameEn} ${m.nameEn}</small><b>${b.nameFa} ${m.nameFa}</b><span class="yr">${fa(m.from)} تا ${fa(m.to)}</span><span class="ft"><span>${m.body}</span><span>${fa(D.products.filter((p) => fits(p, m.id)).length)} قطعه</span></span></a></li>`).join("")}</ul></section>`
+    + `<div class="wrap" style="margin-top:36px">${finderHTML()}</div>`
+    + `<section class="wrap" style="margin-top:40px"><h2 style="font-size:20px;font-weight:900">محصولات ${b.nameFa}</h2>${listing({ brand: bid }, { models: bid, cats: "toggle" })}</section>`
+    + `<section class="wrap seo-copy"><div><h2>درباره لوازم یدکی ${b.nameFa} در فروشگاه حمیدی</h2>${c.body.map((t) => `<p>${t}</p>`).join("")}</div><div class="side-box"><h2>قطعات ${b.nameFa} بر اساس دسته‌بندی</h2><div class="chips">${D.categories.filter((x) => catCount(x.id, (p) => p.brand === bid)).map((x) => `<a class="chip" href="#c-${x.id}">${x.nameFa}</a>`).join("")}</div></div></section>`
+    + `<div class="wrap">${faq(c.faq, `سؤالات متداول قطعات ${b.nameFa}`)}</div>`;
+}
+function modelPage(bid, mid) {
+  const b = brand(bid), m = model(mid); const full = `${b.nameFa} ${m.nameFa}`; const scope = { brand: bid, model: mid };
+  const cats = D.categories.map((c) => [c, catCount(c.id, (p) => fits(p, mid))]).filter(([, n]) => n).sort((a, z) => z[1] - a[1]);
+  return landingHero([{ h: "shop", l: "فروشگاه" }, { h: bid, l: `لوازم یدکی ${b.nameFa}` }, { l: full }], `${b.nameEn} ${m.nameEn}`, `لوازم یدکی ${full}`, `قطعات اصلی و OEM ${full} (${m.body}) برای مدل‌های ${fa(m.from)} تا ${fa(m.to)}. سال ساخت خودروی خود را انتخاب کنید تا فقط قطعات سازگار نمایش داده شوند.`, m.nameEn.split(" ")[0], cats[0] ? cats[0][0].image : "brake-disc", [[fa(D.products.filter((p) => fits(p, mid)).length), "قطعه سازگار"], [fa(cats.length), "دسته‌بندی"], [`${fa(m.from)}–${fa(m.to)}`, "سال‌های ساخت"]])
+    + `<div class="wrap" style="margin-top:24px"><div class="chips">${cats.map(([c, n]) => `<button class="chip ${ui.f.cats.includes(c.id) ? "on" : ""}" data-act="fcat" data-v="${c.id}">${c.nameFa} ${full} <span class="muted">(${fa(n)})</span></button>`).join("")}</div></div>`
+    + `<div class="wrap">${listing(scope, { models: bid, years: mid, cats: "toggle" })}</div>`
+    + `<section class="wrap seo-copy"><div><h2>خرید مطمئن لوازم یدکی ${full}</h2><p>${full} (${b.nameEn} ${m.nameEn}) یک ${m.body} است که از سال ${fa(m.from)} تا ${fa(m.to)} تولید شده و در این بازه چند نسل و تیپ موتوری مختلف داشته است. به همین دلیل یک قطعه ممکن است فقط برای سال‌های مشخصی مناسب باشد. در فروشگاه حمیدی برای هر قطعه ${full} بازه دقیق سال‌های سازگار، کد فنی فروشگاه و شماره OEM کارخانه درج شده است.</p><p>پرتقاضاترین قطعات این خودرو ${cats.slice(0, 4).map(([c]) => c.nameFa).join("، ")} هستند. برای اطمینان صددرصدی، شماره شاسی (VIN) خودرو را از طریق واتساپ ارسال کنید.</p></div>
+      <div class="side-box"><h2>سایر مدل‌های ${b.nameFa}</h2><div class="chips">${modelsOf(bid).filter((x) => x.id !== mid).map((x) => `<a class="chip" href="#m-${bid}-${x.id}">لوازم یدکی ${x.nameFa}</a>`).join("")}</div></div></section>`
+    + `<div class="wrap">${faq([{ q: `چطور مطمئن شوم قطعه با ${full} من سازگار است؟`, a: `سال ساخت را از فیلتر انتخاب کنید؛ فقط قطعاتی نمایش داده می‌شوند که طبق کاتالوگ برای ${full} همان سال مناسب‌اند. برای اطمینان بیشتر شماره شاسی را در واتساپ ارسال کنید.` }, { q: `قطعات ${full} اصلی هستند یا OEM؟`, a: "نوع هر قطعه (اصلی Genuine، OEM یا افترمارکت درجه یک) و نام سازنده به‌صورت شفاف روی صفحه محصول درج شده است." }], `سؤالات متداول قطعات ${full}`)}</div>`;
+}
+function categories() { return pageHead("دسته‌بندی لوازم یدکی", `${fa(D.categories.length)} دسته تخصصی قطعات نیسان و هوندا؛ دسته مورد نظر را انتخاب کنید.`, [{ l: "دسته‌بندی‌ها" }]) + `<div class="wrap"><ul class="cat-grid" style="list-style:none;padding:0;margin:32px 0 0">${D.categories.map((c) => `<li>${catCard(c, true)}</li>`).join("")}</ul></div>`; }
+function categoryPage(cid) {
+  const c = cat(cid);
+  const modelsN = new Map(); D.products.filter((p) => p.category === cid).forEach((p) => p.fitments.forEach((f) => modelsN.set(f.model, (modelsN.get(f.model) || 0) + 1)));
+  return pageHead(`${c.nameFa} نیسان و هوندا`, `${c.description}، قطعات اصلی و OEM با ضمانت اصالت برای تمام مدل‌های نیسان و هوندا.`, [{ h: "categories", l: "دسته‌بندی‌ها" }, { l: c.nameFa }], `<div class="chips" style="margin-top:22px">${D.categories.map((x) => `<a class="chip dk ${x.id === cid ? "on" : ""}" href="#c-${x.id}">${x.nameFa}</a>`).join("")}</div>`)
+    + `<div class="wrap">${listing({ category: cid }, { brands: "toggle" })}</div>`
+    + `<section class="wrap sec"><h2 style="font-size:20px;font-weight:900;margin-bottom:14px">${c.nameFa} بر اساس خودرو</h2><div class="chips">${[...modelsN.entries()].sort((a, z) => z[1] - a[1]).slice(0, 12).map(([id, n]) => { const m = model(id); return `<a class="chip" href="#m-${m.brand}-${m.id}">لوازم یدکی ${brand(m.brand).nameFa} ${m.nameFa} <span class="muted">(${fa(n)} ${c.nameFa})</span></a>`; }).join("")}</div></section>`;
+}
+function productPage(p) {
+  const b = brand(p.brand), c = cat(p.category), o = off(p);
+  const rel = D.products.filter((x) => x.id !== p.id).map((x) => [x, (x.category === p.category ? 3 : 0) + (x.fitments.some((f) => p.fitments.some((g) => g.model === f.model)) ? 2 : 0) + (x.brand === p.brand ? 1 : 0)]).filter(([, s]) => s >= 2).sort((a, z) => z[1] - a[1] || z[0].sold - a[0].sold).slice(0, 10).map(([x]) => x);
+  const views = ["", "v1", "v2", "v3"]; const out = p.stock === "out-of-stock"; const mq = maxQ(p); ui.qty = Math.min(ui.qty, mq);
+  const specs = [["کد فنی", p.sku, 1], ["شماره OEM", p.oem, 1], ["سازنده", p.manufacturer, 1], ["کشور سازنده", p.origin], ["کیفیت", p.quality], ["نام لاتین", p.nameEn, 1], ["دسته‌بندی", c.nameFa], ["برند خودرو", b.nameFa], ["گارانتی", p.warranty]];
+  return `<div class="pd-crumbs"><div class="wrap">${crumbs([{ h: p.brand, l: `لوازم یدکی ${b.nameFa}` }, { h: "c-" + c.id, l: c.nameFa }, { l: p.name }], true)}</div></div>
+  <article class="wrap"><div class="pd">
+    <div class="gal"><div class="thumbs" role="group" aria-label="نماهای تصویر">${views.map((v, i) => `<button class="studio ${ui.gview === i ? "on" : ""}" data-act="gview" data-v="${i}" aria-label="نمای ${fa(i + 1)}"><img class="${v}" src="${img(p.img)}" alt=""></button>`).join("")}</div>
+      <div class="big studio"><img class="${views[ui.gview]}" src="${img(p.img)}" alt="${esc(p.name)}"><div class="badges">${o ? `<span class="badge">٪${fa(o)} تخفیف</span>` : ""}${p.badges.includes("new") ? `<span class="badge dark">جدید</span>` : ""}${p.badges.includes("bestseller") ? `<span class="badge light">پرفروش</span>` : ""}</div></div></div>
+    <div style="min-width:0">
+      <div class="pd-tags"><a class="b" href="#${p.brand}">${b.nameEn}</a><a href="#c-${c.id}">${c.nameFa}</a><span class="q">${p.quality}</span></div>
+      <h1>${esc(p.name)}</h1><p class="en">${esc(p.nameEn)}</p>
+      <div class="rate"><span class="star">${ic("star")}<b>${fa(p.rating.toFixed(1))}</b><span class="muted">از ۵ (${fa(p.reviews)} نظر)</span></span><span class="muted">${money(p.sold)} فروش موفق</span></div>
+      <div class="codes"><button class="code" data-act="copy" data-v="${p.sku}" data-l="کد فنی"><span><small>کد فنی فروشگاه</small><b>${p.sku}</b></span>${ic("copy")}</button><button class="code" data-act="copy" data-v="${p.oem}" data-l="شماره OEM"><span><small>شماره فنی OEM</small><b>${p.oem}</b></span>${ic("copy")}</button></div>
+      <div class="fitbox"><h2>${ic("checkC")}سازگار با خودروهای زیر</h2>${p.fitments.slice(0, 5).map((f) => { const m = model(f.model); return `<a href="#m-${p.brand}-${f.model}"><b>${b.nameFa} ${m.nameFa} <small>${m.nameEn}</small></b><span>${fa(f.from)} تا ${fa(f.to)}</span></a>`; }).join("")}${p.fitments.length > 5 ? `<p class="muted" style="font-size:12px;margin:8px 0 0">+ ${fa(p.fitments.length - 5)} مدل دیگر در جدول سازگاری</p>` : ""}</div>
+      <p class="muted" style="font-size:14px;margin-top:16px">سازنده: <b style="color:var(--tx)">${p.manufacturer}</b> · کشور: <b style="color:var(--tx)">${p.origin}</b></p>
+    </div>
+    <aside class="buy" aria-label="خرید محصول">
+      <div class="top">${stockHTML(p)}${o ? `<span class="badge">٪${fa(o)}</span>` : ""}</div>
+      ${priceHTML(p.price, p.oldPrice)}
+      ${out ? addBtn(p, "btn-lg") : `<div class="sum"><span class="muted">جمع برای ${fa(ui.qty)} عدد</span><b>${money(p.price * ui.qty)} <small class="muted" style="font-weight:400">تومان</small></b></div>
+      <div class="row"><div class="qty" role="group" aria-label="تعداد"><button data-act="pq" data-v="1" aria-label="افزایش" ${ui.qty >= mq ? "disabled" : ""}>${ic("plus")}</button><output>${fa(ui.qty)}</output><button data-act="pq" data-v="-1" aria-label="کاهش" ${ui.qty <= 1 ? "disabled" : ""}>${ic("minus")}</button></div><button class="btn btn-red" data-act="add" data-id="${p.id}" data-q="pd">${ic("cart")}<span>افزودن به سبد</span></button></div>`}
+      <a class="btn btn-wa btn-lg" href="${waLink(`سلام، درباره قطعه «${p.name}» با کد ${p.sku} سؤال دارم.`)}" target="_blank" rel="noopener">${WA}استعلام و مشاوره در واتساپ</a>
+      <ul><li>${ic("shield")}${p.warranty}</li><li>${ic("badge")}ضمانت اصالت و تطابق با کد فنی</li><li>${ic("truck")}ارسال سریع تهران و سراسر کشور</li><li>${ic("returnI")}۷ روز ضمانت بازگشت در صورت عدم تطابق</li></ul>
+    </aside>
+  </div>
+  <div class="pd-secs">
+    <section><h2>توضیحات ${esc(p.name)}</h2><p>${esc(p.description)}</p><p>قبل از خرید، برای اطمینان صددرصدی از تطابق، می‌توانید شماره شاسی (VIN) خودروی خود را از طریق واتساپ برای کارشناسان فروشگاه حمیدی ارسال کنید. سایر قطعات این خودرو را در صفحه <a style="color:var(--red);font-weight:700" href="#m-${p.brand}-${p.fitments[0].model}">لوازم یدکی ${b.nameFa} ${model(p.fitments[0].model).nameFa}</a> ببینید.</p></section>
+    <section><h2>مشخصات فنی</h2><div class="tbl-wrap"><table><tbody>${specs.map(([l, v, lat]) => `<tr><th scope="row">${l}</th><td class="${lat ? "lat" : ""}" style="font-weight:700">${esc(v)}</td></tr>`).join("")}</tbody></table></div></section>
+    <section><h2>جدول سازگاری با خودرو</h2><div class="tbl-wrap"><table><thead><tr><th scope="col">برند</th><th scope="col">مدل</th><th scope="col">سال ساخت</th></tr></thead><tbody>${p.fitments.map((f) => `<tr><td>${b.nameFa}</td><td><a href="#m-${p.brand}-${f.model}" style="font-weight:700">${model(f.model).nameFa}</a> <span class="muted" style="font-size:12px">${model(f.model).nameEn}</span></td><td>${fa(f.from)} – ${fa(f.to)}</td></tr>`).join("")}</tbody></table></div></section>
+    <section><h2>ارسال و ضمانت</h2><ul style="line-height:2.1;padding-right:20px;margin:0"><li>سفارش‌های تهران تا ساعت ۱۴ همان روز با پیک ارسال می‌شوند.</li><li>ارسال به شهرستان‌ها با پست پیشتاز و باربری، معمولاً ۲ تا ۴ روز کاری.</li><li>تمام قطعات ضمانت اصالت دارند و در صورت عدم تطابق تا ۷ روز امکان مرجوعی هست.</li><li>قطعات برقی پس از نصب و تست قابل مرجوع نیستند.</li></ul></section>
+  </div></article>
+  ${rel.length ? `<section class="sec wrap">${secHead("پیشنهاد ما", "محصولات مرتبط", "", "c-" + c.id, "همه " + c.nameFa)}${rail(rel)}</section>` : ""}`;
+}
+const SHIPS = [["courier", "پیک موتوری (تهران)", "تحویل همان روز", 120000], ["post", "پست پیشتاز", "۲ تا ۴ روز کاری", 180000], ["cargo", "باربری (قطعات حجیم)", "پس‌کرایه", 0]];
+const FREE = 1e7, COUPONS = { HAMIDI10: 10, NISSAN5: 5 };
+function cartPage() {
+  const head = `<div class="pd-crumbs"><div class="wrap" style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:14px">${crumbs([{ l: "سبد خرید" }], true)}<ol class="steps" style="list-style:none;margin:0;padding:0">${["سبد خرید", "اطلاعات ارسال", "پرداخت"].map((s, i) => `<li class="${i === 0 ? "on" : ""}" style="display:flex;align-items:center;gap:8px"><i>${fa(i + 1)}</i>${s}${i < 2 ? "<hr>" : ""}</li>`).join("")}</ol></div></div>`;
+  if (!cart.length) return head + `<div class="wrap" style="margin-top:28px"><h1 style="font-size:24px;font-weight:900;margin-bottom:18px">سبد خرید</h1><div class="empty"><span class="ic">${ic("bag")}</span><h2>سبد خرید شما خالی است</h2><p>از بین قطعات اصلی نیسان و هوندا، قطعه مورد نیاز خودروی خود را انتخاب کنید.</p><div class="row"><a class="btn btn-red btn-lg" href="#shop">رفتن به فروشگاه${ic("arrowL")}</a><a class="btn btn-out btn-lg" href="#home">انتخاب بر اساس خودرو</a></div></div></div><section class="sec wrap">${secHead("پیشنهاد ما", "محصولات پرفروش", "", "shop")}${rail([...D.products].sort((a, z) => z.sold - a.sold).slice(0, 8))}</section>`;
+  const L = cart.map((l) => ({ ...l, p: prod(l.id) }));
+  const count = L.reduce((n, l) => n + l.qty, 0), sub = L.reduce((n, l) => n + l.p.price * l.qty, 0), list = L.reduce((n, l) => n + (l.p.oldPrice || l.p.price) * l.qty, 0);
+  const cOff = ui.coupon ? Math.round((sub * COUPONS[ui.coupon]) / 100) : 0; const sm = SHIPS.find((s) => s[0] === ui.ship); const shipC = sub >= FREE && ui.ship !== "cargo" ? 0 : sm[3]; const total = sub - cOff + shipC;
+  ui._total = total;
+  return head + `<div class="wrap"><h1 style="font-size:24px;font-weight:900;margin-top:24px">سبد خرید <span class="muted" style="font-size:15px;font-weight:600">(${fa(count)} کالا)</span></h1><div class="cart-g">
+    <section>
+      <div class="free">${sub >= FREE ? `<b style="color:var(--ok)">ارسال شما رایگان شد!</b>` : `با افزودن <b>${money(FREE - sub)} تومان</b> دیگر، ارسال رایگان می‌شود.`}<div class="bar"><i style="width:${Math.min(100, (sub / FREE) * 100)}%"></i></div></div>
+      <ul class="lines">${L.map(({ p, qty }) => `<li><a class="im studio" href="#${route(p)}" tabindex="-1"><img src="${img(p.img)}" alt=""></a><div class="inf"><a class="nm" href="#${route(p)}">${esc(p.name)}</a><span class="cd2"><span>کد: <span class="ltr">${p.sku}</span></span><span>OEM: <span class="ltr">${p.oem}</span></span></span>
+        <div class="bot"><div style="display:flex;align-items:center;gap:6px"><div class="qty sm"><button data-act="cq" data-id="${p.id}" data-v="1" aria-label="افزایش" ${qty >= maxQ(p) ? "disabled" : ""}>${ic("plus")}</button><output>${fa(qty)}</output><button data-act="cq" data-id="${p.id}" data-v="-1" aria-label="کاهش" ${qty <= 1 ? "disabled" : ""}>${ic("minus")}</button></div><button class="icon-btn" data-act="rm" data-id="${p.id}" aria-label="حذف ${esc(p.name)}">${ic("trash")}</button></div>
+        <div class="tot" style="text-align:left">${p.oldPrice ? `<s>${money(p.oldPrice * qty)}</s>` : ""}<b>${money(p.price * qty)}</b> <small class="muted">تومان</small></div></div></div></li>`).join("")}</ul>
+      <div style="display:flex;justify-content:space-between;margin-top:12px"><a class="btn btn-out btn-sm" href="#shop">ادامه خرید</a><button class="btn btn-sm" style="color:var(--tx-2)" data-act="clear">${ic("trash")}خالی کردن سبد</button></div>
+    </section>
+    <aside>
+      <div class="box"><h2>روش ارسال</h2>${SHIPS.map(([id, l, d, pr]) => `<label class="ship ${ui.ship === id ? "on" : ""}"><input type="radio" name="ship" value="${id}" ${ui.ship === id ? "checked" : ""}><span><b>${l}</b><small>${d}</small></span><em>${pr === 0 ? "پس‌کرایه" : sub >= FREE ? `<span style="color:var(--ok)">رایگان</span>` : money(pr) + " ت"}</em></label>`).join("")}</div>
+      <div class="box"><form class="coupon" data-form="coupon"><label class="sr" for="cpn">کد تخفیف</label><input id="cpn" placeholder="کد تخفیف (HAMIDI10)" dir="auto" autocomplete="off"><button class="btn btn-dark">اعمال</button></form>
+        ${ui.coupon ? `<div class="applied">کد ${ui.coupon} اعمال شد (${fa(COUPONS[ui.coupon])}٪)<button data-act="uncoupon" aria-label="حذف کد">${ic("x")}</button></div>` : ""}
+        <dl class="sumlist"><div><dt>قیمت کالاها (${fa(count)})</dt><dd>${money(list)} تومان</dd></div>${list - sub ? `<div class="acc"><dt>سود شما از خرید</dt><dd>−${money(list - sub)} تومان</dd></div>` : ""}${cOff ? `<div class="acc"><dt>کد تخفیف</dt><dd>−${money(cOff)} تومان</dd></div>` : ""}<div><dt>هزینه ارسال</dt><dd>${sm[3] === 0 ? "پس‌کرایه" : shipC === 0 ? `<span style="color:var(--ok)">رایگان</span>` : money(shipC) + " تومان"}</dd></div><div class="total"><dt>مبلغ قابل پرداخت</dt><dd>${money(total)} <small class="muted" style="font-size:12px;font-weight:500">تومان</small></dd></div></dl>
+        <button class="btn btn-red btn-lg" style="width:100%;margin-top:18px" data-act="checkout">${ic("lock")}ادامه و ثبت سفارش</button><p class="muted" style="font-size:11px;text-align:center;margin:10px 0 0">نسخه نمایشی؛ پرداخت واقعی انجام نمی‌شود.</p></div>
+    </aside></div></div>`;
+}
+function contact() {
+  const T = ["استعلام قیمت قطعه", "پیگیری سفارش", "همکاری تعمیرگاه‌ها", "سایر موارد"];
+  return pageHead("تماس با فروشگاه حمیدی", "برای استعلام قیمت، موجودی و تطابق قطعه با ما در ارتباط باشید. پاسخگویی در ساعات کاری کمتر از ۳۰ دقیقه است.", [{ l: "تماس با ما" }])
+  + `<div class="wrap two contact-g" style="margin-top:32px;align-items:start">
+    <div class="box" style="padding:24px"><h2 style="font-size:20px">ارسال پیام و استعلام قطعه</h2><p class="muted" style="font-size:14px;margin:0 0 18px">فرم زیر را تکمیل کنید؛ کارشناسان ما با شما تماس می‌گیرند.</p>
+      <form data-form="contact" style="display:grid;gap:16px"><div><p style="font-size:14px;font-weight:700;margin:0 0 8px">موضوع پیام</p><div class="chips" role="radiogroup">${T.map((t, i) => `<button type="button" class="topic ${ui.topic === i ? "on" : ""}" data-act="topic" data-v="${i}" role="radio" aria-checked="${ui.topic === i}">${t}</button>`).join("")}</div></div>
+        <div class="two" style="gap:14px"><label class="field" for="cn">نام و نام خانوادگی<input id="cn" required placeholder="مثلاً علی رضایی"></label><label class="field" for="ct">شماره تماس<input id="ct" required inputmode="tel" dir="ltr" placeholder="09120000000"></label></div>
+        <label class="field" for="cv">مدل، سال و شماره شاسی خودرو (اختیاری)<input id="cv" placeholder="مثلاً تیانا ۲۰۱۲"></label>
+        <label class="field" for="cm">متن پیام<textarea id="cm" required rows="5" placeholder="نام یا کد قطعه مورد نیاز را بنویسید…"></textarea></label>
+        <button class="btn btn-red btn-lg" style="justify-self:start">${ic("send")}ارسال پیام</button></form></div>
+    <div style="display:grid;gap:12px">
+      <a class="c-card" style="background:var(--wa);color:#fff;border:0" href="${waLink("سلام، استعلام قطعه دارم.")}" target="_blank" rel="noopener"><span class="ic" style="background:rgb(255 255 255 / .2)">${WA}</span><span><b style="font-size:18px">گفتگوی مستقیم در واتساپ</b><p style="color:#fff;opacity:.9">سریع‌ترین راه استعلام قیمت</p></span></a>
+      <div class="c-card copybox"><span style="display:flex;gap:14px;align-items:center"><span class="ic" style="background:var(--ink);color:#fff">${ic("phone")}</span><span><small>تلفن فروشگاه</small><b>${phoneTxt()}</b></span></span><button class="icon-btn" data-act="copy" data-v="${SHOP.phone}" data-l="شماره تلفن" aria-label="کپی شماره">${ic("copy")}</button></div>
+      <div class="c-card copybox"><span style="display:flex;gap:14px;align-items:center"><span class="ic" style="background:var(--ink);color:#fff">${ic("mail")}</span><span><small>ایمیل</small><b class="ltr">${SHOP.email}</b></span></span><button class="icon-btn" data-act="copy" data-v="${SHOP.email}" data-l="ایمیل" aria-label="کپی ایمیل">${ic("copy")}</button></div>
+      <div class="c-card"><span class="ic" style="background:var(--ink);color:#fff">${ic("clock")}</span><span><small>ساعات کاری</small><b>${SHOP.hours}</b></span></div>
+      <div class="box" style="padding:0;overflow:hidden"><div class="map"><svg viewBox="0 0 400 180" preserveAspectRatio="xMidYMid slice" style="position:absolute;inset:0;width:100%;height:100%" role="img" aria-label="نقشه موقعیت فروشگاه"><rect width="400" height="180" fill="#eceef1"/>${[30, 80, 140, 200, 260, 330].map((x) => `<rect x="${x}" width="10" height="180" fill="#fff"/>`).join("")}${[40, 100, 150].map((y) => `<rect y="${y}" width="400" height="9" fill="#fff"/>`).join("")}<path d="M0 120 C120 100 220 150 400 110" stroke="#ffd36b" stroke-width="12" fill="none"/><rect x="150" y="55" width="40" height="34" rx="4" fill="#dfe3e8"/><rect x="90" y="108" width="40" height="34" rx="4" fill="#d4ecd9"/></svg>${ic("pin", "pin")}</div><p style="display:flex;gap:8px;padding:14px;margin:0;font-size:14px;line-height:1.9"><span style="color:var(--red);width:16px;flex:none">${ic("pin")}</span>${SHOP.address}</p></div>
+    </div></div>
+  <div class="wrap">${faq([{ q: "چطور مطمئن شوم قطعه با خودروی من سازگار است؟", a: "شماره شاسی (VIN) یا عکس کارت خودرو را در واتساپ ارسال کنید. کارشناسان ما قطعه را بر اساس کاتالوگ رسمی EPC نیسان و هوندا بررسی و تأیید می‌کنند." }, { q: "قطعات اصلی هستند یا تقلبی؟", a: "تمام قطعات با ضمانت اصالت عرضه می‌شوند و نوع آن‌ها (Genuine، OEM یا افترمارکت درجه یک) روی هر محصول درج شده است." }, { q: "ارسال به شهرستان چقدر طول می‌کشد؟", a: "معمولاً ۲ تا ۴ روز کاری با پست پیشتاز یا باربری به سراسر ایران." }, { q: "امکان مرجوع کردن قطعه وجود دارد؟", a: "در صورت عدم تطابق، تا ۷ روز امکان بازگشت کالا (به شرط سالم بودن و نصب‌نشدن) وجود دارد." }], "سؤالات متداول")}</div>`;
+}
+function about() {
+  return pageHead("درباره فروشگاه حمیدی", "مرجع تخصصی لوازم یدکی نیسان و هوندا، با بیش از دو دهه همراهی مالکان و تعمیرکاران این دو برند.", [{ l: "درباره ما" }])
+  + `<section class="wrap two" style="margin-top:48px"><div><p class="eyebrow">داستان ما</p><h2 style="font-size:28px;font-weight:900">از یک مغازه کوچک تا مرجع تخصصی قطعات ژاپنی</h2><p style="line-height:2.05;color:#3f3f46">فروشگاه حمیدی در سال ۱۳۸۴ با یک هدف ساده شروع به کار کرد: تأمین قطعه درست، با قیمت منصفانه، برای خودروهای نیسان. با گذشت زمان و اعتماد مشتریان، هوندا نیز به تخصص ما اضافه شد.</p><p style="line-height:2.05;color:#3f3f46">امروز با انباری از هزاران قطعه اصلی و OEM، همکاری مستقیم با تأمین‌کنندگان معتبر و تیمی آشنا به کاتالوگ‌های فنی، به مرجعی برای مالکان و تعمیرکاران این دو برند در سراسر ایران تبدیل شده‌ایم.</p><div class="chips" style="gap:10px;margin-top:20px"><a class="btn btn-red btn-lg" href="#shop">مشاهده فروشگاه${ic("arrowL")}</a><a class="btn btn-out btn-lg" href="#contact">تماس با ما</a></div></div>
+    <div class="pics">${["brake-disc", "piston", "shock-absorber", "water-pump"].map((k) => `<div class="studio"><img src="${img(k)}" alt=""></div>`).join("")}</div></section>
+  <section class="wrap sec"><h2 style="font-size:22px;font-weight:900;margin-bottom:22px">مسیر رشد ما</h2><ol class="timeline">${[["۱۳۸۴", "شروع فعالیت", "آغاز کار با یک مغازه کوچک در بازار امین‌السلطان با تمرکز بر قطعات نیسان."], ["۱۳۹۰", "افزودن هوندا", "گسترش سبد محصولات به تمام مدل‌های هوندا و واردات مستقیم از امارات."], ["۱۳۹۷", "انبار مرکزی", "راه‌اندازی انبار ۶۰۰ متری و سیستم کدینگ فنی قطعات بر اساس OEM."], ["۱۴۰۵", "فروشگاه آنلاین", "خدمات آنلاین و ارسال سریع به سراسر ایران با استعلام هوشمند."]].map(([y, t, d]) => `<li><span class="yr">${y}</span><h3>${t}</h3><p>${d}</p></li>`).join("")}</ol></section>
+  <section class="wrap sec"><h2 style="font-size:22px;font-weight:900;margin-bottom:22px">ارزش‌های ما</h2><div class="values">${[["shield", "اصالت", "هیچ قطعه‌ای بدون بررسی کد فنی و اصالت از انبار خارج نمی‌شود."], ["target", "تخصص", "تمرکز روی دو برند یعنی دانش عمیق‌تر و پاسخ دقیق‌تر."], ["heart", "صداقت", "نوع قطعه (اصلی، OEM یا افترمارکت) همیشه شفاف اعلام می‌شود."], ["award", "کیفیت خدمات", "مشاوره رایگان، ارسال سریع و ضمانت بازگشت کالا."]].map(([i, t, d]) => `<div><span class="ic">${ic(i)}</span><h3>${t}</h3><p>${d}</p></div>`).join("")}</div></section>
+  ${expertise()}`;
+}
+
+/* ---------- chrome ---------- */
+const NAV = [["home", "صفحه اصلی"], ["shop", "فروشگاه"], ["nissan", "قطعات نیسان"], ["honda", "قطعات هوندا"], ["categories", "دسته‌بندی‌ها"], ["about", "درباره ما"], ["contact", "تماس با ما"]];
+function chrome() {
+  document.querySelectorAll("[data-i]").forEach((e) => { e.insertAdjacentHTML("afterbegin", ic(e.dataset.i)); });
+  $("#logo").innerHTML = logoHTML;
+  $("#topPhone").innerHTML = `${ic("phone")} ${fa(SHOP.phone)}`; $("#topPhone").querySelector("svg").style.cssText = "width:14px;height:14px;display:inline;vertical-align:-2px;color:#fff";
+  $("#hPhone").textContent = fa(SHOP.phone);
+  $("#megaPanel").innerHTML = D.categories.map((c) => `<a href="#c-${c.id}"><img class="studio" src="${img(c.image)}" alt=""><span><b>${c.nameFa}</b><small>${c.description}</small></span></a>`).join("");
+  const sb = `<form data-form="search" role="search">${ic("search", "s-ico")}<label class="sr" for="SID">جستجوی قطعات</label><input id="SID" type="search" autocomplete="off" placeholder="جستجوی نام قطعه، کد فنی یا شماره OEM…" role="combobox" aria-expanded="false"><button class="s-btn">جستجو</button></form><div class="suggest" hidden></div>`;
+  $("#searchDesk").innerHTML = sb.replace(/SID/g, "sd"); $("#searchMob").innerHTML = sb.replace(/SID/g, "sm");
+  const mq = matchMedia("(min-width:1024px)"); const sw = () => { $("#searchDesk").hidden = !mq.matches; }; sw(); mq.addEventListener("change", sw);
+  $("#footer").innerHTML = `<div class="wrap"><div class="cta"><div><p class="t">قطعه‌ات را پیدا نکردی؟ <em>کد فنی را بفرست.</em></p><p class="s">عکس قطعه یا شماره شاسی را در واتساپ ارسال کنید؛ کارشناسان ما در کمتر از ۳۰ دقیقه پاسخ می‌دهند.</p></div><div class="chips" style="gap:10px"><a class="btn btn-wa btn-lg" href="${waLink("سلام، استعلام قطعه دارم.")}" target="_blank" rel="noopener">${WA}ارسال در واتساپ</a><span class="btn btn-ghost-w btn-lg">${ic("phone")}${phoneTxt()}</span></div></div>
+    <div class="cols"><div class="about"><a href="#home" class="logo dark" style="margin-bottom:14px">${logoHTML}</a><p>فروشگاه حمیدی، مرجع تخصصی لوازم یدکی نیسان و هوندا؛ بیش از ۲۰ سال تجربه در تأمین قطعات اصلی و OEM خودروهای ژاپنی، با ضمانت اصالت و ارسال به سراسر کشور.</p><ul><li>${ic("pin")}${SHOP.address}</li><li>${ic("clock")}${SHOP.hours}</li><li>${ic("mail")}<span class="ltr">${SHOP.email}</span></li></ul></div>
+      <nav><h2>دسته‌بندی‌های پرطرفدار</h2><ul>${D.categories.slice(0, 9).map((c) => `<li><a href="#c-${c.id}">${c.nameFa}</a></li>`).join("")}</ul></nav>
+      ${D.brands.map((b) => `<nav><h2>لوازم یدکی ${b.nameFa}</h2><ul>${modelsOf(b.id).slice(0, 8).map((m) => `<li><a href="#m-${b.id}-${m.id}">${b.nameFa} ${m.nameFa}</a></li>`).join("")}<li><a href="#${b.id}" style="color:#ff5a4f;font-weight:700">همه مدل‌های ${b.nameFa} ←</a></li></ul></nav>`).join("")}
+      <nav><h2>دسترسی سریع</h2><ul><li><a href="#shop">همه محصولات</a></li><li><a href="#categories">همه دسته‌بندی‌ها</a></li><li><a href="#about">درباره ما</a></li><li><a href="#contact">تماس با ما</a></li><li><a href="#cart">سبد خرید</a></li></ul></nav></div>
+    <div class="copy">© ۱۴۰۵ فروشگاه حمیدی — HAMIDI AUTO PARTS. نسخه نمایشی؛ قیمت‌ها و موجودی‌ها نمونه هستند.</div></div>`;
+  $("#fab").innerHTML = `<div class="opts" hidden><a href="${waLink("سلام، برای استعلام قطعه پیام می‌دهم.")}" target="_blank" rel="noopener"><i style="background:var(--wa)">${WA}</i>گفتگو در واتساپ</a><div><i style="background:var(--ink)">${ic("phone")}</i>${phoneTxt()}</div></div><button data-act="fab" aria-label="راه‌های ارتباطی" aria-expanded="false">${ic("chat")}</button>`;
+  renderCount();
+}
+function renderCount() { const n = cartCount(); const el = $("#cartCnt"); el.hidden = !n; el.textContent = fa(n); }
+
+/* ---------- router ---------- */
+let current = "";
+function render(opts = {}) {
+  const h = decodeURIComponent(location.hash.slice(1)) || "home";
+  const changed = h !== current;
+  if (changed) { ui.gview = 0; ui.qty = 1; if (!opts.keepFilters) { ui.f = freshFilters(); ui.limit = 12; } if (h === "nissan" || h === "honda") finder = { b: h, m: "", y: "" }; }
+  current = h;
+  let html, title = "فروشگاه حمیدی";
+  if (h === "home") html = home();
+  else if (h === "shop") { html = shop(); title = "فروشگاه"; }
+  else if (h === "nissan" || h === "honda") { html = brandPage(h); title = "لوازم یدکی " + brand(h).nameFa; }
+  else if (h.startsWith("m-")) { const [, b, ...m] = h.split("-"); const mid = m.join("-"); if (brand(b) && model(mid)) { html = modelPage(b, mid); title = `${brand(b).nameFa} ${model(mid).nameFa}`; } }
+  else if (h === "categories") { html = categories(); title = "دسته‌بندی‌ها"; }
+  else if (h.startsWith("c-") && cat(h.slice(2))) { html = categoryPage(h.slice(2)); title = cat(h.slice(2)).nameFa; }
+  else if (h.startsWith("p-") && bySlug.get(h.slice(2))) { const p = bySlug.get(h.slice(2)); html = productPage(p); title = p.name; }
+  else if (h === "search") { html = search(); title = "جستجو"; }
+  else if (h === "cart") { html = cartPage(); title = "سبد خرید"; }
+  else if (h === "contact") { html = contact(); title = "تماس با ما"; }
+  else if (h === "about") { html = about(); title = "درباره ما"; }
+  if (!html) html = `<div class="wrap empty" style="margin-top:40px"><span class="ic">${ic("search")}</span><h2>صفحه مورد نظر پیدا نشد</h2><div class="row"><a class="btn btn-red" href="#home">صفحه اصلی</a></div></div>`;
+  $("#main").innerHTML = html;
+  document.title = title + " | HAMIDI AUTO PARTS";
+  $("#navLinks").innerHTML = NAV.map(([r, l]) => `<a href="#${r}" class="${h === r || (r !== "home" && h.startsWith(r)) || (r === "nissan" && h.startsWith("m-nissan")) || (r === "honda" && h.startsWith("m-honda")) || (r === "categories" && h.startsWith("c-")) ? "on" : ""}">${l}</a>`).join("");
+  if (changed && !opts.keepScroll) window.scrollTo({ top: 0, behavior: "instant" });
+  closeSuggest(); tick();
+}
+function rerender() { const y = scrollY; render({ keepFilters: true, keepScroll: true }); window.scrollTo({ top: y, behavior: "instant" }); }
+function go(h) { if (location.hash.slice(1) === h) { ui._keep = false; rerender(); } else location.hash = h; }
+window.addEventListener("hashchange", () => { const k = ui._keep; ui._keep = false; render({ keepFilters: k }); });
+
+/* ---------- countdown ---------- */
+function tick() { const el = $("#cd"); if (!el) return; const t = new Date(); t.setHours(24, 0, 0, 0); let s = Math.max(0, Math.floor((t - Date.now()) / 1000)); const v = [Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60]; el.innerHTML = v.map((n, i) => `<div><b>${fa(String(n).padStart(2, "0"))}</b><small>${["ساعت", "دقیقه", "ثانیه"][i]}</small></div>${i < 2 ? "<span>:</span>" : ""}`).join(""); }
+setInterval(tick, 1000);
+
+/* ---------- live search ---------- */
+let sTimer;
+function suggestFor(input) {
+  const box = input.closest(".search").querySelector(".suggest"); const q = input.value.trim();
+  if (q.length < 2) { box.innerHTML = `<div class="s-head">جستجوهای پرتکرار</div><div class="chips" style="padding:12px 16px">${["لنت ترمز", "کمک‌فنر مورانو", "واترپمپ", "15208-65F0E", "سیبک", "تسمه تایم"].map((s) => `<button class="chip" data-act="sq" data-v="${s}">${s}</button>`).join("")}</div>`; }
+  else { const hits = D.products.filter((p) => match(p, q)).sort((a, b) => b.sold - a.sold); box.innerHTML = hits.length ? `<div class="s-head">${fa(hits.length)} قطعه یافت شد</div>${hits.slice(0, 6).map((p, i) => `<a class="s-item" href="#${route(p)}" data-i="${i}"><img class="studio" src="${img(p.img)}" alt=""><span style="min-width:0"><span class="nm">${esc(p.name)}</span><span class="mt"><span class="ltr">${p.sku}</span> · ${cat(p.category).nameFa}</span></span><span class="pr">${money(p.price)} <small class="muted" style="font-weight:400">تومان</small></span></a>`).join("")}<a class="s-all" href="#search" data-act="sall">مشاهده همه نتایج برای «${esc(q)}» ←</a>` : `<div style="padding:24px;text-align:center;font-size:14px" class="muted">قطعه‌ای با «${esc(q)}» پیدا نشد.<a href="#contact" style="display:block;color:var(--red);font-weight:700;margin-top:6px">استعلام قطعه از کارشناس ←</a></div>`; }
+  box.hidden = false; input.setAttribute("aria-expanded", "true");
+}
+function closeSuggest() { document.querySelectorAll(".suggest").forEach((b) => (b.hidden = true)); document.querySelectorAll(".search input").forEach((i) => i.setAttribute("aria-expanded", "false")); }
+document.addEventListener("input", (e) => {
+  if (e.target.matches(".search input")) { clearTimeout(sTimer); const t = e.target; sTimer = setTimeout(() => suggestFor(t), 120); }
+});
+document.addEventListener("focusin", (e) => { if (e.target.matches(".search input")) suggestFor(e.target); });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { closeSuggest(); closeLayer(); }
+  if (e.target.matches(".search input") && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+    const box = e.target.closest(".search").querySelector(".suggest"); const items = [...box.querySelectorAll(".s-item")]; if (!items.length) return; e.preventDefault();
+    let i = items.findIndex((x) => x.classList.contains("on")); items.forEach((x) => x.classList.remove("on"));
+    i = e.key === "ArrowDown" ? Math.min(items.length - 1, i + 1) : Math.max(-1, i - 1); if (i >= 0) items[i].classList.add("on");
+  }
+});
+document.addEventListener("pointerdown", (e) => { if (!e.target.closest(".search")) closeSuggest(); });
+
+/* ---------- layer (drawers / modal) ---------- */
+function openLayer(kind, html, label) {
+  $("#layer").innerHTML = `<div class="overlay" data-act="close"></div><div class="drawer ${kind}" role="dialog" aria-modal="true" aria-label="${label}">${html}</div>`;
+  document.body.style.overflow = "hidden"; const f = $("#layer [autofocus]") || $("#layer .x-btn"); f && f.focus();
+}
+function closeLayer() { if (!$("#layer").innerHTML) return; $("#layer").innerHTML = ""; document.body.style.overflow = ""; if (ui.checkout === "done") { cart = []; saveCart(); ui.checkout = null; ui.coupon = null; if (current === "cart") rerender(); } ui.checkout = null; }
+function menuHTML() {
+  return `<div class="d-head"><a href="#home" class="logo" data-act="close">${logoHTML}</a><button class="x-btn" data-act="close" aria-label="بستن">${ic("x")}</button></div>
+  <div class="d-body"><nav class="m-links" aria-label="منوی موبایل">${NAV.map(([r, l]) => `<a href="#${r}" data-act="close" class="${current === r ? "on" : ""}">${l}${ic("left")}</a>`).join("")}</nav>
+  ${D.brands.map((b) => `<details class="m-acc"><summary>مدل‌های ${b.nameFa} ${ic("down")}</summary><div class="acc-grid">${modelsOf(b.id).map((m) => `<a href="#m-${b.id}-${m.id}" data-act="close">${m.nameFa}</a>`).join("")}</div></details>`).join("")}
+  <details class="m-acc"><summary>دسته‌بندی قطعات ${ic("down")}</summary><div class="acc-grid" style="grid-template-columns:1fr">${D.categories.map((c) => `<a href="#c-${c.id}" data-act="close">${c.nameFa}</a>`).join("")}</div></details></div>
+  <div class="d-foot"><span class="btn btn-dark">${ic("phone")}${phoneTxt()}</span><a class="btn btn-wa" href="${waLink()}" target="_blank" rel="noopener">${WA}واتساپ</a></div>`;
+}
+function filtersHTML() { const n = query(ui._scope).length; return `<div class="d-head"><b style="font-size:18px">فیلتر محصولات</b><button class="x-btn" data-act="close" aria-label="بستن">${ic("x")}</button></div><div class="d-body" style="padding:18px">${filterPanel(ui._scope, ui._facets)}</div><div class="d-foot" style="grid-template-columns:1fr"><button class="btn btn-red btn-lg" data-act="close">نمایش ${fa(n)} محصول</button></div>`; }
+function checkoutHTML() {
+  if (ui.checkout === "done") return `<div style="padding:28px;text-align:center"><span class="ok-ic">${ic("checkC")}</span><h2 style="margin-top:16px;font-size:20px;font-weight:900">سفارش نمایشی ثبت شد</h2><p class="muted" style="font-size:14px;line-height:2">کد پیگیری: <b class="ltr" style="color:var(--tx)">${ui.order}</b><br>در نسخه نهایی، کارشناسان ما برای تأیید تطابق قطعه با شما تماس می‌گیرند.</p><a class="btn btn-red btn-lg" style="width:100%;margin-top:12px" href="#home" data-act="close">بازگشت به صفحه اصلی</a></div>`;
+  return `<div class="d-head"><b style="font-size:18px">اطلاعات ارسال</b><button class="x-btn" data-act="close" aria-label="بستن">${ic("x")}</button></div><form data-form="checkout" style="padding:18px;display:grid;gap:14px"><p class="muted" style="margin:0;font-size:14px">مبلغ قابل پرداخت: <b style="color:var(--tx)">${money(ui._total)} تومان</b></p>
+    <label class="field" for="o1">نام و نام خانوادگی<input id="o1" required autocomplete="name" autofocus></label><label class="field" for="o2">شماره موبایل<input id="o2" required inputmode="tel" dir="ltr" pattern="[0-9۰-۹]{11}" title="شماره موبایل ۱۱ رقمی" placeholder="09120000000"></label>
+    <label class="field" for="o3">شهر و آدرس کامل<input id="o3" required></label><label class="field" for="o4">شماره شاسی (VIN)، اختیاری<input id="o4" dir="ltr"></label>
+    <div style="display:flex;gap:8px"><button class="btn btn-red btn-lg" style="flex:1">ثبت سفارش نمایشی</button><button type="button" class="btn btn-out btn-lg" data-act="close">انصراف</button></div></form>`;
+}
+
+/* ---------- actions ---------- */
+document.addEventListener("click", async (e) => {
+  const t = e.target.closest("[data-act]"); if (!t) { if (e.target.closest(".suggest a")) closeSuggest(); return; }
+  const a = t.dataset.act, v = t.dataset.v, f = ui.f;
+  const refilter = () => { ui.limit = 12; rerender(); if ($("#layer .drawer.bottom")) $("#layer .drawer").innerHTML = filtersHTML(); };
+  switch (a) {
+    case "add": { const p = prod(t.dataset.id); const q = t.dataset.q === "pd" ? ui.qty : 1; addCart(p.id, q); t.classList.add("done"); t.querySelector("span").textContent = "اضافه شد"; setTimeout(() => { t.classList.remove("done"); t.querySelector("span").textContent = "افزودن به سبد"; }, 1400); toast("به سبد خرید اضافه شد", p.name + (q > 1 ? ` — ${fa(q)} عدد` : ""), { label: "مشاهده سبد", href: "#cart" }); break; }
+    case "menu": openLayer("side", menuHTML(), "منوی اصلی"); break;
+    case "close": closeLayer(); break;
+    case "fab": { const o = $("#fab .opts"); o.hidden = !o.hidden; t.setAttribute("aria-expanded", String(!o.hidden)); t.innerHTML = ic(o.hidden ? "chat" : "x"); break; }
+    case "rail": { const r = t.parentElement.querySelector(".rail"); r.scrollBy({ left: Number(t.dataset.dir) * r.clientWidth * 0.8, behavior: "smooth" }); break; }
+    case "fb": finder.b = t.dataset.b; finder.m = ""; finder.y = ""; $("#finder").outerHTML = finderHTML(); break;
+    case "deals": e.preventDefault(); ui._keep = true; ui.f = freshFilters(); ui.f.sort = "discount"; ui.limit = 12; go("shop"); break;
+    case "fopen": openLayer("bottom", filtersHTML(), "فیلتر محصولات"); break;
+    case "fcat": f.cats = f.cats.includes(v) ? f.cats.filter((x) => x !== v) : [...f.cats, v]; refilter(); break;
+    case "fbrand": f.brand = f.brand === v ? "" : v; refilter(); break;
+    case "fyear": f.year = f.year === Number(v) ? 0 : Number(v); refilter(); break;
+    case "fprice": f.price = f.price === v ? "" : v; refilter(); break;
+    case "fstock": f.stock = !f.stock; refilter(); break;
+    case "fsort": f.sort = v; refilter(); break;
+    case "fclear": ui.f = freshFilters(); refilter(); break;
+    case "more": ui.limit += 12; rerender(); break;
+    case "q": ui.q = v; ui.f = freshFilters(); rerender(); break;
+    case "sq": { const inp = t.closest(".search").querySelector("input"); inp.value = v; suggestFor(inp); inp.focus(); break; }
+    case "sall": e.preventDefault(); ui.q = t.closest(".search").querySelector("input").value.trim(); ui.f = freshFilters(); ui._keep = current !== "search"; closeSuggest(); go("search"); window.scrollTo({ top: 0 }); break;
+    case "gview": ui.gview = Number(v); rerender(); break;
+    case "pq": ui.qty = Math.max(1, ui.qty + Number(v)); rerender(); break;
+    case "cq": { const l = cart.find((x) => x.id === t.dataset.id); l.qty = Math.max(1, Math.min(maxQ(prod(l.id)), l.qty + Number(v))); saveCart(); rerender(); break; }
+    case "rm": { const i = cart.findIndex((x) => x.id === t.dataset.id); const [l] = cart.splice(i, 1); saveCart(); rerender(); toast("از سبد خرید حذف شد", prod(l.id).name, { label: "بازگردانی", fn: () => { cart.splice(i, 0, l); saveCart(); if (current === "cart") rerender(); } }); break; }
+    case "clear": { const snap = cart.slice(); cart = []; saveCart(); rerender(); toast("سبد خرید خالی شد", "", { label: "بازگردانی", fn: () => { cart = snap; saveCart(); if (current === "cart") rerender(); } }); break; }
+    case "uncoupon": ui.coupon = null; rerender(); break;
+    case "checkout": ui.checkout = "form"; openLayer("center", checkoutHTML(), "ثبت سفارش"); break;
+    case "copy": try { await navigator.clipboard.writeText(v); toast(`${t.dataset.l} کپی شد`, v); } catch { toast(t.dataset.l, v); } break;
+    case "topic": ui.topic = Number(v); t.parentElement.querySelectorAll(".topic").forEach((b, i) => { b.classList.toggle("on", i === ui.topic); b.setAttribute("aria-checked", String(i === ui.topic)); }); break;
+  }
+});
+document.addEventListener("change", (e) => {
+  if (e.target.id === "fm") { finder.m = e.target.value; finder.y = ""; $("#finder").outerHTML = finderHTML(); $("#fm").focus(); }
+  if (e.target.id === "fy") finder.y = e.target.value;
+  if (e.target.id === "fsortsel") { ui.f.sort = e.target.value; ui.limit = 12; rerender(); }
+  if (e.target.name === "ship") { ui.ship = e.target.value; rerender(); }
+});
+document.addEventListener("submit", (e) => {
+  e.preventDefault(); const fm = e.target;
+  if (fm.id === "finder") { if (!finder.b) return; ui._keep = !!finder.y; ui.f = freshFilters(); if (finder.y) ui.f.year = Number(finder.y); ui.limit = 12; go(finder.m ? `m-${finder.b}-${finder.m}` : finder.b); return; }
+  const k = fm.dataset.form;
+  if (k === "search") { const q = fm.querySelector("input").value.trim(); if (q.length < 2) return; const it = fm.parentElement.querySelector(".s-item.on"); closeSuggest(); fm.querySelector("input").blur(); if (it) { location.hash = it.getAttribute("href"); return; } ui.q = q; ui.f = freshFilters(); ui._keep = current !== "search"; go("search"); }
+  if (k === "fsearch") { ui.q = fm.querySelector("input").value.trim(); rerender(); }
+  if (k === "coupon") { const c = fm.querySelector("input").value.trim().toUpperCase(); if (COUPONS[c]) { ui.coupon = c; rerender(); toast(`کد تخفیف ${fa(COUPONS[c])}٪ اعمال شد`); } else toast("کد تخفیف معتبر نیست", "در نسخه نمایشی از کد HAMIDI10 استفاده کنید.", null, true); }
+  if (k === "checkout") { ui.checkout = "done"; ui.order = "HAP-" + Math.floor(100000 + Math.random() * 900000); $("#layer .drawer").innerHTML = checkoutHTML(); }
+  if (k === "contact") { fm.reset(); toast("پیام شما ارسال شد", "در نسخه نهایی، کارشناسان ما با شما تماس می‌گیرند."); }
+});
+
+chrome();
+render();
+})();
+</script>
