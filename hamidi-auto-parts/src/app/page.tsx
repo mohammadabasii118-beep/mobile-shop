@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Flame, Sparkles, Zap } from "lucide-react";
 import { Hero } from "@/components/home/hero";
@@ -10,76 +11,83 @@ import { VehicleSelector } from "@/components/shop/vehicle-selector";
 import { SectionHeading } from "@/components/shop/section-heading";
 import { CategoryCard } from "@/components/shop/category-card";
 import { ProductRail } from "@/components/shop/product-rail";
-import { ProductCard } from "@/components/shop/product-card";
+import { ProductGrid } from "@/components/shop/product-card";
 import { CATEGORIES } from "@/data/categories";
-import { bestsellers, newest, specials } from "@/lib/catalog";
+import { bestsellers, categoryFacets, newest, specials } from "@/lib/catalog";
+import { pageMetadata } from "@/lib/seo";
+import { SHOP } from "@/lib/utils";
+
+// Static page, regenerated at most once an hour (ISR) so prices/stock stay fresh.
+export const revalidate = 3600;
+
+export const metadata: Metadata = {
+  ...pageMetadata({
+    title: `${SHOP.nameFa} | لوازم یدکی نیسان و هوندا — HAMIDI AUTO PARTS`,
+    description:
+      "خرید لوازم یدکی اصلی و OEM نیسان و هوندا برای مورانو، ماکسیما، تیانا، آکورد، سیویک و سی‌آر‌وی؛ لنت، کمک‌فنر، قطعات موتوری با ضمانت اصالت و ارسال سریع.",
+    path: "/",
+  }),
+  title: { absolute: `${SHOP.nameFa} | لوازم یدکی نیسان و هوندا — HAMIDI AUTO PARTS` },
+};
 
 export default function HomePage() {
-  const best = bestsellers().slice(0, 10);
-  const fresh = newest().slice(0, 8);
-  const deals = specials().slice(0, 8);
-
+  const counts = categoryFacets({});
   return (
     <>
       <Hero />
       <TrustBar />
 
-      <section className="container-x mt-14" id="vehicle">
-        <VehicleSelector variant="light" />
+      <section className="container-x mt-14" id="vehicle" aria-label="انتخاب خودرو">
+        <VehicleSelector />
       </section>
 
-      <section className="container-x mt-20">
-        <SectionHeading eyebrow="دسته‌بندی قطعات" title="هر قطعه‌ای که خودروی شما نیاز دارد" subtitle="۱۶ دسته تخصصی از موتور تا بدنه؛ قطعه مورد نظرتان را سریع‌تر پیدا کنید." href="/categories" linkLabel="همه دسته‌بندی‌ها" />
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 xl:grid-cols-8">
-          {CATEGORIES.map((c) => <CategoryCard key={c.id} c={c} />)}
-        </div>
+      <section className="container-x mt-20" aria-labelledby="cats-title">
+        <SectionHeading id="cats-title" eyebrow="دسته‌بندی قطعات" title="هر قطعه‌ای که خودروی شما نیاز دارد" subtitle="۱۶ دسته تخصصی از موتور تا بدنه؛ قطعه مورد نظرتان را سریع‌تر پیدا کنید." href="/categories" linkLabel="همه دسته‌بندی‌ها" />
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 xl:grid-cols-8">
+          {CATEGORIES.map((c) => <li key={c.id} className="flex [&>a]:w-full"><CategoryCard c={c} count={counts.get(c.id) ?? 0} /></li>)}
+        </ul>
       </section>
 
-      <section className="container-x mt-20">
-        <SectionHeading eyebrow={"پرفروش‌ترین‌ها"} title={<span className="flex items-center gap-2"><Flame className="size-7 text-primary" />محصولات پرفروش</span>} subtitle="قطعاتی که بیشترین سفارش را از سوی مشتریان و تعمیرکاران داشته‌اند." href="/shop?sort=popular" />
-        <ProductRail products={best} />
+      <section className="container-x mt-20" aria-labelledby="best-title">
+        <SectionHeading id="best-title" eyebrow="پرفروش‌ترین‌ها" title={<span className="flex items-center gap-2"><Flame className="size-7 text-primary" aria-hidden />محصولات پرفروش</span>} subtitle="قطعاتی که بیشترین سفارش را از سوی مشتریان و تعمیرکاران داشته‌اند." href="/shop" />
+        <ProductRail products={bestsellers(8)} label="محصولات پرفروش" />
       </section>
 
-      <section className="container-x mt-14">
+      <section className="container-x mt-14" aria-label="برندها">
         <BrandShowcase />
       </section>
 
-      <section className="mt-20">
-        <div className="container-x">
-          <div className="carbon relative overflow-hidden rounded-[2rem] p-6 sm:p-10">
-            <div className="pointer-events-none absolute -top-32 -right-32 size-96 rounded-full bg-primary/30 blur-[100px]" />
-            <div className="bg-grid absolute inset-0 opacity-50" />
-            <div className="relative mb-8 flex flex-wrap items-end justify-between gap-6">
-              <div>
-                <span className="inline-flex items-center gap-2 rounded-full bg-primary px-3 py-1 text-xs font-bold text-white"><Zap className="size-3.5" />پیشنهاد شگفت‌انگیز</span>
-                <h2 className="mt-3 text-3xl font-black text-white sm:text-4xl">پیشنهادهای ویژه امروز</h2>
-                <p className="mt-2 text-sm text-neutral-400">تخفیف‌های محدود روی قطعات منتخب نیسان و هوندا — تا پایان امروز</p>
-              </div>
-              <div className="flex flex-col items-start gap-3 sm:items-end">
-                <Countdown />
-                <Link href="/shop?sort=discount" className="text-sm font-semibold text-white underline-offset-4 hover:text-primary hover:underline">مشاهده همه تخفیف‌ها ←</Link>
-              </div>
+      <section className="container-x mt-20" aria-labelledby="deals-title">
+        <div className="carbon relative overflow-hidden rounded-[2rem] p-6 sm:p-10">
+          <div className="pointer-events-none absolute hidden sm:block -top-32 -right-32 size-96 rounded-full bg-primary/30 blur-[100px]" aria-hidden />
+          <div className="relative mb-8 flex flex-wrap items-end justify-between gap-6">
+            <div>
+              <p className="inline-flex items-center gap-2 rounded-full bg-primary px-3 py-1 text-xs font-bold text-white"><Zap className="size-3.5" aria-hidden />پیشنهاد شگفت‌انگیز</p>
+              <h2 id="deals-title" className="mt-3 text-3xl font-black text-white sm:text-4xl">پیشنهادهای ویژه امروز</h2>
+              <p className="mt-2 text-sm text-neutral-300">تخفیف‌های محدود روی قطعات منتخب نیسان و هوندا — تا پایان امروز</p>
             </div>
-            <div className="relative">
-              <ProductRail products={deals} dark />
+            <div className="flex flex-col items-start gap-3 sm:items-end">
+              <Countdown />
+              <Link href="/shop?sort=discount" rel="nofollow" className="text-sm font-semibold text-white underline-offset-4 hover:underline">مشاهده همه تخفیف‌ها ←</Link>
             </div>
+          </div>
+          <div className="relative">
+            <ProductRail products={specials(6)} dark label="پیشنهادهای ویژه" />
           </div>
         </div>
       </section>
 
-      <section className="container-x mt-20">
-        <SectionHeading eyebrow="تازه رسیده" title={<span className="flex items-center gap-2"><Sparkles className="size-7 text-primary" />جدیدترین محصولات</span>} subtitle="آخرین قطعاتی که به انبار فروشگاه حمیدی اضافه شده‌اند." href="/shop?sort=newest" />
-        <div className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-2 lg:grid-cols-4">
-          {fresh.map((p) => <ProductCard key={p.id} product={p} />)}
-        </div>
+      <section className="container-x mt-20" aria-labelledby="new-title">
+        <SectionHeading id="new-title" eyebrow="تازه رسیده" title={<span className="flex items-center gap-2"><Sparkles className="size-7 text-primary" aria-hidden />جدیدترین محصولات</span>} subtitle="آخرین قطعاتی که به انبار فروشگاه حمیدی اضافه شده‌اند." href="/shop?sort=newest" />
+        <ProductGrid products={newest(8)} className="lg:grid-cols-4" />
       </section>
 
       <div className="mt-24">
         <Expertise />
       </div>
 
-      <section className="container-x mt-20">
-        <SectionHeading eyebrow="ارتباط با ما" title="همیشه در دسترس شما هستیم" subtitle="برای استعلام قیمت، موجودی یا تطابق قطعه، از هر راهی که راحت‌ترید با ما در تماس باشید." href="/contact" linkLabel="صفحه تماس" />
+      <section className="container-x cv-auto mt-20" aria-labelledby="contact-title">
+        <SectionHeading id="contact-title" eyebrow="ارتباط با ما" title="همیشه در دسترس شما هستیم" subtitle="برای استعلام قیمت، موجودی یا تطابق قطعه، از هر راهی که راحت‌ترید با ما در تماس باشید." href="/contact" linkLabel="صفحه تماس" />
         <ContactStrip />
       </section>
     </>

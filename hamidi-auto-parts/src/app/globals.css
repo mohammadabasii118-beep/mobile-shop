@@ -73,6 +73,7 @@
     font-feature-settings: "ss01";
   }
   ::selection { background: #e10600; color: #fff; }
+  dialog::backdrop { background: rgb(0 0 0 / 0.55); }
   input[type="search"]::-webkit-search-cancel-button { display: none; }
 }
 
@@ -89,6 +90,7 @@
   direction: ltr;
   unicode-bidi: isolate;
   font-variant-numeric: tabular-nums;
+  font-feature-settings: "locl" 0;
 }
 
 @utility no-scrollbar {
@@ -115,7 +117,35 @@
   background-size: 6px 6px;
 }
 
-@keyframes grow {
-  from { width: 0; }
-  to { width: 100%; }
+/* Skip rendering work for off-screen sections until they approach the viewport (INP/LCP) */
+@utility cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 900px;
+}
+
+/* Header shadow driven by scroll position – no JavaScript scroll listener */
+@supports (animation-timeline: scroll()) {
+  .header-elevate {
+    animation: header-elevate linear both;
+    animation-timeline: scroll(root);
+    animation-range: 0 80px;
+  }
+}
+@keyframes header-elevate {
+  to { box-shadow: 0 10px 30px -18px rgb(0 0 0 / 0.35); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* visible keyboard focus everywhere */
+:focus-visible {
+  outline: 2px solid #e10600;
+  outline-offset: 2px;
 }

@@ -10,7 +10,9 @@ export function SectionHeading({
   linkLabel = "مشاهده همه",
   dark,
   className,
+  id,
 }: {
+  id?: string;
   eyebrow?: string;
   title: React.ReactNode;
   subtitle?: string;
@@ -23,24 +25,25 @@ export function SectionHeading({
     <div className={cn("mb-8 flex flex-wrap items-end justify-between gap-4", className)}>
       <div>
         {eyebrow && (
-          <span className="mb-2 inline-flex items-center gap-2 text-xs font-bold tracking-wide text-primary">
+          <p className="mb-2 inline-flex items-center gap-2 text-xs font-bold tracking-wide text-primary">
             <span className="h-[3px] w-6 rounded-full bg-primary" />
             {eyebrow}
-          </span>
+          </p>
         )}
-        <h2 className={cn("text-2xl font-black tracking-tight sm:text-3xl", dark ? "text-white" : "text-neutral-950")}>{title}</h2>
-        {subtitle && <p className={cn("mt-2 max-w-xl text-sm leading-7", dark ? "text-neutral-400" : "text-neutral-500")}>{subtitle}</p>}
+        <h2 id={id} className={cn("text-2xl font-black tracking-tight sm:text-3xl", dark ? "text-white" : "text-neutral-950")}>{title}</h2>
+        {subtitle && <p className={cn("mt-2 max-w-xl text-sm leading-7", dark ? "text-neutral-300" : "text-neutral-600")}>{subtitle}</p>}
       </div>
       {href && (
         <Link
           href={href}
+          rel={href.includes("?") ? "nofollow" : undefined}
           className={cn(
             "group flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold transition",
             dark ? "border-white/15 text-white hover:bg-white hover:text-neutral-950" : "border-neutral-200 hover:border-neutral-950 hover:bg-neutral-950 hover:text-white",
           )}
         >
           {linkLabel}
-          <ArrowLeft className="size-4 transition group-hover:-translate-x-1" />
+          <ArrowLeft className="size-4 transition group-hover:-translate-x-1" aria-hidden />
         </Link>
       )}
     </div>

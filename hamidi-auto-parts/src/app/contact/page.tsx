@@ -1,11 +1,17 @@
 import type { Metadata } from "next";
-import { Clock, Mail, MapPin, Phone, ChevronDown } from "lucide-react";
+import { Clock, Mail, MapPin, Phone } from "lucide-react";
+import { Faq } from "@/components/shop/faq";
+import { pageMetadata } from "@/lib/seo";
 import { PageHeader } from "@/components/shop/breadcrumbs";
 import { ContactForm } from "@/components/shop/contact-form";
 import { WhatsAppIcon } from "@/components/layout/whatsapp-icon";
 import { SHOP, toFa, whatsappLink } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "تماس با ما" };
+export const metadata: Metadata = pageMetadata({
+  title: "تماس با ما — آدرس، تلفن و واتساپ",
+  description: `تماس با فروشگاه حمیدی: تلفن ${SHOP.phone}، واتساپ، آدرس فروشگاه در امین‌السلطان تهران و ساعات کاری. استعلام قیمت و تطابق قطعه نیسان و هوندا.`,
+  path: "/contact",
+});
 
 const FAQ = [
   { q: "چطور مطمئن شوم قطعه با خودروی من سازگار است؟", a: "شماره شاسی (VIN) یا عکس کارت خودرو را در واتساپ ارسال کنید. کارشناسان ما قطعه را بر اساس کاتالوگ رسمی EPC نیسان و هوندا بررسی و تأیید می‌کنند." },
@@ -23,23 +29,23 @@ export default function ContactPage() {
   ];
   return (
     <>
-      <PageHeader title="تماس با فروشگاه حمیدی" subtitle="برای استعلام قیمت، موجودی و تطابق قطعه با ما در ارتباط باشید. پاسخگویی در ساعات کاری کمتر از ۳۰ دقیقه است." crumbs={[{ label: "تماس با ما" }]} />
+      <PageHeader title="تماس با فروشگاه حمیدی" subtitle="برای استعلام قیمت، موجودی و تطابق قطعه با ما در ارتباط باشید. پاسخگویی در ساعات کاری کمتر از ۳۰ دقیقه است." crumbs={[{ href: "/contact", label: "تماس با ما" }]} />
       <div className="container-x mt-10 grid gap-8 lg:grid-cols-[1fr_420px]">
         <div className="rounded-3xl border border-neutral-200 bg-white p-6 sm:p-8">
           <h2 className="text-xl font-black">ارسال پیام و استعلام قطعه</h2>
-          <p className="mt-1 mb-6 text-sm text-neutral-500">فرم زیر را تکمیل کنید؛ کارشناسان ما با شما تماس می‌گیرند.</p>
+          <p className="mt-1 mb-6 text-sm text-neutral-600">فرم زیر را تکمیل کنید؛ کارشناسان ما با شما تماس می‌گیرند.</p>
           <ContactForm />
         </div>
         <div className="space-y-4">
-          <a href={whatsappLink("سلام، استعلام قطعه دارم.")} target="_blank" rel="noreferrer" className="group flex items-center gap-4 rounded-3xl bg-[#25D366] p-5 text-white shadow-[0_20px_40px_-20px_rgba(37,211,102,.9)] transition hover:-translate-y-0.5">
+          <a href={whatsappLink("سلام، استعلام قطعه دارم.")} target="_blank" rel="noopener noreferrer" className="group flex items-center gap-4 rounded-3xl bg-[#25D366] p-5 text-white shadow-[0_20px_40px_-20px_rgba(37,211,102,.9)] transition hover:-translate-y-0.5">
             <span className="grid size-14 place-items-center rounded-2xl bg-white/20"><WhatsAppIcon className="size-7" /></span>
             <span><span className="block text-lg font-black">گفتگوی مستقیم در واتساپ</span><span className="text-sm opacity-90">سریع‌ترین راه استعلام قیمت</span></span>
           </a>
           {cards.map((c) => {
             const body = (
               <>
-                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-neutral-950 text-white"><c.icon className="size-5" /></span>
-                <span className="min-w-0"><span className="block text-xs text-neutral-500">{c.t}</span><span className={`block font-bold ${c.num ? "ltr-nums" : ""}`}>{c.v}</span></span>
+                <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-neutral-950 text-white" aria-hidden><c.icon className="size-5" /></span>
+                <span className="min-w-0"><span className="block text-xs text-neutral-600">{c.t}</span><span className={`block font-bold ${c.num ? "ltr-nums" : ""}`}>{c.v}</span></span>
               </>
             );
             return c.href ? (
@@ -50,7 +56,7 @@ export default function ContactPage() {
           })}
           <div className="overflow-hidden rounded-3xl border border-neutral-200 bg-white">
             <div className="relative h-48 overflow-hidden bg-[#eef0f2]">
-              <svg viewBox="0 0 400 200" className="absolute inset-0 size-full" preserveAspectRatio="xMidYMid slice" aria-hidden>
+              <svg role="img" aria-label="نقشه موقعیت فروشگاه" viewBox="0 0 400 200" className="absolute inset-0 size-full" preserveAspectRatio="xMidYMid slice">
                 <rect width="400" height="200" fill="#eceef1" />
                 {[30, 80, 140, 200, 260, 330].map((x) => <rect key={x} x={x} y="0" width="10" height="200" fill="#fff" />)}
                 {[40, 100, 160].map((y) => <rect key={y} x="0" y={y} width="400" height="9" fill="#fff" />)}
@@ -64,26 +70,15 @@ export default function ContactPage() {
               </div>
             </div>
             <div className="p-4">
-              <p className="flex gap-2 text-sm leading-7"><MapPin className="mt-1 size-4 shrink-0 text-primary" />{SHOP.address}</p>
+              <address className="flex gap-2 text-sm leading-7 not-italic"><MapPin className="mt-1 size-4 shrink-0 text-primary" aria-hidden />{SHOP.address}</address>
             </div>
           </div>
         </div>
       </div>
 
-      <section className="container-x mt-16">
-        <h2 className="mb-6 text-2xl font-black">سؤالات متداول</h2>
-        <div className="grid gap-3 lg:grid-cols-2">
-          {FAQ.map((f) => (
-            <details key={f.q} className="group rounded-2xl border border-neutral-200 bg-white p-5 open:border-neutral-950 [&_summary::-webkit-details-marker]:hidden">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-bold">
-                {f.q}
-                <ChevronDown className="size-5 shrink-0 transition group-open:rotate-180" />
-              </summary>
-              <p className="mt-3 text-sm leading-7 text-neutral-600">{f.a}</p>
-            </details>
-          ))}
-        </div>
-      </section>
+      <div className="container-x mt-16">
+        <Faq items={FAQ} />
+      </div>
     </>
   );
 }

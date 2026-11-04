@@ -12,12 +12,12 @@ export function ContactStrip() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((c) => (
-        <a key={c.t} href={c.href} target={c.ext ? "_blank" : undefined} rel={c.ext ? "noreferrer" : undefined} className="group flex items-start gap-4 rounded-3xl border border-neutral-200 bg-white p-5 transition hover:-translate-y-1 hover:shadow-[0_20px_40px_-24px_rgba(0,0,0,.4)]">
+        <a key={c.t} href={c.href} target={c.ext ? "_blank" : undefined} rel={c.ext ? "noopener noreferrer" : undefined} className="group flex items-start gap-4 rounded-3xl border border-neutral-200 bg-white p-5 transition hover:-translate-y-1 hover:shadow-[0_20px_40px_-24px_rgba(0,0,0,.4)]">
           <span className={`grid size-14 shrink-0 place-items-center rounded-2xl transition group-hover:scale-105 ${c.cls}`}>{c.icon}</span>
           <div className="min-w-0">
-            <p className="text-xs text-neutral-500">{c.t}</p>
+            <p className="text-xs text-neutral-600">{c.t}</p>
             <p className={`mt-1 font-extrabold ${c.num ? "ltr-nums" : ""}`}>{c.v}</p>
-            <p className="mt-1 text-xs leading-5 text-neutral-500">{c.d}</p>
+            <p className="mt-1 text-xs leading-5 text-neutral-600">{c.d}</p>
           </div>
         </a>
       ))}

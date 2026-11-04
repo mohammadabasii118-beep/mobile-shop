@@ -1,6 +1,6 @@
 // Generates studio-style SVG product renders for the demo catalogue.
 import { writeFileSync, mkdirSync } from "node:fs";
-const out = process.argv[2];
+const out = process.argv[2] ?? new URL("../assets/parts-svg", import.meta.url).pathname;
 mkdirSync(out, { recursive: true });
 
 const defs = `

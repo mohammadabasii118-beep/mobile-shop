@@ -1,28 +1,36 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
-/** Studio-lit product image frame. Images are vector renders from /public/parts. */
+/**
+ * Studio-lit product image. Uses next/image so every device receives an
+ * AVIF/WebP of exactly the width it needs; width/height reserve space (CLS = 0).
+ */
 export function PartImage({
   src,
   alt,
+  sizes,
   className,
   imgClassName,
-  priority,
+  preload,
 }: {
   src: string;
   alt: string;
+  sizes: string;
   className?: string;
   imgClassName?: string;
-  priority?: boolean;
+  /** only for the LCP image of a page */
+  preload?: boolean;
 }) {
   return (
     <div className={cn("relative overflow-hidden bg-studio", className)}>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/[0.03] to-transparent" />
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src={src}
         alt={alt}
-        loading={priority ? "eager" : "lazy"}
-        decoding="async"
+        width={1200}
+        height={1200}
+        sizes={sizes}
+        preload={preload}
+        fetchPriority={preload ? "high" : undefined}
         draggable={false}
         className={cn("relative size-full object-contain p-[8%] transition-transform duration-500 ease-out", imgClassName)}
       />

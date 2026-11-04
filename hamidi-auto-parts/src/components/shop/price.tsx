@@ -4,7 +4,7 @@ export function Price({ value, old, size = "md", className }: { value: number; o
   return (
     <div className={cn("flex flex-col", className)}>
       {old ? (
-        <span className={cn("text-neutral-400 line-through decoration-primary/60", size === "lg" ? "text-base" : "text-xs")}>
+        <span className={cn("text-neutral-500 line-through decoration-primary/60", size === "lg" ? "text-base" : "text-xs")}>
           {formatPrice(old)}
         </span>
       ) : null}
@@ -12,7 +12,7 @@ export function Price({ value, old, size = "md", className }: { value: number; o
         <span className={cn("font-extrabold tracking-tight text-neutral-950", size === "sm" && "text-[15px]", size === "md" && "text-lg", size === "lg" && "text-3xl")}>
           {formatPrice(value)}
         </span>
-        <span className={cn("font-medium text-neutral-500", size === "lg" ? "text-sm" : "text-[11px]")}>تومان</span>
+        <span className={cn("font-medium text-neutral-600", size === "lg" ? "text-sm" : "text-[11px]")}>تومان</span>
       </span>
     </div>
   );

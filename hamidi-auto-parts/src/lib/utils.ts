@@ -28,6 +28,9 @@ export function formatPrice(value: number): string {
   return new Intl.NumberFormat("fa-IR").format(value);
 }
 
+/** Public origin used for canonical URLs, sitemap and structured data. Set NEXT_PUBLIC_SITE_URL in production. */
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://hamidiautoparts.ir").replace(/\/$/, "");
+
 export const SHOP = {
   nameFa: "فروشگاه حمیدی",
   nameEn: "HAMIDI AUTO PARTS",
@@ -39,6 +42,10 @@ export const SHOP = {
   hours: "شنبه تا چهارشنبه ۹ تا ۱۹ — پنجشنبه ۹ تا ۱۴",
   email: "info@hamidiautoparts.ir",
   instagram: "hamidi.autoparts",
+  telegram: "hamidiautoparts",
+  street: "خیابان امین‌السلطان (چراغ برق)، پاساژ ایرانیان، پلاک ۱۸",
+  city: "تهران",
+  postalCode: "1145789613",
 };
 
 export function whatsappLink(text?: string) {

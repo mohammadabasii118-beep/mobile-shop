@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { BRANDS, modelsOf } from "@/data/vehicles";
-import { PRODUCTS } from "@/data/products";
+import Image from "next/image";
+import { countProducts } from "@/lib/catalog";
 import { toFa } from "@/lib/utils";
 
 const ART: Record<string, string[]> = {
-  nissan: ["/parts/shock-absorber.svg", "/parts/brake-disc.svg"],
-  honda: ["/parts/timing-belt.svg", "/parts/piston.svg"],
+  nissan: ["/images/parts/shock-absorber.png"],
+  honda: ["/images/parts/timing-belt.png"],
 };
 
 export function BrandShowcase() {
@@ -14,23 +15,23 @@ export function BrandShowcase() {
     <div className="grid gap-5 lg:grid-cols-2">
       {BRANDS.map((b, idx) => {
         const models = modelsOf(b.id);
-        const count = PRODUCTS.filter((p) => p.brand === b.id).length;
+        const count = countProducts({ brand: b.id });
         const dark = idx === 0;
         return (
           <div key={b.id} className={`group relative overflow-hidden rounded-3xl p-6 sm:p-8 ${dark ? "carbon text-white" : "border border-neutral-200 bg-gradient-to-br from-neutral-50 to-neutral-100"}`}>
-            <span className={`pointer-events-none absolute -bottom-6 -left-4 text-[7rem] leading-none font-black tracking-tighter sm:text-[9rem] ${dark ? "text-white/[0.04]" : "text-neutral-950/[0.04]"}`} dir="ltr">{b.nameEn}</span>
-            <div className="pointer-events-none absolute -top-20 -left-20 size-64 rounded-full bg-primary/20 blur-3xl" />
+            <span aria-hidden className={`pointer-events-none absolute -bottom-6 -left-4 text-[7rem] leading-none font-black tracking-tighter sm:text-[9rem] ${dark ? "text-white/[0.04]" : "text-neutral-950/[0.04]"}`} dir="ltr">{b.nameEn}</span>
+            <div className="pointer-events-none absolute hidden sm:block -top-20 -left-20 size-64 rounded-full bg-primary/20 blur-3xl" />
             <div className="relative grid gap-6 sm:grid-cols-[1fr_180px]">
               <div>
-                <span className={`text-xs font-black tracking-[0.3em] ${dark ? "text-primary" : "text-primary"}`} dir="ltr">{b.nameEn}</span>
-                <h3 className="mt-2 text-3xl font-black">قطعات {b.nameFa}</h3>
-                <p className={`mt-2 text-sm leading-7 ${dark ? "text-neutral-400" : "text-neutral-600"}`}>
+                <span className={`text-xs font-black tracking-[0.3em] ${dark ? "text-[#ff5a4f]" : "text-primary"}`} dir="ltr">{b.nameEn}</span>
+                <h3 className="mt-2 text-3xl font-black">لوازم یدکی {b.nameFa}</h3>
+                <p className={`mt-2 text-sm leading-7 ${dark ? "text-neutral-300" : "text-neutral-700"}`}>
                   {b.id === "nissan" ? "تخصص ما در مورانو، ماکسیما، تیانا، ایکس‌تریل، جوک و اکسل." : "پوشش کامل مدل‌های هوندا از ۱۹۹۰ تا ۲۰۱۷؛ آکورد، سیویک، سی‌آر‌وی و …"}
                   {" "}<b className={dark ? "text-white" : "text-neutral-950"}>{toFa(count)}</b> محصول آماده ارسال.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-2">
                   {models.slice(0, b.id === "nissan" ? 6 : 8).map((m) => (
-                    <Link key={m.id} href={`/${b.id}?model=${m.id}`} className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${dark ? "bg-white/10 hover:bg-primary" : "bg-white shadow-sm ring-1 ring-neutral-200 hover:bg-neutral-950 hover:text-white"}`}>
+                    <Link key={m.id} href={`/${b.id}/${m.id}`} className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${dark ? "bg-white/10 hover:bg-primary" : "bg-white shadow-sm ring-1 ring-neutral-200 hover:bg-neutral-950 hover:text-white"}`}>
                       {m.nameFa}
                     </Link>
                   ))}
@@ -41,8 +42,7 @@ export function BrandShowcase() {
                 </Link>
               </div>
               <div className="relative hidden h-full min-h-48 sm:block">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={ART[b.id][0]} alt="" className="absolute inset-0 size-full object-contain drop-shadow-2xl transition duration-700 group-hover:scale-110 group-hover:-rotate-6" />
+                <Image src={ART[b.id][0]} alt="" fill sizes="180px" className="object-contain drop-shadow-2xl transition duration-700 group-hover:scale-110 group-hover:-rotate-6" />
               </div>
             </div>
           </div>

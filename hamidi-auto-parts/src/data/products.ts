@@ -137,6 +137,11 @@ function describe(name: string, manufacturer: string, quality: string, models: s
   return `${name} ساخت ${manufacturer} با کیفیت ${quality}، دقیقاً مطابق استاندارد کارخانه و قابل نصب روی ${models}. این قطعه پیش از ارسال توسط کارشناسان فروشگاه حمیدی از نظر اصالت، کد فنی و سلامت بسته‌بندی بررسی می‌شود و با ضمانت اصالت کالا عرضه می‌گردد.`;
 }
 
+/** URL-safe slug: readable English name + unique SKU (e.g. front-brake-disc-teana-hap-ns-1021) */
+export function slugify(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
 export const PRODUCTS: Product[] = RAW.map((r, i) => {
   const [sku, oem, name, nameEn, brand, category, fit, price, oldPrice, stock, qty, image, manufacturer, origin, quality, badges, sold] = r;
   const fitments = fit.map(([model, from, to]) => ({ model, from, to }));
@@ -145,7 +150,7 @@ export const PRODUCTS: Product[] = RAW.map((r, i) => {
   const month = String(1 + ((i * 5) % 10)).padStart(2, "0");
   return {
     id: sku,
-    slug: sku.toLowerCase(),
+    slug: `${slugify(nameEn)}-${slugify(sku)}`,
     name,
     nameEn,
     sku,
@@ -157,7 +162,7 @@ export const PRODUCTS: Product[] = RAW.map((r, i) => {
     oldPrice: oldPrice ?? undefined,
     stock,
     stockQty: qty,
-    image: `/parts/${image}.svg`,
+    image: `/images/parts/${image}.png`,
     manufacturer,
     origin,
     quality,
@@ -178,8 +183,6 @@ export const PRODUCTS: Product[] = RAW.map((r, i) => {
     ],
   };
 });
-
-export const getProduct = (slug: string) => PRODUCTS.find((p) => p.slug === slug);
 
 export function fitsVehicle(p: Product, model?: string, year?: number) {
   if (!model) return true;
