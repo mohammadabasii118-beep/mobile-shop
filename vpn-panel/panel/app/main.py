@@ -179,6 +179,45 @@ def public_url_from_env() -> str:
     return os.environ.get("PANEL_PUBLIC_URL", "").rstrip("/")
 
 
+class TgWebIn(BaseModel):
+    host: str = Field(default="", max_length=253)
+    secret: str = Field(default="", max_length=80)
+
+
+def clean_tgweb_host(host: str) -> str:
+    host = host.strip().lower()
+    host = re.sub(r"^https?://", "", host).rstrip("/")   # people paste the full URL; keep only the host
+    if host and not re.fullmatch(r"[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?", host):
+        raise HTTPException(422, "آدرس (host) ورکر نامعتبر است")
+    return host
+
+
+def clean_tgweb_secret(secret: str) -> str:
+    secret = secret.strip().lower()
+    if secret and not re.fullmatch(r"(dd)?[0-9a-f]{32}", secret):
+        raise HTTPException(422, "secret باید ۳۲ کاراکتر هگز باشد (یا dd به‌علاوه‌ی ۳۲ هگز)")
+    return secret
+
+
+@app.get("/api/tgweb", dependencies=[Depends(require_admin)])
+def get_tgweb(db: Session = Depends(get_db)):
+    host, secret = tgweb_conf(db)
+    return {"host": host, "secret": secret, "enabled": bool(host and secret)}
+
+
+@app.put("/api/tgweb", dependencies=[Depends(require_admin)])
+def set_tgweb(body: TgWebIn, db: Session = Depends(get_db)):
+    put_setting(db, "tgweb_host", clean_tgweb_host(body.host))
+    put_setting(db, "tgweb_secret", clean_tgweb_secret(body.secret))
+    db.commit()
+    return get_tgweb(db)
+
+
+@app.post("/api/tgweb/secret", dependencies=[Depends(require_admin)])
+def gen_tgweb_secret():
+    return {"secret": secrets.token_hex(16)}   # 16 random bytes = 32 hex, the abridged-mode secret
+
+
 @app.get("/api/settings", dependencies=[Depends(require_admin)])
 def get_access():
     return access_out()
@@ -336,9 +375,13 @@ USER_ONLINE_WINDOW = timedelta(minutes=3)   # a user counts as online if a node 
 ONLINE_MIN_BYTES = 1024                # keep-alive chatter alone does not count
 
 
+def tgweb_conf(db: Session) -> tuple[str, str]:
+    return get_setting(db, "tgweb_host"), get_setting(db, "tgweb_secret")
+
+
 def entries_for(user: User, db: Session) -> list[dict]:
     return user_entries(user, list(db.scalars(select(Node).order_by(Node.id))), dnstt_info(db),
-                        list(db.scalars(select(Tunnel).where(Tunnel.publish == True))))  # noqa: E712
+                        list(db.scalars(select(Tunnel).where(Tunnel.publish == True))), tgweb_conf(db))  # noqa: E712
 
 
 def user_out(user: User, request: Request) -> dict:

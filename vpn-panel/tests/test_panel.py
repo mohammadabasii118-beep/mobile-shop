@@ -1931,3 +1931,28 @@ def test_node_reports_and_exposes_live_bandwidth():
         row = next(n for n in c.get("/api/nodes", headers=h).json() if n["id"] == node["id"])
         assert row["rx_bps"] == 0 and row["tx_bps"] == 0
         assert c.post("/api/node/report", headers=nh, json={"rx_bps": -1}).status_code == 422
+
+
+def test_telegram_web_proxy_settings_and_entry():
+    with TestClient(app) as c:
+        h = admin(c)
+        assert c.get("/api/tgweb", headers=h).json() == {"host": "", "secret": "", "enabled": False}
+        gen = c.post("/api/tgweb/secret", headers=h).json()["secret"]
+        assert len(gen) == 32 and all(ch in "0123456789abcdef" for ch in gen)
+        # validation: bad host / bad secret
+        assert c.put("/api/tgweb", headers=h, json={"host": "a b", "secret": gen}).status_code == 422
+        assert c.put("/api/tgweb", headers=h, json={"host": "p.workers.dev", "secret": "xyz"}).status_code == 422
+        # a pasted full URL is normalized to the host, and dd+32hex is accepted
+        r = c.put("/api/tgweb", headers=h, json={"host": "https://My.Workers.Dev/", "secret": "dd" + gen}).json()
+        assert r == {"host": "my.workers.dev", "secret": "dd" + gen, "enabled": True}
+        node = c.post("/api/nodes", headers=h, json={"name": "TG", "cc": "de", "address": "tg.example.com"}).json()
+        u_tg = c.post("/api/users", headers=h, json={"name": "tguser", "protos": ["mtproto"], "node_ids": [node["id"]]}).json()
+        u_no = c.post("/api/users", headers=h, json={"name": "nouser", "protos": ["vless"], "node_ids": [node["id"]]}).json()
+        rows = c.get(f"/api/users/{u_tg['id']}/configs", headers=h).json()
+        tg = [r for r in rows if r["proto"] == "tgweb"]
+        assert len(tg) == 1 and tg[0]["details"] == {"host": "my.workers.dev", "secret": "dd" + gen} and tg[0]["link"] is None
+        # a user without any Telegram proxy protocol does not get it
+        assert not any(r["proto"] == "tgweb" for r in c.get(f"/api/users/{u_no['id']}/configs", headers=h).json())
+        # clearing it removes the entry
+        c.put("/api/tgweb", headers=h, json={"host": "", "secret": ""})
+        assert not any(r["proto"] == "tgweb" for r in c.get(f"/api/users/{u_tg['id']}/configs", headers=h).json())

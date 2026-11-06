@@ -223,7 +223,19 @@ def tunnel_entries(user: User, nodes: list[Node], tunnels: list) -> list[dict]:
     return out
 
 
-def user_entries(user: User, nodes: list[Node], dnstt: dict | None = None, tunnels: list | None = None) -> list[dict]:
+def tgweb_entry(user: User, host: str, secret: str) -> dict:
+    """The Telegram WEB Proxy (a Cloudflare Worker the admin deploys separately): one global entry, host + secret.
+    It has no tg:// link yet and is added by hand in Telegram Desktop, so this is a manual entry like MTProto's."""
+    e = {"node": "Telegram WEB Proxy", "node_id": 0, "cc": "", "proto": "tgweb", "label": "Telegram WEB Proxy",
+         "link": None, "details": None, "summary": None, "copy": None, "file_ext": None}
+    _manual(e, {"host": host, "secret": secret})
+    e["copy"] = f"Host: {host}\nSecret: {secret}"
+    e["summary"] = f"Telegram Desktop ← تنظیمات ← پروکسی ← Add ← WEB Proxy  ({host})"
+    return e
+
+
+def user_entries(user: User, nodes: list[Node], dnstt: dict | None = None, tunnels: list | None = None,
+                 tgweb: tuple[str, str] | None = None) -> list[dict]:
     out, dnstt_done = [], False
     for node in nodes:
         if user.node_ids and node.id not in user.node_ids:
@@ -243,6 +255,8 @@ def user_entries(user: User, nodes: list[Node], dnstt: dict | None = None, tunne
                 if cf_ok:
                     out.append(build_entry(user, node, np.proto, np.port, cdn=True, name=_entry_name(np)))
     out += tunnel_entries(user, nodes, tunnels or [])
+    if tgweb and tgweb[0] and tgweb[1] and ("mtproto" in user.protos or "tg_socks" in user.protos):
+        out.append(tgweb_entry(user, tgweb[0], tgweb[1]))
     return out
 
 

@@ -78,7 +78,7 @@ async function refresh() {
     const [users, opts] = await Promise.all([api('GET', '/me/users'), api('GET', '/me/options')]);
     S.users = users; S.nodes = opts.nodes; S.protos = opts.protocols; S.admins = []; S.tab = 'users';
   } else {
-    [S.nodes, S.users, S.protos, S.admins, S.dnstt, S.tunnels, S.access, S.bp] = await Promise.all([api('GET', '/nodes'), api('GET', '/users'), api('GET', '/protocols'), api('GET', '/admins'), api('GET', '/dnstt'), api('GET', '/tunnels'), api('GET', '/settings'), api('GET', '/bp')]);
+    [S.nodes, S.users, S.protos, S.admins, S.dnstt, S.tunnels, S.access, S.bp, S.tgweb] = await Promise.all([api('GET', '/nodes'), api('GET', '/users'), api('GET', '/protocols'), api('GET', '/admins'), api('GET', '/dnstt'), api('GET', '/tunnels'), api('GET', '/settings'), api('GET', '/bp'), api('GET', '/tgweb')]);
     if (!S.bpMeta) S.bpMeta = await api('GET', '/bp/meta');
   }
   const on = S.nodes.filter(n => n.online); if (on.length) { const avg = on.reduce((a, n) => a + n.load, 0) / on.length; if (!S.loadHist.length) S.loadHist = Array(30).fill(avg); S.loadHist.push(avg); if (S.loadHist.length > 60) S.loadHist.shift(); }
@@ -210,7 +210,7 @@ const views = {
         ${S.nodes.map(n => { const np = n.protocols.find(x => x.proto === p.id);
           return `<td><input type="checkbox" data-node="${n.id}" data-proto="${p.id}" aria-label="${esc(p.label)} در ${esc(n.cc)}" ${np && np.enabled ? 'checked' : ''}></td>`; }).join('')}</tr>`).join('')}
       </tbody></table></div>
-      ${portPanel()}${dnsttPanel()}`;
+      ${portPanel()}${tgwebPanel()}${dnsttPanel()}`;
   },
   routing() {
     if (!S.nodes.length) return '<div class="note">ابتدا یک لوکیشن اضافه کنید.</div>';
@@ -360,6 +360,17 @@ const views = {
   },
 };
 
+function tgwebPanel() {
+  const t = S.tgweb || {};
+  return `<div class="panel"><h2>${ic('send') || ''}پروکسی WEB تلگرام (Cloudflare Worker)</h2>
+    <div class="note">پروتکل جدید تلگرام که روی <b>Cloudflare Worker</b> اجرا می‌شود (نه روی سرور تو). ورکر را یک‌بار خودت روی کلودفلر مستقر کن (مثلاً پروژه‌ی <span class="mono" dir="ltr">ProxyGosha</span> با دکمه‌ی Deploy)، بعد <b>host</b> و <b>secret</b> همان را این‌جا بگذار تا به کاربرهایی که «پروکسی تلگرام» دارند نشان داده شود. فعلاً فقط <b>Telegram Desktop</b> پشتیبانی می‌کند.</div>
+    <div class="form" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+      <label class="f">آدرس ورکر (host)<input type="text" id="twHost" value="${esc(t.host || '')}" placeholder="myproxy.workers.dev" dir="ltr"></label>
+      <label class="f">Secret (۳۲ هگز، یا dd+۳۲ هگز)<input type="text" id="twSecret" value="${esc(t.secret || '')}" placeholder="بدون تغییر = خالی" dir="ltr"></label></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"><button class="btn pri" id="twSave">ذخیره</button><button class="btn" id="twGen">ساخت secret تصادفی</button>
+      ${t.enabled ? '<button class="btn danger" id="twClear">حذف</button> <span class="pill good">فعال</span>' : ''}</div>
+    <div class="note">در Telegram Desktop: تنظیمات ← Data and Storage ← Proxy ← Add Proxy ← <b>WEB Proxy</b> ← همین host و secret. همان secret باید در Secret خودِ ورکر هم باشد.</div></div>`;
+}
 function dnsttPanel() {
   const d = S.dnstt; if (!d) return '';
   const ls = d.last_sync || {}, st = (ls.nodes || {}), cell = v => !v ? '<span class="muted">—</span>' : v.startsWith('error') ? `<span class="pill bad wrap">${esc(v)}</span>` : `<span class="pill good">${esc(v === 'created' ? 'ساخته شد' : v === 'exists' ? 'هست' : 'پاک شد')}</span>`;
@@ -818,6 +829,10 @@ document.addEventListener('click', async e => {
       const body = {domain: $('#dtDomain').value.trim(), zone: $('#dtZone').value.trim(), inner: $('#dtInner').value}, tok = $('#dtToken').value.trim();
       if (t.id === 'dtClear') body.cf_token = ''; else if (tok) body.cf_token = tok;
       S.dnstt = await api('PUT', '/dnstt', body); render(); toast('ذخیره شد');
+    }
+    else if (t.id === 'twSave') { S.tgweb = await api('PUT', '/tgweb', {host: $('#twHost').value.trim(), secret: $('#twSecret').value.trim()}); render(); toast('ذخیره شد'); }
+    else if (t.id === 'twGen') { const r = await api('POST', '/tgweb/secret'); $('#twSecret').value = r.secret; toast('secret ساخته شد؛ همین را در Secret ورکر هم بگذار'); }
+    else if (t.id === 'twClear') { S.tgweb = await api('PUT', '/tgweb', {host: '', secret: ''}); render(); toast('حذف شد');
     }
     else if (t.id === 'dtSync') { S.dnstt = await api('POST', '/dnstt/sync'); render(); toast(S.dnstt.last_sync.ok ? 'DNS همگام شد' : 'همگام‌سازی ناموفق بود'); }
     else if (t.id === 'addAdmin') adminForm();
