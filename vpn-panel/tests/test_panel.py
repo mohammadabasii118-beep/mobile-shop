@@ -1982,3 +1982,30 @@ def test_outbound_ping_measures_reachability():
         dob = next(o for o in down if o["name"] == "down")
         r = c.post(f"/api/outbounds/{dob['id']}/ping", headers=h).json()
         assert r["ok"] is False and "error" in r
+
+
+def test_restore_replaces_db_and_validates(monkeypatch):
+    # os._exit would kill the test process; stub the restart thread (tests share one DB file, so use unique names)
+    import app.main as m
+    monkeypatch.setattr(m.os, "_exit", lambda code: None)
+    before, after = f"before-{os.urandom(3).hex()}", f"after-{os.urandom(3).hex()}"
+    with TestClient(app) as c:
+        h = admin(c)
+        c.post("/api/nodes", headers=h, json={"name": before, "cc": "de", "address": "a.example.com"})
+        backup = c.get("/api/backup", headers=h).content          # a real panel backup, taken now
+        c.post("/api/nodes", headers=h, json={"name": after, "cc": "fr", "address": "b.example.com"})
+        names = {n["name"] for n in c.get("/api/nodes", headers=h).json()}
+        assert before in names and after in names
+        # bad uploads are refused, nothing changes
+        assert c.post("/api/restore", headers=h, files={"file": ("x.db", b"not a database", "application/octet-stream")}).status_code == 422
+        import sqlite3 as _sq, tempfile as _tf, os as _os
+        fd, foreign = _tf.mkstemp(suffix=".db"); _os.close(fd)
+        con = _sq.connect(foreign); con.execute("CREATE TABLE t(x)"); con.commit(); con.close()
+        assert c.post("/api/restore", headers=h, files={"file": ("f.db", open(foreign, "rb").read(), "application/octet-stream")}).status_code == 422
+        _os.remove(foreign)
+        r = c.post("/api/restore", headers=h, files={"file": ("panel.db", backup, "application/octet-stream")})
+        assert r.status_code == 200 and r.json()["restarting"] is True
+    with TestClient(app) as c:   # a new client re-opens the engine against the restored file
+        h = admin(c)
+        names = {n["name"] for n in c.get("/api/nodes", headers=h).json()}
+        assert before in names and after not in names   # the node added after the backup is gone

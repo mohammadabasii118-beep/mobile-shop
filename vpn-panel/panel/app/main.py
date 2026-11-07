@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
 from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
@@ -340,6 +340,46 @@ def backup():
     name = f"panel-backup-{utcnow():%Y%m%d-%H%M}.db"
     return FileResponse(path, filename=name, media_type="application/octet-stream",
                         background=BackgroundTask(os.unlink, path))
+
+
+@app.post("/api/restore", dependencies=[Depends(require_admin)])
+async def restore(file: UploadFile = File(...)):
+    """Replace the whole database with an uploaded panel backup, then restart so the new data is loaded.
+    Everything (users, locations, settings, keys) is taken from the file; the current data is discarded."""
+    if engine.url.get_backend_name() != "sqlite":
+        raise HTTPException(501, "بازیابی فقط برای SQLite پشتیبانی می‌شود")
+    data = await file.read()
+    if len(data) > 200 * 1024 * 1024 or data[:16] != b"SQLite format 3\x00":
+        raise HTTPException(422, "فایل پشتیبان معتبر نیست (باید همان فایلی باشد که از «دانلود پشتیبان» گرفته‌اید)")
+    dbpath = engine.url.database
+    fd, tmp = tempfile.mkstemp(suffix=".db", dir=os.path.dirname(dbpath) or ".")   # same filesystem, so the swap is atomic
+    with os.fdopen(fd, "wb") as f:
+        f.write(data)
+    try:
+        con = sqlite3.connect(tmp)
+        tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        con.close()
+    except sqlite3.Error:
+        os.unlink(tmp)
+        raise HTTPException(422, "فایل پشتیبان خراب است یا خوانده نشد")
+    if not {"users", "nodes", "settings"} <= tables:
+        os.unlink(tmp)
+        raise HTTPException(422, "این فایل، دیتابیس پنل نیست")
+    engine.dispose()
+    os.replace(tmp, dbpath)
+    for ext in ("-wal", "-shm"):
+        try:
+            os.unlink(dbpath + ext)
+        except OSError:
+            pass
+
+    def bye():
+        import time as _t
+        _t.sleep(1)       # let the response reach the browser first
+        os._exit(0)       # the container's restart policy brings it back up with the restored database
+    import threading
+    threading.Thread(target=bye, daemon=True).start()
+    return {"ok": True, "restarting": True}
 
 
 # ---------- helpers ----------

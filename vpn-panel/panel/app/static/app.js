@@ -193,7 +193,14 @@ const views = {
             <span class="muted">${num(fmtGB(u.used_gb) + (u.quota_gb ? ' / ' + fmtGB(u.quota_gb) : '') + ' GB')}</span></div>`).join('')}</div>` : `<div class="empty"><span>کاربری نیست.</span></div>`}</div>
         <div class="panel"><h2>${ic('pie')}وضعیت کاربران</h2>${S.users.length ? `<div class="seg">${segs.filter(x => x[2]).map(x => `<i style="flex:${x[2]};background:${x[3]}" title="${x[1]}: ${x[2]}"></i>`).join('')}</div>
           <div class="legend">${segs.map(x => `<span><i style="background:${x[3]}"></i>${x[1]} ${num(x[2])}</span>`).join('')}</div>` : `<div class="empty"><span>کاربری نیست.</span></div>`}</div>
-      </div>`;
+      </div>
+      <div class="panel"><h2>${ic('activity')}پشتیبان‌گیری و بازیابی</h2>
+        <div class="note">یک فایل پشتیبان شامل <b>همه‌چیز</b> است: کاربران، لوکیشن‌ها، تنظیمات و کلیدها. برای انتقال پنل به سرور دیگر یا مواقع قطعی، پشتیبان بگیر و در سرور جدید بازیابی کن.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <button class="btn pri" id="dashBackup">دانلود پشتیبان (لحظه‌ای)</button>
+          <button class="btn" id="dashRestore">بازیابی از فایل…</button>
+          <input type="file" id="restoreFile" accept=".db,.sqlite,application/octet-stream" hidden></div>
+        <div class="note" style="margin-top:8px;color:var(--warn)">⚠️ بازیابی، <b>همهٔ دادهٔ فعلی پنل را با فایل پشتیبان جایگزین می‌کند</b> و پنل چند ثانیه ری‌استارت می‌شود؛ بعدش صفحه را تازه کن.</div></div>`;
   },
   nodes() {
     return `<div class="panel scroll"><table><thead><tr><th>لوکیشن</th><th>آدرس</th><th>بار</th><th>آخرین گزارش</th><th>وضعیت</th><th></th></tr></thead><tbody>
@@ -659,13 +666,14 @@ document.addEventListener('click', async e => {
   try {
     if (d.tab) { if (S.draft) { S.draft = null; loadBrand(); } S.tab = d.tab; render(); }   // unsaved branding preview is dropped
     else if (t.id === 'themeBtn') { const r = document.documentElement; r.dataset.theme = getComputedStyle(r).colorScheme.includes('dark') ? 'light' : 'dark'; }
-    else if (t.id === 'backupBtn') {
+    else if (t.id === 'backupBtn' || t.id === 'dashBackup') {
       const r = await fetch((window.BASE || '') + '/api/backup', {headers: {Authorization: 'Bearer ' + token}});
       if (!r.ok) throw new Error('پشتیبان‌گیری ناموفق بود');
       const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob());
       a.download = (r.headers.get('content-disposition') || '').split('filename=')[1]?.replace(/"/g, '') || 'panel-backup.db';
       a.click(); URL.revokeObjectURL(a.href); toast('پشتیبان دانلود شد');
     }
+    else if (t.id === 'dashRestore') { $('#restoreFile').click(); }
     else if (d.skin !== undefined) { setSkin(d.skin); S._tab = null; render(); toast(d.skin === '3d' ? 'سبک سه‌بعدی روشن شد' : 'سبک کلاسیک'); }
     else if (t.id === 'acRand') {
       $('#acPort').value = 20000 + Math.floor(Math.random() * 40000);
@@ -948,6 +956,18 @@ function shrink(file) {   // -> data URI no bigger than ~200 px, so it stays sma
 document.addEventListener('input', e => {
   if (e.target.id === 'bColor') { draft().color = e.target.value; applyBrand({...S.brand, color: e.target.value}); return; } if (e.target.id === 'uq') { S.q = e.target.value; render(); } });
 document.addEventListener('change', async e => {
+  if (e.target.id === 'restoreFile' && e.target.files[0]) {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!confirm('همهٔ دادهٔ فعلی پنل با این فایل جایگزین می‌شود و پنل ری‌استارت می‌شود. ادامه می‌دهی؟')) return;
+    try {
+      const fd = new FormData(); fd.append('file', f);
+      const r = await fetch((window.BASE || '') + '/api/restore', {method: 'POST', headers: {Authorization: 'Bearer ' + token}, body: fd});
+      if (!r.ok) { const j = await r.json().catch(() => ({})); throw new Error(j.detail || 'بازیابی ناموفق بود'); }
+      toast('بازیابی شد؛ پنل در حال ری‌استارت است. چند ثانیه صبر کن و صفحه را تازه کن.');
+      setTimeout(() => location.reload(), 6000);
+    } catch (err) { toast(err.message); }
+    return;
+  }
   if (e.target.id === 'bFile' && e.target.files[0]) {
     try { const uri = await shrink(e.target.files[0]); draft().logo = uri; applyBrand({...S.brand, logo: uri}); $('#bPrev').innerHTML = logoMark(); $('#bClearLogo').disabled = false; }
     catch (err) { toast(err.message); }
