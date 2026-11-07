@@ -7,7 +7,7 @@ set -euo pipefail
 REPO_URL="${REPO_URL:-https://github.com/mohammadabasii118-beep/mobile-shop.git}"
 BRANCH="${BRANCH:-claude/vpn-panel}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/vpn-panel}"
-DOMAIN=""; PASSWORD=""; SECURE=""; ADMIN_PORT=""; ADMIN_PATH=""; OPEN_ADMIN=""
+DOMAIN=""; PASSWORD=""; SECURE=""; ADMIN_PORT=""; ADMIN_PATH=""; OPEN_ADMIN=""; RESTORE=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -17,12 +17,18 @@ while [ $# -gt 0 ]; do
     --admin-port) ADMIN_PORT="$2"; SECURE=1; shift 2 ;;
     --admin-path) ADMIN_PATH="$2"; SECURE=1; shift 2 ;;
     --no-secure) OPEN_ADMIN=1; shift ;;                # back to the plain address
+    --restore) RESTORE="$2"; shift 2 ;;                # restore a panel-backup.db into this install (move the panel, keep all data)
     --branch) BRANCH="$2"; shift 2 ;;
     --repo) REPO_URL="$2"; shift 2 ;;
     *) echo "unknown option: $1"; exit 1 ;;
   esac
 done
 [ "$(id -u)" = 0 ] || { echo "run as root"; exit 1; }
+if [ -n "$RESTORE" ]; then
+  [ -f "$RESTORE" ] || { echo "restore file not found: $RESTORE"; exit 1; }
+  head -c 16 "$RESTORE" | grep -q "SQLite format 3" || { echo "restore file is not a panel backup (SQLite) database: $RESTORE"; exit 1; }
+  RESTORE=$(readlink -f "$RESTORE")
+fi
 
 # A fresh server often runs automatic updates for a few minutes and holds the apt lock
 wait_for_apt() {
@@ -111,7 +117,16 @@ if [ -z "${SKIP_DOCKER:-}" ]; then
     [ -f "$CADDY_DIR/Caddyfile" ] || { echo "no previous Caddyfile: stopping"; exit 1; }
   fi
   rm -rf "$CADDY_DIR.new"
-  docker compose --env-file "$ENV_FILE" -f "$APP/deploy/docker-compose.yml" up -d --build
+  COMPOSE="docker compose --env-file $ENV_FILE -f $APP/deploy/docker-compose.yml"
+  $COMPOSE up -d --build
+  if [ -n "$RESTORE" ]; then
+    echo "Restoring the panel database from $RESTORE (all users, locations and settings) ..."
+    $COMPOSE stop panel
+    $COMPOSE cp "$RESTORE" panel:/data/panel.db
+    $COMPOSE run --rm --no-deps --entrypoint sh panel -c 'rm -f /data/panel.db-wal /data/panel.db-shm'   # drop the empty DB's journal so the restored one is read as-is
+    $COMPOSE start panel
+    echo "Database restored. Point the domain to THIS server and the nodes reconnect on their own."
+  fi
 else
   cp "$CADDY_DIR.new/admin.json" "$CADDY_DIR/admin.json"; cp "$CADDY_DIR.new/Caddyfile" "$CADDY_DIR/Caddyfile"; rm -rf "$CADDY_DIR.new"
 fi
