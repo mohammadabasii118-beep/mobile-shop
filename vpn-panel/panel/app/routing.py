@@ -29,6 +29,25 @@ def tag_of(name: str) -> str:
     return name if name in BUILTIN else f"out-{name}"
 
 
+def outbound_target(data: dict) -> tuple[str, int] | None:
+    """The host and port an outbound dials, for a reachability/ping check; None for direct/block (they go nowhere)."""
+    ob = (data or {}).get("xray") or {}
+    st = ob.get("settings") or {}
+    for key in ("vnext", "servers"):          # vless/vmess use vnext; trojan/shadowsocks/socks/http use servers
+        arr = st.get(key)
+        if isinstance(arr, list) and arr and isinstance(arr[0], dict) and arr[0].get("address") and arr[0].get("port"):
+            try:
+                return str(arr[0]["address"]), int(arr[0]["port"])
+            except (TypeError, ValueError):
+                return None
+    peers = st.get("peers")                   # wireguard
+    if isinstance(peers, list) and peers and isinstance(peers[0], dict) and peers[0].get("endpoint"):
+        host, _, port = str(peers[0]["endpoint"]).rpartition(":")
+        if host and port.isdigit():
+            return host, int(port)
+    return None
+
+
 def build_outbound(kind: str, d: dict) -> tuple[dict, str]:
     """-> (xray outbound without tag, one-line summary without secrets). Raises ValueError."""
     if kind == "link":

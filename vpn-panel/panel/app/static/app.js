@@ -1,7 +1,7 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function ago(iso) { const m = Math.max(1, Math.round((Date.now() - new Date(iso)) / 60000)); return m < 60 ? m + ' دقیقه پیش' : m < 1440 ? Math.round(m / 60) + ' ساعت پیش' : Math.round(m / 1440) + ' روز پیش'; }
-const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: [], brand: {name: 'پنل چندلوکیشن', logo: '', color: ''}, dnstt: null, tunnels: [], access: null, bp: [], bpMeta: null, loadHist: [], owner: '', onlineOnly: false};
+const S = {tab: 'dash', nodes: [], users: [], protos: [], portNode: null, routeNode: null, routing: null, sel: new Set(), q: '', me: {role: 'sudo'}, admins: [], brand: {name: 'پنل چندلوکیشن', logo: '', color: ''}, dnstt: null, tunnels: [], access: null, bp: [], bpMeta: null, loadHist: [], owner: '', onlineOnly: false, obPing: {}};
 const TITLES = {dash: 'داشبورد', nodes: 'لوکیشن‌ها', protos: 'پروتکل‌ها', routing: 'مسیریابی', users: 'کاربران', tunnels: 'تونل‌ها', bp: 'بک‌پک', settings: 'تنظیمات', admins: 'ادمین‌ها', look: 'ظاهر پنل'};
 const STATUS = {active: ['good', 'فعال'], disabled: ['bad', 'غیرفعال'], expired: ['bad', 'منقضی'], quota: ['bad', 'حجم تمام شده']};
 
@@ -227,7 +227,8 @@ const views = {
         <div class="scroll"><table><thead><tr><th>نام</th><th>نوع</th><th>مقصد</th><th></th></tr></thead><tbody>
         <tr><td class="mono">direct</td><td>داخلی</td><td class="muted">مستقیم به اینترنت (پیش‌فرض)</td><td></td></tr>
         <tr><td class="mono">block</td><td>داخلی</td><td class="muted">مسدود کردن</td><td></td></tr>
-        ${R.outbounds.map(o => `<tr><td class="mono">${esc(o.name)}</td><td>${esc(o.kind)}</td><td class="mono">${esc(o.summary)}</td><td><button class="btn sm" data-rt-delout="${o.id}">حذف</button></td></tr>`).join('')}
+        ${R.outbounds.map(o => { const p = S.obPing[o.id]; const pv = !p ? '' : p.loading ? '<span class="muted">…</span>' : p.ok ? `<span class="pill good" dir="ltr">${p.ms} ms</span>` : '<span class="pill bad">قطع</span>';
+          return `<tr><td class="mono">${esc(o.name)}</td><td>${esc(o.kind)}</td><td class="mono">${esc(o.summary)}</td><td style="white-space:nowrap"><button class="btn sm" data-rt-ping="${o.id}">پینگ</button> ${pv} <button class="btn sm" data-rt-delout="${o.id}">حذف</button></td></tr>`; }).join('')}
         </tbody></table></div></div>
       <div class="panel"><div style="display:flex;justify-content:space-between;align-items:center"><h2>قانون‌های مسیریابی</h2><button class="btn sm pri" data-rt-addrule>+ قانون جدید</button></div>
         <div class="scroll"><table><thead><tr><th>روشن</th><th>شرط</th><th>خروجی</th><th>یادداشت</th><th></th></tr></thead><tbody>
@@ -907,6 +908,10 @@ document.addEventListener('click', async e => {
         public_key: v('oPub'), local_address: v('oLocal'), reserved: v('oReserved')});
       closeModal(); render(); toast('خروجی افزوده شد');
     }
+    else if (d.rtPing) { const id = d.rtPing; S.obPing = {...S.obPing, [id]: {loading: true}}; render();
+      try { const r = await api('POST', '/outbounds/' + id + '/ping'); S.obPing = {...S.obPing, [id]: r}; }
+      catch (err) { S.obPing = {...S.obPing, [id]: {ok: false}}; toast(err.message); }
+      render(); }
     else if (d.rtDelout) { S.routing.data = await api('DELETE', '/outbounds/' + d.rtDelout); render(); toast('خروجی و قانون‌های وابسته حذف شد'); }
     else if ('rtAddrule' in d) ruleDialog();
     else if (t.id === 'ruleSave') {

@@ -9,6 +9,7 @@ import os
 import random
 import re
 import secrets
+import socket
 import time
 import uuid as uuidlib
 from contextlib import asynccontextmanager
@@ -681,6 +682,22 @@ def add_outbound(node_id: int, body: OutboundIn, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(node)
     return routing_out(node)
+
+
+@app.post("/api/outbounds/{outbound_id}/ping", dependencies=[Depends(require_admin)])
+def ping_outbound(outbound_id: int, db: Session = Depends(get_db)):
+    """A quick TCP connect to where the outbound dials, measured from the panel: is it up, and how far."""
+    ob = db.get(Outbound, outbound_id) or _404()
+    target = routing.outbound_target(ob.data)
+    if not target:
+        raise HTTPException(422, "این خروجی مقصدی برای پینگ ندارد")
+    host, port = target
+    start = time.perf_counter()
+    try:
+        socket.create_connection((host, port), timeout=5).close()
+        return {"ok": True, "ms": round((time.perf_counter() - start) * 1000, 1), "target": f"{host}:{port}"}
+    except OSError as e:
+        return {"ok": False, "error": str(e)[:100], "target": f"{host}:{port}"}
 
 
 @app.delete("/api/outbounds/{outbound_id}", dependencies=[Depends(require_admin)])

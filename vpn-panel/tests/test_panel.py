@@ -1956,3 +1956,29 @@ def test_telegram_web_proxy_settings_and_entry():
         # clearing it removes the entry
         c.put("/api/tgweb", headers=h, json={"host": "", "secret": ""})
         assert not any(r["proto"] == "tgweb" for r in c.get(f"/api/users/{u_tg['id']}/configs", headers=h).json())
+
+
+def test_outbound_ping_measures_reachability():
+    import socket as _sock
+    from app import routing as _routing
+    # outbound_target pulls host:port from each outbound shape, None for freedom/blackhole
+    assert _routing.outbound_target({"xray": {"settings": {"vnext": [{"address": "a.com", "port": 443}]}}}) == ("a.com", 443)
+    assert _routing.outbound_target({"xray": {"settings": {"servers": [{"address": "b.com", "port": 1080}]}}}) == ("b.com", 1080)
+    assert _routing.outbound_target({"xray": {"protocol": "freedom", "settings": {}}}) is None
+    with TestClient(app) as c:
+        h = admin(c)
+        node = c.post("/api/nodes", headers=h, json={"name": "RT", "cc": "de", "address": "rt.example.com"}).json()
+        srv = _sock.socket()
+        srv.bind(("127.0.0.1", 0))
+        srv.listen(1)
+        port = srv.getsockname()[1]
+        ob = c.post(f"/api/nodes/{node['id']}/outbounds", headers=h,
+                    json={"name": "up", "kind": "socks", "address": "127.0.0.1", "port": port}).json()["outbounds"][0]
+        r = c.post(f"/api/outbounds/{ob['id']}/ping", headers=h).json()
+        assert r["ok"] is True and isinstance(r["ms"], (int, float)) and r["target"] == f"127.0.0.1:{port}"
+        srv.close()
+        down = c.post(f"/api/nodes/{node['id']}/outbounds", headers=h,
+                      json={"name": "down", "kind": "socks", "address": "127.0.0.1", "port": port}).json()["outbounds"]
+        dob = next(o for o in down if o["name"] == "down")
+        r = c.post(f"/api/outbounds/{dob['id']}/ping", headers=h).json()
+        assert r["ok"] is False and "error" in r
