@@ -2009,3 +2009,38 @@ def test_restore_replaces_db_and_validates(monkeypatch):
         h = admin(c)
         names = {n["name"] for n in c.get("/api/nodes", headers=h).json()}
         assert before in names and after not in names   # the node added after the backup is gone
+
+
+def test_reseller_pool_keeps_deleted_users_consumption():
+    from app.db import User, engine
+    from sqlalchemy.orm import Session
+    with TestClient(app) as c:
+        h = admin(c)
+        c.post("/api/nodes", headers=h, json={"name": "PN", "cc": "de", "address": "9.9.2.2"})
+        # a reseller with a 100 GB pool who may delete their users
+        a = c.post("/api/admins", headers=h, json={"username": "poolman", "password": "longpass1",
+                                                   "max_total_gb": 100, "can_delete": True}).json()
+        sh = {"Authorization": "Bearer " + c.post("/api/login", json={"username": "poolman", "password": "longpass1"}).json()["token"]}
+        mk = lambda n, q: c.post("/api/me/users", headers=sh, json={"name": n, "protos": ["vless"], "quota_gb": q, "days": 30})
+        u1 = mk("p_u1", 60).json()
+        assert c.get("/api/me", headers=sh).json()["allocated_gb"] == 60
+        # the user consumes 50 of their 60 GB
+        with Session(engine) as db:
+            db.get(User, u1["id"]).used_bytes = 50 * 1024 ** 3
+            db.commit()
+        # deleting the user: the 50 GB consumed stays debited, the 10 GB unused returns -> pool shows 50 used
+        c.delete(f"/api/me/users/{u1['id']}", headers=sh)
+        me = c.get("/api/me", headers=sh).json()
+        assert me["allocated_gb"] == 50 and me["used_gb"] == 50
+        # so only 50 GB is free: a 60 GB user is refused, a 50 GB one fits
+        assert mk("p_u2", 60).status_code == 403
+        assert mk("p_u2", 50).status_code == 200
+        # main-admin view agrees, and a main-admin delete of a reseller's user debits the pool too
+        row = next(x for x in c.get("/api/admins", headers=h).json() if x["username"] == "poolman")
+        assert row["allocated_gb"] == 100 and row["used_gb"] == 50
+        u2 = next(u for u in c.get("/api/me/users", headers=sh).json() if u["name"] == "p_u2")
+        with Session(engine) as db:
+            db.get(User, u2["id"]).used_bytes = 20 * 1024 ** 3
+            db.commit()
+        c.delete(f"/api/users/{u2['id']}", headers=h)        # main admin deletes it
+        assert c.get("/api/me", headers=sh).json()["allocated_gb"] == 70   # 50 + 20 consumed stays

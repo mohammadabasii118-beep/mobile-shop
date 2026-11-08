@@ -155,6 +155,7 @@ class Admin(Base):
     max_quota_gb: Mapped[float] = mapped_column(default=0)     # per user; 0 = no cap
     max_days: Mapped[int] = mapped_column(default=0)           # per user; 0 = no cap
     max_total_gb: Mapped[float] = mapped_column(default=0)     # pool: sum of the volume of all their users; 0 = no cap
+    spent_bytes: Mapped[int] = mapped_column(default=0)        # volume consumed by users they deleted — stays debited to the pool
     allowed_protos: Mapped[list] = mapped_column(JSON, default=list)   # protocols they may give users; empty = all
     allowed_nodes: Mapped[list] = mapped_column(JSON, default=list)    # locations they may give users; empty = all
     can_delete: Mapped[bool] = mapped_column(default=False)    # may delete the users they created

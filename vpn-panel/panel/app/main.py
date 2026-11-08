@@ -983,9 +983,20 @@ def patch_user(user_id: int, body: UserPatch, request: Request, db: Session = De
     return user_out(user, request)
 
 
+def debit_owner_on_delete(db: Session, user: User) -> None:
+    """Keep the volume a user already consumed debited to their reseller's pool, so deleting a used-up user
+    does not hand that volume back (which would let a reseller get unlimited traffic by delete-and-recreate)."""
+    if user.owner_id and user.used_bytes:
+        owner = db.get(Admin, user.owner_id)
+        if owner:
+            owner.spent_bytes = (owner.spent_bytes or 0) + user.used_bytes
+
+
 @app.delete("/api/users/{user_id}", dependencies=[Depends(require_admin)])
 def delete_user(user_id: int, db: Session = Depends(get_db)):
-    db.delete(db.get(User, user_id) or _404())
+    user = db.get(User, user_id) or _404()
+    debit_owner_on_delete(db, user)
+    db.delete(user)
     db.commit()
     return {"ok": True}
 
@@ -1184,7 +1195,7 @@ def admin_out(a: Admin, db: Session) -> dict:
             "max_quota_gb": a.max_quota_gb, "max_days": a.max_days, "users": len(mine),
             "max_total_gb": a.max_total_gb, "allowed_protos": a.allowed_protos or [], "allowed_nodes": a.allowed_nodes or [],
             "active_users": sum(1 for u in mine if u.status() == "active"),
-            "allocated_gb": round(sum(u.quota_bytes for u in mine) / GB, 2), "used_gb": round(sum(u.used_bytes for u in mine) / GB, 2),
+            "allocated_gb": round(allocated_gb(db, a), 2), "used_gb": round((sum(u.used_bytes for u in mine) + (a.spent_bytes or 0)) / GB, 2),
             "can_delete": a.can_delete, "can_edit": a.can_edit}
 
 
@@ -1240,7 +1251,7 @@ def me(authorization: str | None = Header(None), db: Session = Depends(get_db)):
     if _is_api_key(token) or (parse_token(token) or ("",))[0] == "sudo":
         return {"role": "sudo"}
     a = require_reseller(authorization, db)
-    return {"role": "reseller", "username": a.username, **{k: v for k, v in admin_out(a, db).items() if k in ("max_users", "max_quota_gb", "max_days", "users", "can_delete", "can_edit", "max_total_gb", "allocated_gb", "allowed_protos", "allowed_nodes")}}
+    return {"role": "reseller", "username": a.username, **{k: v for k, v in admin_out(a, db).items() if k in ("max_users", "max_quota_gb", "max_days", "users", "can_delete", "can_edit", "max_total_gb", "allocated_gb", "used_gb", "allowed_protos", "allowed_nodes")}}
 
 
 @app.get("/api/me/options")
@@ -1282,8 +1293,10 @@ def me_create_user(body: "UserIn", request: Request, admin: Admin = Depends(requ
 
 
 def allocated_gb(db: Session, admin: Admin) -> float:
-    """Volume already handed to the admin's users (what counts against their pool)."""
-    return sum(u.quota_bytes for u in db.scalars(select(User).where(User.owner_id == admin.id))) / GB
+    """Volume counted against the admin's pool: the quota of their live users plus what their deleted users
+    already consumed (that volume is spent and never returns to the pool)."""
+    live = sum(u.quota_bytes for u in db.scalars(select(User).where(User.owner_id == admin.id)))
+    return (live + (admin.spent_bytes or 0)) / GB
 
 
 def own_user(db: Session, admin: Admin, user_id: int) -> User:
@@ -1329,7 +1342,9 @@ def me_patch_user(user_id: int, body: MeUserPatch, request: Request, admin: Admi
 def me_delete_user(user_id: int, admin: Admin = Depends(require_reseller), db: Session = Depends(get_db)):
     if not admin.can_delete:
         raise HTTPException(403, "اجازه‌ی حذف کاربر را ندارید")
-    db.delete(own_user(db, admin, user_id))
+    user = own_user(db, admin, user_id)
+    debit_owner_on_delete(db, user)
+    db.delete(user)
     db.commit()
     return {"ok": True}
 
