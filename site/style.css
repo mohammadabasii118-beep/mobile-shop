@@ -1,0 +1,24 @@
+@font-face{font-family:V;src:url(fonts/Vazirmatn-Medium.ttf);font-weight:500}
+@font-face{font-family:V;src:url(fonts/Vazirmatn-Bold.ttf);font-weight:700}
+@font-face{font-family:V;src:url(fonts/Vazirmatn-ExtraBold.ttf);font-weight:800}
+:root{--bg:#0b1020;--card:#141b34;--line:#243056;--tx:#e8ecf8;--mu:#9aa6c9;--ac:#3ddc97;--ac2:#4c8dff}
+*{box-sizing:border-box;margin:0}
+body{font-family:V,Tahoma,sans-serif;background:var(--bg);color:var(--tx);line-height:2;font-weight:500}
+a{color:var(--ac2);text-decoration:none}
+.w{max-width:960px;margin:0 auto;padding:0 16px}
+header{border-bottom:1px solid var(--line);background:#0e1530}
+header .w{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:12px;padding-bottom:12px}
+.logo{font-weight:800;font-size:20px;color:var(--tx)}.logo b{color:var(--ac)}
+nav a{color:var(--mu);margin-inline-start:16px;font-size:14px}nav a:hover{color:var(--tx)}
+.hero{padding:56px 0 40px;text-align:center}
+.hero h1{font-size:clamp(26px,5vw,40px);font-weight:800;line-height:1.6}
+.hero p{color:var(--mu);max-width:640px;margin:12px auto 24px}
+.btn{display:inline-block;background:var(--ac);color:#06210f;font-weight:800;padding:10px 26px;border-radius:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;padding-bottom:40px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px}
+.card h3{font-size:17px;margin-bottom:6px;color:var(--ac)}.card p{color:var(--mu);font-size:14px}
+h2{font-size:22px;margin:32px 0 8px}
+.page{padding:36px 0 56px}.page h1{font-size:28px;font-weight:800;margin-bottom:12px}
+.page p,.page li{color:#cdd5ee;font-size:15px}.page ul{padding-inline-start:22px;margin:8px 0}
+footer{border-top:1px solid var(--line);padding:20px 0;color:var(--mu);font-size:13px;text-align:center}
+footer a{margin:0 8px}
