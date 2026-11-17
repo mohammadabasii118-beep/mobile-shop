@@ -5,6 +5,7 @@ reports load and per-user traffic back. Standard library only."""
 import hashlib
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -1212,6 +1213,91 @@ def apply(cfg, reality, tls, wg):
     return conflicts, errors, dnstt
 
 
+ACME_CF_INI = f"{STATE_DIR}/cloudflare.ini"
+ACME_HOOK = "/etc/letsencrypt/renewal-hooks/deploy/vpn-node-acme.sh"
+
+
+def _cert_days_left(path):
+    """Days until the certificate in `path` expires, or -1 if it can't be read."""
+    r = sh("openssl", "x509", "-enddate", "-noout", "-in", path)
+    m = re.search(r"notAfter=(.+)", r.stdout or "")
+    if not m:
+        return -1
+    try:
+        import calendar
+        t = time.strptime(m.group(1).strip(), "%b %d %H:%M:%S %Y %Z")
+        return int((calendar.timegm(t) - time.time()) / 86400)
+    except (ValueError, OverflowError):
+        return -1
+
+
+def _install_le_cert(conf, le):
+    """Copy a Let's Encrypt cert into the places xray/sing-box/IPsec read, restart them if it changed, and
+    mark this node no longer self-signed so the panel drops allowInsecure/pin from the links it hands out."""
+    tls_crt, tls_key = f"{STATE_DIR}/tls.crt", f"{STATE_DIR}/tls.key"
+    changed = write_if_changed(tls_crt, read_text(f"{le}/fullchain.pem"), 0o644)
+    changed |= write_if_changed(tls_key, read_text(f"{le}/privkey.pem"), 0o644)
+    for dst, src in (("/etc/ipsec.d/certs/server.crt", tls_crt), ("/etc/ipsec.d/private/server.key", tls_key)):
+        if os.path.isdir(os.path.dirname(dst)):
+            write_if_changed(dst, read_text(src), 0o644)
+    if changed:
+        for svc in ("xray", "sing-box", "ocserv"):
+            restart(svc)
+        sh("ipsec", "restart")
+    if conf.get("tls_self_signed", True):     # tell the panel it is a real certificate now
+        conf["tls_self_signed"] = False
+        write_if_changed(CONF, json.dumps(conf), 0o600)
+
+
+def ensure_acme(conf, cfg):
+    """Automatic real certificate via Cloudflare DNS (DNS-01): works behind a CDN or a tunnel, where HTTP-01
+    can't. Issues once, then certbot's own timer renews it and the deploy hook reinstalls it. Enabled from the
+    panel; a bare-IP node is skipped because Let's Encrypt only issues for domains."""
+    acme = cfg.get("acme") or {}
+    token, domain, email = acme.get("token"), (acme.get("domain") or "").strip(), (acme.get("email") or "").strip()
+    if not (token and domain) or re.fullmatch(r"[0-9.]+", domain):
+        return
+    le = f"/etc/letsencrypt/live/{domain}"
+    if os.path.exists(f"{le}/fullchain.pem") and _cert_days_left(f"{le}/fullchain.pem") > 25:
+        _install_le_cert(conf, le)      # already valid: just make sure it is in place and marked real
+        return
+    stamp = f"{STATE_DIR}/.acme-try"      # back off after a failure so a bad token can't hit Let's Encrypt rate limits
+    try:
+        if time.time() - os.path.getmtime(stamp) < 900:
+            return
+    except OSError:
+        pass
+    write_if_changed(stamp, str(int(time.time())), 0o600)
+    if sh("certbot", "--version").returncode != 0:
+        sh("apt-get", "install", "-y", "certbot", "python3-certbot-dns-cloudflare")
+        if sh("certbot", "--version").returncode != 0:
+            print("acme: certbot could not be installed", file=sys.stderr, flush=True)
+            return
+    write_if_changed(ACME_CF_INI, f"dns_cloudflare_api_token = {token}\n", 0o600)
+    os.makedirs(os.path.dirname(ACME_HOOK), exist_ok=True)
+    hook = ("#!/bin/sh\n"
+            f"cp /etc/letsencrypt/live/{domain}/fullchain.pem {STATE_DIR}/tls.crt\n"
+            f"cp /etc/letsencrypt/live/{domain}/privkey.pem {STATE_DIR}/tls.key\n"
+            f"chmod 644 {STATE_DIR}/tls.crt {STATE_DIR}/tls.key\n"
+            f"cp {STATE_DIR}/tls.crt /etc/ipsec.d/certs/server.crt 2>/dev/null\n"
+            f"cp {STATE_DIR}/tls.key /etc/ipsec.d/private/server.key 2>/dev/null\n"
+            "systemctl restart xray sing-box ocserv 2>/dev/null; ipsec restart 2>/dev/null; exit 0\n")
+    write_if_changed(ACME_HOOK, hook, 0o755)
+    args = ["certbot", "certonly", "--dns-cloudflare", "--dns-cloudflare-credentials", ACME_CF_INI,
+            "--dns-cloudflare-propagation-seconds", "30", "-d", domain, "--non-interactive", "--agree-tos",
+            "--keep-until-expiring", "--deploy-hook", ACME_HOOK]
+    args += ["-m", email] if email else ["--register-unsafely-without-email"]
+    r = sh(*args)
+    if os.path.exists(f"{le}/fullchain.pem") and _cert_days_left(f"{le}/fullchain.pem") > 0:
+        try:
+            os.unlink(stamp)
+        except OSError:
+            pass
+        _install_le_cert(conf, le)
+    else:
+        print("acme: certbot failed:", ((r.stderr or "") + (r.stdout or ""))[-300:], file=sys.stderr, flush=True)
+
+
 def cert_sha256(path):
     """SHA-256 (hex) of the first certificate in a PEM file: what clients pin for a self-signed node."""
     import ssl
@@ -1259,6 +1345,10 @@ def main():
             cfg = api(conf, "GET", "/api/node/config")
             self_update(conf, cfg.get("agent_sha256"))
             adopt_keys(cfg.get("keys") or {}, reality, wg)
+            try:
+                ensure_acme(conf, cfg)
+            except Exception as e:
+                print("acme error:", e, file=sys.stderr, flush=True)
             conflicts, errors, dnstt = apply(cfg, reality, tls, wg)
             for src in (xray_usage(), wg_usage(cfg) if wg else {}, session_usage()):
                 for k, v in src.items():

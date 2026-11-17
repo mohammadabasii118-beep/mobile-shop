@@ -78,7 +78,7 @@ async function refresh() {
     const [users, opts] = await Promise.all([api('GET', '/me/users'), api('GET', '/me/options')]);
     S.users = users; S.nodes = opts.nodes; S.protos = opts.protocols; S.admins = []; S.tab = 'users';
   } else {
-    [S.nodes, S.users, S.protos, S.admins, S.dnstt, S.tunnels, S.access, S.bp, S.tgweb] = await Promise.all([api('GET', '/nodes'), api('GET', '/users'), api('GET', '/protocols'), api('GET', '/admins'), api('GET', '/dnstt'), api('GET', '/tunnels'), api('GET', '/settings'), api('GET', '/bp'), api('GET', '/tgweb')]);
+    [S.nodes, S.users, S.protos, S.admins, S.dnstt, S.tunnels, S.access, S.bp, S.tgweb, S.acme] = await Promise.all([api('GET', '/nodes'), api('GET', '/users'), api('GET', '/protocols'), api('GET', '/admins'), api('GET', '/dnstt'), api('GET', '/tunnels'), api('GET', '/settings'), api('GET', '/bp'), api('GET', '/tgweb'), api('GET', '/acme')]);
     if (!S.bpMeta) S.bpMeta = await api('GET', '/bp/meta');
   }
   const on = S.nodes.filter(n => n.online); if (on.length) { const avg = on.reduce((a, n) => a + n.load, 0) / on.length; if (!S.loadHist.length) S.loadHist = Array(30).fill(avg); S.loadHist.push(avg); if (S.loadHist.length > 60) S.loadHist.shift(); }
@@ -217,7 +217,7 @@ const views = {
         ${S.nodes.map(n => { const np = n.protocols.find(x => x.proto === p.id);
           return `<td><input type="checkbox" data-node="${n.id}" data-proto="${p.id}" aria-label="${esc(p.label)} در ${esc(n.cc)}" ${np && np.enabled ? 'checked' : ''}></td>`; }).join('')}</tr>`).join('')}
       </tbody></table></div>
-      ${portPanel()}${tgwebPanel()}${dnsttPanel()}`;
+      ${portPanel()}${acmePanel()}${tgwebPanel()}${dnsttPanel()}`;
   },
   routing() {
     if (!S.nodes.length) return '<div class="note">ابتدا یک لوکیشن اضافه کنید.</div>';
@@ -368,6 +368,16 @@ const views = {
   },
 };
 
+function acmePanel() {
+  const a = S.acme || {};
+  return `<div class="panel"><h2>${ic('shield') || ''}گواهی معتبر خودکار (Let's Encrypt)</h2>
+    <div class="note">با روشن کردن این، پنل برای هر لوکیشنی که آدرسش <b>دامنه</b> است، خودکار گواهی واقعی Let's Encrypt می‌گیرد (از روش Cloudflare DNS، پس حتی پشت CDN یا تونل هم کار می‌کند). آن‌وقت کانفیگ‌ها دیگر «گواهی خودامضا» ندارند و روی <b>v2rayNG</b> و همه‌ی برنامه‌ها بدون تنظیم دستی وصل می‌شوند. از همان توکن Cloudflare بخش DNSTT استفاده می‌کند.
+    ${a.token_set ? '' : '<br><b style="color:var(--bad)">اول توکن Cloudflare را در بخش DNSTT پایین ذخیره کن.</b>'}</div>
+    <label class="chk" style="display:flex;gap:8px;align-items:center;margin:10px 0"><input type="checkbox" id="acmeOn" ${a.enabled ? 'checked' : ''} ${a.token_set ? '' : 'disabled'}> روشن باشد</label>
+    <label class="f">ایمیل (اختیاری؛ برای هشدار انقضای گواهی)<input type="email" id="acmeEmail" dir="ltr" value="${esc(a.email || '')}" placeholder="you@example.com"></label>
+    <div style="margin-top:10px"><button class="btn pri" id="acmeSave">ذخیره</button></div>
+    <div class="note" style="margin-top:8px">نکته: اولین بار برای هر لوکیشن ۱ تا ۲ دقیقه طول می‌کشد؛ بعد خودکار تمدید می‌شود. آدرس لوکیشن باید دامنه باشد (نه IP خام) و همان دامنه در Cloudflare زیر همین توکن باشد.</div></div>`;
+}
 function tgwebPanel() {
   const t = S.tgweb || {};
   return `<div class="panel"><h2>${ic('send') || ''}پروکسی WEB تلگرام (Cloudflare Worker)</h2>
@@ -839,6 +849,7 @@ document.addEventListener('click', async e => {
       if (t.id === 'dtClear') body.cf_token = ''; else if (tok) body.cf_token = tok;
       S.dnstt = await api('PUT', '/dnstt', body); render(); toast('ذخیره شد');
     }
+    else if (t.id === 'acmeSave') { S.acme = await api('PUT', '/acme', {enabled: $('#acmeOn').checked, email: $('#acmeEmail').value.trim()}); render(); toast('ذخیره شد؛ گواهی‌ها ظرف چند دقیقه روی لوکیشن‌ها گرفته می‌شوند'); }
     else if (t.id === 'twSave') { S.tgweb = await api('PUT', '/tgweb', {host: $('#twHost').value.trim(), secret: $('#twSecret').value.trim()}); render(); toast('ذخیره شد'); }
     else if (t.id === 'twGen') { const r = await api('POST', '/tgweb/secret'); $('#twSecret').value = r.secret; toast('secret ساخته شد؛ همین را در Secret ورکر هم بگذار'); }
     else if (t.id === 'twClear') { S.tgweb = await api('PUT', '/tgweb', {host: '', secret: ''}); render(); toast('حذف شد');

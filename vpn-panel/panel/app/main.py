@@ -1149,6 +1149,36 @@ def set_dnstt(body: DnsttIn, db: Session = Depends(get_db)):
     return dnstt_out(db)
 
 
+class AcmeIn(BaseModel):
+    enabled: bool | None = None
+    email: str | None = Field(default=None, max_length=120)
+
+
+def acme_conf(db: Session) -> dict:
+    return {"enabled": get_setting(db, "acme_on") == "1", "email": get_setting(db, "acme_email"),
+            "token_set": bool(get_setting(db, "dnstt_cf_token"))}
+
+
+@app.get("/api/acme", dependencies=[Depends(require_admin)])
+def get_acme(db: Session = Depends(get_db)):
+    return acme_conf(db)
+
+
+@app.put("/api/acme", dependencies=[Depends(require_admin)])
+def set_acme(body: AcmeIn, db: Session = Depends(get_db)):
+    if body.email is not None:
+        email = body.email.strip()
+        if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+            raise HTTPException(422, "ایمیل نامعتبر است")
+        put_setting(db, "acme_email", email)
+    if body.enabled is not None:
+        if body.enabled and not get_setting(db, "dnstt_cf_token"):
+            raise HTTPException(422, "اول توکن Cloudflare را در بخش DNSTT ذخیره کنید (همان برای گواهی هم استفاده می‌شود)")
+        put_setting(db, "acme_on", "1" if body.enabled else "")
+    db.commit()
+    return acme_conf(db)
+
+
 @app.post("/api/dnstt/sync", dependencies=[Depends(require_admin)])
 def sync_dnstt(db: Session = Depends(get_db)):
     run_dns_sync(db)
@@ -1914,6 +1944,9 @@ def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db
     served = {p.proto for p in node.protocols if p.enabled}   # a user needs an account while any copy of the protocol runs
     extra = [{"proto": p.proto, "port": p.port, "tag": inst_tag(p)} for p in node.protocols if p.enabled and p.extra]
     dc = dnstt_conf(db)
+    ac = get_setting(db, "acme_on") == "1" and bool(get_setting(db, "dnstt_cf_token"))
+    acme = ({"token": get_setting(db, "dnstt_cf_token"), "email": get_setting(db, "acme_email"), "domain": node.address}
+            if ac and not re.fullmatch(r"[0-9.]+", node.address) else None)
     tunnels = [{"id": t.id, "server": f"{t.iran_host}:{t.ctl_port}", "token": t.token, "pool": 8, "encrypt": t.encrypt, "mode": t.mode, "listen": t.ctl_port, "test": test_job(t, "node", t.iran_host),
                 "targets": sorted({f["target"] for f in t.forwards if f["proto"] == "tcp"})}
                for t in db.scalars(select(Tunnel).where(Tunnel.node_id == node.id, Tunnel.enabled == True))]  # noqa: E712
@@ -1938,7 +1971,8 @@ def node_config(node: Node = Depends(require_node), db: Session = Depends(get_db
                     "ping": bpmod.net_addrs(t.net_n)[0] if t.kind == "direct" else ""}
                    for t in db.scalars(select(BpTunnel).where(BpTunnel.node_id == node.id, BpTunnel.enabled == True))],  # noqa: E712
             "bp_sha256": bpmod.BP_SHA256,
-            "dnstt": ({"domain": dc["domain"], "privkey": dc["priv"], "inner": dc["inner"]} if "dnstt" in enabled and dc["domain"] else None)}
+            "dnstt": ({"domain": dc["domain"], "privkey": dc["priv"], "inner": dc["inner"]} if "dnstt" in enabled and dc["domain"] else None),
+            "acme": acme}
 
 
 class Report(BaseModel):

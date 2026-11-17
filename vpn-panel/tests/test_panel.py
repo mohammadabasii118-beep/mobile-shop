@@ -2044,3 +2044,28 @@ def test_reseller_pool_keeps_deleted_users_consumption():
             db.commit()
         c.delete(f"/api/users/{u2['id']}", headers=h)        # main admin deletes it
         assert c.get("/api/me", headers=sh).json()["allocated_gb"] == 70   # 50 + 20 consumed stays
+
+
+def test_acme_settings_and_node_config_block():
+    with TestClient(app) as c:
+        h = admin(c)
+        c.put("/api/dnstt", headers=h, json={"cf_token": ""})                # tests share one DB: start from no token
+        c.put("/api/acme", headers=h, json={"enabled": False})
+        assert c.get("/api/acme", headers=h).json()["token_set"] is False
+        # cannot enable without a Cloudflare token
+        assert c.put("/api/acme", headers=h, json={"enabled": True}).status_code == 422
+        assert c.put("/api/acme", headers=h, json={"email": "bad email"}).status_code == 422
+        c.put("/api/dnstt", headers=h, json={"cf_token": "CFTOKEN123"})      # the shared Cloudflare token
+        r = c.put("/api/acme", headers=h, json={"enabled": True, "email": "me@example.com"}).json()
+        assert r == {"enabled": True, "email": "me@example.com", "token_set": True}
+        # a domain node gets the acme block in its config; an IP node does not
+        dom = c.post("/api/nodes", headers=h, json={"name": "D", "cc": "de", "address": "de.example.com"}).json()
+        ipn = c.post("/api/nodes", headers=h, json={"name": "I", "cc": "fr", "address": "5.6.7.8"}).json()
+        dh = {"Authorization": "Bearer " + dom["install_command"].split("--token ")[1].split()[0]}
+        ih = {"Authorization": "Bearer " + ipn["install_command"].split("--token ")[1].split()[0]}
+        acme = c.get("/api/node/config", headers=dh).json()["acme"]
+        assert acme == {"token": "CFTOKEN123", "email": "me@example.com", "domain": "de.example.com"}
+        assert c.get("/api/node/config", headers=ih).json()["acme"] is None
+        # turning it off drops the block
+        c.put("/api/acme", headers=h, json={"enabled": False})
+        assert c.get("/api/node/config", headers=dh).json()["acme"] is None
