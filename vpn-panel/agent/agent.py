@@ -198,7 +198,10 @@ def render_ocpasswd(cfg, hasher):
 
 # ---------- system glue ----------
 def sh(*cmd):
-    return subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True)
+    except FileNotFoundError:   # a missing binary (e.g. certbot, ipsec) is a 127, not a crash
+        return subprocess.CompletedProcess(cmd, 127, "", f"{cmd[0]}: not found")
 
 
 def write_if_changed(path, content, mode=0o600):
