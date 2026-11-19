@@ -1,0 +1,6 @@
+[
+ {"id":"draft","title":"ثبت‌نام مسابقات PCL DRAFT","desc":"شرکت در مسابقات آنلاین فوتبال با فرمت درفت","price":20000,"unit":"","capacity":"","terms":"","active":true,"art":"draft"},
+ {"id":"onc","title":"ثبت‌نام مسابقات ONE NIGHT CHAMPION","desc":"رقابت هیجان‌انگیز یک‌شبه برای بازیکنان فوتبال آنلاین","price":30000,"unit":"","capacity":"","terms":"","active":true,"art":"night"},
+ {"id":"tdc","title":"ثبت‌نام مسابقات TOUR DE CLUBS","desc":"حضور در تورنمنت رقابتی باشگاه‌های فوتبال مجازی","price":20000,"unit":"","capacity":"","terms":"","active":true,"art":"tour"},
+ {"id":"pclx","title":"ثبت‌نام مسابقات PCLX","desc":"شرکت در رقابت‌های ویژه PCL با قوانین اختصاصی","price":30000,"unit":"","capacity":"","terms":"","active":true,"art":"x"}
+]

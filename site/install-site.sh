@@ -2,15 +2,21 @@
 # نصب سایت نمادین PCL روی nginx + گواهی SSL
 # مثال: bash site/install-site.sh --domain pclproclubss.ir --email you@example.com [--phone 0912...]
 set -e
-DOMAIN=pclproclubss.ir; EMAIL=""; PHONE=""; MAIL=""
+DOMAIN=pclproclubss.ir; EMAIL=""; PHONE=""; MAIL=""; ENAMAD=""
 while [ $# -gt 0 ]; do case "$1" in
   --domain) DOMAIN="$2"; shift 2;; --email) EMAIL="$2"; shift 2;;
-  --phone) PHONE="$2"; shift 2;; --contact-mail) MAIL="$2"; shift 2;; *) shift;; esac; done
+  --phone) PHONE="$2"; shift 2;; --contact-mail) MAIL="$2"; shift 2;; --enamad-file) ENAMAD="$2"; shift 2;; *) shift;; esac; done
 SRC="$(cd "$(dirname "$0")" && pwd)"; ROOT=/var/www/pcl-site
+python3 "$SRC/build.py"
 mkdir -p "$ROOT"; cp -r "$SRC"/{*.html,style.css,fonts} "$ROOT"/
 EXTRA=""
 [ -n "$PHONE" ] && EXTRA="$EXTRA<li>تلفن: <span dir=\"ltr\">$PHONE</span></li>"
 [ -n "$MAIL" ] && EXTRA="$EXTRA<li>ایمیل: <span dir=\"ltr\">$MAIL</span></li>"
+[ -n "$ENAMAD" ] && python3 - "$ENAMAD" "$ROOT" <<'PY2'
+import sys,glob;c=open(sys.argv[1],encoding='utf-8').read()
+for p in glob.glob(sys.argv[2]+'/*.html'):
+    t=open(p,encoding='utf-8').read().replace('<!--ENAMAD-->',c);open(p,'w',encoding='utf-8').write(t)
+PY2
 python3 - "$ROOT/contact.html" "$EXTRA" <<'PY'
 import sys;p,e=sys.argv[1:];s=open(p,encoding='utf-8').read().replace('<!--CONTACT-->',e);open(p,'w',encoding='utf-8').write(s)
 PY
